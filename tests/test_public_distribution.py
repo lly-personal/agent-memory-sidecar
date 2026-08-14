@@ -355,6 +355,8 @@ class PublicDistributionTests(unittest.TestCase):
         draft_create = workflow.index("gh release create")
         asset_upload = workflow.index("gh release upload")
         draft_readback = workflow.index("Keep release draft")
+        draft_job = workflow.split("  draft-release:", 1)[1]
+        self.assertLess(draft_job.index("actions/checkout@"), draft_job.index("gh release create"))
         self.assertLess(draft_create, asset_upload)
         self.assertLess(asset_upload, draft_readback)
         self.assertIn('= "true"', workflow)
