@@ -1,0 +1,87 @@
+name: Build attested release artifacts
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install pinned build frontend
+        run: python -m pip install build==1.5.0
+      - name: Build and verify release set
+        run: >-
+          python scripts/build_release_artifacts.py
+          --output dist/release
+          --repository-url https://github.com/${{ github.repository }}
+          --source-ref ${{ github.ref_name }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-artifacts-${{ github.ref_name }}
+          path: dist/release/**
+          if-no-files-found: error
+  attest:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-artifacts-${{ github.ref_name }}
+          path: dist/release
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/release/**
+  draft-release:
+    if: github.event.repository.visibility == 'public'
+    needs: [build, attest]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-artifacts-${{ github.ref_name }}
+          path: dist/release
+      - name: Create or resume draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" --json isDraft --jq .isDraft > release-draft-state.txt 2>/dev/null; then
+            test "$(cat release-draft-state.txt)" = "true"
+          else
+            gh release create "${GITHUB_REF_NAME}" --verify-tag --draft --title "${GITHUB_REF_NAME}" --notes-from-tag
+          fi
+      - name: Upload and verify complete asset set
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -d '' assets < <(find dist/release -type f -print0 | sort -z)
+          test "${#assets[@]}" -gt 0
+          printf '%s\n' "${assets[@]##*/}" | sort > expected-assets.txt
+          test "$(wc -l < expected-assets.txt)" = "$(sort -u expected-assets.txt | wc -l)"
+          gh release upload "${GITHUB_REF_NAME}" "${assets[@]}" --clobber
+          gh release view "${GITHUB_REF_NAME}" --json assets --jq '.assets[].name' | sort > actual-assets.txt
+          diff -u expected-assets.txt actual-assets.txt
+      - name: Keep release draft for authorized publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh release view "${GITHUB_REF_NAME}" --json isDraft --jq .isDraft)" = "true"
+          echo "Draft assets verified; an explicitly authorized administrator must verify immutable releases before publishing."

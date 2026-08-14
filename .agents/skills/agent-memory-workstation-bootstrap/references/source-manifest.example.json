@@ -1,0 +1,10 @@
+{
+  "contract_version": "agent_memory_source_manifest_v1",
+  "distribution": "release",
+  "sidecar": {
+    "remote": "https://example.invalid/agent-memory-sidecar.git",
+    "ref": "v0.3.0",
+    "commit": "0000000000000000000000000000000000000000"
+  },
+  "canonical_owner": null
+}

@@ -1,0 +1,123 @@
+name: Core and Scout contracts
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Sidecar
+        run: python -m pip install -e .
+      - name: Verify active Core and Scout contracts
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: >-
+          python -m unittest discover &&
+          python scripts/check_doc_links.py
+
+  performance-observation:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install Sidecar
+        run: python -m pip install -e .
+      - name: Record hosted-runner performance observation
+        env:
+          AGENT_MEMORY_PERFORMANCE_MODE: "observe"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m unittest -v tests.test_performance
+
+  public-release-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install release test dependencies
+        run: python -m pip install -e . build==1.5.0
+      - name: Export, commit, build, and consume a synthetic public release
+        env:
+          AGENT_MEMORY_PUBLIC_RELEASE_SMOKE: "1"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: >-
+          python -m unittest -v
+          tests.test_public_distribution.PublicDistributionTests.test_positive_public_release_lane
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Build Core wheel and sdist
+        run: |
+          python -m pip install build==1.5.0
+          python -m build --sdist --wheel
+      - name: Smoke installed wheel
+        run: |
+          python -m venv .venv-smoke
+          .venv-smoke/bin/python -m pip install --no-deps dist/*.whl
+          .venv-smoke/bin/python -m agent_memory_sidecar --help
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: core-packages
+          path: dist/*
+          if-no-files-found: error
+
+  artifact-smoke:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: core-packages
+          path: dist
+      - name: Install built wheel and run CLI
+        run: >-
+          python -c "import glob,subprocess,sys; wheels=glob.glob('dist/*.whl'); assert len(wheels)==1;
+          subprocess.check_call([sys.executable,'-m','pip','install','--no-deps',wheels[0]])" &&
+          python -m agent_memory_sidecar --help

@@ -1,0 +1,24 @@
+{
+  "name": "agent-memory-sidecar",
+  "version": "1.1.0",
+  "description": "Cold-start anchor for portable Agent Memory workstation capability.",
+  "author": {
+    "name": "IIyaqoo",
+    "url": "https://github.com/IIyaqoo"
+  },
+  "repository": "https://github.com/lly-personal/agent-memory-sidecar",
+  "skills": "./skills/",
+  "keywords": ["agent-memory", "codex", "owner", "bootstrap"],
+  "interface": {
+    "displayName": "Agent Memory",
+    "shortDescription": "从远端恢复本机 Agent Memory 能力",
+    "longDescription": "从不可变 Sidecar 发行物冷启动本机 Agent Memory，并可选绑定用户自有的私有 Global Owner。",
+    "developerName": "IIyaqoo",
+    "category": "Productivity",
+    "capabilities": ["Workstation bootstrap", "Interactive project review"],
+    "defaultPrompt": [
+      "同步并部署本机 Agent Memory"
+    ],
+    "brandColor": "#2F6FED"
+  }
+}

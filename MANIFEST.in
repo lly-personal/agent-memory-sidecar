@@ -1,0 +1,21 @@
+include LICENSE
+include README.md
+include pyproject.toml
+recursive-include src/agent_memory_sidecar *.py
+prune .agents
+prune .github
+prune docs
+prune plugins
+prune scripts
+prune specs
+prune templates
+prune tests
+exclude AGENTS.md
+exclude CHANGELOG.md
+exclude CODE_OF_CONDUCT.md
+exclude COMPATIBILITY.md
+exclude CONTRIBUTING.md
+exclude PRIVACY.md
+exclude SECURITY.md
+exclude SUPPORT.md
+exclude THREAT_MODEL.md

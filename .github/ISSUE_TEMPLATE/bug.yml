@@ -1,0 +1,35 @@
+name: Bug report
+description: Report a reproducible Agent Memory Sidecar defect
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, prompt contents, private rules, absolute personal paths, or security vulnerabilities. Use private vulnerability reporting for security issues.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Core version, release tag, or commit.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options: [CLI, Runtime Hook, Store, Instruction mutation, Plugin or Skill, Packaging, Documentation]
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Use placeholders for private data.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and observed result
+    validations:
+      required: true

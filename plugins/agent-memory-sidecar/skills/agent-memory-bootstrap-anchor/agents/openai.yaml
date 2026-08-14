@@ -1,0 +1,6 @@
+interface:
+  display_name: "Agent Memory 冷启动"
+  short_description: "从远端恢复本机完整 Agent Memory 能力"
+  default_prompt: "Use $agent-memory-bootstrap-anchor to synchronize and deploy Agent Memory on this host without changing Scheduled tasks."
+policy:
+  allow_implicit_invocation: true

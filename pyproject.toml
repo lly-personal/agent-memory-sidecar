@@ -1,0 +1,38 @@
+[project]
+name = "agent-memory-sidecar"
+version = "0.3.0"
+description = "Publishes user-authorized collaboration rules to scoped Codex AGENTS.md files."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dependencies = []
+authors = [{ name = "IIyaqoo" }]
+keywords = ["codex", "agents", "agent-memory", "collaboration-rules"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+Homepage = "https://github.com/lly-personal/agent-memory-sidecar"
+Documentation = "https://github.com/lly-personal/agent-memory-sidecar/tree/main/docs"
+Issues = "https://github.com/lly-personal/agent-memory-sidecar/issues"
+Changelog = "https://github.com/lly-personal/agent-memory-sidecar/blob/main/CHANGELOG.md"
+
+[project.scripts]
+agent-memory = "agent_memory_sidecar.cli:main"
+
+[build-system]
+requires = ["setuptools==83.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

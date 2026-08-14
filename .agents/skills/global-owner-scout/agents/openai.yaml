@@ -1,0 +1,6 @@
+interface:
+  display_name: "Global Owner Scout"
+  short_description: "中文项目深挖与完整决策卡"
+  default_prompt: "$global-owner-scout 复盘当前项目"
+policy:
+  allow_implicit_invocation: false

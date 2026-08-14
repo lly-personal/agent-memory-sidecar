@@ -1,0 +1,7 @@
+* @IIyaqoo
+
+/src/agent_memory_sidecar/ @IIyaqoo
+/.agents/ @IIyaqoo
+/.github/workflows/ @IIyaqoo
+/scripts/build_public_export.py @IIyaqoo
+/scripts/build_release_artifacts.py @IIyaqoo
