@@ -18,6 +18,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 EXPORTER = ROOT / "scripts" / "build_public_export.py"
 RELEASE_BUILDER = ROOT / "scripts" / "build_release_artifacts.py"
+DOC_LINK_CHECKER = ROOT / "scripts" / "check_doc_links.py"
 PRIVATE_EXPORT_TEMPLATE = ROOT / "templates" / "public" / "AGENTS.md"
 
 
@@ -35,6 +36,7 @@ class PublicDistributionTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.exporter = load_module("public_export_builder", EXPORTER)
         cls.release = load_module("public_release_builder", RELEASE_BUILDER)
+        cls.doc_links = load_module("public_doc_link_checker", DOC_LINK_CHECKER)
         cls.head = subprocess.run(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True,
             text=True, encoding="utf-8", check=True,
@@ -224,6 +226,28 @@ class PublicDistributionTests(unittest.TestCase):
         )
         self.assertNotIn("AGENTS.md", allowlist["copy"])
         self.assertEqual("AGENTS.md", allowlist["map"]["templates/public/AGENTS.md"])
+
+    def test_public_context_preserves_active_rationale_and_archive_boundary(self) -> None:
+        decision = ROOT / "docs/decisions/0058-persistent-runtime-journal.zh.md"
+        docs_index = (ROOT / "docs/README.md").read_text(encoding="utf-8")
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        active_documents = set(self.doc_links.ACTIVE_DOCUMENTS)
+
+        self.assertTrue(decision.is_file())
+        self.assertIn(decision, active_documents)
+        self.assertLessEqual(
+            set((ROOT / "docs/decisions").glob("*.md")),
+            active_documents,
+        )
+        self.assertIn(ROOT / "specs/public-authority-cutover-v1.md", active_documents)
+        self.assertIn("0058-persistent-runtime-journal.zh.md", docs_index)
+        self.assertIn("冻结的私有工程归档", docs_index)
+        self.assertIn("ADR 0052", docs_index)
+        self.assertIn("ADR 0061", docs_index)
+        self.assertIn("ADR 0062", docs_index)
+        self.assertIn("cross-session key memory continuity", agents)
+        self.assertIn("Historical archives can", agents)
+        self.assertIn("real Codex Desktop new-task check", agents)
 
     @unittest.skipUnless(PRIVATE_EXPORT_TEMPLATE.is_file(), "private engineering export source required")
     def test_public_active_marker_requires_tracked_ancestral_release(self) -> None:
