@@ -1,0 +1,12 @@
+{
+  "contract_version": "agent_memory_public_authority_v1",
+  "status": "public_active",
+  "repository": "https://github.com/lly-personal/agent-memory-sidecar",
+  "engineering_source_commit": "83c9d47ddf9d0cba6c3a6e629cc857f32416221c",
+  "initial_public_release": {
+    "ref": "v0.3.0",
+    "commit": "12ce861ba51a51eac68ec0ed51322172e5ed3c1c",
+    "snapshot_sha256": "dabdc9ab272446e21451e15b0ea4b9690e04d43963d21c0ed2d7507881dc6ad7"
+  },
+  "activated_at": "2026-08-14T05:03:52Z"
+}
