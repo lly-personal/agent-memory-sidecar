@@ -5,6 +5,8 @@ their own component versions in `COMPATIBILITY.md`.
 
 ## Unreleased
 
+## 0.3.5 (2026-08-14)
+
 ### Changed
 
 - The public Plugin now verifies and safely materializes the portable release, then runs the formal Workstation Bootstrap in the
@@ -12,7 +14,7 @@ their own component versions in `COMPATIBILITY.md`.
 - Workstation Bootstrap now uses one fresh-plan reconcile path for fresh, update, and legacy hosts. A public manifest preserves an
   existing private Owner only when its clean managed checkout exactly matches Core's bound root and commit; ambiguous state fails
   closed and Owner removal remains a separate decision.
-- Candidate versions are Core 0.3.4, Plugin 1.3.0, Workstation Bootstrap 1.8.0, and Scout 5.5.0.
+- Release versions are Core 0.3.5, Plugin 1.3.0, Workstation Bootstrap 1.8.0, and Scout 5.5.0.
 
 ## 0.3.3 (2026-08-14)
 

@@ -218,7 +218,7 @@ class PublicDistributionTests(unittest.TestCase):
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
         self.assertEqual(
-            {"core": "0.3.4", "plugin": "1.3.0", "bootstrap": "1.8.0", "scout": "5.5.0"},
+            {"core": "0.3.5", "plugin": "1.3.0", "bootstrap": "1.8.0", "scout": "5.5.0"},
             facts,
         )
         allowlist = json.loads(
@@ -459,17 +459,6 @@ class PublicDistributionTests(unittest.TestCase):
         version = project["version"]
         source_ref = f"v{version}"
 
-        if not PRIVATE_EXPORT_TEMPLATE.is_file() and (ROOT / "PUBLIC_AUTHORITY.json").is_file():
-            commit, _ = self.release.validate_release_source(root=ROOT)
-            authority = self.release.resolve_release_authority(
-                root=ROOT,
-                repository_url=project["urls"]["Homepage"],
-                source_ref=source_ref,
-                commit=commit,
-            )
-            self.assertEqual("public_active", authority["authority_epoch"])
-            return
-
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             public_root = root / "public"
@@ -501,13 +490,26 @@ class PublicDistributionTests(unittest.TestCase):
                     check=True,
                     capture_output=True,
                 )
-                receipt = json.loads((public_root / "PUBLIC_EXPORT_RECEIPT.json").read_text(encoding="utf-8"))
+                receipt = None
                 commands = (
                     ["git", "remote", "set-url", "origin", repository_url + ".git"],
                     ["git", "tag", "--force", source_ref],
                 )
             for command in commands:
                 subprocess.run(command, cwd=public_root, check=True, capture_output=True)
+
+            if (public_root / "PUBLIC_AUTHORITY.json").is_file():
+                commit, _ = self.release.validate_release_source(root=public_root)
+                authority = self.release.resolve_release_authority(
+                    root=public_root,
+                    repository_url=repository_url,
+                    source_ref=source_ref,
+                    commit=commit,
+                )
+                self.assertEqual("public_active", authority["authority_epoch"])
+                receipt = {"source_commit": authority["engineering_source_commit"]}
+            elif receipt is None:
+                receipt = json.loads((public_root / "PUBLIC_EXPORT_RECEIPT.json").read_text(encoding="utf-8"))
 
             release_root = public_root / "dist" / "release"
             manifest = self.release.build(
