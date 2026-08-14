@@ -218,7 +218,7 @@ class PublicDistributionTests(unittest.TestCase):
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
         self.assertEqual(
-            {"core": "0.3.0", "plugin": "1.1.0", "bootstrap": "1.6.0", "scout": "5.5.0"},
+            {"core": "0.3.1", "plugin": "1.2.0", "bootstrap": "1.7.0", "scout": "5.5.0"},
             facts,
         )
         allowlist = json.loads(
@@ -226,6 +226,21 @@ class PublicDistributionTests(unittest.TestCase):
         )
         self.assertNotIn("AGENTS.md", allowlist["copy"])
         self.assertEqual("AGENTS.md", allowlist["map"]["templates/public/AGENTS.md"])
+
+    def test_repo_and_plugin_anchor_are_byte_identical(self) -> None:
+        repo_anchor = ROOT / ".agents" / "skills" / "agent-memory-bootstrap-anchor"
+        plugin_anchor = ROOT / "plugins" / "agent-memory-sidecar" / "skills" / "agent-memory-bootstrap-anchor"
+        repo_files = {
+            path.relative_to(repo_anchor).as_posix(): path.read_bytes()
+            for path in repo_anchor.rglob("*")
+            if path.is_file() and "__pycache__" not in path.parts
+        }
+        plugin_files = {
+            path.relative_to(plugin_anchor).as_posix(): path.read_bytes()
+            for path in plugin_anchor.rglob("*")
+            if path.is_file() and "__pycache__" not in path.parts
+        }
+        self.assertEqual(repo_files, plugin_files)
 
     def test_public_context_preserves_active_rationale_and_archive_boundary(self) -> None:
         decision = ROOT / "docs/decisions/0058-persistent-runtime-journal.zh.md"

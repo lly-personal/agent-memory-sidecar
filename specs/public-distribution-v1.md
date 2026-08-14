@@ -60,6 +60,12 @@ reproducible-rebuild, CLI, Skill self-test, source-manifest, portable-content, a
 
 Neither stage changes repository visibility, Git history, tags, Releases, registries, local Codex state, or private Owner state.
 
+The repository marketplace and both byte-identical Bootstrap Anchors are discovery surfaces. The Anchor's Release Resolver accepts
+the latest stable immutable GitHub Release or an explicit version and verifies the release tag/commit, GitHub asset digests,
+`SHA256SUMS`, release/source manifests, and portable embedded manifests before installation. Resolution failure is
+`release_resolution_blocked`; it never falls back to `main`, a private repository, or an unverified local checkout. The resolver
+contract begins with `v0.3.1`; earlier public releases remain historical artifacts and are not valid inputs for this cold-start path.
+
 The export stage is a bootstrap and provenance mechanism, not an ongoing mirror. Authority epochs, the one-time cutover gate, and
 steady-state public development are owned by `public-authority-cutover-v1.md`:
 

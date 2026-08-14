@@ -54,6 +54,7 @@ class ContractTests(unittest.TestCase):
                 "agent-memory-core-v1.md",
                 "public-distribution-v1.md",
                 "public-authority-cutover-v1.md",
+                "source-authority-cutover-v1.md",
             }:
                 continue
             heading = "\n".join(
@@ -91,6 +92,16 @@ class ContractTests(unittest.TestCase):
         self.assertIn("public_published", contract)
         self.assertIn("Status: accepted", adr)
         self.assertIn("不得继续修改或向公开仓库导出同一产品", adr)
+
+    def test_source_authority_cutover_keeps_normal_sync_fail_closed(self) -> None:
+        contract = (ROOT / "specs" / "source-authority-cutover-v1.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("source-cutover --dry-run", contract)
+        self.assertIn("source-cutover --apply", contract)
+        self.assertIn("plan_hash", contract)
+        self.assertIn("There is no `force` option", contract)
+        self.assertIn("does not weaken the normal `sync-sources` contract", contract)
 
     def test_core_adr_is_accepted(self) -> None:
         adr = (

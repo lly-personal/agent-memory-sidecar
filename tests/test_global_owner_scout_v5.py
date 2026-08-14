@@ -161,6 +161,10 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_public_core_refuses_to_hide_existing_global_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             codex_home = Path(temporary)
+            remote = self.managed_sources.create_remote(codex_home, "sidecar")
+            commit = self.managed_sources.run_git(
+                ["rev-parse", "HEAD"], cwd=codex_home / "sidecar-work"
+            )
             store = codex_home / "agent-memory-sidecar" / "memory.sqlite"
             store.parent.mkdir(parents=True)
             connection = self.managed_sources.sqlite3.connect(store)
@@ -172,9 +176,14 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 connection.close()
             specs = (
                 self.managed_sources.SourceSpec(
-                    "sidecar", "https://example.invalid/sidecar.git", "v0.3.0", "a" * 40
+                    "sidecar", str(remote), "main", commit
                 ),
             )
+            with self.assertRaisesRegex(
+                self.managed_sources.BootstrapError,
+                "public_core_existing_global_binding",
+            ):
+                self.managed_sources.plan_source_cutover(codex_home, specs)
             with self.assertRaisesRegex(
                 self.managed_sources.BootstrapError,
                 "public_core_existing_global_binding",
@@ -202,7 +211,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 if "install-skill" in command:
                     version = command[command.index("--version") + 1]
                     return {"status": "installed", "version": version, "hash": "a" * 64}
-                return {"status": "ok"}
+                return {"status": "ok", "doctor": {"status": "ok"}}
 
             specs = (
                 self.managed_sources.SourceSpec(
@@ -292,10 +301,221 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             self.assertFalse((source_root / "sidecar").exists())
             self.assertFalse((source_root / "canonical_owner").exists())
 
+    def test_source_cutover_requires_fresh_plan_and_preserves_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            old_sidecar = self.managed_sources.create_remote(root, "old-sidecar")
+            public_sidecar = self.managed_sources.create_remote(root, "public-sidecar")
+            owner = self.managed_sources.create_remote(root, "owner")
+            codex_home = root / "codex-home"
+            old_specs = (
+                self.managed_sources.SourceSpec("sidecar", str(old_sidecar)),
+                self.managed_sources.SourceSpec("canonical_owner", str(owner)),
+            )
+            self.managed_sources.sync_sources(codex_home, old_specs)
+            desired_specs = (
+                self.managed_sources.SourceSpec(
+                    "sidecar",
+                    str(public_sidecar),
+                    "main",
+                    self.managed_sources.run_git(["rev-parse", "HEAD"], cwd=root / "public-sidecar-work"),
+                ),
+                self.managed_sources.SourceSpec(
+                    "canonical_owner",
+                    str(owner),
+                    "main",
+                    self.managed_sources.run_git(["rev-parse", "HEAD"], cwd=root / "owner-work"),
+                ),
+            )
+            with self.assertRaisesRegex(
+                self.managed_sources.BootstrapError,
+                "managed_source_identity_mismatch",
+            ):
+                self.managed_sources.sync_sources(codex_home, desired_specs)
+            plan = self.managed_sources.plan_source_cutover(codex_home, desired_specs)
+            self.assertEqual("keep_owner", plan["owner_action"])
+            self.assertEqual(["sidecar:replace"], plan["changes"])
+            self.assertNotIn(str(root), json.dumps(plan))
+            with self.assertRaisesRegex(
+                self.managed_sources.BootstrapError,
+                "source_cutover_plan_stale",
+            ):
+                self.managed_sources.apply_source_cutover(
+                    codex_home, desired_specs, plan_hash="f" * 64,
+                )
+            with mock.patch.object(
+                self.managed_sources,
+                "materialize_host",
+                return_value={"status": "ok", "doctor": "verified"},
+            ):
+                receipt = self.managed_sources.apply_source_cutover(
+                    codex_home, desired_specs, plan_hash=plan["plan_hash"],
+                )
+            self.assertEqual("applied", receipt["status"])
+            self.assertEqual("keep_owner", receipt["owner_action"])
+            source_root = codex_home / "agent-memory" / "sources"
+            self.assertEqual(
+                desired_specs[0].expected_commit,
+                self.managed_sources.inspect_checkout(source_root / "sidecar", desired_specs[0]),
+            )
+            self.assertEqual(
+                desired_specs[1].expected_commit,
+                self.managed_sources.inspect_checkout(source_root / "canonical_owner", desired_specs[1]),
+            )
+            persisted = json.loads(
+                (codex_home / "agent-memory" / "source-cutover-receipt.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(plan["plan_hash"], persisted["plan_hash"])
+            help_result = subprocess.run(
+                [sys.executable, "-B", str(MANAGED_SOURCES), "source-cutover", "--help"],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            )
+            self.assertIn("--dry-run", help_result.stdout)
+            self.assertIn("--apply", help_result.stdout)
+            self.assertNotIn("--force", help_result.stdout)
+
+    def test_source_cutover_materialization_failure_restores_sources_and_skills(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            old_sidecar = self.managed_sources.create_remote(root, "old-sidecar")
+            public_sidecar = self.managed_sources.create_remote(root, "public-sidecar")
+            owner = self.managed_sources.create_remote(root, "owner")
+            codex_home = root / "codex-home"
+            old_specs = (
+                self.managed_sources.SourceSpec("sidecar", str(old_sidecar)),
+                self.managed_sources.SourceSpec("canonical_owner", str(owner)),
+            )
+            self.managed_sources.sync_sources(codex_home, old_specs)
+            skill_root = codex_home / "skills"
+            for name in ("agent-memory-workstation-bootstrap", "global-owner-scout"):
+                target = skill_root / name
+                target.mkdir(parents=True)
+                (target / "marker.txt").write_text("before", encoding="utf-8")
+            desired_specs = (
+                self.managed_sources.SourceSpec(
+                    "sidecar", str(public_sidecar), "main",
+                    self.managed_sources.run_git(["rev-parse", "HEAD"], cwd=root / "public-sidecar-work"),
+                ),
+                self.managed_sources.SourceSpec(
+                    "canonical_owner", str(owner), "main",
+                    self.managed_sources.run_git(["rev-parse", "HEAD"], cwd=root / "owner-work"),
+                ),
+            )
+            plan = self.managed_sources.plan_source_cutover(codex_home, desired_specs)
+
+            def fail_materialization(*_args, **_kwargs):
+                for name in ("agent-memory-workstation-bootstrap", "global-owner-scout"):
+                    (skill_root / name / "marker.txt").write_text("after", encoding="utf-8")
+                raise self.managed_sources.BootstrapError("simulated_materialization_failure")
+
+            with mock.patch.object(
+                self.managed_sources, "materialize_host", side_effect=fail_materialization
+            ):
+                with self.assertRaisesRegex(
+                    self.managed_sources.BootstrapError,
+                    "simulated_materialization_failure",
+                ):
+                    self.managed_sources.apply_source_cutover(
+                        codex_home, desired_specs, plan_hash=plan["plan_hash"],
+                    )
+            source_root = codex_home / "agent-memory" / "sources"
+            self.assertEqual(
+                self.managed_sources.normalize_remote(str(old_sidecar)),
+                self.managed_sources.normalize_remote(
+                    self.managed_sources.run_git(["remote", "get-url", "origin"], cwd=source_root / "sidecar")
+                ),
+            )
+            for name in ("agent-memory-workstation-bootstrap", "global-owner-scout"):
+                self.assertEqual("before", (skill_root / name / "marker.txt").read_text(encoding="utf-8"))
+            self.assertFalse((codex_home / "agent-memory" / "source-cutover-receipt.json").exists())
+
+    def test_source_cutover_rejects_unsafe_installed_skill_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            codex_home = Path(temporary)
+            target = codex_home / "skills" / "agent-memory-workstation-bootstrap"
+            target.mkdir(parents=True)
+            first = target / "first.txt"
+            second = target / "second.txt"
+            first.write_text("managed", encoding="utf-8")
+            try:
+                second.hardlink_to(first)
+            except OSError as exc:
+                self.skipTest(f"hard links unavailable: {exc}")
+            with self.assertRaisesRegex(
+                self.managed_sources.BootstrapError,
+                "installed_skill_target_invalid",
+            ):
+                self.managed_sources._snapshot_skill_targets(codex_home)
+            self.assertTrue(first.exists())
+            self.assertTrue(second.exists())
+
+    def test_source_cutover_preflights_receipt_before_source_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            old_sidecar = self.managed_sources.create_remote(root, "old-sidecar")
+            public_sidecar = self.managed_sources.create_remote(root, "public-sidecar")
+            owner = self.managed_sources.create_remote(root, "owner")
+            codex_home = root / "codex-home"
+            old_specs = (
+                self.managed_sources.SourceSpec("sidecar", str(old_sidecar)),
+                self.managed_sources.SourceSpec("canonical_owner", str(owner)),
+            )
+            self.managed_sources.sync_sources(codex_home, old_specs)
+            desired_specs = (
+                self.managed_sources.SourceSpec(
+                    "sidecar", str(public_sidecar), "main",
+                    self.managed_sources.run_git(["rev-parse", "HEAD"], cwd=root / "public-sidecar-work"),
+                ),
+                self.managed_sources.SourceSpec(
+                    "canonical_owner", str(owner), "main",
+                    self.managed_sources.run_git(["rev-parse", "HEAD"], cwd=root / "owner-work"),
+                ),
+            )
+            plan = self.managed_sources.plan_source_cutover(codex_home, desired_specs)
+            receipt_target = codex_home / "agent-memory" / "source-cutover-receipt.json"
+            receipt_target.mkdir()
+            with self.assertRaisesRegex(
+                self.managed_sources.BootstrapError,
+                "source_cutover_receipt_target_invalid",
+            ):
+                self.managed_sources.apply_source_cutover(
+                    codex_home, desired_specs, plan_hash=plan["plan_hash"],
+                )
+            source_root = codex_home / "agent-memory" / "sources"
+            self.assertEqual(
+                self.managed_sources.normalize_remote(str(old_sidecar)),
+                self.managed_sources.normalize_remote(
+                    self.managed_sources.run_git(["remote", "get-url", "origin"], cwd=source_root / "sidecar")
+                ),
+            )
+
+    def test_managed_source_root_rejects_directory_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            codex_home = root / "codex-home"
+            codex_home.mkdir()
+            external = root / "external"
+            external.mkdir()
+            alias = codex_home / "agent-memory"
+            try:
+                alias.symlink_to(external, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"directory symbolic links unavailable: {exc}")
+            with self.assertRaisesRegex(
+                self.managed_sources.BootstrapError,
+                "managed_directory_alias_forbidden",
+            ):
+                self.managed_sources.sync_sources(codex_home, ())
+            self.assertEqual([], list(external.iterdir()))
+
     def test_deployment_pack_keeps_proof_layers_separate(self) -> None:
         pack = self.managed_sources.valid_pack()
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("1.6.0", validated["bootstrap_version"])
+        self.assertEqual("1.7.0", validated["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
         for label in ("可移植分发", "能力源同步", "主机物化", "项目启用"):
             self.assertIn(label, rendered)
@@ -324,8 +544,12 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         marketplace = ROOT / ".agents" / "plugins" / "marketplace.json"
         if marketplace.is_file():
             text = marketplace.read_text(encoding="utf-8")
-            self.assertIn("INSTALLED_BY_DEFAULT", text)
-            self.managed_sources.validate_marketplace(json.loads(text))
+            self.assertIn('"installation": "AVAILABLE"', text)
+            value = self.managed_sources.validate_marketplace(
+                json.loads(text),
+                expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
+            )
+            self.assertEqual("v0.3.1", value["plugins"][0]["source"]["ref"])
         else:
             self.assertTrue(
                 (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()

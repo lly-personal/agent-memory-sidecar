@@ -108,15 +108,19 @@ Hook 命令只引用 immutable artifact，不引用 editable checkout。遇到 l
   global binding/Owner parity 明确 unavailable。若该主机已存在 global binding，Bootstrap 必须以
   `public_core_existing_global_binding` 阻断并等待显式解绑/迁移决定，不得把旧绑定伪报为 unavailable。
 - `owner_integrated` 另外提供 clean、commit-bound canonical Owner；未配置时不得搜索替代 Owner。
-- Workstation Bootstrap 1.6.0 的 `sync-sources` 与 `materialize-host` 必须消费同一
+- Workstation Bootstrap 1.7.0 的 `sync-sources` 与 `materialize-host` 必须消费同一
   `agent_memory_source_manifest_v1`。release source 同时绑定 ref 与完整 commit，ref 漂移整次失败。
-- 当前私有工程仓库不原地公开。`build_public_export.py` 只准备 allowlisted source 并记录 engineering commit/snapshot；
-  真实许可证、独立 public repo commit 和精确指向该 commit 的 `v<Core>` tag 之后，`build_release_artifacts.py` 才能生成 Core wheel/sdist、portable bundle、SBOM、source manifest、
-  checksums 和 release manifest。
+- 正常 Desktop 首跳固定为 `codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.1` 后
+  `codex plugin add agent-memory-sidecar@agent-memory`。Marketplace 只提供 Anchor；Anchor 的 Resolver 验证 stable immutable
+  Release、tag/commit、asset digest、checksums 与 manifest 后才能安装 Bootstrap/Scout。
+- 已有受管 Sidecar identity 不同时，普通 `sync-sources` 必须继续失败。先运行 `source-cutover --dry-run`，再以 exact
+  `plan_hash` 执行 `source-cutover --apply`；默认保留独立私有 Owner，解绑不是隐含动作。
+- `build_public_export.py` 只保留为首个公开 seed 的 provenance 工具；`public_active` 后不得再次从冻结私有工程导出。
+  后续 `build_release_artifacts.py` 只从公开 commit 和精确指向该 commit 的 `v<Core>` tag 生成 Core wheel/sdist、portable
+  bundle、SBOM、source manifest、checksums 和 release manifest。
 - `public_artifact_verified` 不等于 public repository、Release、PyPI 或新任务采用；外部发布仍需独立授权和远端复读。
-- 首发前的公开仓库只是 `public_candidate`，私有工程仓库仍是唯一研发权威。只有 artifact 安装、immutable Release
-  远端回读和单独人工确认全部成立后，才提交 `PUBLIC_AUTHORITY.json`、把公开 `main` 提升为 `public_active`，并冻结
-  归档私有工程仓库。发布状态不自动授权该切换。
+- 当前 `PUBLIC_AUTHORITY.json` 已把公开 `main` 固定为 `public_active`；旧私有工程源只读冻结。后续代码、规范、Issue、
+  PR、tag 与 Release 只从公开仓库演进，不再执行私有 export 或双向同步。
 - seed 阶段 release builder 要求 export receipt 与 tracked snapshot 精确相同；`public_active` 后改为验证 marker、
   初始 Release tag/commit 和祖先关系，后续版本直接从公开 Git 演进，不再刷新私有 export receipt。
 - Tag workflow 只在 public repository 创建/恢复 draft 并上传、比对全部资产；它不持有管理员 Token，也不自动

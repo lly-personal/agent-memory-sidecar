@@ -7,7 +7,20 @@ their own component versions in `COMPATIBILITY.md`.
 
 No changes have been assigned to a later release.
 
-## 0.3.0 (unreleased public candidate)
+## 0.3.1 (2026-08-14)
+
+### Added
+
+- Explicit Source Authority Cutover v1 with a read-only plan hash, `keep_owner` boundary, atomic source/Skill rollback, and success receipt.
+- Public Release Resolver that rejects mutable or incomplete Releases and verifies tag/commit, GitHub asset digests, checksums, manifests, and portable contents.
+- Tagged repository Marketplace and byte-identical repository/plugin Bootstrap Anchors.
+
+### Changed
+
+- Workstation Bootstrap is 1.7.0; Plugin is 1.2.0; Scout remains 5.5.0.
+- Public `main` is documented as the sole engineering authority; consumer release installation and contributor editable setup are separate paths.
+
+## 0.3.0 (2026-08-14)
 
 ### Added
 

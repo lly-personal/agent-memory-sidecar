@@ -237,13 +237,16 @@ Repo/plugin 分发的冷启动 Anchor 固定识别：
 同步并部署本机 Agent Memory
 ```
 
-Anchor 只负责使正式 Bootstrap 可发现。公开通道必须从 portable release 取得 root `source-manifest.json`，并只用其中
+Anchor 只负责使正式 Bootstrap 可发现。公开通道先运行同包 `resolve_release.py`；默认解析 latest stable，也可消费用户
+指定版本。只有 `agent_memory_release_resolution_v1 / verified` 才能提供 root `source-manifest.json`，并只用其中
 repository、immutable ref 与 full commit 安装 `.agents/skills/agent-memory-workstation-bootstrap` 与
-`.agents/skills/global-owner-scout`；仓库 checkout、repo marketplace 或浮动 branch 本身都不是公开 source authority。
+`.agents/skills/global-owner-scout`。Resolver 必须验证 Release immutable/stable、tag/commit、GitHub asset digest、
+`SHA256SUMS`、release/source manifest 与 portable 内嵌副本；仓库 checkout、repo marketplace 或浮动 branch 本身都
+不是公开 source authority，失败固定为 `release_resolution_blocked` 且不兜底。
 私有开发通道可使用显式 development manifest，但不得成为公开兜底。Anchor 不得要求 project ID、项目名单或资源配置，
 不得复制完整实现，也不得在当前任务把新安装 Skill 冒充已加载。可靠加载边界是下一任务。
 
-`agent-memory-workstation-bootstrap` Skill 1.6.0 提供两个显式模式：
+`agent-memory-workstation-bootstrap` Skill 1.7.0 提供两个显式模式：
 
 - `inspect`：先同步受管 Sidecar/canonical Owner 源，再部署或验证 Core、global binding 与 versioned Skills；Skill
   安装通过后从下一任务保证交互 Scout 可用，无需 Host Enrollment。项目发现和
@@ -277,6 +280,17 @@ remote identity 和 primary folder 的仓库内相对位置共同输入 SHA-256�
 部分同步声明为部署完成。活跃项目 checkout 永远不是更新目标。生产命令固定为 `managed_sources.py sync-sources`
 和 `managed_sources.py materialize-host`；后一命令从受管源执行 Core setup、global binding、Doctor 与两项 Skill
 安装，Agent 不得用临时手工命令序列替代该契约后再宣称完整物化。
+
+已有受管源 identity 与 release manifest 不一致时，普通 sync 继续失败关闭。唯一换源入口为：
+
+```text
+managed_sources.py source-cutover --dry-run --codex-home <home> --source-manifest <manifest>
+managed_sources.py source-cutover --apply --codex-home <home> --source-manifest <manifest> --plan-hash <hash>
+```
+
+计划精确遵循 [`source-authority-cutover-v1`](../../specs/source-authority-cutover-v1.md)。无 `--force`；apply 前重算完整
+状态。`canonical_owner` 存在时为 `keep_owner`；已有 Owner checkout/global binding 却传 `null` 时阻断并等待独立解绑
+决策。成功 receipt 只证明本机 source sync 与 materialization，不证明当前任务加载或跨主机连续性。
 
 `agent_memory_workstation_deployment_pack_v1` 顶层精确包含：
 
@@ -522,7 +536,7 @@ Apply 需要新的当前 approval ref；setup 遇到旧 schema 只返回 `migrat
 {
   "contract_version": "agent_memory_source_manifest_v1",
   "distribution": "release",
-  "sidecar": {"remote": "https://example.invalid/agent-memory-sidecar.git", "ref": "v0.3.0", "commit": "<40 hex>"},
+  "sidecar": {"remote": "https://example.invalid/agent-memory-sidecar.git", "ref": "v0.3.1", "commit": "<40 hex>"},
   "canonical_owner": null
 }
 ```

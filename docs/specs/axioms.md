@@ -148,6 +148,12 @@ integration preview，并把完整中文审阅包直接呈现给用户；用户�
 22. **公开工程权威单一化**：独立公开仓库在首发资格完成前只是候选，不能与私有工程源同时拥有产品事实；只有
     公开 Release、干净安装、远端回读和单独人工确认全部成立后，公开 `main` 才成为唯一工程权威，私有工程仓库
     随即冻结归档。发布证据不得自动冒充权威切换，切换后不得继续私有导出或双向同步。
+23. **可发现入口不等于安装权威**：公开 checkout、Marketplace 与 Release 页面只帮助定位能力；Anchor 必须验证
+    stable immutable Release、tag/commit、资产 digest、checksums 与 manifest 后，才可把准确来源交给安装器。解析失败
+    不得回退浮动 branch、私有工程源或人工猜测资产。
+24. **换源是显式例外而非同步特权**：普通 source sync 永远拒绝 identity 变化；存量主机换到公开 Sidecar 必须先
+    生成无写入 `plan_hash`，再以 fresh hash 原子执行并失败恢复。已有私有 Owner 默认保持独立后端，移除它需要另一
+    个明确决策。
 
 该实验按入口独立停止：无法证明交互 worktree 任务取得任务索引终态、中文 Review Pack 可理解性、直接呈现、
 隔离零变化或隐私过滤时，交互入口保持 `interactive_host_blocked`；无法证明 automation 执行源时只保持 Scheduled

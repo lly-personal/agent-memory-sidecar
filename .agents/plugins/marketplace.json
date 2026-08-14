@@ -1,0 +1,22 @@
+{
+  "name": "agent-memory",
+  "interface": {
+    "displayName": "Agent Memory"
+  },
+  "plugins": [
+    {
+      "name": "agent-memory-sidecar",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/lly-personal/agent-memory-sidecar.git",
+        "path": "./plugins/agent-memory-sidecar",
+        "ref": "v0.3.1"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
