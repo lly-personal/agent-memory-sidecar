@@ -242,7 +242,9 @@ Anchor 只负责使正式 Bootstrap 可发现。公开通道先运行同包 `res
 repository、immutable ref 与 full commit 安装 `.agents/skills/agent-memory-workstation-bootstrap` 与
 `.agents/skills/global-owner-scout`。Resolver 必须验证 Release immutable/stable、tag/commit、GitHub asset digest、
 `SHA256SUMS`、release/source manifest 与 portable 内嵌副本；仓库 checkout、repo marketplace 或浮动 branch 本身都
-不是公开 source authority，失败固定为 `release_resolution_blocked` 且不兜底。
+不是公开 source authority。GitHub API metadata 请求依次接受显式 `GITHUB_TOKEN`/`GH_TOKEN` 或本机现有非交互 `gh`
+authentication，只把 token 放入 API 请求头且不写入输出；两者均不可用时允许匿名请求。API rate limit、无效认证与
+metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_resolution_blocked` 且不兜底。
 私有开发通道可使用显式 development manifest，但不得成为公开兜底。Anchor 不得要求 project ID、项目名单或资源配置，
 不得复制完整实现，也不得在当前任务把新安装 Skill 冒充已加载。可靠加载边界是下一任务。
 
@@ -536,7 +538,7 @@ Apply 需要新的当前 approval ref；setup 遇到旧 schema 只返回 `migrat
 {
   "contract_version": "agent_memory_source_manifest_v1",
   "distribution": "release",
-  "sidecar": {"remote": "https://example.invalid/agent-memory-sidecar.git", "ref": "v0.3.1", "commit": "<40 hex>"},
+  "sidecar": {"remote": "https://example.invalid/agent-memory-sidecar.git", "ref": "v0.3.2", "commit": "<40 hex>"},
   "canonical_owner": null
 }
 ```

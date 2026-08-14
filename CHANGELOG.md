@@ -7,6 +7,19 @@ their own component versions in `COMPATIBILITY.md`.
 
 No changes have been assigned to a later release.
 
+## 0.3.2 (2026-08-14)
+
+### Fixed
+
+- Release Resolver metadata requests now use an explicit `GITHUB_TOKEN`/`GH_TOKEN` or existing non-interactive `gh` authentication
+  when available, so an exhausted anonymous GitHub API quota does not block an otherwise valid public cold start.
+- GitHub API rate limiting, invalid authentication, and missing release metadata now remain distinguishable fail-closed errors instead
+  of collapsing into a generic availability failure.
+
+### Changed
+
+- Core is 0.3.2 and Plugin is 1.2.1; Bootstrap remains 1.7.0 and Scout remains 5.5.0.
+
 ## 0.3.1 (2026-08-14)
 
 ### Added

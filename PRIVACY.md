@@ -8,6 +8,10 @@ Public source is built from an allowlist into a new repository root. Engineering
 local databases, caches, credentials, and task identifiers are outside that boundary. The exporter rejects physical filesystem
 aliases, binary/NUL-bearing files, common credential forms, thread URIs, personal home paths, and caller-supplied private literals.
 
+The public Release Resolver may read `GITHUB_TOKEN`/`GH_TOKEN` or an existing non-interactive `gh` token to authenticate GitHub API
+metadata requests. It keeps the token in process memory, sends it only to `api.github.com`, and never writes or renders it in the
+resolved release output or sends it to release asset URLs.
+
 Removal requires an explicit local uninstall or manual removal after Codex is closed. Do not delete an entire Codex home or project
 directory. Preserve any instruction file you still use, and treat old Core Store backups as private local data.
 

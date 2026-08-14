@@ -16,6 +16,8 @@ When the user says `同步并部署本机 Agent Memory`:
    portable bundle before writing its output. `release_resolution_blocked` ends the operation: do not guess an asset, ask for a
    checkout, or fall back to a branch or private repository. This resolver contract starts with the complete `v0.3.1` public
    operations release; earlier releases remain historical artifacts rather than valid cold-start inputs for this Anchor.
+   GitHub API metadata may use an explicit `GITHUB_TOKEN`/`GH_TOKEN` or existing non-interactive `gh` authentication. Never render,
+   persist, or pass that token to release asset URLs; rate limiting or invalid authentication remains a visible blocker.
 3. Use the built-in `$skill-installer` only with the exact repository, immutable ref, and full commit in the verified
    `source-manifest.json` to install:
    - `.agents/skills/agent-memory-workstation-bootstrap`
