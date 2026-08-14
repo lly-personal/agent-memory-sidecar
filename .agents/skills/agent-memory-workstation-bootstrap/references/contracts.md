@@ -1,4 +1,4 @@
-# Workstation Bootstrap 1.6 contracts
+# Workstation Bootstrap 1.7 contracts
 
 This reference owns the external Bootstrap workflow's Deployment Pack, Enrollment Pack, and Host Profile contracts. It does not
 extend the Core v1 public contract surface.
@@ -6,15 +6,21 @@ extend the Core v1 public contract surface.
 ## Cold-start source and trust boundary
 
 The stable source identity is a release-manifest-bound Sidecar repository; a canonical Global Owner is an optional private backend.
-They are capability authorities, not the host's project enrollment list. A private continuity-enabled repository may expose a small
-`agent-memory-bootstrap-anchor` plus a repo marketplace; public distribution instead requires the checksummed portable bundle and
-its commit-bound source manifest because a marketplace entry alone is not source authority. Neither surface may
+They are capability authorities, not the host's project enrollment list. A continuity-enabled repository may expose a small
+`agent-memory-bootstrap-anchor` plus a repo marketplace; public distribution requires its Anchor to resolve and verify the stable
+immutable Release, checksums, manifests, and portable bundle before consuming the commit-bound source manifest. A marketplace entry
+alone is not source authority. Neither surface may
 contain local paths, project IDs, a fixed business-project list, Owner text, or host activation state.
 
 Bootstrap materializes clean, reconstructable source snapshots only under the active Codex home's
 `agent-memory/sources/{sidecar,canonical_owner}` roots. It stages both sources before replacing either target. An existing managed
 source must have the expected normalized origin and a clean worktree; identity mismatch or dirty state fails closed. Active project
 checkouts are never reset, cleaned, pulled, or overwritten.
+
+An intentional managed-source identity change uses `source-cutover --dry-run` followed by `source-cutover --apply --plan-hash`.
+The plan exposes only hashed source identities and binds the current state, desired release commits, and `keep_owner`/`public_core`
+action. There is no force path. Existing Owner state cannot be silently removed; apply retains source and Skill rollbacks until Core
+setup's strict Doctor succeeds.
 
 `managed_sources.py sync-sources` owns the source transaction. `managed_sources.py materialize-host` owns deterministic Core setup,
 global binding, Doctor, and per-target atomic Bootstrap/Scout installation from those sources. Agent-authored shell sequences are
@@ -36,7 +42,7 @@ limitations, pack_hash
 ```
 
 - `status`: `ready`, `reload_required`, `source_sync_blocked`, or `host_materialization_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `1.6.0`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `1.7.0`.
 - `portable_distribution` exact fields are `repo_anchor`, `plugin`, and `marketplace`; values are `verified`, `installed`,
   `unavailable`, or `failed`.
 - `source_sync` contains exact `sidecar` and `canonical_owner` receipts. Each receipt has `status`, `ref`, and `commit`; status is
@@ -61,7 +67,7 @@ automation_change_count, allowed_actions, limitations, pack_hash
 ```
 
 - `status`: `ready`, `bounded`, or `host_activation_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `1.6.0`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `1.7.0`.
 - `portable_layer` exact fields: `sidecar`, `canonical_owner`, `core_setup`, `doctor`, `scout_skill_version`,
   `scout_skill_hash`. State values are `synced`, `unchanged`, `installed`, `verified`, `failed`, or `unavailable`.
 - `discovery` exact fields: `inventory_status`, `activity_status`, `desktop_project_count`, `accessible_count`,

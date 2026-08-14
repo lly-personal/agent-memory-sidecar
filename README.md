@@ -20,8 +20,9 @@ be consolidated only through one exact user-authorized before/after revision.
 Read the normative design in [L1 axioms](docs/specs/axioms.md),
 [L2 topology](docs/specs/topology.md), and [L3 interface](docs/specs/interface.md).
 The detailed machine contract is [Agent Memory Core v1](specs/agent-memory-core-v1.md);
-the decisions are [ADR 0057](docs/decisions/0057-agent-memory-core-v1.zh.md)
-and [ADR 0059](docs/decisions/0059-bounded-behavior-set-evolution.zh.md).
+the decisions are [ADR 0057](docs/decisions/0057-agent-memory-core-v1.zh.md),
+[ADR 0059](docs/decisions/0059-bounded-behavior-set-evolution.zh.md), and
+[ADR 0074](docs/decisions/0074-public-operations-closure.zh.md).
 
 ## Product boundary
 
@@ -85,15 +86,30 @@ instruction target, consumes one approval for the exact aggregate revision, and
 applies the complete ruleset change atomically. Any stale, conflicting, invalid,
 over-capacity, or failed item leaves every target unchanged.
 
-## Installation profiles
+## Install and use
 
-The current Python project can be installed as Core from a verified source or
-built wheel:
+For normal Codex Desktop use, register the immutable repository Marketplace,
+install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-python -m pip install .
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.1
+codex plugin add agent-memory-sidecar@agent-memory
+```
+
+In the new task, send `同步并部署本机 Agent Memory`. The Anchor resolves and
+verifies the immutable public Release before installing Bootstrap and Scout.
+Marketplace registration and a repository checkout are discovery surfaces;
+they are not source authority and do not by themselves prove host deployment.
+
+For Core-only CLI use, install the wheel from the same Release, then preview and
+apply setup:
+
+```powershell
+python -m pip install .\agent_memory_sidecar-0.3.1-py3-none-any.whl
 agent-memory --help
 agent-memory setup
+agent-memory setup --apply
+agent-memory doctor
 ```
 
 `setup --apply` without `--global-rules-source` is the supported public Core
@@ -102,28 +118,39 @@ and Doctor remain available; global publication and Scout Owner parity are
 explicitly unavailable. Owner-integrated installations provide a separate clean
 Git checkout and bind it explicitly.
 
-Workstation Bootstrap 1.6 accepts `agent_memory_source_manifest_v1`. Release
+Workstation Bootstrap 1.7 accepts `agent_memory_source_manifest_v1`. Release
 manifests bind each source to both a ref and a full commit SHA; an optional
 `canonical_owner` is `null` in the public profile. Floating branches are a
 development convenience and are never accepted as public release evidence.
 
+An existing host that still has a managed Sidecar from another repository must
+not use normal sync to replace it. Review and apply the explicit
+[`source-authority-cutover-v1`](specs/source-authority-cutover-v1.md) plan; an
+existing private Owner remains a separate optional backend unless explicitly
+detached.
+
 ## Open-source release boundary
 
-Project source is published through an allowlisted export from a separate,
-history-bearing engineering repository. The public checkout excludes host
+Project source was initially published through an allowlisted export from a
+separate, history-bearing engineering repository. The public checkout excludes host
 state, private Owner identities, historical runtime evidence, and unknown
 files. Core packages and the portable Plugin/Skill bundle are separate
 artifacts connected by `COMPATIBILITY.md`, a release manifest, checksums, and
 installed-runtime smoke tests.
 
-The export is a one-time seed and provenance path, not a permanent mirror. Before
-the first release is qualified, the private engineering repository remains the
-sole development authority and the independent public repository is only a
-candidate. After an immutable Release, clean artifact installation, remote
-readback, and a separate human cutover decision, public `main` becomes the sole
-home for code, specifications, issues, pull requests, CI, tags, and releases;
-the private engineering repository is frozen and archived. See
+The export was a one-time seed and provenance path, not a permanent mirror.
+Public `main` is now the sole home for code, specifications, issues, pull
+requests, CI, tags, and releases. The former private engineering repository is
+frozen read-only history and rollback evidence; future product changes never
+flow from it back into this repository. See
 [`specs/public-authority-cutover-v1.md`](specs/public-authority-cutover-v1.md).
+
+## Contribute
+
+Clone public `main`, create a `codex/` or topic branch, and work in that checkout.
+Editable installation is contributor-only and must not be used as evidence for
+the released consumer path. See [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Desktop setup guide](docs/codex-desktop-setup.md).
 
 The public checkout's root `LICENSE` and `pyproject.toml` SPDX metadata are the
 authoritative license declaration. The export and release path fails closed

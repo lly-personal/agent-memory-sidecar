@@ -101,8 +101,10 @@ flowchart LR
 | --- | --- | --- |
 | Repo Bootstrap Anchor | 在连续性工程中识别统一部署意图，路由到插件/skill-installer/正式 Bootstrap | 复制 Bootstrap/Scout、保存主机状态、项目枚举、Owner |
 | Agent Memory Plugin | 私有 repo marketplace 或公开 portable release 分发冷启动 Anchor | 完整实现、行为 Owner、Host Profile、自动项目启用 |
+| Public Release Resolver | 解析 latest stable 或指定版本，验证 immutable Release、tag/commit、asset digest、checksums、manifest 与 portable | 回退 `main`、把 Marketplace 当 source authority、后台自动升级 |
 | Managed capability sources | 在 `$CODEX_HOME` 保存 Sidecar 与 canonical Owner 的 clean、可重建安装快照 | 活跃项目工作区、任务历史、候选或第二 Owner |
 | Workstation Bootstrap Skill | 同步受管源并物化 Core/global binding/Bootstrap/Scout/Doctor；只有用户明确要求 Scheduled 实验时才生成 Enrollment Pack 和调和 Host Profile | 把内容同步冒充主机激活、清理活跃工程、自动选择新项目、修改 Owner |
+| Source Authority Cutover | 用 fresh `plan_hash` 显式替换存量主机受管 Sidecar identity，并在失败时恢复 source/Skill | 放宽普通 sync、隐式移除 Owner、修改项目 checkout 或 Scheduled |
 | Deployment Pack | 以中文分层报告可移植分发、源同步、主机物化和项目激活 | 用前一层成功替代后一层、声称未验收的第二台设备成功 |
 | Interactive Worktree Task | 在当前绑定项目承载 30 天手动复盘并把结果留在同一任务 | 隐式触发、修改活跃工作区、计入 Scheduled 14 次实验 |
 | Project Discovery | 关联 Desktop 项目、自然任务、Git 内容 identity 与安全资格 | 根据固定项目名或路径决定启用 |
@@ -134,12 +136,17 @@ Review Pack 结构通过校验后仍未完成链路；只有 renderer 成功并�
 surface-specific wrapper 数量守恒，该次结果才完成呈现。verifier 是最后一个工具调用；之后不得执行独立 memory 审计
 或追加尾注。
 
-Bootstrap 1.6.0 先通过 Repo Anchor 或 Git-backed plugin 获得第一跳，再按 source manifest 把 Sidecar 与可选
+Bootstrap 1.7.0 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，再按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前
 Codex home 的受管 clean sources。两个源必须全部完成 staged clone、remote identity、clean worktree 与 commit
 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得 pull/reset/clean 任何 Desktop
 项目。随后才从受管源运行 Core setup、global binding、Doctor，并原子安装 Bootstrap/Scout。新安装能力只从下一
 任务保证加载。相同主机空 CODEX_HOME 验收和真实第二设备验收分别报告，不得互相替代。
+
+普通 `sync-sources` 不拥有 identity 换源能力。存量主机从历史 Sidecar 切换到公开权威时，只能使用 Source Authority
+Cutover v1：dry-run 解析目标 ref、读取 clean 当前状态并生成不含路径/URL 的 plan；apply 重算并消费 exact hash，
+保持已配置 Owner 或在真正无 Owner/binding 时进入 public Core。任一 source、Core setup、Doctor 或 Skill 安装失败都
+恢复切换前状态。
 
 Bootstrap 安装并验证 Skill 后，交互入口不需要 Host Enrollment。只有用户明确要求 Scheduled 实验时，Bootstrap
 才为用户确认的 `active + eligible` 项目建立 Host Enrollment。`active` 来自滚动 30 天自然用户任务，

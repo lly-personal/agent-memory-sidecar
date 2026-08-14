@@ -2,16 +2,32 @@
 
 - Status: active
 - Owner layer: project_docs
-- Last verified: 2026-08-13
-- Evidence: [Core v1 contract](../specs/agent-memory-core-v1.md)、[Public distribution v1](../specs/public-distribution-v1.md)
+- Last verified: 2026-08-14
+- Evidence: [Core v1 contract](../specs/agent-memory-core-v1.md)、[Public distribution v1](../specs/public-distribution-v1.md)、[Source cutover v1](../specs/source-authority-cutover-v1.md)
 
-## Preview and install
+## Released consumer path
+
+Codex Desktop users register the tagged public Marketplace and install the plugin:
 
 ```powershell
-python -m pip install -e .
-python -m agent_memory_sidecar setup
-python -m agent_memory_sidecar setup --apply
-python -m agent_memory_sidecar doctor
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.1
+codex plugin add agent-memory-sidecar@agent-memory
+```
+
+Restart Desktop and start a new task, then send `同步并部署本机 Agent Memory`.
+The Anchor resolves the latest stable immutable Release (or an explicitly
+selected version), verifies asset digests, checksums, tag/commit and manifests,
+and installs the commit-bound Bootstrap and Scout. Newly installed Skills are
+reliably discoverable from the following task. A checkout or Marketplace alone
+does not authorize source materialization.
+
+Core-only consumers install the Release wheel and run:
+
+```powershell
+python -m pip install .\agent_memory_sidecar-0.3.1-py3-none-any.whl
+agent-memory setup
+agent-memory setup --apply
+agent-memory doctor
 ```
 
 Preview performs no writes. Apply builds a deterministic content-addressed
@@ -37,6 +53,25 @@ trust are never copied between devices.
 Workstation Bootstrap uses the same `agent_memory_source_manifest_v1` for
 `sync-sources` and `materialize-host`. Public Core sets `canonical_owner` to
 `null`; a release source must bind the Sidecar ref and full commit SHA.
+
+If an existing host has a clean managed Sidecar with a different repository
+identity, normal `sync-sources` intentionally fails closed. Use `source-cutover
+--dry-run`, review `owner_action` and `changes`, then pass the exact fresh
+`plan_hash` to `source-cutover --apply`. Existing global Owner removal is not
+implicit and requires a separate decision.
+
+## Contributor path
+
+Contributors clone this public repository, work on a topic branch, and may use
+an editable install only for development:
+
+```powershell
+python -m pip install -e .
+python -m agent_memory_sidecar setup
+```
+
+Editable setup is not the released consumer acceptance path. Before a pull
+request, run the full checks in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Installed Hooks
 

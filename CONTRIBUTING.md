@@ -26,5 +26,4 @@ or private Global Owner contents.
 Keep one coherent behavior change per pull request. Explain the user-visible problem, owner/spec change, failure behavior, tests, and
 unproven result layers. A passing test or Doctor report does not prove later-task model adoption or product effect.
 
-By contributing, you agree that your contribution will be distributed under the repository's selected license once that license is
-present. Until then, no public release is authorized.
+By contributing, you agree that your contribution is distributed under the repository's Apache-2.0 license. See [LICENSE](LICENSE).

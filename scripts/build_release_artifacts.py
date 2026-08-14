@@ -137,7 +137,7 @@ def version_facts(root: Path = ROOT) -> dict[str, str]:
     }
     require(all(VERSION.fullmatch(value) is not None for value in facts.values()), "release_component_version_invalid")
     compatibility = (root / "COMPATIBILITY.md").read_text(encoding="utf-8")
-    expected_row = f"| Unreleased public candidate | {core} | {facts['plugin']} | {facts['bootstrap']} | {facts['scout']} | v4 | 3.11–3.13 |"
+    expected_row = f"| v{core} | {core} | {facts['plugin']} | {facts['bootstrap']} | {facts['scout']} | v4 | 3.11–3.13 |"
     require(compatibility.count(expected_row) == 1, "release_compatibility_mismatch")
     return facts
 
@@ -544,6 +544,11 @@ def inspect_portable(
             required = {
                 "source-manifest.json",
                 "plugins/agent-memory-sidecar/source-manifest.json",
+                ".agents/plugins/marketplace.json",
+                ".agents/skills/agent-memory-bootstrap-anchor/SKILL.md",
+                ".agents/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py",
+                "plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor/SKILL.md",
+                "plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py",
                 "specs/public-authority-cutover-v1.md",
                 ".agents/skills/agent-memory-workstation-bootstrap/scripts/managed_sources.py",
                 ".agents/skills/agent-memory-workstation-bootstrap/scripts/enrollment.py",
@@ -555,12 +560,37 @@ def inspect_portable(
                 and json.loads(archive.read("plugins/agent-memory-sidecar/source-manifest.json")) == source_manifest,
                 "release_portable_manifest_mismatch",
             )
+            require(
+                archive.read(".agents/skills/agent-memory-bootstrap-anchor/SKILL.md")
+                == archive.read("plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor/SKILL.md")
+                and archive.read(".agents/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py")
+                == archive.read("plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py"),
+                "release_anchor_parity_mismatch",
+            )
             archive.extractall(extracted)
         managed = extracted / ".agents/skills/agent-memory-workstation-bootstrap/scripts/managed_sources.py"
         enrollment = extracted / ".agents/skills/agent-memory-workstation-bootstrap/scripts/enrollment.py"
         run([sys.executable, "-B", str(managed), "validate-source-manifest", "--path", str(extracted / "source-manifest.json")], cwd=extracted)
+        run(
+            [sys.executable, "-B", str(managed), "validate-marketplace"],
+            cwd=extracted,
+            input_text=(extracted / ".agents/plugins/marketplace.json").read_text(encoding="utf-8"),
+        )
+        marketplace = json.loads((extracted / ".agents/plugins/marketplace.json").read_text(encoding="utf-8"))
+        source = marketplace["plugins"][0]["source"]
+        require(
+            source["url"].rstrip("/").casefold() == source_manifest["sidecar"]["remote"].rstrip("/").casefold()
+            and source["ref"] == source_manifest["sidecar"]["ref"],
+            "release_marketplace_source_mismatch",
+        )
         run([sys.executable, "-B", str(managed), "self-test"], cwd=extracted)
         run([sys.executable, "-B", str(enrollment), "self-test"], cwd=extracted)
+        run([
+            sys.executable,
+            "-B",
+            str(extracted / ".agents/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py"),
+            "--help",
+        ], cwd=extracted)
         scout_scripts = extracted / ".agents/skills/global-owner-scout/scripts"
         for name in ("validate_output.py", "render_review.py", "verify_visible_output.py", "resolve_owner_parity.py"):
             run([sys.executable, "-B", str(scout_scripts / name), "--self-test"], cwd=scout_scripts)
@@ -661,6 +691,7 @@ def build(
                 root / ".agents" / "skills" / "agent-memory-bootstrap-anchor",
                 root / ".agents" / "skills" / "agent-memory-workstation-bootstrap",
                 root / ".agents" / "skills" / "global-owner-scout",
+                root / ".agents" / "plugins" / "marketplace.json",
                 root / "plugins" / "agent-memory-sidecar",
                 root / "docs" / "specs",
                 root / "specs" / "agent-memory-core-v1.md",

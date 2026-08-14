@@ -66,6 +66,10 @@
   私有仓库一次性切换到公开 `main`，并冻结归档私有工程仓库的治理动作；不是 Core runtime mutation。
 - `public_authority_marker`：`public_active` 后由公开仓库跟踪的 `agent_memory_public_authority_v1` provenance 文件；
   它绑定首个公开 Release 和原始工程 snapshot，但不自行授权切换，也不是行为 Owner。
+- `release_resolver`：Anchor 内只读解析 stable immutable GitHub Release 的确定性消费者；同时验证 tag/commit、asset
+  digest、checksums、release/source manifest 与 portable，失败不回退。
+- `source_authority_cutover`：存量主机以无写入 plan 和 fresh `plan_hash` 把受管 Sidecar identity 显式切到公开
+  Release 的一次性 host operation；不放宽普通 sync，也不隐式移除私有 Owner。
 - `source_manifest`：把 Sidecar 和可选 canonical Owner 的 credential-free remote、ref 与完整 commit 绑定的安装输入。
 - `core_public`：不携带 canonical Owner 的公开安装 profile；project scope Core 可用，global 集成明确 unavailable。
 - `owner_integrated`：宿主另外提供 commit-bound 私有 Owner 后启用 global binding 的安装 profile。
