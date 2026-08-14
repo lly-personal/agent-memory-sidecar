@@ -111,7 +111,7 @@ Hook 命令只引用 immutable artifact，不引用 editable checkout。遇到 l
 - Workstation Bootstrap 1.8.0 以 `source-cutover --dry-run` 与 exact-hash apply 统一 fresh/update/legacy；底层
   `sync-sources` 与 `materialize-host` 继续保持严格、无隐式换源能力。release source 同时绑定 ref 与完整 commit，
   ref 漂移整次失败。
-- 正常 Desktop 首跳固定为 `codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.4` 后
+- 正常 Desktop 首跳固定为 `codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.5` 后
   `codex plugin add agent-memory-sidecar@agent-memory`。Marketplace 只提供 Anchor；Anchor 的 Resolver 验证 stable immutable
   Release、tag/commit、asset digest、checksums 与 manifest，安全展开 portable，并在同一任务执行正式 Bootstrap。
 - 已有受管 Sidecar identity 不同时，普通 `sync-sources` 必须继续失败。统一入口只展示一次短计划并取得一次确认，
@@ -128,6 +128,8 @@ Hook 命令只引用 immutable artifact，不引用 editable checkout。遇到 l
 - Tag workflow 只在 public repository 创建/恢复 draft 并上传、比对全部资产；它不持有管理员 Token，也不自动
   publish。阶段 C 的独立管理员操作在发布前验证 immutable releases，复读资产，发布后逐资产验证 attestation 并
   回读 non-draft/immutable。PyPI 不属于该首发链。
+- 远端 tag 只能在版本化 Changelog、组件兼容行和包元数据一致后创建。先在目标公开 commit 上建立本地 annotated
+  tag，并从该 clean tag/HEAD 执行完整 `build_release_artifacts.py`；只有本地发行构建成功后才能推送同一 tag。
 
 ## Global 双目标事务
 

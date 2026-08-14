@@ -542,7 +542,7 @@ Apply 需要新的当前 approval ref；setup 遇到旧 schema 只返回 `migrat
 {
   "contract_version": "agent_memory_source_manifest_v1",
   "distribution": "release",
-  "sidecar": {"remote": "https://example.invalid/agent-memory-sidecar.git", "ref": "v0.3.4", "commit": "<40 hex>"},
+  "sidecar": {"remote": "https://example.invalid/agent-memory-sidecar.git", "ref": "v0.3.5", "commit": "<40 hex>"},
   "canonical_owner": null
 }
 ```
