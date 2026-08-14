@@ -5,7 +5,7 @@
 - Applies when: 定位 Agent Memory Core v1 的当前规范、操作文档、实现契约或历史理由。
 - Avoid when: 小范围源码查找即可回答。
 - Last verified: 2026-08-14
-- Evidence: [L1](specs/axioms.md)、[L2](specs/topology.md)、[L3](specs/interface.md)、[ADR 0057](decisions/0057-agent-memory-core-v1.zh.md)、[ADR 0058](decisions/0058-persistent-runtime-journal.zh.md)、[ADR 0059](decisions/0059-bounded-behavior-set-evolution.zh.md)、[ADR 0070](decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[ADR 0072](decisions/0072-allowlisted-public-distribution-lane.zh.md)、[ADR 0073](decisions/0073-public-engineering-authority-cutover.zh.md)、[ADR 0074](decisions/0074-public-operations-closure.zh.md)
+- Evidence: [L1](specs/axioms.md)、[L2](specs/topology.md)、[L3](specs/interface.md)、[ADR 0057](decisions/0057-agent-memory-core-v1.zh.md)、[ADR 0058](decisions/0058-persistent-runtime-journal.zh.md)、[ADR 0059](decisions/0059-bounded-behavior-set-evolution.zh.md)、[ADR 0070](decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[ADR 0072](decisions/0072-allowlisted-public-distribution-lane.zh.md)、[ADR 0073](decisions/0073-public-engineering-authority-cutover.zh.md)、[ADR 0074](decisions/0074-public-operations-closure.zh.md)、[ADR 0075](decisions/0075-unified-workstation-reconcile.zh.md)
 
 ## 当前 Core v1 权威路径
 
@@ -28,8 +28,9 @@
     [`ADR 0072`](decisions/0072-allowlisted-public-distribution-lane.zh.md)：公开导出、可选私有 Owner 与发布证据门。
 15. [`public-authority-cutover-v1.md`](../specs/public-authority-cutover-v1.md) 与
     [`ADR 0073`](decisions/0073-public-engineering-authority-cutover.zh.md)：首发候选、公开工程权威切换与私有工程源归档。
-16. [`source-authority-cutover-v1.md`](../specs/source-authority-cutover-v1.md) 与
-    [`ADR 0074`](decisions/0074-public-operations-closure.zh.md)：存量主机显式换源、公开 Release 解析与第一跳闭环。
+16. [`source-authority-cutover-v2.md`](../specs/source-authority-cutover-v2.md) 与
+    [`ADR 0074`](decisions/0074-public-operations-closure.zh.md)、[`ADR 0075`](decisions/0075-unified-workstation-reconcile.zh.md)：
+    公开 Release 解析、统一工作站调和与存量主机显式换源。
 
 Global Owner Scout 的确认交接还必须读取 [`ADR 0070`](decisions/0070-atomic-review-pack-rule-bundles.zh.md)：用户可以
 精确多选，同一 target 以一个原子规则包提交；逐卡只是批次大小为一的兼容形式。

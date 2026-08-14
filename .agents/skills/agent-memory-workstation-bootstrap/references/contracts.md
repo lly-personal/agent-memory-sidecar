@@ -1,4 +1,4 @@
-# Workstation Bootstrap 1.7 contracts
+# Workstation Bootstrap 1.8 contracts
 
 This reference owns the external Bootstrap workflow's Deployment Pack, Enrollment Pack, and Host Profile contracts. It does not
 extend the Core v1 public contract surface.
@@ -17,19 +17,22 @@ Bootstrap materializes clean, reconstructable source snapshots only under the ac
 source must have the expected normalized origin and a clean worktree; identity mismatch or dirty state fails closed. Active project
 checkouts are never reset, cleaned, pulled, or overwritten.
 
-An intentional managed-source identity change uses `source-cutover --dry-run` followed by `source-cutover --apply --plan-hash`.
-The plan exposes only hashed source identities and binds the current state, desired release commits, and `keep_owner`/`public_core`
-action. There is no force path. Existing Owner state cannot be silently removed; apply retains source and Skill rollbacks until Core
-setup's strict Doctor succeeds.
+All workstation deployment uses `source-cutover --dry-run` followed by exact-hash apply. Fresh install and `noop` are covered by the
+user's deployment request; an existing Sidecar identity replacement requires one visible plan and one confirmation. The plan exposes
+only hashed source identities and binds the current state, desired release commits, and `keep_owner`/`public_core` action. There is
+no force path. An omitted public Owner preserves an existing Owner only when its clean checkout exactly matches Core's bound root and
+commit. One-sided, dirty, or mismatched state fails closed. Apply retains source and Skill rollbacks until strict Doctor succeeds.
 
-`managed_sources.py sync-sources` owns the source transaction. `managed_sources.py materialize-host` owns deterministic Core setup,
-global binding, Doctor, and per-target atomic Bootstrap/Scout installation from those sources. Agent-authored shell sequences are
-not an alternative production contract.
+`managed_sources.py source-cutover` owns the unified source and host transaction: deterministic Core setup, global binding, Doctor,
+and per-target atomic Bootstrap/Scout installation. `sync-sources` and `materialize-host` remain lower-level strict contracts and do
+not gain implicit identity replacement or Owner discovery. Agent-authored shell sequences are not an alternative production contract.
 
 The source manifest binds each configured source to a credential-free remote identity, ref, and full commit. Public Core mode sets
-`canonical_owner=null`; this keeps global parity unavailable without blocking project-scope Core. Private Owner authentication uses
-the host's existing Git credentials. Failure to authenticate is `source_sync_blocked`, not a request for project paths and not
-proof that the capability is installed. A newly installed plugin or Skill is guaranteed discoverable only from a new task.
+`canonical_owner=null`; on a fresh host this keeps global parity unavailable without blocking project-scope Core, while a legacy host
+may retain an already exact Core-bound Owner. Private Owner authentication uses the host's existing Git credentials. Failure to
+authenticate is `source_sync_blocked`, not a request for project paths and not proof that the capability is installed. A newly
+installed plugin or Skill is guaranteed automatically discoverable only after one Codex refresh or from a new task; host
+materialization finishes in the current deployment task.
 
 ## Deployment Pack
 
@@ -42,7 +45,7 @@ limitations, pack_hash
 ```
 
 - `status`: `ready`, `reload_required`, `source_sync_blocked`, or `host_materialization_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `1.7.1`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `1.8.0`.
 - `portable_distribution` exact fields are `repo_anchor`, `plugin`, and `marketplace`; values are `verified`, `installed`,
   `unavailable`, or `failed`.
 - `source_sync` contains exact `sidecar` and `canonical_owner` receipts. Each receipt has `status`, `ref`, and `commit`; status is
@@ -67,7 +70,7 @@ automation_change_count, allowed_actions, limitations, pack_hash
 ```
 
 - `status`: `ready`, `bounded`, or `host_activation_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `1.7.1`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `1.8.0`.
 - `portable_layer` exact fields: `sidecar`, `canonical_owner`, `core_setup`, `doctor`, `scout_skill_version`,
   `scout_skill_hash`. State values are `synced`, `unchanged`, `installed`, `verified`, `failed`, or `unavailable`.
 - `discovery` exact fields: `inventory_status`, `activity_status`, `desktop_project_count`, `accessible_count`,

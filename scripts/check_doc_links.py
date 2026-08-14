@@ -36,11 +36,12 @@ ACTIVE_DOCUMENTS = (
     ROOT / "docs" / "decisions" / "0072-allowlisted-public-distribution-lane.zh.md",
     ROOT / "docs" / "decisions" / "0073-public-engineering-authority-cutover.zh.md",
     ROOT / "docs" / "decisions" / "0074-public-operations-closure.zh.md",
+    ROOT / "docs" / "decisions" / "0075-unified-workstation-reconcile.zh.md",
     ROOT / "specs" / "README.md",
     ROOT / "specs" / "agent-memory-core-v1.md",
     ROOT / "specs" / "public-distribution-v1.md",
     ROOT / "specs" / "public-authority-cutover-v1.md",
-    ROOT / "specs" / "source-authority-cutover-v1.md",
+    ROOT / "specs" / "source-authority-cutover-v2.md",
 )
 LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 

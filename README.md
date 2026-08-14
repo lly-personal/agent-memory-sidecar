@@ -92,12 +92,15 @@ For normal Codex Desktop use, register the immutable repository Marketplace,
 install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.3
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.4
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
-In the new task, send `同步并部署本机 Agent Memory`. The Anchor resolves and
-verifies the immutable public Release before installing Bootstrap and Scout.
+After Codex refreshes the installed Plugin, start one task and send `同步并部署本机 Agent Memory`. The Anchor resolves and
+verifies the immutable public Release, safely materializes its portable bundle, and runs the formal Bootstrap in that same task.
+Fresh and same-source hosts complete directly; an existing Sidecar identity replacement shows one short plan and consumes one
+confirmation. Host source sync, Core/Owner/Skill materialization, and Doctor finish before the result is returned. One later Codex
+refresh or new task is needed only for automatic discovery of the newly installed Skills.
 Marketplace registration and a repository checkout are discovery surfaces;
 they are not source authority and do not by themselves prove host deployment.
 
@@ -105,7 +108,7 @@ For Core-only CLI use, install the wheel from the same Release, then preview and
 apply setup:
 
 ```powershell
-python -m pip install .\agent_memory_sidecar-0.3.3-py3-none-any.whl
+python -m pip install .\agent_memory_sidecar-0.3.4-py3-none-any.whl
 agent-memory --help
 agent-memory setup
 agent-memory setup --apply
@@ -118,14 +121,15 @@ and Doctor remain available; global publication and Scout Owner parity are
 explicitly unavailable. Owner-integrated installations provide a separate clean
 Git checkout and bind it explicitly.
 
-Workstation Bootstrap 1.7 accepts `agent_memory_source_manifest_v1`. Release
+Workstation Bootstrap 1.8 accepts `agent_memory_source_manifest_v1`. Release
 manifests bind each source to both a ref and a full commit SHA; an optional
-`canonical_owner` is `null` in the public profile. Floating branches are a
+`canonical_owner` is `null` in the public profile. On an existing host that means “the release does not distribute an Owner”, not
+“detach the current Owner”: a clean managed Owner is preserved only when Core is bound to that exact root and commit. Floating branches are a
 development convenience and are never accepted as public release evidence.
 
 An existing host that still has a managed Sidecar from another repository must
-not use normal sync to replace it. Review and apply the explicit
-[`source-authority-cutover-v1`](specs/source-authority-cutover-v1.md) plan; an
+not use normal sync to replace it. The unified deployment flow reviews and applies the explicit
+[`source-authority-cutover-v2`](specs/source-authority-cutover-v2.md) plan; an
 existing private Owner remains a separate optional backend unless explicitly
 detached.
 

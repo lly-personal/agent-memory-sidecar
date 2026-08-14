@@ -108,13 +108,15 @@ Hook 命令只引用 immutable artifact，不引用 editable checkout。遇到 l
   global binding/Owner parity 明确 unavailable。若该主机已存在 global binding，Bootstrap 必须以
   `public_core_existing_global_binding` 阻断并等待显式解绑/迁移决定，不得把旧绑定伪报为 unavailable。
 - `owner_integrated` 另外提供 clean、commit-bound canonical Owner；未配置时不得搜索替代 Owner。
-- Workstation Bootstrap 1.7.1 的 `sync-sources` 与 `materialize-host` 必须消费同一
-  `agent_memory_source_manifest_v1`。release source 同时绑定 ref 与完整 commit，ref 漂移整次失败。
-- 正常 Desktop 首跳固定为 `codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.3` 后
+- Workstation Bootstrap 1.8.0 以 `source-cutover --dry-run` 与 exact-hash apply 统一 fresh/update/legacy；底层
+  `sync-sources` 与 `materialize-host` 继续保持严格、无隐式换源能力。release source 同时绑定 ref 与完整 commit，
+  ref 漂移整次失败。
+- 正常 Desktop 首跳固定为 `codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.4` 后
   `codex plugin add agent-memory-sidecar@agent-memory`。Marketplace 只提供 Anchor；Anchor 的 Resolver 验证 stable immutable
-  Release、tag/commit、asset digest、checksums 与 manifest 后才能安装 Bootstrap/Scout。
-- 已有受管 Sidecar identity 不同时，普通 `sync-sources` 必须继续失败。先运行 `source-cutover --dry-run`，再以 exact
-  `plan_hash` 执行 `source-cutover --apply`；默认保留独立私有 Owner，解绑不是隐含动作。
+  Release、tag/commit、asset digest、checksums 与 manifest，安全展开 portable，并在同一任务执行正式 Bootstrap。
+- 已有受管 Sidecar identity 不同时，普通 `sync-sources` 必须继续失败。统一入口只展示一次短计划并取得一次确认，
+  再以 fresh `plan_hash` 原子 apply；公开 manifest 不携带 Owner 时，仅在既有 clean checkout 与 Core binding
+  root/commit 精确一致时保留私有 Owner，解绑不是隐含动作。
 - `build_public_export.py` 只保留为首个公开 seed 的 provenance 工具；`public_active` 后不得再次从冻结私有工程导出。
   后续 `build_release_artifacts.py` 只从公开 commit 和精确指向该 commit 的 `v<Core>` tag 生成 Core wheel/sdist、portable
   bundle、SBOM、source manifest、checksums 和 release manifest。

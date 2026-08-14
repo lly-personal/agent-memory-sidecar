@@ -5,7 +5,7 @@
 - Applies when: 设计、评审或变更 Agent Memory 的产品目标、行为权威、授权、隐私、证据或发布边界。
 - Avoid when: 只执行普通项目工作或不改变机制语义的机械修改。
 - Last verified: 2026-08-14
-- Evidence: 用户批准的 Agent Memory Core v1 与条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)
+- Evidence: 用户批准的 Agent Memory Core v1 与条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)
 
 ## 产品定义
 
@@ -139,7 +139,8 @@ integration preview，并把完整中文审阅包直接呈现给用户；用户�
     当前主机 canary 不得外推为另一台机器已经具备相同能力。
 19. **冷启动第一跳必须自包含**：任何明确加入跨设备连续性的工程必须携带极小 repo Anchor 或等价官方分发入口，
     使用户只需表达“同步并部署本机 Agent Memory”；不得要求用户记住 Sidecar checkout、canonical Owner 路径、
-    project ID、项目名单或安装顺序。Anchor 只路由到唯一 Bootstrap 源，不复制实现或成为第二 Owner。
+    project ID、项目名单或安装顺序。Anchor 只路由到唯一 Bootstrap 源，不复制实现或成为第二 Owner；经验证的 portable
+    Bootstrap 可以在同一任务继续完成主机调和，不能再人为增加一次“先安装、下个任务再部署”的产品步骤。
 20. **派生源与工作区分离**：Bootstrap 只原子更新 `$CODEX_HOME` 下身份固定、clean、可重建的受管源，不得为同步
     而 pull/reset/clean/覆盖 Desktop 活跃项目。项目集合仍由当前主机动态发现和用户决定，不由能力源仓库反推。
 21. **公开分发与私有证据分离**：不得把带历史证据和主机痕迹的工程仓库原地公开。公开物必须来自默认拒绝的
@@ -150,10 +151,12 @@ integration preview，并把完整中文审阅包直接呈现给用户；用户�
     随即冻结归档。发布证据不得自动冒充权威切换，切换后不得继续私有导出或双向同步。
 23. **可发现入口不等于安装权威**：公开 checkout、Marketplace 与 Release 页面只帮助定位能力；Anchor 必须验证
     stable immutable Release、tag/commit、资产 digest、checksums 与 manifest 后，才可把准确来源交给安装器。解析失败
-    不得回退浮动 branch、私有工程源或人工猜测资产。
+    不得回退浮动 branch、私有工程源或人工猜测资产。安装后的 Skill 自动发现仍以一次 Codex 刷新或新任务为平台
+    边界，但主机 source sync、Core/Owner/Skill 物化与 Doctor 不得被推迟到第二个任务。
 24. **换源是显式例外而非同步特权**：普通 source sync 永远拒绝 identity 变化；存量主机换到公开 Sidecar 必须先
-    生成无写入 `plan_hash`，再以 fresh hash 原子执行并失败恢复。已有私有 Owner 默认保持独立后端，移除它需要另一
-    个明确决策。
+    生成无写入计划，再由用户一次确认后以 fresh `plan_hash` 原子执行并失败恢复。公开 manifest 的
+    `canonical_owner=null` 只表示发行物不携带 Owner：已有 Owner checkout 与 Core binding identity 完全一致时必须保持
+    该独立后端；二者缺一、dirty 或 identity 不一致时阻断。移除 Owner 需要另一个明确决策。
 
 该实验按入口独立停止：无法证明交互 worktree 任务取得任务索引终态、中文 Review Pack 可理解性、直接呈现、
 隔离零变化或隐私过滤时，交互入口保持 `interactive_host_blocked`；无法证明 automation 执行源时只保持 Scheduled

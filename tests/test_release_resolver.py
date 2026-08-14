@@ -112,6 +112,22 @@ class ReleaseResolverTests(unittest.TestCase):
                 b"same resolver\n",
             )
             archive.writestr(
+                ".agents/skills/agent-memory-workstation-bootstrap/SKILL.md",
+                b"bootstrap skill\n",
+            )
+            archive.writestr(
+                ".agents/skills/agent-memory-workstation-bootstrap/scripts/enrollment.py",
+                b"enrollment script\n",
+            )
+            archive.writestr(
+                ".agents/skills/agent-memory-workstation-bootstrap/scripts/managed_sources.py",
+                b"managed sources script\n",
+            )
+            archive.writestr(
+                ".agents/skills/global-owner-scout/SKILL.md",
+                b"scout skill\n",
+            )
+            archive.writestr(
                 "plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py",
                 b"same resolver\n",
             )
@@ -262,8 +278,46 @@ class ReleaseResolverTests(unittest.TestCase):
             result = self.resolver.resolve_release(output=output, version="0.3.1")
             self.assertEqual("verified", result["status"])
             self.assertEqual(commit, result["commit"])
+            self.assertEqual("portable", result["portable_root"])
             self.assertTrue((output / "resolution.json").is_file())
             self.assertTrue((output / "agent-memory-portable-0.3.1.zip").is_file())
+            self.assertEqual(
+                b"managed sources script\n",
+                (
+                    output / "portable" / ".agents" / "skills"
+                    / "agent-memory-workstation-bootstrap" / "scripts" / "managed_sources.py"
+                ).read_bytes(),
+            )
+
+    def test_portable_materialization_rejects_symbolic_link_entries(self) -> None:
+        value = io.BytesIO()
+        with zipfile.ZipFile(value, "w") as archive:
+            info = zipfile.ZipInfo("linked")
+            info.create_system = 3
+            info.external_attr = 0o120777 << 16
+            archive.writestr(info, "outside")
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / "portable"
+            with self.assertRaisesRegex(
+                self.resolver.ResolutionError,
+                "release_portable_entry_invalid",
+            ):
+                self.resolver._materialize_portable(value.getvalue(), destination=target)
+            self.assertFalse(target.exists())
+
+    def test_portable_materialization_rejects_case_collisions(self) -> None:
+        value = io.BytesIO()
+        with zipfile.ZipFile(value, "w") as archive:
+            archive.writestr("Skill/File.txt", "first")
+            archive.writestr("skill/file.txt", "second")
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / "portable"
+            with self.assertRaisesRegex(
+                self.resolver.ResolutionError,
+                "release_portable_duplicate",
+            ):
+                self.resolver._materialize_portable(value.getvalue(), destination=target)
+            self.assertFalse(target.exists())
 
     def test_resolver_rejects_mutable_release_without_writing_output(self) -> None:
         release, _, commit = self.fixture(immutable=False)
