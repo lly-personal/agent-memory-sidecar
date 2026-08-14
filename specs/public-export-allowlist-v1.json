@@ -58,6 +58,7 @@
     ".github/dependabot.yml"
   ],
   "map": {
+    "templates/public/.gitattributes": ".gitattributes",
     "templates/public/AGENTS.md": "AGENTS.md"
   }
 }

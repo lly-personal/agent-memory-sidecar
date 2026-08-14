@@ -28,6 +28,8 @@ No changes have been assigned to a later release.
 - Public export normalizes all selected UTF-8 source and license bytes to LF, so the initial public snapshot is independent of the private checkout's line-ending policy.
 - Contract tests distinguish the private export-authority surface from the exported public checkout, so public CI validates portable consumers without requiring intentionally excluded private templates or marketplace files.
 - Release archives prune ignored interpreter and log noise created by prior validation while still rejecting the same paths when they are tracked source, so the test-to-release sequence remains composable without weakening the artifact boundary.
+- The positive release smoke follows the active authority context: private engineering validates export through consumption, an initial public checkout validates its own tagged snapshot through consumption, and a public-active checkout validates the tracked authority marker without requiring private export templates.
+- Public exports include an LF-enforcing `.gitattributes`, keeping the receipt-bound snapshot stable when Windows consumers clone under a global `core.autocrlf=true` policy.
 
 ### Security
 

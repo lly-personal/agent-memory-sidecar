@@ -58,6 +58,10 @@ class PublicDistributionTests(unittest.TestCase):
             self.assertEqual("public_repository_commit_required", receipt["status"])
             self.assertEqual(self.head, receipt["source_commit"])
             self.assertTrue((output / "AGENTS.md").is_file())
+            self.assertEqual(
+                "* text=auto eol=lf",
+                (output / ".gitattributes").read_text(encoding="utf-8").splitlines()[-1],
+            )
             self.assertTrue((output / "LICENSE").is_file())
             self.assertTrue((output / "specs" / "public-authority-cutover-v1.md").is_file())
             self.assertTrue((output / "docs" / "decisions" / "0073-public-engineering-authority-cutover.zh.md").is_file())
@@ -410,29 +414,57 @@ class PublicDistributionTests(unittest.TestCase):
         "positive release smoke runs in its dedicated CI job",
     )
     def test_positive_public_release_lane(self) -> None:
-        repository_url = "https://github.com/example/agent-memory-sidecar"
+        project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+        version = project["version"]
+        source_ref = f"v{version}"
+
+        if not PRIVATE_EXPORT_TEMPLATE.is_file() and (ROOT / "PUBLIC_AUTHORITY.json").is_file():
+            commit, _ = self.release.validate_release_source(root=ROOT)
+            authority = self.release.resolve_release_authority(
+                root=ROOT,
+                repository_url=project["urls"]["Homepage"],
+                source_ref=source_ref,
+                commit=commit,
+            )
+            self.assertEqual("public_active", authority["authority_epoch"])
+            return
+
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            license_file = root / "selected-license.txt"
-            license_file.write_text("Synthetic test license.\n", encoding="utf-8")
             public_root = root / "public"
-            receipt = self.exporter.prepare_export(
-                output=public_root,
-                source_commit=self.head,
-                repository_url=repository_url,
-                license_expression="LicenseRef-Synthetic-Test",
-                license_file=license_file,
-                require_clean=False,
-            )
-            commands = (
-                ["git", "init", "-b", "main"],
-                ["git", "config", "user.name", "Public Lane Test"],
-                ["git", "config", "user.email", "public-lane@example.invalid"],
-                ["git", "add", "."],
-                ["git", "commit", "-m", "Synthetic public snapshot"],
-                ["git", "remote", "add", "origin", repository_url + ".git"],
-                ["git", "tag", "v0.3.0"],
-            )
+            if PRIVATE_EXPORT_TEMPLATE.is_file():
+                repository_url = "https://github.com/example/agent-memory-sidecar"
+                license_file = root / "selected-license.txt"
+                license_file.write_text("Synthetic test license.\n", encoding="utf-8")
+                receipt = self.exporter.prepare_export(
+                    output=public_root,
+                    source_commit=self.head,
+                    repository_url=repository_url,
+                    license_expression="LicenseRef-Synthetic-Test",
+                    license_file=license_file,
+                    require_clean=False,
+                )
+                commands = (
+                    ["git", "init", "-b", "main"],
+                    ["git", "config", "user.name", "Public Lane Test"],
+                    ["git", "config", "user.email", "public-lane@example.invalid"],
+                    ["git", "add", "."],
+                    ["git", "commit", "-m", "Synthetic public snapshot"],
+                    ["git", "remote", "add", "origin", repository_url + ".git"],
+                    ["git", "tag", source_ref],
+                )
+            else:
+                repository_url = project["urls"]["Homepage"]
+                subprocess.run(
+                    ["git", "clone", "--no-hardlinks", str(ROOT), str(public_root)],
+                    check=True,
+                    capture_output=True,
+                )
+                receipt = json.loads((public_root / "PUBLIC_EXPORT_RECEIPT.json").read_text(encoding="utf-8"))
+                commands = (
+                    ["git", "remote", "set-url", "origin", repository_url + ".git"],
+                    ["git", "tag", "--force", source_ref],
+                )
             for command in commands:
                 subprocess.run(command, cwd=public_root, check=True, capture_output=True)
 
@@ -440,14 +472,14 @@ class PublicDistributionTests(unittest.TestCase):
             manifest = self.release.build(
                 output=release_root,
                 repository_url=repository_url,
-                source_ref="v0.3.0",
+                source_ref=source_ref,
                 root=public_root,
             )
             self.assertEqual("public_artifact_verified", manifest["status"])
             self.assertEqual(receipt["source_commit"], manifest["source"]["engineering_source_commit"])
             self.assertEqual("private_engineering", manifest["source"]["authority_epoch"])
             self.assertTrue(all(manifest["verification"].values()))
-            portable = release_root / "agent-memory-portable-0.3.0.zip"
+            portable = release_root / f"agent-memory-portable-{version}.zip"
             self.assertTrue(portable.is_file())
             for line in (release_root / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
                 expected, relative = line.split("  ", 1)

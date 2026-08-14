@@ -537,8 +537,9 @@ Apply 需要新的当前 approval ref；setup 遇到旧 schema 只返回 `migrat
 `public_source_export_v1` 的输入包含独立 public repository URL、engineering source commit、SPDX license expression 与
 UTF-8 license file；输出目录必须不存在。它只复制 allowlist 选择面，记录 engineering commit 与公开 snapshot digest；
 未选中文件留在私有源，已声明但为空的 pattern、alias/hardlink、binary、隐私命中、缺许可证或 dirty source 失败关闭。
-所有选中的 UTF-8 文本与许可证在写入和计算 snapshot 前统一为 LF；无法严格解码的字节失败关闭，公开源码 identity
-不得随私有工程 checkout 的 CRLF/LF 策略漂移。
+所有选中的 UTF-8 文本与许可证在写入和计算 snapshot 前统一为 LF；公开根目录同时映射
+`* text=auto eol=lf` 的 `.gitattributes`，使后续跨平台 clone 继续保留 snapshot 的物理字节。无法严格解码的字节失败关闭，
+公开源码 identity 不得随私有工程或公开消费 checkout 的 CRLF/LF 策略漂移。
 Allowlist 中的 `path/**` 固定表示该目录下全部后代普通文件；实现不得直接依赖 Python 版本相关的尾部 `**` glob
 返回集合，遍历中遇到 alias/reparse 或零普通文件均失败关闭。
 独立公开仓库提交后，release builder 才接受 `v<Core>` ref，并要求 origin、ref commit 与 public HEAD 三者一致；随后验证
