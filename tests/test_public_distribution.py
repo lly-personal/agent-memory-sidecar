@@ -464,6 +464,7 @@ class PublicDistributionTests(unittest.TestCase):
             public_root = root / "public"
             if PRIVATE_EXPORT_TEMPLATE.is_file():
                 repository_url = "https://github.com/example/agent-memory-sidecar"
+                expected_authority_epoch = "private_engineering"
                 license_file = root / "selected-license.txt"
                 license_file.write_text("Synthetic test license.\n", encoding="utf-8")
                 receipt = self.exporter.prepare_export(
@@ -485,6 +486,7 @@ class PublicDistributionTests(unittest.TestCase):
                 )
             else:
                 repository_url = project["urls"]["Homepage"]
+                expected_authority_epoch = "public_active"
                 subprocess.run(
                     ["git", "clone", "--no-hardlinks", str(ROOT), str(public_root)],
                     check=True,
@@ -520,7 +522,7 @@ class PublicDistributionTests(unittest.TestCase):
             )
             self.assertEqual("public_artifact_verified", manifest["status"])
             self.assertEqual(receipt["source_commit"], manifest["source"]["engineering_source_commit"])
-            self.assertEqual("private_engineering", manifest["source"]["authority_epoch"])
+            self.assertEqual(expected_authority_epoch, manifest["source"]["authority_epoch"])
             self.assertTrue(all(manifest["verification"].values()))
             portable = release_root / f"agent-memory-portable-{version}.zip"
             self.assertTrue(portable.is_file())
