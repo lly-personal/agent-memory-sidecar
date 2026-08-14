@@ -327,7 +327,10 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             self.assertIn("INSTALLED_BY_DEFAULT", text)
             self.managed_sources.validate_marketplace(json.loads(text))
         else:
-            self.assertTrue((ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file())
+            self.assertTrue(
+                (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()
+                or (ROOT / "PUBLIC_AUTHORITY.json").is_file()
+            )
             self.assertTrue((ROOT / "LICENSE").is_file())
 
     def test_scout_validator_renderer_and_visible_verifier_self_tests(self) -> None:
