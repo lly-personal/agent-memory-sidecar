@@ -65,6 +65,9 @@ the latest stable immutable GitHub Release or an explicit version and verifies t
 `SHA256SUMS`, release/source manifests, and portable embedded manifests before installation. Resolution failure is
 `release_resolution_blocked`; it never falls back to `main`, a private repository, or an unverified local checkout. The resolver
 contract begins with `v0.3.1`; earlier public releases remain historical artifacts and are not valid inputs for this cold-start path.
+For GitHub API metadata only, the Resolver may use an explicit `GITHUB_TOKEN`/`GH_TOKEN` or existing non-interactive `gh`
+authentication before falling back to the anonymous public quota. It never persists or renders that token; rate limiting and invalid
+authentication remain distinguishable failure details under `release_resolution_blocked`.
 
 The export stage is a bootstrap and provenance mechanism, not an ongoing mirror. Authority epochs, the one-time cutover gate, and
 steady-state public development are owned by `public-authority-cutover-v1.md`:

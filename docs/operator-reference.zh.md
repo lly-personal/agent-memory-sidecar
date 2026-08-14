@@ -110,7 +110,7 @@ Hook 命令只引用 immutable artifact，不引用 editable checkout。遇到 l
 - `owner_integrated` 另外提供 clean、commit-bound canonical Owner；未配置时不得搜索替代 Owner。
 - Workstation Bootstrap 1.7.0 的 `sync-sources` 与 `materialize-host` 必须消费同一
   `agent_memory_source_manifest_v1`。release source 同时绑定 ref 与完整 commit，ref 漂移整次失败。
-- 正常 Desktop 首跳固定为 `codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.1` 后
+- 正常 Desktop 首跳固定为 `codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.2` 后
   `codex plugin add agent-memory-sidecar@agent-memory`。Marketplace 只提供 Anchor；Anchor 的 Resolver 验证 stable immutable
   Release、tag/commit、asset digest、checksums 与 manifest 后才能安装 Bootstrap/Scout。
 - 已有受管 Sidecar identity 不同时，普通 `sync-sources` 必须继续失败。先运行 `source-cutover --dry-run`，再以 exact

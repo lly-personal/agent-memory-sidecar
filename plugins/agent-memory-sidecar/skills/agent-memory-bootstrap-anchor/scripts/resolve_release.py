@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import urllib.error
@@ -49,14 +50,51 @@ def canonical(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
+def _github_api_token() -> str | None:
+    for name in ("GITHUB_TOKEN", "GH_TOKEN"):
+        token = os.environ.get(name, "").strip()
+        if token:
+            require(len(token) <= 4096 and not re.search(r"\s", token), "release_github_token_invalid")
+            return token
+    executable = shutil.which("gh")
+    if executable is None:
+        return None
+    env = dict(os.environ)
+    env["GH_PROMPT_DISABLED"] = "1"
+    try:
+        result = subprocess.run(
+            [executable, "auth", "token"],
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    token = result.stdout.strip() if result.returncode == 0 else ""
+    if not token:
+        return None
+    require(len(token) <= 4096 and not re.search(r"\s", token), "release_github_token_invalid")
+    return token
+
+
 def _request(url: str, *, limit: int) -> bytes:
+    parsed = urllib.parse.urlsplit(url)
+    api_request = parsed.scheme == "https" and parsed.netloc.casefold() == "api.github.com"
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "agent-memory-release-resolver/1",
+    }
+    if api_request:
+        token = _github_api_token()
+        if token is not None:
+            headers["Authorization"] = f"Bearer {token}"
     request = urllib.request.Request(
         url,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "agent-memory-release-resolver/1",
-        },
+        headers=headers,
     )
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
@@ -75,6 +113,17 @@ def _request(url: str, *, limit: int) -> bytes:
             return b"".join(chunks)
     except ResolutionError:
         raise
+    except urllib.error.HTTPError as exc:
+        if api_request and exc.code == 403 and (
+            exc.headers.get("X-RateLimit-Remaining") == "0"
+            or "rate limit" in str(exc.reason).casefold()
+        ):
+            raise ResolutionError("release_github_api_rate_limited") from exc
+        if api_request and exc.code == 401:
+            raise ResolutionError("release_github_auth_invalid") from exc
+        if api_request and exc.code == 404:
+            raise ResolutionError("release_metadata_not_found") from exc
+        raise ResolutionError("release_resolution_unavailable") from exc
     except (OSError, ValueError, urllib.error.URLError) as exc:
         raise ResolutionError("release_resolution_unavailable") from exc
 

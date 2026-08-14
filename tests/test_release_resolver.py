@@ -31,6 +31,34 @@ class ReleaseResolverTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.resolver = load_module("agent_memory_release_resolver", REPO_RESOLVER)
 
+    def urlopen_response(self, *, expected_auth: str | None, payload: bytes = b"{}"):
+        test = self
+
+        class Response:
+            headers = {"Content-Length": str(len(payload))}
+
+            def __init__(self) -> None:
+                self.finished = False
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self, _size: int) -> bytes:
+                if self.finished:
+                    return b""
+                self.finished = True
+                return payload
+
+        def fake_urlopen(request, *, timeout: int):
+            test.assertEqual(30, timeout)
+            test.assertEqual(expected_auth, request.get_header("Authorization"))
+            return Response()
+
+        return fake_urlopen
+
     def fixture(
         self,
         *,
@@ -137,6 +165,81 @@ class ReleaseResolverTests(unittest.TestCase):
 
     def test_resolver_is_identical_across_anchor_surfaces(self) -> None:
         self.assertEqual(REPO_RESOLVER.read_bytes(), PLUGIN_RESOLVER.read_bytes())
+
+    def test_api_request_uses_explicit_github_token(self) -> None:
+        with mock.patch.dict(
+            self.resolver.os.environ,
+            {"GITHUB_TOKEN": "", "GH_TOKEN": "github-token-for-test"},
+        ), mock.patch.object(
+            self.resolver.urllib.request,
+            "urlopen",
+            side_effect=self.urlopen_response(expected_auth="Bearer github-token-for-test"),
+        ):
+            self.assertEqual(b"{}", self.resolver._request(self.resolver.API_ROOT, limit=1024))
+
+    def test_api_rate_limit_has_a_distinct_failure(self) -> None:
+        error = self.resolver.urllib.error.HTTPError(
+            self.resolver.API_ROOT,
+            403,
+            "rate limit exceeded",
+            {"X-RateLimit-Remaining": "0"},
+            None,
+        )
+        with mock.patch.dict(
+            self.resolver.os.environ,
+            {"GITHUB_TOKEN": "", "GH_TOKEN": ""},
+        ), mock.patch.object(
+            self.resolver.urllib.request,
+            "urlopen",
+            side_effect=error,
+        ):
+            with self.assertRaisesRegex(
+                self.resolver.ResolutionError,
+                "release_github_api_rate_limited",
+            ):
+                self.resolver._request(self.resolver.API_ROOT, limit=1024)
+
+    def test_api_request_uses_existing_noninteractive_gh_token(self) -> None:
+        completed = self.resolver.subprocess.CompletedProcess(
+            args=["gh", "auth", "token"],
+            returncode=0,
+            stdout="gh-token-for-test\n",
+            stderr="",
+        )
+        with mock.patch.dict(
+            self.resolver.os.environ,
+            {"GITHUB_TOKEN": "", "GH_TOKEN": ""},
+        ), mock.patch.object(
+            self.resolver.shutil,
+            "which",
+            return_value="gh",
+        ), mock.patch.object(
+            self.resolver.subprocess,
+            "run",
+            return_value=completed,
+        ), mock.patch.object(
+            self.resolver.urllib.request,
+            "urlopen",
+            side_effect=self.urlopen_response(expected_auth="Bearer gh-token-for-test"),
+        ):
+            self.assertEqual(b"{}", self.resolver._request(self.resolver.API_ROOT, limit=1024))
+
+    def test_release_asset_request_never_receives_api_token(self) -> None:
+        with mock.patch.dict(
+            self.resolver.os.environ,
+            {"GITHUB_TOKEN": "github-token-for-test", "GH_TOKEN": ""},
+        ), mock.patch.object(
+            self.resolver.urllib.request,
+            "urlopen",
+            side_effect=self.urlopen_response(expected_auth=None, payload=b"ok"),
+        ):
+            self.assertEqual(
+                b"ok",
+                self.resolver._request(
+                    "https://github.com/lly-personal/agent-memory-sidecar/releases/download/v0.3.1/SHA256SUMS",
+                    limit=1024,
+                ),
+            )
 
     def test_resolver_verifies_immutable_release_and_writes_only_after_success(self) -> None:
         release, payloads, commit = self.fixture()
