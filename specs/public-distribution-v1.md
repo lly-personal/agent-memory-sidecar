@@ -34,7 +34,9 @@ remote, ref, commit
 - `ref` is a non-empty branch/tag/ref used for bounded fetch.
 - `commit` is a full lowercase 40-hex Git commit. It is mandatory for `release`; `development` may use `null`.
 - A checkout is accepted only when normalized origin, clean status, checked-out commit, and expected commit all match.
-- `canonical_owner=null` means public Core mode. It is not permission to search for another Owner or to perform global mutation.
+- `canonical_owner=null` means the public artifact does not distribute an Owner. On a fresh host this selects public Core. During
+  explicit workstation reconcile, an existing clean Owner may remain only when its managed checkout exactly matches Core's bound
+  root and commit. It is not permission to search for, synthesize, detach, or publish another Owner.
 
 ## Two-stage public export
 
@@ -64,7 +66,10 @@ The repository marketplace and both byte-identical Bootstrap Anchors are discove
 the latest stable immutable GitHub Release or an explicit version and verifies the release tag/commit, GitHub asset digests,
 `SHA256SUMS`, release/source manifests, and portable embedded manifests before installation. Resolution failure is
 `release_resolution_blocked`; it never falls back to `main`, a private repository, or an unverified local checkout. The resolver
-contract begins with `v0.3.1`; earlier public releases remain historical artifacts and are not valid inputs for this cold-start path.
+manually materializes only validated regular-file entries under a new `portable_root`, rejecting absolute/traversal paths,
+case-collisions, symlink/device metadata, encryption, and expansion beyond its bound. Anchor executes the formal Bootstrap from that
+verified root in the same deployment task; a later Codex refresh/new task is only the automatic Skill discovery boundary. The
+resolver contract begins with `v0.3.1`; earlier public releases remain historical artifacts and are not valid inputs for this cold-start path.
 For GitHub API metadata only, the Resolver may use an explicit `GITHUB_TOKEN`/`GH_TOKEN` or existing non-interactive `gh`
 authentication before falling back to the anonymous public quota. It never persists or renders that token; rate limiting and invalid
 authentication remain distinguishable failure details under `release_resolution_blocked`.

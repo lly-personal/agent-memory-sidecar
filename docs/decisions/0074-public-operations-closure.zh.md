@@ -2,7 +2,7 @@
 
 - 状态：Accepted
 - 日期：2026-08-14
-- 关联：[L1](../specs/axioms.md)、[L2](../specs/topology.md)、[L3](../specs/interface.md)、[Source Authority Cutover v1](../../specs/source-authority-cutover-v1.md)、[Public Distribution v1](../../specs/public-distribution-v1.md)
+- 关联：[L1](../specs/axioms.md)、[L2](../specs/topology.md)、[L3](../specs/interface.md)、[Source Authority Cutover](../../specs/source-authority-cutover-v2.md)、[统一工作站调和 ADR](0075-unified-workstation-reconcile.zh.md)、[Public Distribution v1](../../specs/public-distribution-v1.md)
 
 ## 背景
 
@@ -20,7 +20,8 @@ Marketplace 或一段人工复制命令当作发行权限。若直接放宽 `syn
    失败恢复来源与 Bootstrap/Scout。
 4. 冷启动 Anchor 使用公开 Release Resolver 获取 latest stable 或显式版本，验证 immutable Release、tag/commit、
    GitHub asset digest、`SHA256SUMS`、source manifest 与 portable 内嵌 manifest；不得回退 `main`、私有仓库或猜测资产。
-5. 仓库 Marketplace 只是可发现入口，不是 source authority。新安装 Plugin/Skill 只从下一任务保证可加载。
+5. 仓库 Marketplace 只是可发现入口，不是 source authority。新安装 Plugin/Skill 只从下一任务保证自动发现，但经验证
+   portable 中的正式 Bootstrap 可以在当前部署任务直接执行；详见 ADR 0075。
 
 ## 结果与代价
 

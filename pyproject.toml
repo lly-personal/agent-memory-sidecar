@@ -1,6 +1,6 @@
 [project]
 name = "agent-memory-sidecar"
-version = "0.3.3"
+version = "0.3.4"
 description = "Publishes user-authorized collaboration rules to scoped Codex AGENTS.md files."
 readme = "README.md"
 license = "Apache-2.0"

@@ -7,7 +7,7 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `1.7.1`
+- Skill version: `1.8.0`
 - Modes: `inspect`, `apply_enrollment`
 - Deployment pack: `agent_memory_workstation_deployment_pack_v1`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
@@ -30,22 +30,21 @@ not change the Host Profile. Only an explicit request to retest or configure Sch
 1. Establish the cold-start source without assuming a pre-existing Sidecar checkout:
    - When invoked from the installed `agent-memory-sidecar` plugin, use its release source manifest as the first trusted Bootstrap source.
    - For the public lane, locate and validate the portable bundle's root `source-manifest.json`; a repository checkout or marketplace
-     entry alone is not source authority. Use `skill-installer` only with its immutable ref and full commit. Never default to a
-     floating branch, ask for project IDs/model settings/project lists, or invent a source.
+     entry alone is not source authority. Execute this Skill's deterministic scripts from the Resolver's safely materialized portable
+     root. Never default to a floating branch, ask for project IDs/model settings/project lists, or invent a source.
    - Authentication or source failure ends as `source_sync_blocked`; do not claim the capability is synchronized.
-2. Run `python -B scripts/managed_sources.py sync-sources --codex-home <active-codex-home> --source-manifest <release-manifest>`.
-   This creates or refreshes only the
-   reconstructable managed source roots under the active Codex home. Never reset, clean, pull, or overwrite an active project
-   checkout. A dirty or identity-mismatched managed source fails closed instead of being replaced.
-   If the Sidecar identity differs because the host predates public authority, stop normal sync and use the contract-owned
-   `source-cutover --dry-run`/fresh `plan_hash`/`--apply` flow. Do not add a force flag or silently drop an existing Owner.
-3. Run `python -B scripts/managed_sources.py materialize-host --codex-home <active-codex-home> --source-manifest <same-release-manifest>`.
-   The deterministic command uses the clean managed Sidecar source to run Core setup, optionally bind the commit-bound canonical
-   Owner source, verify Doctor, and install both
-   versioned repository Skills atomically per target while excluding bytecode caches. Validate Bootstrap `1.7.1`, Scout `5.5.0`,
-   their content hashes, and canonical/local Owner parity. Installation evidence proves host materialization, not later model
-   adoption. A newly installed Skill is guaranteed as a discovery input only from the next task; report `available_next_turn`
-   unless this task independently loaded and verified the installed entry.
+2. Run `python -B scripts/managed_sources.py source-cutover --dry-run --codex-home <active-codex-home>
+   --source-manifest <release-manifest>` as the unified fresh/update/legacy inspection. It only targets reconstructable managed
+   sources under the active Codex home and never resets, cleans, pulls, or overwrites an active project checkout.
+   - a plan containing only `:install`, or `noop`, is covered by the user's deployment request and may consume the exact plan.
+   - any `:replace` requires `render-cutover-plan`, one confirmation, another dry-run, and only the fresh hash may apply.
+   - a public manifest with `canonical_owner=null` preserves a clean existing Owner only when its checkout and Core binding
+     root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
+3. Run the exact-hash `source-cutover --apply`. The transaction uses the managed Sidecar source to run Core setup, bind the explicit
+   or preserved canonical Owner, verify Doctor, and install both versioned repository Skills atomically per target while excluding
+   bytecode caches. Validate Bootstrap `1.8.0`, Scout `5.5.0`, their content hashes, and canonical/local Owner parity. Installation
+   evidence proves host materialization, not later model adoption. A newly installed Skill is guaranteed as a discovery input only
+   after one Codex refresh or from the next task; report `available_next_turn` without asking the user to repeat deployment.
 5. Use the Codex Desktop project API to enumerate the complete visible project inventory. Do not infer a fixed project list from
    repository names, paths, old automation names, another host's profile, or the repositories used as capability sources.
 6. Enumerate recent tasks with the host-supported bound. Classify a task as natural only when native metadata proves it was

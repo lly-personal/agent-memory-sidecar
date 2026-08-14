@@ -48,8 +48,8 @@
 - `host_project_id`：当前 Codex Desktop 对本机项目的执行标识；只用于当前主机绑定，不进入 Git 或跨设备 identity。
 - `host_enrollment`：用户确认当前主机是否为一个已发现项目运行 Global Owner Scout 的本机配置；不是行为 Owner。
 - `enrollment_pack`：Bootstrap 对本机项目发现、自然活动覆盖、隔离资格、现有状态和建议动作的中文确认界面。
-- `repo_bootstrap_anchor`：连续性工程内的极小冷启动 Skill；只把统一部署意图路由到正式 Bootstrap/插件，不复制
-  实现、不保存主机状态，也不是行为 Owner。
+- `repo_bootstrap_anchor`：连续性工程内的极小冷启动 Skill；验证不可变发行物并从安全展开的 portable 在同一任务
+  调用正式 Bootstrap，不复制实现、不保存主机状态，也不是行为 Owner。
 - `managed_capability_source`：当前 Codex home 下 identity 固定、clean、可重建的 Sidecar 或 canonical Owner 安装
   快照；不等同于活跃项目工作区或行为 Owner。
 - `deployment_pack`：按可移植分发、源同步、主机物化、项目激活四层展示本机部署事实的中文回执；前一层不能
@@ -67,9 +67,11 @@
 - `public_authority_marker`：`public_active` 后由公开仓库跟踪的 `agent_memory_public_authority_v1` provenance 文件；
   它绑定首个公开 Release 和原始工程 snapshot，但不自行授权切换，也不是行为 Owner。
 - `release_resolver`：Anchor 内只读解析 stable immutable GitHub Release 的确定性消费者；同时验证 tag/commit、asset
-  digest、checksums、release/source manifest 与 portable，失败不回退。
+  digest、checksums、release/source manifest 与 portable，并把普通文件安全展开到临时解析目录；失败不回退。
+- `workstation_reconcile`：fresh、同 identity 更新与 legacy 换源共享的单一主机部署模型；用户只表达一次部署目标，
+  仅在 Sidecar identity 变化时看见一份短计划并确认一次，随后原子 source/host 物化并得到一份分层回执。
 - `source_authority_cutover`：存量主机以无写入 plan 和 fresh `plan_hash` 把受管 Sidecar identity 显式切到公开
-  Release 的一次性 host operation；不放宽普通 sync，也不隐式移除私有 Owner。
+  Release 的 `workstation_reconcile` 内部事务；不放宽普通 sync，也不隐式移除私有 Owner。
 - `source_manifest`：把 Sidecar 和可选 canonical Owner 的 credential-free remote、ref 与完整 commit 绑定的安装输入。
 - `core_public`：不携带 canonical Owner 的公开安装 profile；project scope Core 可用，global 集成明确 unavailable。
 - `owner_integrated`：宿主另外提供 commit-bound 私有 Owner 后启用 global binding 的安装 profile。

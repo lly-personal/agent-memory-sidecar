@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Atomic managed-source sync and deployment-pack contracts for Bootstrap 1.7."""
+"""Atomic managed-source sync and deployment-pack contracts for Bootstrap 1.8."""
 
 from __future__ import annotations
 
@@ -21,12 +21,16 @@ from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 
-BOOTSTRAP_VERSION = "1.7.1"
+BOOTSTRAP_VERSION = "1.8.0"
 SCOUT_VERSION = "5.5.0"
 PACK_VERSION = "agent_memory_workstation_deployment_pack_v1"
 SOURCE_MANIFEST_VERSION = "agent_memory_source_manifest_v1"
-SOURCE_CUTOVER_PLAN_VERSION = "agent_memory_source_cutover_plan_v1"
-SOURCE_CUTOVER_RECEIPT_VERSION = "agent_memory_source_cutover_receipt_v1"
+SOURCE_CUTOVER_PLAN_VERSION = "agent_memory_source_cutover_plan_v2"
+SOURCE_CUTOVER_RECEIPT_VERSION = "agent_memory_source_cutover_receipt_v2"
+SOURCE_CUTOVER_PLAN_FIELDS = {
+    "contract_version", "bootstrap_version", "status", "owner_action",
+    "current", "desired", "changes", "plan_hash",
+}
 SOURCE_MANIFEST_FIELDS = {
     "contract_version", "distribution", "sidecar", "canonical_owner",
 }
@@ -290,6 +294,79 @@ def source_identity(spec: SourceSpec) -> dict[str, str]:
     }
 
 
+def _existing_global_binding(codex_home: Path) -> dict[str, str] | None:
+    store = codex_home.resolve() / "agent-memory-sidecar" / "memory.sqlite"
+    if not store.exists() and not store.is_symlink():
+        return None
+    try:
+        value = store.lstat()
+        require(
+            stat.S_ISREG(value.st_mode)
+            and not stat.S_ISLNK(value.st_mode)
+            and not _is_reparse(value)
+            and value.st_nlink == 1,
+            "source_cutover_owner_state_ambiguous",
+        )
+        connection = sqlite3.connect(f"file:{store.as_posix()}?mode=ro", uri=True)
+        try:
+            table = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='global_instruction_binding'"
+            ).fetchone()
+            if table is None:
+                return None
+            columns = {
+                str(row[1])
+                for row in connection.execute("PRAGMA table_info(global_instruction_binding)")
+            }
+            require(
+                {"singleton", "source_root", "source_commit"}.issubset(columns),
+                "source_cutover_owner_state_ambiguous",
+            )
+            row = connection.execute(
+                "SELECT source_root, source_commit FROM global_instruction_binding WHERE singleton = 1"
+            ).fetchone()
+            if row is None:
+                return None
+            source_root = str(row[0]).strip()
+            source_commit = str(row[1]).strip().casefold()
+            require(
+                source_root and SHA40.fullmatch(source_commit) is not None,
+                "source_cutover_owner_state_ambiguous",
+            )
+            return {"source_root": source_root, "source_commit": source_commit}
+        finally:
+            connection.close()
+    except BootstrapError:
+        raise
+    except (OSError, sqlite3.Error) as exc:
+        raise BootstrapError("source_cutover_owner_state_ambiguous") from exc
+
+
+def _preserved_owner_identity(
+    codex_home: Path,
+    current_owner: dict[str, str] | None,
+) -> dict[str, str] | None:
+    binding = _existing_global_binding(codex_home)
+    if current_owner is None and binding is None:
+        return None
+    require(
+        current_owner is not None and binding is not None,
+        "source_cutover_owner_state_ambiguous",
+    )
+    owner_root = _managed_source_root(codex_home, create=False) / "canonical_owner"
+    try:
+        bound_root = Path(binding["source_root"]).expanduser().resolve()
+        expected_root = owner_root.resolve()
+    except OSError as exc:
+        raise BootstrapError("source_cutover_owner_state_ambiguous") from exc
+    require(
+        os.path.normcase(str(bound_root)) == os.path.normcase(str(expected_root))
+        and binding["source_commit"] == current_owner["commit"],
+        "source_cutover_owner_state_ambiguous",
+    )
+    return {**current_owner, "ref": "preserved"}
+
+
 def verify_remote_ref(spec: SourceSpec) -> None:
     require(spec.expected_commit is not None, "source_cutover_commit_required")
     output = run_git([
@@ -320,8 +397,23 @@ def _source_cutover_state(codex_home: Path, specs: tuple[SourceSpec, ...]) -> di
     changes: list[str] = []
     for name in ("sidecar", "canonical_owner"):
         target = root / name
-        current[name] = inspect_existing_checkout(target) if target.exists() else None
-        desired[name] = source_identity(by_name[name]) if name in by_name else None
+        try:
+            current[name] = inspect_existing_checkout(target) if target.exists() else None
+        except BootstrapError as exc:
+            if name == "canonical_owner" and name not in by_name:
+                raise BootstrapError("source_cutover_owner_state_ambiguous") from exc
+            raise
+    desired["sidecar"] = source_identity(by_name["sidecar"])
+    if "canonical_owner" in by_name:
+        desired["canonical_owner"] = source_identity(by_name["canonical_owner"])
+        owner_action = "keep_owner"
+    else:
+        desired["canonical_owner"] = _preserved_owner_identity(
+            codex_home, current["canonical_owner"],
+        )
+        owner_action = "keep_owner" if desired["canonical_owner"] is not None else "public_core"
+
+    for name in ("sidecar", "canonical_owner"):
         current_comparable = current[name]
         desired_comparable = desired[name]
         if current_comparable is not None:
@@ -333,12 +425,6 @@ def _source_cutover_state(codex_home: Path, specs: tuple[SourceSpec, ...]) -> di
             action = "remove" if desired[name] is None else ("install" if current[name] is None else "replace")
             changes.append(f"{name}:{action}")
 
-    if desired["canonical_owner"] is None:
-        require(current["canonical_owner"] is None, "source_cutover_owner_detach_required")
-        require(not _has_existing_global_binding(codex_home), "public_core_existing_global_binding")
-        owner_action = "public_core"
-    else:
-        owner_action = "keep_owner"
     return {
         "current": current,
         "desired": desired,
@@ -361,6 +447,79 @@ def plan_source_cutover(codex_home: Path, specs: tuple[SourceSpec, ...]) -> dict
     }
     plan["plan_hash"] = object_hash(plan, "plan_hash")
     return plan
+
+
+def validate_source_cutover_plan(value: Any) -> dict[str, Any]:
+    exact(value, SOURCE_CUTOVER_PLAN_FIELDS, "$")
+    require(value["contract_version"] == SOURCE_CUTOVER_PLAN_VERSION, "source_cutover_plan_contract_invalid")
+    require(value["bootstrap_version"] == BOOTSTRAP_VERSION, "source_cutover_plan_bootstrap_invalid")
+    require(value["status"] in {"ready", "noop"}, "source_cutover_plan_status_invalid")
+    require(value["owner_action"] in {"keep_owner", "public_core"}, "source_cutover_plan_owner_action_invalid")
+    require(
+        isinstance(value["current"], dict)
+        and set(value["current"]) == {"sidecar", "canonical_owner"}
+        and isinstance(value["desired"], dict)
+        and set(value["desired"]) == {"sidecar", "canonical_owner"},
+        "source_cutover_plan_sources_invalid",
+    )
+    changes = value["changes"]
+    require(
+        isinstance(changes, list)
+        and len(changes) <= 2
+        and len(changes) == len(set(changes))
+        and all(
+            isinstance(item, str)
+            and re.fullmatch(r"(?:sidecar|canonical_owner):(?:install|replace)", item) is not None
+            for item in changes
+        ),
+        "source_cutover_plan_changes_invalid",
+    )
+    require((value["status"] == "noop") == (not changes), "source_cutover_plan_status_invalid")
+    plan_hash = str(value["plan_hash"]).casefold()
+    require(
+        SHA64.fullmatch(plan_hash) is not None
+        and object_hash(value, "plan_hash") == plan_hash,
+        "source_cutover_plan_hash_invalid",
+    )
+    return value
+
+
+def render_source_cutover_plan(value: Any) -> str:
+    plan = validate_source_cutover_plan(value)
+    sidecar_change = next(
+        (item.split(":", 1)[1] for item in plan["changes"] if item.startswith("sidecar:")),
+        "unchanged",
+    )
+    sidecar_labels = {
+        "install": "首次安装公开 Sidecar",
+        "replace": "将现有 Sidecar 切换到已验证的公开发行来源",
+        "unchanged": "Sidecar 来源身份不变，仅重新验证并修复主机物化",
+    }
+    owner_change = next(
+        (item.split(":", 1)[1] for item in plan["changes"] if item.startswith("canonical_owner:")),
+        "unchanged",
+    )
+    if owner_change == "install":
+        owner_label = "绑定显式提供且已验证的私有 Owner"
+    elif owner_change == "replace":
+        owner_label = "切换到显式提供且已验证的私有 Owner"
+    elif plan["owner_action"] == "keep_owner":
+        owner_label = "保持本机已精确绑定的私有 Owner，不修改或公开其内容"
+    else:
+        owner_label = "使用 public Core；本机不存在待解绑 Owner"
+    replaces_existing_source = any(item.endswith(":replace") for item in plan["changes"])
+    confirmation = (
+        "请回复“确认更新”后执行一次原子切换；任一步失败会恢复原状态。"
+        if replaces_existing_source
+        else "当前部署请求已覆盖该动作，将直接执行并在失败时恢复原状态。"
+    )
+    return "\n".join([
+        "## 本机 Agent Memory 调和计划",
+        "",
+        f"- Sidecar：{sidecar_labels[sidecar_change]}",
+        f"- Owner：{owner_label}",
+        f"- 执行：{confirmation}",
+    ]) + "\n"
 
 
 def _snapshot_skill_targets(codex_home: Path) -> list[tuple[Path, Path | None]]:
@@ -489,7 +648,7 @@ def apply_source_cutover(
     require(SHA64.fullmatch(plan_hash.casefold()) is not None, "source_cutover_plan_hash_invalid")
     plan = plan_source_cutover(codex_home, specs)
     require(plan["plan_hash"] == plan_hash.casefold(), "source_cutover_plan_stale")
-    require(plan["status"] == "ready", "source_cutover_not_required")
+    require(plan["status"] in {"ready", "noop"}, "source_cutover_plan_invalid")
     _preflight_cutover_receipt(codex_home)
     root = _managed_source_root(codex_home, create=True)
     by_name = {spec.name: spec for spec in specs}
@@ -540,8 +699,23 @@ def apply_source_cutover(
             current = inspect_existing_checkout(target) if target.exists() else None
             require(current == plan["current"][name], "source_cutover_plan_stale")
 
+        if plan["owner_action"] == "keep_owner" and "canonical_owner" not in by_name:
+            preserved = _preserved_owner_identity(codex_home, plan["current"]["canonical_owner"])
+            require(preserved == plan["desired"]["canonical_owner"], "source_cutover_plan_stale")
+            receipts["canonical_owner"] = {
+                "status": "unchanged",
+                "ref": "preserved",
+                "commit": preserved["commit"],
+            }
+
         skill_snapshots = _snapshot_skill_targets(codex_home)
-        materialization = materialize_host(codex_home, specs)
+        materialization = materialize_host(
+            codex_home,
+            specs,
+            preserve_existing_owner=(
+                plan["owner_action"] == "keep_owner" and "canonical_owner" not in by_name
+            ),
+        )
         receipt = {
             "contract_version": SOURCE_CUTOVER_RECEIPT_VERSION,
             "bootstrap_version": BOOTSTRAP_VERSION,
@@ -678,14 +852,23 @@ def core_setup_data(payload: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-def materialize_host(codex_home: Path, specs: tuple[SourceSpec, ...]) -> dict[str, Any]:
+def materialize_host(
+    codex_home: Path,
+    specs: tuple[SourceSpec, ...],
+    *,
+    preserve_existing_owner: bool = False,
+) -> dict[str, Any]:
     codex_home = _codex_home_root(codex_home, create=False)
     root = _managed_source_root(codex_home, create=False)
     by_name = {spec.name: spec for spec in specs}
     require(set(by_name).issubset({"sidecar", "canonical_owner"}), "managed_source_name_invalid")
     require("sidecar" in by_name, "managed_sidecar_source_missing")
     require(len(by_name) == len(specs), "managed_source_name_duplicate")
-    if "canonical_owner" not in by_name:
+    require(
+        not preserve_existing_owner or "canonical_owner" not in by_name,
+        "managed_owner_preservation_invalid",
+    )
+    if "canonical_owner" not in by_name and not preserve_existing_owner:
         require(
             not _has_existing_global_binding(codex_home),
             "public_core_existing_global_binding",
@@ -694,6 +877,13 @@ def materialize_host(codex_home: Path, specs: tuple[SourceSpec, ...]) -> dict[st
         inspect_checkout(root / spec.name, spec)
     sidecar = root / "sidecar"
     canonical_owner = root / "canonical_owner" if "canonical_owner" in by_name else None
+    if preserve_existing_owner:
+        current_owner = inspect_existing_checkout(root / "canonical_owner")
+        require(
+            _preserved_owner_identity(codex_home, current_owner) is not None,
+            "source_cutover_owner_state_ambiguous",
+        )
+        canonical_owner = root / "canonical_owner"
     enrollment = sidecar / ".agents" / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "enrollment.py"
     require(enrollment.is_file(), "managed_bootstrap_missing")
     skill_root = _installed_skill_root(codex_home, create=True)
@@ -987,6 +1177,7 @@ def main() -> int:
     validate_source.add_argument("--path", required=True)
     sub.add_parser("validate-pack")
     sub.add_parser("render-pack")
+    sub.add_parser("render-cutover-plan")
     sub.add_parser("validate-marketplace")
     sub.add_parser("self-test")
     args = parser.parse_args()
@@ -1016,6 +1207,8 @@ def main() -> int:
             print(json.dumps({"status": "ok", "contract_version": pack["contract_version"]}, separators=(",", ":")))
         elif args.command == "render-pack":
             sys.stdout.write(render_pack(json.load(sys.stdin)))
+        elif args.command == "render-cutover-plan":
+            sys.stdout.write(render_source_cutover_plan(json.load(sys.stdin)))
         elif args.command == "validate-marketplace":
             validate_marketplace(json.load(sys.stdin))
             print(json.dumps({"status": "ok", "contract": "agent-memory-marketplace-v1"}, separators=(",", ":")))

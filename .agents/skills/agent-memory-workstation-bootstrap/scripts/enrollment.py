@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic identity, validation, installation, and rendering for Bootstrap 1.6."""
+"""Deterministic identity, validation, installation, and rendering for Bootstrap 1.8."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from urllib.parse import urlsplit
 
 PACK_VERSION = "global_owner_scout_enrollment_pack_v1"
 PROFILE_VERSION = "global_owner_scout_host_profile_v1"
-BOOTSTRAP_VERSION = "1.7.1"
+BOOTSTRAP_VERSION = "1.8.0"
 SCOUT_VERSION = "5.5.0"
 PACK_FIELDS = {
     "contract_version", "status", "display_locale", "bootstrap_version", "generated_at",

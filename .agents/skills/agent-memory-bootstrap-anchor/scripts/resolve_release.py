@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -272,65 +274,125 @@ def _validate_release_manifest(value: Any, *, tag: str, commit: str, checksums: 
     return portable_name
 
 
+def _portable_entries(archive: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
+    entries = archive.infolist()
+    names = [entry.filename for entry in entries]
+    require(len(names) == len(set(names)), "release_portable_duplicate")
+    require(len(names) == len({name.casefold() for name in names}), "release_portable_duplicate")
+    total_size = 0
+    for entry in entries:
+        name = entry.filename
+        is_directory = entry.is_dir()
+        parts = name[:-1].split("/") if is_directory else name.split("/")
+        require(
+            name
+            and "\\" not in name
+            and "\x00" not in name
+            and not name.startswith("/")
+            and all(part not in {"", ".", ".."} and ":" not in part for part in parts),
+            "release_portable_path_invalid",
+        )
+        mode = (entry.external_attr >> 16) & 0xFFFF
+        kind = stat.S_IFMT(mode)
+        require(
+            kind in {0, stat.S_IFREG, stat.S_IFDIR}
+            and not (entry.flag_bits & 0x1),
+            "release_portable_entry_invalid",
+        )
+        require(is_directory == (kind == stat.S_IFDIR) if kind else True, "release_portable_entry_invalid")
+        total_size += entry.file_size
+        require(total_size <= MAX_PORTABLE, "release_portable_expanded_too_large")
+    return entries
+
+
 def _inspect_portable(value: bytes, *, source_manifest: dict[str, Any]) -> None:
-    with tempfile.TemporaryDirectory() as temporary:
-        path = Path(temporary) / "portable.zip"
-        path.write_bytes(value)
-        try:
-            with zipfile.ZipFile(path) as archive:
-                names = archive.namelist()
-                require(len(names) == len(set(names)), "release_portable_duplicate")
-                for name in names:
-                    relative = Path(name)
-                    require(not relative.is_absolute() and ".." not in relative.parts, "release_portable_path_invalid")
-                required = {
-                    "source-manifest.json",
-                    "plugins/agent-memory-sidecar/source-manifest.json",
-                    ".agents/plugins/marketplace.json",
-                    ".agents/skills/agent-memory-bootstrap-anchor/SKILL.md",
-                    ".agents/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py",
-                    "plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor/SKILL.md",
-                    "plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py",
-                }
-                require(required.issubset(names), "release_portable_content_missing")
+    try:
+        with zipfile.ZipFile(io.BytesIO(value)) as archive:
+            entries = _portable_entries(archive)
+            names = {entry.filename for entry in entries}
+            required = {
+                "source-manifest.json",
+                "plugins/agent-memory-sidecar/source-manifest.json",
+                ".agents/plugins/marketplace.json",
+                ".agents/skills/agent-memory-bootstrap-anchor/SKILL.md",
+                ".agents/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py",
+                ".agents/skills/agent-memory-workstation-bootstrap/SKILL.md",
+                ".agents/skills/agent-memory-workstation-bootstrap/scripts/enrollment.py",
+                ".agents/skills/agent-memory-workstation-bootstrap/scripts/managed_sources.py",
+                ".agents/skills/global-owner-scout/SKILL.md",
+                "plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor/SKILL.md",
+                "plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py",
+            }
+            require(required.issubset(names), "release_portable_content_missing")
+            require(
+                json.loads(archive.read("source-manifest.json")) == source_manifest
+                and json.loads(archive.read("plugins/agent-memory-sidecar/source-manifest.json")) == source_manifest,
+                "release_portable_manifest_mismatch",
+            )
+            require(
+                archive.read(".agents/skills/agent-memory-bootstrap-anchor/SKILL.md")
+                == archive.read("plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor/SKILL.md")
+                and
+                archive.read(".agents/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py")
+                == archive.read("plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py"),
+                "release_anchor_parity_mismatch",
+            )
+            marketplace = json.loads(archive.read(".agents/plugins/marketplace.json"))
+            require(
+                isinstance(marketplace, dict)
+                and marketplace.get("name") == "agent-memory"
+                and isinstance(marketplace.get("plugins"), list)
+                and len(marketplace["plugins"]) == 1,
+                "release_marketplace_invalid",
+            )
+            entry = marketplace["plugins"][0]
+            require(isinstance(entry, dict), "release_marketplace_invalid")
+            source = entry.get("source")
+            require(
+                entry.get("name") == "agent-memory-sidecar"
+                and entry.get("policy") == {"installation": "AVAILABLE", "authentication": "ON_INSTALL"}
+                and isinstance(source, dict)
+                and set(source) == {"source", "url", "path", "ref"}
+                and source.get("source") == "git-subdir"
+                and str(source.get("url", "")).rstrip("/").casefold()
+                == str(source_manifest["sidecar"]["remote"]).rstrip("/").casefold()
+                and source.get("ref") == source_manifest["sidecar"]["ref"]
+                and source.get("path") == "./plugins/agent-memory-sidecar",
+                "release_marketplace_invalid",
+            )
+    except ResolutionError:
+        raise
+    except (OSError, zipfile.BadZipFile, UnicodeError, json.JSONDecodeError) as exc:
+        raise ResolutionError("release_portable_invalid") from exc
+
+
+def _materialize_portable(value: bytes, *, destination: Path) -> None:
+    require(not destination.exists() and not destination.is_symlink(), "release_portable_output_exists")
+    destination.mkdir()
+    try:
+        with zipfile.ZipFile(io.BytesIO(value)) as archive:
+            for entry in _portable_entries(archive):
+                parts = entry.filename.rstrip("/").split("/")
+                target = destination.joinpath(*parts)
+                if entry.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with archive.open(entry, "r") as source, target.open("xb") as sink:
+                    shutil.copyfileobj(source, sink, length=1_048_576)
+                value_stat = target.lstat()
                 require(
-                    json.loads(archive.read("source-manifest.json")) == source_manifest
-                    and json.loads(archive.read("plugins/agent-memory-sidecar/source-manifest.json")) == source_manifest,
-                    "release_portable_manifest_mismatch",
+                    stat.S_ISREG(value_stat.st_mode)
+                    and not stat.S_ISLNK(value_stat.st_mode)
+                    and value_stat.st_nlink == 1,
+                    "release_portable_materialization_invalid",
                 )
-                require(
-                    archive.read(".agents/skills/agent-memory-bootstrap-anchor/SKILL.md")
-                    == archive.read("plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor/SKILL.md")
-                    and
-                    archive.read(".agents/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py")
-                    == archive.read("plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor/scripts/resolve_release.py"),
-                    "release_anchor_parity_mismatch",
-                )
-                marketplace = json.loads(archive.read(".agents/plugins/marketplace.json"))
-                require(
-                    isinstance(marketplace, dict)
-                    and marketplace.get("name") == "agent-memory"
-                    and isinstance(marketplace.get("plugins"), list)
-                    and len(marketplace["plugins"]) == 1,
-                    "release_marketplace_invalid",
-                )
-                entry = marketplace["plugins"][0]
-                require(isinstance(entry, dict), "release_marketplace_invalid")
-                source = entry.get("source")
-                require(
-                    entry.get("name") == "agent-memory-sidecar"
-                    and entry.get("policy") == {"installation": "AVAILABLE", "authentication": "ON_INSTALL"}
-                    and isinstance(source, dict)
-                    and set(source) == {"source", "url", "path", "ref"}
-                    and source.get("source") == "git-subdir"
-                    and str(source.get("url", "")).rstrip("/").casefold()
-                    == str(source_manifest["sidecar"]["remote"]).rstrip("/").casefold()
-                    and source.get("ref") == source_manifest["sidecar"]["ref"]
-                    and source.get("path") == "./plugins/agent-memory-sidecar",
-                    "release_marketplace_invalid",
-                )
-        except (OSError, zipfile.BadZipFile, UnicodeError, json.JSONDecodeError) as exc:
-            raise ResolutionError("release_portable_invalid") from exc
+    except ResolutionError:
+        shutil.rmtree(destination, ignore_errors=True)
+        raise
+    except (OSError, zipfile.BadZipFile) as exc:
+        shutil.rmtree(destination, ignore_errors=True)
+        raise ResolutionError("release_portable_materialization_invalid") from exc
 
 
 def resolve_release(*, output: Path, version: str | None = None) -> dict[str, Any]:
@@ -381,12 +443,14 @@ def resolve_release(*, output: Path, version: str | None = None) -> dict[str, An
         downloaded[portable_name] = portable
         for name, value in downloaded.items():
             (staged / name).write_bytes(value)
+        _materialize_portable(portable, destination=staged / "portable")
         result = {
             "contract_version": CONTRACT,
             "status": "verified",
             "repository": REPOSITORY,
             "tag": tag,
             "commit": commit,
+            "portable_root": "portable",
             "assets": {
                 name: {"sha256": digest_bytes(value), "bytes": len(value)}
                 for name, value in sorted(downloaded.items())
