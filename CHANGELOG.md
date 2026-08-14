@@ -7,6 +7,18 @@ their own component versions in `COMPATIBILITY.md`.
 
 No changes have been assigned to a later release.
 
+## 0.3.3 (2026-08-14)
+
+### Fixed
+
+- Source Authority Cutover now consumes Core setup through the real `agent_memory_result_v1.data` boundary. This prevents a successful
+  Core setup from being falsely reported as `core_setup_doctor_missing` and leaving source rollback behind an already-updated runtime.
+- The materialization regression test now uses the real CLI result envelope and rejects the former mock-only raw result shape.
+
+### Changed
+
+- Core is 0.3.3 and Workstation Bootstrap is 1.7.1; Plugin remains 1.2.1 and Scout remains 5.5.0.
+
 ## 0.3.2 (2026-08-14)
 
 ### Fixed

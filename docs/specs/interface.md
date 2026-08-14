@@ -248,7 +248,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 私有开发通道可使用显式 development manifest，但不得成为公开兜底。Anchor 不得要求 project ID、项目名单或资源配置，
 不得复制完整实现，也不得在当前任务把新安装 Skill 冒充已加载。可靠加载边界是下一任务。
 
-`agent-memory-workstation-bootstrap` Skill 1.7.0 提供两个显式模式：
+`agent-memory-workstation-bootstrap` Skill 1.7.1 提供两个显式模式：
 
 - `inspect`：先同步受管 Sidecar/canonical Owner 源，再部署或验证 Core、global binding 与 versioned Skills；Skill
   安装通过后从下一任务保证交互 Scout 可用，无需 Host Enrollment。项目发现和
@@ -538,7 +538,7 @@ Apply 需要新的当前 approval ref；setup 遇到旧 schema 只返回 `migrat
 {
   "contract_version": "agent_memory_source_manifest_v1",
   "distribution": "release",
-  "sidecar": {"remote": "https://example.invalid/agent-memory-sidecar.git", "ref": "v0.3.2", "commit": "<40 hex>"},
+  "sidecar": {"remote": "https://example.invalid/agent-memory-sidecar.git", "ref": "v0.3.3", "commit": "<40 hex>"},
   "canonical_owner": null
 }
 ```

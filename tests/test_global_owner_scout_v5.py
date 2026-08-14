@@ -211,7 +211,18 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 if "install-skill" in command:
                     version = command[command.index("--version") + 1]
                     return {"status": "installed", "version": version, "hash": "a" * 64}
-                return {"status": "ok", "doctor": {"status": "ok"}}
+                return {
+                    "contract_version": "agent_memory_result_v1",
+                    "operation": "setup",
+                    "status": "ok",
+                    "scope": None,
+                    "target": None,
+                    "data": {
+                        "status": "ok",
+                        "doctor": {"status": "ok"},
+                    },
+                    "error": None,
+                }
 
             specs = (
                 self.managed_sources.SourceSpec(
@@ -515,7 +526,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_deployment_pack_keeps_proof_layers_separate(self) -> None:
         pack = self.managed_sources.valid_pack()
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("1.7.0", validated["bootstrap_version"])
+        self.assertEqual("1.7.1", validated["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
         for label in ("可移植分发", "能力源同步", "主机物化", "项目启用"):
             self.assertIn(label, rendered)
@@ -529,6 +540,15 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         with mock.patch.object(self.managed_sources.subprocess, "run", return_value=completed):
             result = self.managed_sources.run_json(["example"], cwd=ROOT, env={})
         self.assertEqual("ok", result["status"])
+
+    def test_core_setup_result_rejects_mock_only_raw_shape(self) -> None:
+        with self.assertRaisesRegex(
+            self.managed_sources.BootstrapError,
+            "core_setup_result_invalid",
+        ):
+            self.managed_sources.core_setup_data(
+                {"status": "ok", "doctor": {"status": "ok"}}
+            )
 
     def test_cold_start_anchor_and_plugin_do_not_embed_host_identity(self) -> None:
         portable_paths = (
@@ -549,7 +569,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 json.loads(text),
                 expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
             )
-            self.assertEqual("v0.3.2", value["plugins"][0]["source"]["ref"])
+            self.assertEqual("v0.3.3", value["plugins"][0]["source"]["ref"])
         else:
             self.assertTrue(
                 (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()

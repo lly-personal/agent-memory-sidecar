@@ -10,7 +10,7 @@
 Codex Desktop users register the tagged public Marketplace and install the plugin:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.2
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.3
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -24,7 +24,7 @@ does not authorize source materialization.
 Core-only consumers install the Release wheel and run:
 
 ```powershell
-python -m pip install .\agent_memory_sidecar-0.3.2-py3-none-any.whl
+python -m pip install .\agent_memory_sidecar-0.3.3-py3-none-any.whl
 agent-memory setup
 agent-memory setup --apply
 agent-memory doctor
