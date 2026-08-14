@@ -21,7 +21,7 @@ from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 
-BOOTSTRAP_VERSION = "1.7.0"
+BOOTSTRAP_VERSION = "1.7.1"
 SCOUT_VERSION = "5.5.0"
 PACK_VERSION = "agent_memory_workstation_deployment_pack_v1"
 SOURCE_MANIFEST_VERSION = "agent_memory_source_manifest_v1"
@@ -661,6 +661,23 @@ def run_json(command: list[str], *, cwd: Path, env: dict[str, str]) -> dict[str,
     return payload
 
 
+def core_setup_data(payload: dict[str, Any]) -> dict[str, Any]:
+    require(
+        payload.get("contract_version") == "agent_memory_result_v1"
+        and payload.get("operation") == "setup"
+        and payload.get("status") == "ok"
+        and payload.get("error") is None,
+        "core_setup_result_invalid",
+    )
+    data = payload.get("data")
+    require(isinstance(data, dict), "core_setup_output_invalid")
+    require(data.get("status") == "ok", "core_setup_failed")
+    doctor = data.get("doctor")
+    require(isinstance(doctor, dict), "core_setup_doctor_missing")
+    require(doctor.get("status") == "ok", "doctor_failed")
+    return data
+
+
 def materialize_host(codex_home: Path, specs: tuple[SourceSpec, ...]) -> dict[str, Any]:
     codex_home = _codex_home_root(codex_home, create=False)
     root = _managed_source_root(codex_home, create=False)
@@ -702,11 +719,7 @@ def materialize_host(codex_home: Path, specs: tuple[SourceSpec, ...]) -> dict[st
         setup_command.extend([
             "--global-rules-source", str(canonical_owner), "--rebind-global-rules-source",
         ])
-    setup = run_json(setup_command, cwd=sidecar, env=env)
-    require(setup.get("status") == "ok", "core_setup_failed")
-    doctor = setup.get("doctor")
-    require(isinstance(doctor, dict), "core_setup_doctor_missing")
-    require(doctor.get("status") == "ok", "doctor_failed")
+    core_setup_data(run_json(setup_command, cwd=sidecar, env=env))
     return {
         "status": "ok",
         "core_setup": "verified",

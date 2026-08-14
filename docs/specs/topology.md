@@ -136,7 +136,7 @@ Review Pack 结构通过校验后仍未完成链路；只有 renderer 成功并�
 surface-specific wrapper 数量守恒，该次结果才完成呈现。verifier 是最后一个工具调用；之后不得执行独立 memory 审计
 或追加尾注。
 
-Bootstrap 1.7.0 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，再按 source manifest 把 Sidecar 与可选
+Bootstrap 1.7.1 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，再按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前
 Codex home 的受管 clean sources。两个源必须全部完成 staged clone、remote identity、clean worktree 与 commit
 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得 pull/reset/clean 任何 Desktop

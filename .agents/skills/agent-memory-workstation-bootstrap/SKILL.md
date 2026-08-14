@@ -7,7 +7,7 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `1.7.0`
+- Skill version: `1.7.1`
 - Modes: `inspect`, `apply_enrollment`
 - Deployment pack: `agent_memory_workstation_deployment_pack_v1`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
@@ -42,7 +42,7 @@ not change the Host Profile. Only an explicit request to retest or configure Sch
 3. Run `python -B scripts/managed_sources.py materialize-host --codex-home <active-codex-home> --source-manifest <same-release-manifest>`.
    The deterministic command uses the clean managed Sidecar source to run Core setup, optionally bind the commit-bound canonical
    Owner source, verify Doctor, and install both
-   versioned repository Skills atomically per target while excluding bytecode caches. Validate Bootstrap `1.7.0`, Scout `5.5.0`,
+   versioned repository Skills atomically per target while excluding bytecode caches. Validate Bootstrap `1.7.1`, Scout `5.5.0`,
    their content hashes, and canonical/local Owner parity. Installation evidence proves host materialization, not later model
    adoption. A newly installed Skill is guaranteed as a discovery input only from the next task; report `available_next_turn`
    unless this task independently loaded and verified the installed entry.

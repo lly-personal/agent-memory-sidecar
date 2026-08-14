@@ -42,7 +42,7 @@ limitations, pack_hash
 ```
 
 - `status`: `ready`, `reload_required`, `source_sync_blocked`, or `host_materialization_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `1.7.0`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `1.7.1`.
 - `portable_distribution` exact fields are `repo_anchor`, `plugin`, and `marketplace`; values are `verified`, `installed`,
   `unavailable`, or `failed`.
 - `source_sync` contains exact `sidecar` and `canonical_owner` receipts. Each receipt has `status`, `ref`, and `commit`; status is
@@ -67,7 +67,7 @@ automation_change_count, allowed_actions, limitations, pack_hash
 ```
 
 - `status`: `ready`, `bounded`, or `host_activation_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `1.7.0`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `1.7.1`.
 - `portable_layer` exact fields: `sidecar`, `canonical_owner`, `core_setup`, `doctor`, `scout_skill_version`,
   `scout_skill_hash`. State values are `synced`, `unchanged`, `installed`, `verified`, `failed`, or `unavailable`.
 - `discovery` exact fields: `inventory_status`, `activity_status`, `desktop_project_count`, `accessible_count`,
