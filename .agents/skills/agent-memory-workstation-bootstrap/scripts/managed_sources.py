@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Atomic managed-source sync and deployment-pack contracts for Bootstrap 1.9."""
+"""Atomic workstation reconcile and deployment-pack contracts for Bootstrap 2.0."""
 
 from __future__ import annotations
 
@@ -16,15 +16,20 @@ import sys
 import tempfile
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
 
 
-BOOTSTRAP_VERSION = "1.9.0"
+BOOTSTRAP_VERSION = "2.0.0"
 SCOUT_VERSION = "5.6.0"
-PACK_VERSION = "agent_memory_workstation_deployment_pack_v1"
+PACK_VERSION = "agent_memory_workstation_deployment_pack_v2"
+WORKSTATION_RECONCILE_PLAN_VERSION = "agent_memory_workstation_reconcile_plan_v2"
 SOURCE_MANIFEST_VERSION = "agent_memory_source_manifest_v1"
+RELEASE_MANIFEST_VERSION = "agent_memory_public_release_manifest_v1"
+RELEASE_RESOLUTION_VERSION = "agent_memory_release_resolution_v1"
+PUBLIC_REPOSITORY = "lly-personal/agent-memory-sidecar"
 SOURCE_CUTOVER_PLAN_VERSION = "agent_memory_source_cutover_plan_v2"
 SOURCE_CUTOVER_RECEIPT_VERSION = "agent_memory_source_cutover_receipt_v2"
 SOURCE_CUTOVER_PLAN_FIELDS = {
@@ -35,23 +40,51 @@ SOURCE_MANIFEST_FIELDS = {
     "contract_version", "distribution", "sidecar", "canonical_owner",
 }
 SOURCE_FIELDS = {"remote", "ref", "commit"}
+RELEASE_MANIFEST_FIELDS = {
+    "contract_version", "status", "source", "versions", "artifacts", "verification",
+}
+RELEASE_SOURCE_FIELDS = {
+    "repository", "ref", "commit", "authority_epoch", "engineering_source_commit",
+    "initial_public_release", "authority_activated_at",
+}
+RELEASE_VERSION_FIELDS = {"core", "plugin", "bootstrap", "scout"}
+RELEASE_RESOLUTION_FIELDS = {
+    "contract_version", "status", "repository", "tag", "commit", "portable_root", "assets",
+}
+RELEASE_ASSET_FIELDS = {"sha256", "bytes"}
 SAFE_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$")
 PACK_FIELDS = {
-    "contract_version", "status", "display_locale", "bootstrap_version", "generated_at",
-    "portable_distribution", "source_sync", "host_materialization", "project_activation",
+    "contract_version", "status", "display_locale", "generated_at", "desired_bundle",
+    "distribution", "source_sync", "host_materialization", "consumer_activation",
     "limitations", "pack_hash",
 }
-DISTRIBUTION_FIELDS = {"repo_anchor", "plugin", "marketplace"}
+RECONCILE_PLAN_FIELDS = {
+    "contract_version", "bootstrap_version", "status", "desired_bundle",
+    "observed_distribution", "source_plan_hash", "changes", "blockers",
+    "confirmation_required", "requires_reload", "plan_hash",
+}
+DESIRED_BUNDLE_FIELDS = {
+    "release_ref", "source_commit", "core_version", "plugin_version",
+    "plugin_sha256", "bootstrap_version", "bootstrap_sha256",
+    "scout_version", "scout_sha256",
+}
+DISTRIBUTION_FIELDS = {"marketplace", "plugin"}
+MARKETPLACE_STATE_FIELDS = {"status", "source_sha256", "ref", "commit"}
+PLUGIN_STATE_FIELDS = {
+    "status", "source_sha256", "ref", "version", "content_sha256", "enabled",
+}
 SOURCE_SYNC_FIELDS = {"sidecar", "canonical_owner"}
 SOURCE_RECEIPT_FIELDS = {"status", "ref", "commit"}
 MATERIALIZATION_FIELDS = {
-    "core_setup", "global_binding", "doctor", "bootstrap_skill", "scout_skill",
-    "bootstrap_skill_version", "scout_skill_version",
+    "core", "global_binding", "doctor", "bootstrap_skill", "scout_skill",
 }
-ACTIVATION_FIELDS = {"interactive_entry", "scheduled"}
+CORE_STATE_FIELDS = {"status", "version", "source_commit", "artifact_sha256"}
+SKILL_STATE_FIELDS = {"status", "version", "content_sha256"}
+ACTIVATION_FIELDS = {"desktop_reload", "interactive_entry", "scheduled"}
 MARKETPLACE_FIELDS = {"name", "interface", "plugins"}
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA64 = re.compile(r"^[0-9a-f]{64}$")
+SEMVER = re.compile(r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:[-+][0-9A-Za-z.-]+)?$")
 ABSOLUTE_PATH = re.compile(r"(?:[A-Za-z]:[\\/]|/(?:Users|home|var|tmp|opt|mnt)/)", re.IGNORECASE)
 RAW_URL = re.compile(r"(?:https?|ssh|git)://|git@[^\s:]+:", re.IGNORECASE)
 
@@ -108,11 +141,163 @@ def validate_source_manifest(value: Any) -> tuple[SourceSpec, ...]:
 
 
 def load_source_manifest(path: Path | str) -> tuple[SourceSpec, ...]:
-    try:
-        value = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise BootstrapError("source_manifest_unreadable") from exc
+    value = _load_json_file(path, "source_manifest_unreadable")
     return validate_source_manifest(value)
+
+
+def _physical_file_bytes(path: Path, code: str, *, limit: int = 1_048_576) -> bytes:
+    try:
+        value = path.lstat()
+        require(
+            stat.S_ISREG(value.st_mode)
+            and not stat.S_ISLNK(value.st_mode)
+            and not _is_reparse(value)
+            and value.st_nlink == 1
+            and 0 < value.st_size <= limit,
+            code,
+        )
+        data = path.read_bytes()
+        require(len(data) == value.st_size, code)
+        return data
+    except BootstrapError:
+        raise
+    except OSError as exc:
+        raise BootstrapError(code) from exc
+
+
+def _load_json_file(path: Path | str, code: str) -> dict[str, Any]:
+    try:
+        value = json.loads(_physical_file_bytes(Path(path), code).decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise BootstrapError(code) from exc
+    require(isinstance(value, dict), code)
+    return value
+
+
+def _portable_root_for_release_manifest(path: Path) -> Path:
+    path = path.expanduser().resolve()
+    candidates = (path.parent / "portable", path.parent)
+    for candidate in candidates:
+        if (
+            (candidate / "plugins" / "agent-memory-sidecar").is_dir()
+            and (candidate / ".agents" / "skills" / "agent-memory-workstation-bootstrap").is_dir()
+            and (candidate / ".agents" / "skills" / "global-owner-scout").is_dir()
+        ):
+            return candidate
+    raise BootstrapError("release_portable_root_unavailable")
+
+
+def load_desired_bundle(
+    source_manifest_path: Path | str,
+    release_manifest_path: Path | str,
+) -> tuple[dict[str, Any], SourceSpec, str]:
+    specs = load_source_manifest(source_manifest_path)
+    by_name = {item.name: item for item in specs}
+    sidecar = by_name["sidecar"]
+    require(sidecar.expected_commit is not None, "desired_source_commit_required")
+    release_path = Path(release_manifest_path).expanduser().resolve()
+    release = _load_json_file(release_path, "release_manifest_unreadable")
+    exact(release, RELEASE_MANIFEST_FIELDS, "$.release_manifest")
+    require(release["contract_version"] == RELEASE_MANIFEST_VERSION, "release_manifest_contract_invalid")
+    require(release["status"] == "public_artifact_verified", "release_manifest_status_invalid")
+    source = release["source"]
+    exact(source, RELEASE_SOURCE_FIELDS, "$.release_manifest.source")
+    require(source["ref"] == sidecar.ref, "release_source_ref_mismatch")
+    require(source["commit"] == sidecar.expected_commit, "release_source_commit_mismatch")
+    require(normalize_remote(str(source["repository"])) == normalize_remote(sidecar.remote), "release_source_identity_mismatch")
+    require(
+        normalize_remote(str(source["repository"]))
+        == normalize_remote(f"https://github.com/{PUBLIC_REPOSITORY}"),
+        "release_public_repository_mismatch",
+    )
+    versions = release["versions"]
+    exact(versions, RELEASE_VERSION_FIELDS, "$.release_manifest.versions")
+    for field in RELEASE_VERSION_FIELDS:
+        require(SEMVER.fullmatch(str(versions[field])) is not None, f"release {field} version invalid")
+    require(sidecar.ref == f"v{versions['core']}", "release_core_ref_mismatch")
+    resolution = _load_json_file(
+        release_path.with_name("resolution.json"), "release_resolution_receipt_unreadable",
+    )
+    exact(resolution, RELEASE_RESOLUTION_FIELDS, "$.release_resolution")
+    require(
+        resolution["contract_version"] == RELEASE_RESOLUTION_VERSION
+        and resolution["status"] == "verified"
+        and resolution["repository"] == PUBLIC_REPOSITORY
+        and resolution["tag"] == sidecar.ref
+        and resolution["commit"] == sidecar.expected_commit
+        and resolution["portable_root"] == "portable",
+        "release_resolution_receipt_invalid",
+    )
+    assets = resolution["assets"]
+    require(isinstance(assets, dict), "release_resolution_assets_invalid")
+    for name, asset in assets.items():
+        safe_text(name, "$.release_resolution.assets.name", 200)
+        exact(asset, RELEASE_ASSET_FIELDS, f"$.release_resolution.assets.{name}")
+        require(
+            SHA64.fullmatch(str(asset["sha256"])) is not None
+            and isinstance(asset["bytes"], int)
+            and 0 < asset["bytes"] <= 67_108_864,
+            "release_resolution_assets_invalid",
+        )
+    portable_name = f"agent-memory-portable-{versions['core']}.zip"
+    for name in ("release-manifest.json", portable_name):
+        artifact = release_path.with_name(name)
+        require(name in assets, "release_resolution_assets_incomplete")
+        data = _physical_file_bytes(artifact, "release_resolution_assets_incomplete", limit=67_108_864)
+        require(
+            len(data) == assets[name]["bytes"]
+            and hashlib.sha256(data).hexdigest() == assets[name]["sha256"],
+            f"release_resolution_asset_mismatch:{name}",
+        )
+    resolved_source = release_path.with_name("source-manifest.json")
+    if Path(source_manifest_path).expanduser().resolve() == resolved_source:
+        source_bytes = _physical_file_bytes(
+            resolved_source, "release_resolution_asset_mismatch:source-manifest.json",
+        )
+        require(
+            "source-manifest.json" in assets
+            and len(source_bytes) == assets["source-manifest.json"]["bytes"]
+            and hashlib.sha256(source_bytes).hexdigest()
+            == assets["source-manifest.json"]["sha256"],
+            "release_resolution_asset_mismatch:source-manifest.json",
+        )
+    portable_root = _portable_root_for_release_manifest(release_path)
+    plugin_manifest = _load_json_file(
+        portable_root / "plugins" / "agent-memory-sidecar" / ".codex-plugin" / "plugin.json",
+        "release_plugin_manifest_unreadable",
+    )
+    require(plugin_manifest.get("version") == versions["plugin"], "release_plugin_version_mismatch")
+    require(
+        _skill_version(portable_root / ".agents" / "skills" / "agent-memory-workstation-bootstrap")
+        == versions["bootstrap"],
+        "release_bootstrap_version_mismatch",
+    )
+    require(
+        _skill_version(portable_root / ".agents" / "skills" / "global-owner-scout")
+        == versions["scout"],
+        "release_scout_version_mismatch",
+    )
+    desired = {
+        "release_ref": sidecar.ref,
+        "source_commit": sidecar.expected_commit,
+        "core_version": versions["core"],
+        "plugin_version": versions["plugin"],
+        "plugin_sha256": physical_tree_hash(
+            portable_root / "plugins" / "agent-memory-sidecar",
+            excluded_relatives={"source-manifest.json"},
+        ),
+        "bootstrap_version": versions["bootstrap"],
+        "bootstrap_sha256": physical_tree_hash(
+            portable_root / ".agents" / "skills" / "agent-memory-workstation-bootstrap",
+        ),
+        "scout_version": versions["scout"],
+        "scout_sha256": physical_tree_hash(
+            portable_root / ".agents" / "skills" / "global-owner-scout",
+        ),
+    }
+    validate_desired_bundle(desired)
+    source_sha256 = hashlib.sha256(normalize_remote(sidecar.remote).encode("utf-8")).hexdigest()
+    return desired, sidecar, source_sha256
 
 
 def require(condition: bool, message: str) -> None:
@@ -291,6 +476,56 @@ def source_identity(spec: SourceSpec) -> dict[str, str]:
         "remote_sha256": hashlib.sha256(normalize_remote(spec.remote).encode("utf-8")).hexdigest(),
         "ref": spec.ref,
         "commit": spec.expected_commit,
+    }
+
+
+def inspect_marketplace_checkout(path: Path) -> dict[str, str]:
+    """Inspect the Codex-owned marketplace snapshot and its install metadata."""
+    value = path.lstat()
+    require(
+        stat.S_ISDIR(value.st_mode) and not stat.S_ISLNK(value.st_mode) and not _is_reparse(value),
+        "marketplace_root_invalid",
+    )
+    git_root = path / ".git"
+    git_value = git_root.lstat()
+    require(
+        stat.S_ISDIR(git_value.st_mode)
+        and not stat.S_ISLNK(git_value.st_mode)
+        and not _is_reparse(git_value),
+        "marketplace_git_invalid",
+    )
+    require(
+        run_git(["status", "--porcelain", "--untracked-files=no"], cwd=path) == "",
+        "marketplace_tracked_tree_dirty",
+    )
+    untracked = set(filter(None, run_git(["ls-files", "--others", "--exclude-standard"], cwd=path).splitlines()))
+    require(untracked == {".codex-marketplace-install.json"}, "marketplace_untracked_state_invalid")
+    metadata = _load_json_file(
+        path / ".codex-marketplace-install.json", "marketplace_install_metadata_unreadable",
+    )
+    exact(
+        metadata,
+        {"source_type", "source", "ref_name", "sparse_paths", "revision"},
+        "$.marketplace_install_metadata",
+    )
+    require(
+        metadata["source_type"] == "git"
+        and isinstance(metadata["source"], str)
+        and isinstance(metadata["ref_name"], str)
+        and isinstance(metadata["sparse_paths"], list)
+        and metadata["revision"] == run_git(["rev-parse", "HEAD"], cwd=path).casefold()
+        and SHA40.fullmatch(str(metadata["revision"])) is not None,
+        "marketplace_install_metadata_invalid",
+    )
+    actual_remote = run_git(["remote", "get-url", "origin"], cwd=path)
+    require(
+        normalize_remote(actual_remote) == normalize_remote(str(metadata["source"])),
+        "marketplace_install_source_mismatch",
+    )
+    return {
+        "remote_sha256": hashlib.sha256(normalize_remote(actual_remote).encode("utf-8")).hexdigest(),
+        "ref": str(metadata["ref_name"]),
+        "commit": str(metadata["revision"]),
     }
 
 
@@ -575,6 +810,37 @@ def _validate_physical_skill_tree(root: Path) -> None:
             )
 
 
+def physical_tree_hash(
+    root: Path,
+    *,
+    excluded_relatives: set[str] | None = None,
+) -> str:
+    """Hash one physical portable component without caches or Git metadata."""
+    excluded = set() if excluded_relatives is None else set(excluded_relatives)
+    _validate_physical_skill_tree(root)
+    files: list[Path] = []
+    for current_raw, directory_names, file_names in os.walk(root, topdown=True, followlinks=False):
+        directory_names[:] = sorted(
+            name for name in directory_names if name not in {".git", "__pycache__"}
+        )
+        current = Path(current_raw)
+        for name in sorted(file_names):
+            item = current / name
+            relative = item.relative_to(root).as_posix()
+            if relative in excluded or item.suffix.casefold() in {".pyc", ".pyo"}:
+                continue
+            files.append(item)
+    require(files, "component_tree_empty")
+    digest = hashlib.sha256()
+    for item in sorted(files, key=lambda candidate: candidate.relative_to(root).as_posix()):
+        relative = item.relative_to(root).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(item.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
 def _restore_skill_targets(root: Path, snapshots: list[tuple[Path, Path | None]]) -> None:
     for target, backup in reversed(snapshots):
         if target.exists() or target.is_symlink():
@@ -644,6 +910,9 @@ def apply_source_cutover(
     specs: tuple[SourceSpec, ...],
     *,
     plan_hash: str,
+    external_apply: Callable[[], None] | None = None,
+    external_rollback: Callable[[], None] | None = None,
+    precommit_verify: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     require(SHA64.fullmatch(plan_hash.casefold()) is not None, "source_cutover_plan_hash_invalid")
     plan = plan_source_cutover(codex_home, specs)
@@ -656,6 +925,8 @@ def apply_source_cutover(
     swapped: list[tuple[Path, Path | None]] = []
     skill_snapshots: list[tuple[Path, Path | None]] = []
     receipts: dict[str, Any] = {}
+    external_started = False
+    committed = False
     try:
         for name in ("sidecar", "canonical_owner"):
             spec = by_name.get(name)
@@ -707,7 +978,15 @@ def apply_source_cutover(
                 "ref": "preserved",
                 "commit": preserved["commit"],
             }
+        elif plan["owner_action"] == "public_core":
+            receipts["canonical_owner"] = {
+                "status": "unavailable", "ref": "unavailable", "commit": "unavailable",
+            }
 
+        if external_apply is not None:
+            require(external_rollback is not None, "source_cutover_external_rollback_required")
+            external_started = True
+            external_apply()
         skill_snapshots = _snapshot_skill_targets(codex_home)
         materialization = materialize_host(
             codex_home,
@@ -727,13 +1006,26 @@ def apply_source_cutover(
             "sources": receipts,
             "materialization": materialization,
         }
+        _validate_source_sync(receipt["sources"])
+        _validate_host_materialization(receipt["materialization"])
+        if precommit_verify is not None:
+            precommit_verify(receipt)
         _write_cutover_receipt(codex_home, receipt)
+        committed = True
         for _, rollback in swapped:
             if rollback is not None:
                 safe_remove(root, rollback)
         _discard_skill_snapshots(_installed_skill_root(codex_home, create=False), skill_snapshots)
         return receipt
-    except Exception:
+    except Exception as original:
+        if committed:
+            raise BootstrapError("source_cutover_postcommit_cleanup_failed") from original
+        rollback_error: BaseException | None = None
+        if external_started and external_rollback is not None:
+            try:
+                external_rollback()
+            except BaseException as exc:
+                rollback_error = exc
         if skill_snapshots:
             _restore_skill_targets(_installed_skill_root(codex_home, create=False), skill_snapshots)
         for target, rollback in reversed(swapped):
@@ -743,7 +1035,9 @@ def apply_source_cutover(
                 safe_remove(root, failed)
             if rollback is not None and rollback.exists():
                 os.replace(rollback, target)
-        raise
+        if rollback_error is not None:
+            raise BootstrapError("distribution_rollback_failed") from rollback_error
+        raise original
     finally:
         for _, staged, _ in prepared.values():
             if staged.exists():
@@ -835,6 +1129,178 @@ def run_json(command: list[str], *, cwd: Path, env: dict[str, str]) -> dict[str,
     return payload
 
 
+def run_codex_json(arguments: list[str], *, codex_home: Path) -> dict[str, Any]:
+    executable = shutil.which("codex")
+    require(executable is not None, "codex_cli_unavailable")
+    env = dict(os.environ)
+    env["CODEX_HOME"] = str(codex_home)
+    try:
+        result = subprocess.run(
+            [executable, *arguments],
+            cwd=codex_home,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise BootstrapError("codex_plugin_command_timeout") from exc
+    require(
+        len(result.stdout) <= 1_048_576 and len(result.stderr) <= 1_048_576,
+        "codex_plugin_output_too_large",
+    )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise BootstrapError("codex_plugin_output_invalid") from exc
+    require(isinstance(payload, dict), "codex_plugin_output_invalid")
+    require(result.returncode == 0, "codex_plugin_command_failed")
+    return payload
+
+
+def _missing_marketplace_state() -> dict[str, Any]:
+    return {
+        "status": "missing", "source_sha256": "unavailable",
+        "ref": "unavailable", "commit": "unavailable",
+    }
+
+
+def _missing_plugin_state() -> dict[str, Any]:
+    return {
+        "status": "missing", "source_sha256": "unavailable", "ref": "unavailable",
+        "version": "unavailable", "content_sha256": "unavailable", "enabled": None,
+    }
+
+
+def _unavailable_marketplace_state() -> dict[str, Any]:
+    return {**_missing_marketplace_state(), "status": "unavailable"}
+
+
+def _unavailable_plugin_state() -> dict[str, Any]:
+    return {**_missing_plugin_state(), "status": "unavailable"}
+
+
+def _observe_distribution_with_private(
+    codex_home: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    codex_home = _codex_home_root(codex_home, create=False)
+    private: dict[str, Any] = {
+        "marketplace": {"present": False, "remote": None, "ref": None},
+        "plugin": {"installed": False, "enabled": None},
+    }
+    try:
+        marketplace_payload = run_codex_json(
+            ["plugin", "marketplace", "list", "--json"], codex_home=codex_home,
+        )
+        marketplaces = marketplace_payload.get("marketplaces")
+        require(isinstance(marketplaces, list), "marketplace_observation_invalid")
+        matches = [item for item in marketplaces if isinstance(item, dict) and item.get("name") == "agent-memory"]
+        require(len(matches) <= 1, "marketplace_observation_ambiguous")
+        if not matches:
+            marketplace_state = _missing_marketplace_state()
+        else:
+            entry = matches[0]
+            root_text = entry.get("root")
+            source_data = entry.get("marketplaceSource")
+            require(isinstance(root_text, str) and root_text, "marketplace_root_invalid")
+            require(
+                isinstance(source_data, dict)
+                and source_data.get("sourceType") == "git"
+                and isinstance(source_data.get("source"), str),
+                "marketplace_source_invalid",
+            )
+            root = Path(root_text).expanduser().resolve()
+            checkout = inspect_marketplace_checkout(root)
+            remote = str(source_data["source"])
+            require(
+                checkout["remote_sha256"]
+                == hashlib.sha256(normalize_remote(remote).encode("utf-8")).hexdigest(),
+                "marketplace_source_identity_mismatch",
+            )
+            marketplace_value = _load_json_file(
+                root / ".agents" / "plugins" / "marketplace.json",
+                "marketplace_manifest_unreadable",
+            )
+            validate_marketplace(marketplace_value, expected_remote=remote)
+            source = marketplace_value["plugins"][0]["source"]
+            require(checkout["ref"] == source["ref"], "marketplace_ref_mismatch")
+            marketplace_state = {
+                "status": "present",
+                "source_sha256": checkout["remote_sha256"],
+                "ref": checkout["ref"],
+                "commit": checkout["commit"],
+            }
+            private["marketplace"] = {
+                "present": True, "remote": remote, "ref": source["ref"],
+            }
+    except (BootstrapError, OSError, UnicodeError):
+        marketplace_state = _unavailable_marketplace_state()
+
+    try:
+        plugin_payload = run_codex_json(
+            ["plugin", "list", "--marketplace", "agent-memory", "--available", "--json"],
+            codex_home=codex_home,
+        )
+        installed = plugin_payload.get("installed")
+        require(isinstance(installed, list), "plugin_observation_invalid")
+        matches = [
+            item for item in installed
+            if isinstance(item, dict) and item.get("pluginId") == "agent-memory-sidecar@agent-memory"
+        ]
+        require(len(matches) <= 1, "plugin_observation_ambiguous")
+        if not matches:
+            plugin_state = _missing_plugin_state()
+        else:
+            entry = matches[0]
+            source = entry.get("source")
+            version = str(entry.get("version", ""))
+            enabled = entry.get("enabled")
+            require(
+                entry.get("installed") is True
+                and isinstance(enabled, bool)
+                and SEMVER.fullmatch(version) is not None
+                and isinstance(source, dict)
+                and source.get("source") == "git-subdir"
+                and isinstance(source.get("url"), str)
+                and source.get("path") in {"plugins/agent-memory-sidecar", "./plugins/agent-memory-sidecar"}
+                and isinstance(source.get("ref"), str),
+                "plugin_observation_invalid",
+            )
+            cache_root = (
+                codex_home / "plugins" / "cache" / "agent-memory"
+                / "agent-memory-sidecar" / version
+            )
+            manifest = _load_json_file(
+                cache_root / ".codex-plugin" / "plugin.json",
+                "plugin_manifest_unreadable",
+            )
+            require(manifest.get("version") == version, "plugin_manifest_version_mismatch")
+            plugin_state = {
+                "status": "installed",
+                "source_sha256": hashlib.sha256(
+                    normalize_remote(str(source["url"])).encode("utf-8")
+                ).hexdigest(),
+                "ref": str(source["ref"]),
+                "version": version,
+                "content_sha256": physical_tree_hash(
+                    cache_root, excluded_relatives={"source-manifest.json"},
+                ),
+                "enabled": enabled,
+            }
+            private["plugin"] = {"installed": True, "enabled": enabled}
+    except (BootstrapError, OSError, UnicodeError):
+        plugin_state = _unavailable_plugin_state()
+    observed = {"marketplace": marketplace_state, "plugin": plugin_state}
+    return validate_observed_distribution(observed), private
+
+
+def observe_distribution(codex_home: Path) -> dict[str, Any]:
+    observed, _ = _observe_distribution_with_private(codex_home)
+    return observed
+
+
 def core_setup_data(payload: dict[str, Any]) -> dict[str, Any]:
     require(
         payload.get("contract_version") == "agent_memory_result_v1"
@@ -850,6 +1316,125 @@ def core_setup_data(payload: dict[str, Any]) -> dict[str, Any]:
     require(isinstance(doctor, dict), "core_setup_doctor_missing")
     require(doctor.get("status") == "ok", "doctor_failed")
     return data
+
+
+def _skill_version(root: Path) -> str:
+    try:
+        text = (root / "SKILL.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise BootstrapError("installed_skill_version_unreadable") from exc
+    match = re.search(r"^- Skill version:\s*`([^`]+)`\s*$", text, re.MULTILINE)
+    require(match is not None and SEMVER.fullmatch(match.group(1)) is not None, "installed_skill_version_invalid")
+    return match.group(1)
+
+
+def _unavailable_skill_state() -> dict[str, Any]:
+    return {"status": "unavailable", "version": "unavailable", "content_sha256": "unavailable"}
+
+
+def _observe_installed_skill(codex_home: Path, name: str) -> dict[str, Any]:
+    target = _installed_skill_root(codex_home, create=False) / name
+    if not target.exists() and not target.is_symlink():
+        return _unavailable_skill_state()
+    try:
+        return {
+            "status": "unchanged",
+            "version": _skill_version(target),
+            "content_sha256": physical_tree_hash(target),
+        }
+    except (BootstrapError, OSError, UnicodeError):
+        return _unavailable_skill_state()
+
+
+def _unavailable_host_materialization(*, owner_expected: bool) -> dict[str, Any]:
+    return {
+        "core": {
+            "status": "unavailable", "version": "unavailable",
+            "source_commit": "unavailable", "artifact_sha256": "unavailable",
+        },
+        "global_binding": "failed" if owner_expected else "unavailable",
+        "doctor": "failed",
+        "bootstrap_skill": _unavailable_skill_state(),
+        "scout_skill": _unavailable_skill_state(),
+    }
+
+
+def observe_host_materialization(
+    codex_home: Path,
+    specs: tuple[SourceSpec, ...],
+    *,
+    owner_expected: bool,
+) -> dict[str, Any]:
+    """Read the current Core, Doctor, Owner binding, and installed Skill state."""
+    codex_home = _codex_home_root(codex_home, create=False)
+    by_name = {spec.name: spec for spec in specs}
+    require("sidecar" in by_name and len(by_name) == len(specs), "managed_source_name_invalid")
+    sidecar = _managed_source_root(codex_home, create=False) / "sidecar"
+    state = _unavailable_host_materialization(owner_expected=owner_expected)
+    state["bootstrap_skill"] = _observe_installed_skill(
+        codex_home, "agent-memory-workstation-bootstrap",
+    )
+    state["scout_skill"] = _observe_installed_skill(codex_home, "global-owner-scout")
+    try:
+        inspect_checkout(sidecar, by_name["sidecar"])
+        init_text = (sidecar / "src" / "agent_memory_sidecar" / "__init__.py").read_text(encoding="utf-8")
+        version_match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', init_text, re.MULTILINE)
+        require(
+            version_match is not None and SEMVER.fullmatch(version_match.group(1)) is not None,
+            "core_version_invalid",
+        )
+        env = dict(os.environ)
+        env["CODEX_HOME"] = str(codex_home)
+        existing_pythonpath = env.get("PYTHONPATH")
+        env["PYTHONPATH"] = str(sidecar / "src") + (
+            os.pathsep + existing_pythonpath if existing_pythonpath else ""
+        )
+        payload = run_json(
+            [sys.executable, "-B", "-m", "agent_memory_sidecar", "--cwd", str(sidecar), "doctor"],
+            cwd=sidecar,
+            env=env,
+        )
+        require(
+            payload.get("contract_version") == "agent_memory_result_v1"
+            and payload.get("operation") == "doctor"
+            and payload.get("status") == "ok"
+            and payload.get("error") is None,
+            "core_doctor_result_invalid",
+        )
+        data = payload.get("data")
+        require(isinstance(data, dict) and data.get("status") == "ok", "doctor_failed")
+        runtime = data.get("runtime")
+        require(isinstance(runtime, dict), "core_runtime_identity_missing")
+        source_commit = str(runtime.get("source_commit", "")).casefold()
+        artifact_sha256 = str(runtime.get("artifact_sha256", "")).removeprefix("sha256:")
+        require(
+            SHA40.fullmatch(source_commit) is not None
+            and SHA64.fullmatch(artifact_sha256) is not None,
+            "core_runtime_identity_invalid",
+        )
+        global_state = data.get("global")
+        if owner_expected:
+            require(
+                isinstance(global_state, dict) and global_state.get("full_document_parity") is True,
+                "global_binding_unverified",
+            )
+            binding = "verified"
+        else:
+            require(global_state is None, "unexpected_global_binding")
+            binding = "unavailable"
+        state.update({
+            "core": {
+                "status": "verified",
+                "version": version_match.group(1),
+                "source_commit": source_commit,
+                "artifact_sha256": artifact_sha256,
+            },
+            "global_binding": binding,
+            "doctor": "verified",
+        })
+    except (BootstrapError, OSError, UnicodeError):
+        pass
+    return _validate_host_materialization(state)
 
 
 def materialize_host(
@@ -909,18 +1494,46 @@ def materialize_host(
         setup_command.extend([
             "--global-rules-source", str(canonical_owner), "--rebind-global-rules-source",
         ])
-    core_setup_data(run_json(setup_command, cwd=sidecar, env=env))
+    setup_data = core_setup_data(run_json(setup_command, cwd=sidecar, env=env))
+    runtime = setup_data.get("runtime")
+    require(isinstance(runtime, dict), "core_runtime_identity_missing")
+    source_commit = runtime.get("source_commit")
+    artifact_sha256 = str(runtime.get("artifact_sha256", ""))
+    if artifact_sha256.startswith("sha256:"):
+        artifact_sha256 = artifact_sha256.removeprefix("sha256:")
+    require(
+        source_commit == by_name["sidecar"].expected_commit
+        and SHA64.fullmatch(artifact_sha256) is not None,
+        "core_runtime_identity_mismatch",
+    )
+    try:
+        init_text = (sidecar / "src" / "agent_memory_sidecar" / "__init__.py").read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise BootstrapError("core_version_unreadable") from exc
+    version_match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', init_text, re.MULTILINE)
+    require(
+        version_match is not None and SEMVER.fullmatch(version_match.group(1)) is not None,
+        "core_version_invalid",
+    )
     return {
-        "status": "ok",
-        "core_setup": "verified",
+        "core": {
+            "status": "verified",
+            "version": version_match.group(1),
+            "source_commit": source_commit,
+            "artifact_sha256": artifact_sha256,
+        },
         "global_binding": "verified" if canonical_owner is not None else "unavailable",
         "doctor": "verified",
-        "bootstrap_skill": bootstrap_result["status"],
-        "bootstrap_skill_version": bootstrap_result["version"],
-        "bootstrap_skill_hash": bootstrap_result["hash"],
-        "scout_skill": scout_result["status"],
-        "scout_skill_version": scout_result["version"],
-        "scout_skill_hash": scout_result["hash"],
+        "bootstrap_skill": {
+            "status": bootstrap_result["status"],
+            "version": bootstrap_result["version"],
+            "content_sha256": bootstrap_result["hash"],
+        },
+        "scout_skill": {
+            "status": scout_result["status"],
+            "version": scout_result["version"],
+            "content_sha256": scout_result["hash"],
+        },
     }
 
 
@@ -945,39 +1558,639 @@ def _has_existing_global_binding(codex_home: Path) -> bool:
         raise BootstrapError("public_core_binding_check_failed") from exc
 
 
+def validate_desired_bundle(value: Any) -> dict[str, Any]:
+    exact(value, DESIRED_BUNDLE_FIELDS, "$.desired_bundle")
+    safe_text(value["release_ref"], "$.desired_bundle.release_ref", 128)
+    require(SHA40.fullmatch(str(value["source_commit"])) is not None, "desired source commit invalid")
+    for field in ("core_version", "plugin_version", "bootstrap_version", "scout_version"):
+        require(SEMVER.fullmatch(str(value[field])) is not None, f"desired {field} invalid")
+    for field in ("plugin_sha256", "bootstrap_sha256", "scout_sha256"):
+        require(SHA64.fullmatch(str(value[field])) is not None, f"desired {field} invalid")
+    require(value["bootstrap_version"] == BOOTSTRAP_VERSION, "desired Bootstrap version invalid")
+    require(value["scout_version"] == SCOUT_VERSION, "desired Scout version invalid")
+    return value
+
+
+def _unavailable_or_sha64(value: Any, path: str) -> None:
+    require(value == "unavailable" or SHA64.fullmatch(str(value)) is not None, f"{path} invalid")
+
+
+def _unavailable_or_sha40(value: Any, path: str) -> None:
+    require(value == "unavailable" or SHA40.fullmatch(str(value)) is not None, f"{path} invalid")
+
+
+def validate_observed_distribution(value: Any) -> dict[str, Any]:
+    exact(value, DISTRIBUTION_FIELDS, "$.observed_distribution")
+    marketplace = value["marketplace"]
+    exact(marketplace, MARKETPLACE_STATE_FIELDS, "$.observed_distribution.marketplace")
+    require(marketplace["status"] in {"present", "missing", "unavailable"}, "marketplace state invalid")
+    _unavailable_or_sha64(marketplace["source_sha256"], "marketplace source identity")
+    _unavailable_or_sha40(marketplace["commit"], "marketplace commit")
+    require(isinstance(marketplace["ref"], str) and marketplace["ref"], "marketplace ref invalid")
+
+    plugin = value["plugin"]
+    exact(plugin, PLUGIN_STATE_FIELDS, "$.observed_distribution.plugin")
+    require(plugin["status"] in {"installed", "missing", "unavailable"}, "plugin state invalid")
+    _unavailable_or_sha64(plugin["source_sha256"], "plugin source identity")
+    _unavailable_or_sha64(plugin["content_sha256"], "plugin content identity")
+    require(isinstance(plugin["ref"], str) and plugin["ref"], "plugin ref invalid")
+    require(isinstance(plugin["version"], str) and plugin["version"], "plugin version invalid")
+    require(plugin["enabled"] is None or isinstance(plugin["enabled"], bool), "plugin enabled invalid")
+    if marketplace["status"] == "missing":
+        require(
+            marketplace == {
+                "status": "missing", "source_sha256": "unavailable",
+                "ref": "unavailable", "commit": "unavailable",
+            },
+            "missing marketplace carries identity",
+        )
+    if plugin["status"] == "missing":
+        require(
+            plugin == {
+                "status": "missing", "source_sha256": "unavailable", "ref": "unavailable",
+                "version": "unavailable", "content_sha256": "unavailable", "enabled": None,
+            },
+            "missing plugin carries identity",
+        )
+    return value
+
+
+def _distribution_is_exact(
+    desired: dict[str, Any],
+    observed: dict[str, Any],
+    *,
+    desired_source_sha256: str,
+) -> bool:
+    marketplace = observed["marketplace"]
+    plugin = observed["plugin"]
+    return bool(
+        marketplace == {
+            "status": "present",
+            "source_sha256": desired_source_sha256,
+            "ref": desired["release_ref"],
+            "commit": desired["source_commit"],
+        }
+        and plugin == {
+            "status": "installed",
+            "source_sha256": desired_source_sha256,
+            "ref": desired["release_ref"],
+            "version": desired["plugin_version"],
+            "content_sha256": desired["plugin_sha256"],
+            "enabled": True,
+        }
+    )
+
+
+def build_workstation_reconcile_plan(
+    desired_bundle: dict[str, Any],
+    observed_distribution: dict[str, Any],
+    *,
+    desired_source_sha256: str,
+    source_plan: dict[str, Any],
+    host_materialization: dict[str, Any],
+) -> dict[str, Any]:
+    desired = validate_desired_bundle(desired_bundle)
+    observed = validate_observed_distribution(observed_distribution)
+    require(SHA64.fullmatch(desired_source_sha256) is not None, "desired source identity invalid")
+    source = validate_source_cutover_plan(source_plan)
+    host = _validate_host_materialization(host_materialization)
+    changes: list[str] = []
+    blockers: list[str] = []
+    confirmation_required = False
+
+    marketplace = observed["marketplace"]
+    if marketplace["status"] == "unavailable":
+        blockers.append("marketplace:unavailable")
+    elif marketplace["status"] == "missing":
+        changes.append("marketplace:install")
+    elif marketplace != {
+        "status": "present",
+        "source_sha256": desired_source_sha256,
+        "ref": desired["release_ref"],
+        "commit": desired["source_commit"],
+    }:
+        changes.append("marketplace:replace")
+        confirmation_required = marketplace["source_sha256"] != desired_source_sha256
+
+    plugin = observed["plugin"]
+    if plugin["status"] == "unavailable":
+        blockers.append("plugin:unavailable")
+    elif plugin["status"] == "missing":
+        changes.append("plugin:install")
+    elif plugin["enabled"] is False:
+        blockers.append("plugin:disabled")
+    elif plugin != {
+        "status": "installed",
+        "source_sha256": desired_source_sha256,
+        "ref": desired["release_ref"],
+        "version": desired["plugin_version"],
+        "content_sha256": desired["plugin_sha256"],
+        "enabled": True,
+    }:
+        changes.append("plugin:replace")
+
+    changes.extend(f"source:{item}" for item in source["changes"])
+    if not _host_is_exact(
+        desired,
+        host,
+        owner_expected=source["desired"]["canonical_owner"] is not None,
+    ):
+        changes.append("host:materialize")
+    for item in source["changes"]:
+        name, action = item.split(":", 1)
+        if action != "replace":
+            continue
+        current_identity = source["current"][name]
+        desired_identity = source["desired"][name]
+        if (
+            not isinstance(current_identity, dict)
+            or not isinstance(desired_identity, dict)
+            or current_identity.get("remote_sha256") != desired_identity.get("remote_sha256")
+        ):
+            confirmation_required = True
+    status = "distribution_reconcile_blocked" if blockers else ("ready" if changes else "noop")
+    if blockers:
+        confirmation_required = False
+    plan = {
+        "contract_version": WORKSTATION_RECONCILE_PLAN_VERSION,
+        "bootstrap_version": BOOTSTRAP_VERSION,
+        "status": status,
+        "desired_bundle": desired,
+        "observed_distribution": observed,
+        "source_plan_hash": source["plan_hash"],
+        "changes": changes,
+        "blockers": blockers,
+        "confirmation_required": confirmation_required,
+        "requires_reload": bool(changes),
+        "plan_hash": "",
+    }
+    plan["plan_hash"] = object_hash(plan, "plan_hash")
+    return validate_workstation_reconcile_plan(plan)
+
+
+def validate_workstation_reconcile_plan(value: Any) -> dict[str, Any]:
+    exact(value, RECONCILE_PLAN_FIELDS, "$")
+    require(value["contract_version"] == WORKSTATION_RECONCILE_PLAN_VERSION, "reconcile plan contract invalid")
+    require(value["bootstrap_version"] == BOOTSTRAP_VERSION, "reconcile plan Bootstrap version invalid")
+    require(value["status"] in {"ready", "noop", "distribution_reconcile_blocked"}, "reconcile plan status invalid")
+    validate_desired_bundle(value["desired_bundle"])
+    validate_observed_distribution(value["observed_distribution"])
+    require(SHA64.fullmatch(str(value["source_plan_hash"])) is not None, "reconcile source plan hash invalid")
+    require(isinstance(value["changes"], list) and len(value["changes"]) == len(set(value["changes"])), "reconcile changes invalid")
+    require(
+        all(
+            re.fullmatch(
+                r"(?:marketplace|plugin):(?:install|replace)|source:(?:sidecar|canonical_owner):(?:install|replace)|host:materialize",
+                str(item),
+            ) is not None
+            for item in value["changes"]
+        ),
+        "reconcile changes invalid",
+    )
+    require(
+        isinstance(value["blockers"], list)
+        and len(value["blockers"]) == len(set(value["blockers"]))
+        and all(item in {"marketplace:unavailable", "plugin:unavailable", "plugin:disabled"} for item in value["blockers"]),
+        "reconcile blockers invalid",
+    )
+    require(isinstance(value["confirmation_required"], bool), "reconcile confirmation invalid")
+    require(isinstance(value["requires_reload"], bool), "reconcile reload invalid")
+    require((value["status"] == "noop") == (not value["changes"] and not value["blockers"]), "reconcile plan status mismatch")
+    require((value["status"] == "distribution_reconcile_blocked") == bool(value["blockers"]), "reconcile blocker status mismatch")
+    require(not value["blockers"] or not value["confirmation_required"], "blocked reconcile cannot request confirmation")
+    require(value["requires_reload"] == bool(value["changes"]), "reconcile reload mismatch")
+    require(
+        SHA64.fullmatch(str(value["plan_hash"])) is not None
+        and value["plan_hash"] == object_hash(value, "plan_hash"),
+        "reconcile plan hash invalid",
+    )
+    return value
+
+
+def _workstation_reconcile_context(
+    codex_home: Path,
+    source_manifest_path: Path | str,
+    release_manifest_path: Path | str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    desired, sidecar, source_sha256 = load_desired_bundle(
+        source_manifest_path, release_manifest_path,
+    )
+    specs = load_source_manifest(source_manifest_path)
+    observed, private_distribution = _observe_distribution_with_private(codex_home)
+    source_plan = plan_source_cutover(codex_home, specs)
+    if source_plan["status"] == "noop":
+        observed_host = observe_host_materialization(
+            codex_home,
+            specs,
+            owner_expected=source_plan["desired"]["canonical_owner"] is not None,
+        )
+    else:
+        observed_host = _unavailable_host_materialization(
+            owner_expected=source_plan["desired"]["canonical_owner"] is not None,
+        )
+    plan = build_workstation_reconcile_plan(
+        desired,
+        observed,
+        desired_source_sha256=source_sha256,
+        source_plan=source_plan,
+        host_materialization=observed_host,
+    )
+    return plan, {
+        "desired": desired,
+        "sidecar": sidecar,
+        "source_sha256": source_sha256,
+        "specs": specs,
+        "source_plan": source_plan,
+        "observed": observed,
+        "observed_host": observed_host,
+        "private_distribution": private_distribution,
+    }
+
+
+def inspect_workstation_reconcile(
+    codex_home: Path,
+    source_manifest_path: Path | str,
+    release_manifest_path: Path | str,
+) -> dict[str, Any]:
+    plan, _ = _workstation_reconcile_context(
+        codex_home, source_manifest_path, release_manifest_path,
+    )
+    return plan
+
+
+def legacy_release_reconcile_manifest(source_manifest_path: Path | str) -> Path | None:
+    """Recognize the verified Resolver layout consumed by pre-v2 public Anchors."""
+    source = Path(source_manifest_path).expanduser().resolve()
+    if source.name != "source-manifest.json":
+        return None
+    release = source.with_name("release-manifest.json")
+    resolution = source.with_name("resolution.json")
+    portable = source.with_name("portable")
+    if release.is_file() and resolution.is_file() and portable.is_dir():
+        return release
+    return None
+
+
+def _remove_plugin(codex_home: Path) -> None:
+    run_codex_json(
+        ["plugin", "remove", "agent-memory-sidecar@agent-memory", "--json"],
+        codex_home=codex_home,
+    )
+
+
+def _remove_marketplace(codex_home: Path) -> None:
+    run_codex_json(
+        ["plugin", "marketplace", "remove", "agent-memory", "--json"],
+        codex_home=codex_home,
+    )
+
+
+def _add_marketplace(codex_home: Path, *, remote: str, ref: str) -> None:
+    run_codex_json(
+        ["plugin", "marketplace", "add", remote, "--ref", ref, "--json"],
+        codex_home=codex_home,
+    )
+
+
+def _add_plugin(codex_home: Path) -> None:
+    run_codex_json(
+        ["plugin", "add", "agent-memory-sidecar@agent-memory", "--json"],
+        codex_home=codex_home,
+    )
+
+
+def _restore_distribution(
+    codex_home: Path,
+    *,
+    before: dict[str, Any],
+    private_before: dict[str, Any],
+    marketplace_touched: bool,
+    plugin_touched: bool,
+) -> None:
+    current, _ = _observe_distribution_with_private(codex_home)
+    if plugin_touched and current["plugin"]["status"] == "installed":
+        _remove_plugin(codex_home)
+    if marketplace_touched and current["marketplace"]["status"] == "present":
+        _remove_marketplace(codex_home)
+    if marketplace_touched and private_before["marketplace"]["present"]:
+        remote = private_before["marketplace"]["remote"]
+        ref = private_before["marketplace"]["ref"]
+        require(isinstance(remote, str) and isinstance(ref, str), "distribution_rollback_snapshot_invalid")
+        _add_marketplace(codex_home, remote=remote, ref=ref)
+    if plugin_touched and private_before["plugin"]["installed"]:
+        require(private_before["plugin"]["enabled"] is True, "distribution_rollback_disabled_plugin_unsupported")
+        _add_plugin(codex_home)
+    restored = observe_distribution(codex_home)
+    require(restored == before, "distribution_rollback_verification_failed")
+
+
+def _apply_distribution_changes(
+    codex_home: Path,
+    *,
+    plan: dict[str, Any],
+    sidecar: SourceSpec,
+) -> tuple[bool, bool]:
+    marketplace_touched = any(item.startswith("marketplace:") for item in plan["changes"])
+    plugin_touched = marketplace_touched or any(item.startswith("plugin:") for item in plan["changes"])
+    before = plan["observed_distribution"]
+    if plugin_touched and before["plugin"]["status"] == "installed":
+        _remove_plugin(codex_home)
+    if marketplace_touched and before["marketplace"]["status"] == "present":
+        _remove_marketplace(codex_home)
+    if marketplace_touched:
+        _add_marketplace(codex_home, remote=sidecar.remote, ref=sidecar.ref)
+    if plugin_touched:
+        _add_plugin(codex_home)
+    return marketplace_touched, plugin_touched
+
+
+def apply_workstation_reconcile(
+    codex_home: Path,
+    source_manifest_path: Path | str,
+    release_manifest_path: Path | str,
+    *,
+    plan_hash: str,
+) -> dict[str, Any]:
+    require(SHA64.fullmatch(plan_hash.casefold()) is not None, "reconcile_plan_hash_invalid")
+    plan, context = _workstation_reconcile_context(
+        codex_home, source_manifest_path, release_manifest_path,
+    )
+    require(plan["plan_hash"] == plan_hash.casefold(), "reconcile_plan_stale")
+    require(plan["status"] != "distribution_reconcile_blocked", "distribution_reconcile_blocked")
+    before = context["observed"]
+    private_before = context["private_distribution"]
+    marketplace_touched = any(item.startswith("marketplace:") for item in plan["changes"])
+    plugin_touched = marketplace_touched or any(item.startswith("plugin:") for item in plan["changes"])
+    pack_holder: dict[str, Any] = {}
+
+    def apply_distribution() -> None:
+        _apply_distribution_changes(codex_home, plan=plan, sidecar=context["sidecar"])
+
+    def rollback_distribution() -> None:
+        _restore_distribution(
+            codex_home,
+            before=before,
+            private_before=private_before,
+            marketplace_touched=marketplace_touched,
+            plugin_touched=plugin_touched,
+        )
+
+    def verify_and_build_pack(source_receipt: dict[str, Any]) -> None:
+        observed_after = observe_distribution(codex_home)
+        require(
+            _distribution_is_exact(
+                context["desired"],
+                observed_after,
+                desired_source_sha256=context["source_sha256"],
+            ),
+            "distribution_readback_mismatch",
+        )
+        materialization = observe_host_materialization(
+            codex_home,
+            context["specs"],
+            owner_expected=source_receipt["sources"]["canonical_owner"]["status"] != "unavailable",
+        )
+        require(
+            _host_is_exact(
+                context["desired"],
+                materialization,
+                owner_expected=source_receipt["sources"]["canonical_owner"]["status"] != "unavailable",
+            ),
+            "host_materialization_readback_mismatch",
+        )
+        source_receipt["materialization"] = materialization
+        effective_reload = bool(
+            plan["requires_reload"]
+            or materialization["bootstrap_skill"]["status"] == "installed"
+            or materialization["scout_skill"]["status"] == "installed"
+        )
+        pack_holder["value"] = build_deployment_pack_v2(
+            desired=context["desired"],
+            observed_distribution=observed_after,
+            desired_source_sha256=context["source_sha256"],
+            source_sync=source_receipt["sources"],
+            host_materialization=source_receipt["materialization"],
+            requires_reload=effective_reload,
+            consumer_verified=False,
+            generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        )
+
+    apply_source_cutover(
+        codex_home,
+        context["specs"],
+        plan_hash=context["source_plan"]["plan_hash"],
+        external_apply=apply_distribution if (marketplace_touched or plugin_touched) else None,
+        external_rollback=rollback_distribution if (marketplace_touched or plugin_touched) else None,
+        precommit_verify=verify_and_build_pack,
+    )
+    require("value" in pack_holder, "deployment_pack_not_built")
+    return {
+        "contract_version": "agent_memory_workstation_reconcile_receipt_v2",
+        "status": "applied",
+        "plan_hash": plan["plan_hash"],
+        "deployment_pack": pack_holder["value"],
+    }
+
+
+def _source_sync_from_exact_plan(source_plan: dict[str, Any]) -> dict[str, Any]:
+    source = validate_source_cutover_plan(source_plan)
+    require(source["status"] == "noop", "source_sync_requires_exact_plan")
+    desired = source["desired"]
+    sidecar = desired["sidecar"]
+    owner = desired["canonical_owner"]
+    receipts = {
+        "sidecar": {
+            "status": "unchanged", "ref": sidecar["ref"], "commit": sidecar["commit"],
+        },
+        "canonical_owner": (
+            {"status": "unavailable", "ref": "unavailable", "commit": "unavailable"}
+            if owner is None
+            else {"status": "unchanged", "ref": owner["ref"], "commit": owner["commit"]}
+        ),
+    }
+    return _validate_source_sync(receipts)
+
+
+def verify_workstation_consumer(
+    codex_home: Path,
+    source_manifest_path: Path | str,
+    release_manifest_path: Path | str,
+) -> dict[str, Any]:
+    plan, context = _workstation_reconcile_context(
+        codex_home, source_manifest_path, release_manifest_path,
+    )
+    require(plan["status"] == "noop", "consumer_verification_requires_exact_host")
+    return build_deployment_pack_v2(
+        desired=context["desired"],
+        observed_distribution=context["observed"],
+        desired_source_sha256=context["source_sha256"],
+        source_sync=_source_sync_from_exact_plan(context["source_plan"]),
+        host_materialization=context["observed_host"],
+        requires_reload=False,
+        consumer_verified=True,
+        generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    )
+
+
+def _validate_source_sync(value: Any) -> dict[str, Any]:
+    exact(value, SOURCE_SYNC_FIELDS, "$.source_sync")
+    for name in SOURCE_SYNC_FIELDS:
+        receipt = value[name]
+        exact(receipt, SOURCE_RECEIPT_FIELDS, f"$.source_sync.{name}")
+        require(receipt["status"] in {"synced", "unchanged", "unavailable", "failed"}, f"source {name} status invalid")
+        safe_text(receipt["ref"], f"$.source_sync.{name}.ref", 128)
+        _unavailable_or_sha40(receipt["commit"], f"source {name} commit")
+    return value
+
+
+def _validate_host_materialization(value: Any) -> dict[str, Any]:
+    exact(value, MATERIALIZATION_FIELDS, "$.host_materialization")
+    core = value["core"]
+    exact(core, CORE_STATE_FIELDS, "$.host_materialization.core")
+    require(core["status"] in {"verified", "failed", "unavailable"}, "Core materialization status invalid")
+    require(
+        core["version"] == "unavailable" or SEMVER.fullmatch(str(core["version"])) is not None,
+        "Core materialization version invalid",
+    )
+    _unavailable_or_sha40(core["source_commit"], "Core materialization source commit")
+    _unavailable_or_sha64(core["artifact_sha256"], "Core artifact identity")
+    require(value["global_binding"] in {"verified", "unavailable", "failed"}, "global binding state invalid")
+    require(value["doctor"] in {"verified", "failed"}, "Doctor state invalid")
+    for name in ("bootstrap_skill", "scout_skill"):
+        skill = value[name]
+        exact(skill, SKILL_STATE_FIELDS, f"$.host_materialization.{name}")
+        require(skill["status"] in {"installed", "unchanged", "failed", "unavailable"}, f"{name} state invalid")
+        require(
+            skill["version"] == "unavailable" or SEMVER.fullmatch(str(skill["version"])) is not None,
+            f"{name} version invalid",
+        )
+        _unavailable_or_sha64(skill["content_sha256"], f"{name} content identity")
+    return value
+
+
+def _host_is_exact(
+    desired: dict[str, Any],
+    material: dict[str, Any],
+    *,
+    owner_expected: bool,
+) -> bool:
+    expected_binding = "verified" if owner_expected else "unavailable"
+    return bool(
+        material["core"]["status"] == "verified"
+        and material["core"]["version"] == desired["core_version"]
+        and material["core"]["source_commit"] == desired["source_commit"]
+        and material["global_binding"] == expected_binding
+        and material["doctor"] == "verified"
+        and material["bootstrap_skill"]["status"] in {"installed", "unchanged"}
+        and material["bootstrap_skill"]["version"] == desired["bootstrap_version"]
+        and material["bootstrap_skill"]["content_sha256"] == desired["bootstrap_sha256"]
+        and material["scout_skill"]["status"] in {"installed", "unchanged"}
+        and material["scout_skill"]["version"] == desired["scout_version"]
+        and material["scout_skill"]["content_sha256"] == desired["scout_sha256"]
+    )
+
+
+def build_deployment_pack_v2(
+    *,
+    desired: dict[str, Any],
+    observed_distribution: dict[str, Any],
+    desired_source_sha256: str,
+    source_sync: dict[str, Any],
+    host_materialization: dict[str, Any],
+    requires_reload: bool,
+    consumer_verified: bool,
+    generated_at: str,
+) -> dict[str, Any]:
+    desired = validate_desired_bundle(desired)
+    observed = validate_observed_distribution(observed_distribution)
+    require(SHA64.fullmatch(desired_source_sha256) is not None, "desired source identity invalid")
+    source_sync = _validate_source_sync(source_sync)
+    material = _validate_host_materialization(host_materialization)
+    distribution_exact = _distribution_is_exact(
+        desired, observed, desired_source_sha256=desired_source_sha256,
+    )
+    source_exact = (
+        source_sync["sidecar"]["status"] in {"synced", "unchanged"}
+        and source_sync["sidecar"]["ref"] == desired["release_ref"]
+        and source_sync["sidecar"]["commit"] == desired["source_commit"]
+        and source_sync["canonical_owner"]["status"] in {"synced", "unchanged", "unavailable"}
+    )
+    host_exact = _host_is_exact(
+        desired,
+        material,
+        owner_expected=source_sync["canonical_owner"]["status"] != "unavailable",
+    )
+    if not distribution_exact:
+        status = "distribution_reconcile_blocked"
+    elif not source_exact:
+        status = "source_sync_blocked"
+    elif not host_exact:
+        status = "host_materialization_blocked"
+    elif requires_reload or not consumer_verified:
+        status = "reload_required"
+    else:
+        status = "ready"
+    blocked = status in {
+        "distribution_reconcile_blocked", "source_sync_blocked", "host_materialization_blocked",
+    }
+    activation_pending = not blocked and (requires_reload or not consumer_verified)
+    interactive_entry = (
+        "blocked" if blocked else ("available_next_task" if activation_pending else "verified")
+    )
+    limitations = ["真实第二台设备的首次部署与项目续接仍需独立验收。"]
+    if not consumer_verified and not blocked:
+        limitations.insert(0, "当前任务未证明新版本已被模型加载；需在一次 Desktop 刷新后的新任务中验收。")
+    pack = {
+        "contract_version": PACK_VERSION,
+        "status": status,
+        "display_locale": "zh-CN",
+        "generated_at": generated_at,
+        "desired_bundle": desired,
+        "distribution": observed,
+        "source_sync": source_sync,
+        "host_materialization": material,
+        "consumer_activation": {
+            "desktop_reload": "required" if activation_pending else "not_required",
+            "interactive_entry": interactive_entry,
+            "scheduled": "unchanged",
+        },
+        "limitations": limitations,
+        "pack_hash": "",
+    }
+    pack["pack_hash"] = object_hash(pack, "pack_hash")
+    return validate_pack(pack)
+
+
 def validate_pack(value: Any) -> dict[str, Any]:
     exact(value, PACK_FIELDS, "$")
     require(value["contract_version"] == PACK_VERSION, "deployment pack contract invalid")
     require(value["display_locale"] == "zh-CN", "deployment pack locale invalid")
-    require(value["bootstrap_version"] == BOOTSTRAP_VERSION, "deployment pack Bootstrap version invalid")
-    require(value["status"] in {"ready", "reload_required", "source_sync_blocked", "host_materialization_blocked"}, "deployment pack status invalid")
+    require(
+        value["status"] in {
+            "ready", "reload_required", "distribution_reconcile_blocked",
+            "source_sync_blocked", "host_materialization_blocked",
+        },
+        "deployment pack status invalid",
+    )
     safe_text(value["generated_at"], "$.generated_at", 80)
-
-    distribution = value["portable_distribution"]
-    exact(distribution, DISTRIBUTION_FIELDS, "$.portable_distribution")
-    for field in DISTRIBUTION_FIELDS:
-        require(distribution[field] in {"verified", "installed", "unavailable", "failed"}, f"portable distribution {field} invalid")
-
-    source_sync = value["source_sync"]
-    exact(source_sync, SOURCE_SYNC_FIELDS, "$.source_sync")
-    for name in SOURCE_SYNC_FIELDS:
-        receipt = source_sync[name]
-        exact(receipt, SOURCE_RECEIPT_FIELDS, f"$.source_sync.{name}")
-        require(receipt["status"] in {"synced", "unchanged", "unavailable", "failed"}, f"source {name} status invalid")
-        safe_text(receipt["ref"], f"$.source_sync.{name}.ref", 80)
-        require(receipt["commit"] == "unavailable" or SHA40.fullmatch(receipt["commit"]) is not None, f"source {name} commit invalid")
-
-    material = value["host_materialization"]
-    exact(material, MATERIALIZATION_FIELDS, "$.host_materialization")
-    for field in ("core_setup", "global_binding", "doctor", "bootstrap_skill", "scout_skill"):
-        require(material[field] in {"verified", "installed", "unchanged", "unavailable", "failed"}, f"materialization {field} invalid")
-    require(material["bootstrap_skill_version"] == BOOTSTRAP_VERSION, "materialized Bootstrap version invalid")
-    require(material["scout_skill_version"] == SCOUT_VERSION, "materialized Scout version invalid")
-
-    activation = value["project_activation"]
-    exact(activation, ACTIVATION_FIELDS, "$.project_activation")
-    require(activation["interactive_entry"] in {"available_next_turn", "verified", "blocked"}, "interactive activation invalid")
-    require(activation["scheduled"] in {"paused", "not_configured", "unchanged"}, "scheduled activation invalid")
+    validate_desired_bundle(value["desired_bundle"])
+    validate_observed_distribution(value["distribution"])
+    _validate_source_sync(value["source_sync"])
+    _validate_host_materialization(value["host_materialization"])
+    activation = value["consumer_activation"]
+    exact(activation, ACTIVATION_FIELDS, "$.consumer_activation")
+    require(activation["desktop_reload"] in {"required", "not_required"}, "Desktop reload state invalid")
+    require(activation["interactive_entry"] in {"available_next_task", "verified", "unproven", "blocked"}, "interactive activation invalid")
+    require(activation["scheduled"] == "unchanged", "Scheduled activation invalid")
+    if value["status"] == "reload_required":
+        require(activation["desktop_reload"] == "required", "reload-required pack must require Desktop reload")
+        require(activation["interactive_entry"] == "available_next_task", "reload-required pack must expose next-task entry")
+    if value["status"] == "ready":
+        require(activation["desktop_reload"] == "not_required", "ready pack cannot require Desktop reload")
+        require(activation["interactive_entry"] == "verified", "ready pack requires verified interactive entry")
+    if value["status"].endswith("_blocked"):
+        require(activation["desktop_reload"] == "not_required", "blocked pack cannot request Desktop reload")
+        require(activation["interactive_entry"] == "blocked", "blocked pack must block interactive entry")
     require(isinstance(value["limitations"], list), "$.limitations must be a list")
     for index, item in enumerate(value["limitations"]):
         safe_text(item, f"$.limitations[{index}]", 300)
@@ -1025,14 +2238,17 @@ def validate_marketplace(
 def render_pack(value: Any) -> str:
     pack = validate_pack(value)
     status = {
-        "ready": "本机能力已对齐",
-        "reload_required": "能力已安装，需在下一任务加载",
+        "ready": "本机能力与新任务入口已对齐",
+        "reload_required": "能力已对齐到磁盘，需一次 Desktop 刷新后在新任务验收",
+        "distribution_reconcile_blocked": "Plugin 或 Marketplace 尚未精确对齐",
         "source_sync_blocked": "远端能力源同步受阻",
         "host_materialization_blocked": "本机能力物化受阻",
     }[pack["status"]]
+    desired = pack["desired_bundle"]
+    distribution = pack["distribution"]
     sources = pack["source_sync"]
     material = pack["host_materialization"]
-    activation = pack["project_activation"]
+    activation = pack["consumer_activation"]
     lines = [
         "# Agent Memory 本机部署结果",
         "",
@@ -1040,46 +2256,68 @@ def render_pack(value: Any) -> str:
         "",
         "| 能力层 | 结果 | 说明 |",
         "|---|---|---|",
-        f"| 可移植分发 | Anchor `{pack['portable_distribution']['repo_anchor']}` / Plugin `{pack['portable_distribution']['plugin']}` | 当前工程可发现冷启动入口 |",
+        f"| 期望发行身份 | Core `{desired['core_version']}` / Plugin `{desired['plugin_version']}` | Release `{desired['release_ref']}` / `{desired['source_commit'][:12]}` |",
+        f"| Plugin 分发 | Marketplace `{distribution['marketplace']['status']}` / Plugin `{distribution['plugin']['status']}` | Ref `{distribution['plugin']['ref']}` / enabled `{str(distribution['plugin']['enabled']).lower()}` |",
         f"| 能力源同步 | Sidecar `{sources['sidecar']['status']}` / Global Owner `{sources['canonical_owner']['status']}` | 只更新本机受管缓存，不清理活跃工程 |",
-        f"| 主机物化 | Core `{material['core_setup']}` / Doctor `{material['doctor']}` / Scout `{material['scout_skill']}` | Bootstrap {material['bootstrap_skill_version']}；Scout {material['scout_skill_version']} |",
-        f"| 项目启用 | 交互入口 `{activation['interactive_entry']}` / Scheduled `{activation['scheduled']}` | 项目集合仍由当前主机和用户决定 |",
+        f"| 主机物化 | Core `{material['core']['status']}` / Doctor `{material['doctor']}` / Scout `{material['scout_skill']['status']}` | Bootstrap {material['bootstrap_skill']['version']}；Scout {material['scout_skill']['version']} |",
+        f"| 消费者采用 | Desktop 刷新 `{activation['desktop_reload']}` / 交互入口 `{activation['interactive_entry']}` | Scheduled `{activation['scheduled']}`，项目集合仍由当前主机和用户决定 |",
     ]
     if pack["limitations"]:
         lines.extend(["", "## 尚未证明", ""])
         lines.extend(f"> {item}" for item in pack["limitations"])
+    next_step = {
+        "reload_required": "下一步：刷新一次 Codex Desktop，并在新任务中再次发送“同步并部署本机 Agent Memory”完成采用验收。",
+        "ready": "下一步：可在目标工程的新任务中发送 `$global-owner-scout 复盘当前项目`。",
+        "distribution_reconcile_blocked": "下一步：处理上表显示的 Plugin/Marketplace 唯一阻断后，再发送“同步并部署本机 Agent Memory”。",
+        "source_sync_blocked": "下一步：恢复期望来源的只读访问或消除来源歧义后，再发送“同步并部署本机 Agent Memory”。",
+        "host_materialization_blocked": "下一步：保留当前失败现场并重试同一句部署入口；不得手工跳过 Core、Doctor 或 Skill 步骤。",
+    }[pack["status"]]
     lines.extend([
         "",
-        "下一步：在目标工程的新任务中发送 `$global-owner-scout 复盘当前项目`；若本次刚安装插件或 Skill，请使用下一任务加载。",
+        next_step,
         "",
         f"校验回执：`{PACK_VERSION}`｜Pack `{pack['pack_hash'][:12]}`",
     ])
     return "\n".join(lines) + "\n"
 
 
-def valid_pack() -> dict[str, Any]:
-    pack = {
-        "contract_version": PACK_VERSION,
-        "status": "ready",
-        "display_locale": "zh-CN",
-        "bootstrap_version": BOOTSTRAP_VERSION,
-        "generated_at": "2026-08-12T12:00:00+08:00",
-        "portable_distribution": {"repo_anchor": "verified", "plugin": "installed", "marketplace": "verified"},
-        "source_sync": {
-            "sidecar": {"status": "synced", "ref": "main", "commit": "a" * 40},
-            "canonical_owner": {"status": "unchanged", "ref": "main", "commit": "b" * 40},
-        },
-        "host_materialization": {
-            "core_setup": "verified", "global_binding": "verified", "doctor": "verified",
-            "bootstrap_skill": "installed", "scout_skill": "installed",
-            "bootstrap_skill_version": BOOTSTRAP_VERSION, "scout_skill_version": SCOUT_VERSION,
-        },
-        "project_activation": {"interactive_entry": "verified", "scheduled": "paused"},
-        "limitations": ["真实第二台设备的首次部署与项目续接仍需独立验收。"],
-        "pack_hash": "",
+def render_workstation_reconcile_plan(value: Any) -> str:
+    plan = validate_workstation_reconcile_plan(value)
+    if plan["blockers"]:
+        blocker_labels = {
+            "marketplace:unavailable": "Marketplace 状态无法可靠读取",
+            "plugin:unavailable": "Plugin 状态无法可靠读取",
+            "plugin:disabled": "Plugin 已由用户显式停用，调和不会静默改写该选择",
+        }
+        items = [f"- 阻断：{blocker_labels[item]}" for item in plan["blockers"]]
+        return "\n".join(["## 本机 Agent Memory 调和受阻", "", *items, "", "未执行任何部署变更。", ""])
+    labels = {
+        "marketplace:install": "安装受发行身份固定的 Marketplace",
+        "marketplace:replace": "将 Marketplace 更新到期望发行身份",
+        "plugin:install": "安装 Agent Memory Plugin",
+        "plugin:replace": "将 Agent Memory Plugin 更新到期望版本和内容",
+        "host:materialize": "修复并复核 Core、Owner、Doctor、Bootstrap 与 Scout",
     }
-    pack["pack_hash"] = object_hash(pack, "pack_hash")
-    return pack
+    rendered_changes: list[str] = []
+    for item in plan["changes"]:
+        rendered_changes.append(
+            "同步并物化受管能力源" if item.startswith("source:") else labels[item]
+        )
+    if not rendered_changes:
+        rendered_changes = ["所有受管分发面身份一致；只进行确定性复核"]
+    confirmation = (
+        "检测到既有来源身份变化，需要一次明确确认后才能执行 exact-hash apply。"
+        if plan["confirmation_required"]
+        else "当前部署请求已覆盖这些同身份安装或更新动作。"
+    )
+    return "\n".join([
+        "## 本机 Agent Memory 统一调和计划",
+        "",
+        *[f"- {item}" for item in dict.fromkeys(rendered_changes)],
+        f"- 授权：{confirmation}",
+        f"- 平台边界：{'执行后需要一次 Desktop 刷新。' if plan['requires_reload'] else '无需额外刷新。'}",
+        "",
+    ])
 
 
 def create_remote(parent: Path, name: str) -> Path:
@@ -1097,8 +2335,48 @@ def create_remote(parent: Path, name: str) -> Path:
 
 
 def self_test() -> None:
-    pack = valid_pack()
-    validate_pack(pack)
+    desired = {
+        "release_ref": "v0.3.8", "source_commit": "a" * 40,
+        "core_version": "0.3.8", "plugin_version": "1.5.0", "plugin_sha256": "b" * 64,
+        "bootstrap_version": BOOTSTRAP_VERSION, "bootstrap_sha256": "c" * 64,
+        "scout_version": SCOUT_VERSION, "scout_sha256": "d" * 64,
+    }
+    source_identity_hash = "e" * 64
+    pack = build_deployment_pack_v2(
+        desired=desired,
+        observed_distribution={
+            "marketplace": {
+                "status": "present", "source_sha256": source_identity_hash,
+                "ref": "v0.3.8", "commit": "a" * 40,
+            },
+            "plugin": {
+                "status": "installed", "source_sha256": source_identity_hash,
+                "ref": "v0.3.8", "version": "1.5.0",
+                "content_sha256": "b" * 64, "enabled": True,
+            },
+        },
+        desired_source_sha256=source_identity_hash,
+        source_sync={
+            "sidecar": {"status": "unchanged", "ref": "v0.3.8", "commit": "a" * 40},
+            "canonical_owner": {"status": "unavailable", "ref": "unavailable", "commit": "unavailable"},
+        },
+        host_materialization={
+            "core": {
+                "status": "verified", "version": "0.3.8",
+                "source_commit": "a" * 40, "artifact_sha256": "f" * 64,
+            },
+            "global_binding": "unavailable", "doctor": "verified",
+            "bootstrap_skill": {
+                "status": "unchanged", "version": BOOTSTRAP_VERSION, "content_sha256": "c" * 64,
+            },
+            "scout_skill": {
+                "status": "unchanged", "version": SCOUT_VERSION, "content_sha256": "d" * 64,
+            },
+        },
+        requires_reload=True,
+        consumer_verified=False,
+        generated_at="2026-08-21T12:00:00+08:00",
+    )
     require("真实第二台设备" in render_pack(pack), "deployment renderer lost proof boundary")
     marketplace = {
         "name": "agent-memory", "interface": {"displayName": "Agent Memory"},
@@ -1173,11 +2451,23 @@ def main() -> int:
     cutover_mode.add_argument("--dry-run", action="store_true")
     cutover_mode.add_argument("--apply", action="store_true")
     cutover.add_argument("--plan-hash")
+    reconcile = sub.add_parser("workstation-reconcile")
+    reconcile.add_argument("--codex-home", required=True)
+    reconcile.add_argument("--source-manifest", required=True)
+    reconcile.add_argument("--release-manifest", required=True)
+    reconcile_mode = reconcile.add_mutually_exclusive_group(required=True)
+    reconcile_mode.add_argument("--dry-run", action="store_true")
+    reconcile_mode.add_argument("--apply", action="store_true")
+    reconcile_mode.add_argument("--verify-consumer", action="store_true")
+    reconcile.add_argument("--plan-hash")
     validate_source = sub.add_parser("validate-source-manifest")
     validate_source.add_argument("--path", required=True)
     sub.add_parser("validate-pack")
     sub.add_parser("render-pack")
     sub.add_parser("render-cutover-plan")
+    sub.add_parser("render-reconcile-plan")
+    observe = sub.add_parser("observe-distribution")
+    observe.add_argument("--codex-home", required=True)
     sub.add_parser("validate-marketplace")
     sub.add_parser("self-test")
     args = parser.parse_args()
@@ -1189,14 +2479,46 @@ def main() -> int:
             specs = load_source_manifest(args.source_manifest)
             print(json.dumps(materialize_host(Path(args.codex_home), specs), ensure_ascii=False, separators=(",", ":")))
         elif args.command == "source-cutover":
-            specs = load_source_manifest(args.source_manifest)
-            if args.dry_run:
-                require(args.plan_hash is None, "source_cutover_plan_hash_unexpected")
-                result = plan_source_cutover(Path(args.codex_home), specs)
+            legacy_release = legacy_release_reconcile_manifest(args.source_manifest)
+            if legacy_release is not None:
+                if args.dry_run:
+                    require(args.plan_hash is None, "source_cutover_plan_hash_unexpected")
+                    result = inspect_workstation_reconcile(
+                        Path(args.codex_home), args.source_manifest, legacy_release,
+                    )
+                else:
+                    require(args.plan_hash is not None, "source_cutover_plan_hash_required")
+                    result = apply_workstation_reconcile(
+                        Path(args.codex_home), args.source_manifest, legacy_release,
+                        plan_hash=args.plan_hash,
+                    )
             else:
-                require(args.plan_hash is not None, "source_cutover_plan_hash_required")
-                result = apply_source_cutover(
-                    Path(args.codex_home), specs, plan_hash=args.plan_hash,
+                specs = load_source_manifest(args.source_manifest)
+                if args.dry_run:
+                    require(args.plan_hash is None, "source_cutover_plan_hash_unexpected")
+                    result = plan_source_cutover(Path(args.codex_home), specs)
+                else:
+                    require(args.plan_hash is not None, "source_cutover_plan_hash_required")
+                    result = apply_source_cutover(
+                        Path(args.codex_home), specs, plan_hash=args.plan_hash,
+                    )
+            print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+        elif args.command == "workstation-reconcile":
+            if args.dry_run:
+                require(args.plan_hash is None, "reconcile_plan_hash_unexpected")
+                result = inspect_workstation_reconcile(
+                    Path(args.codex_home), args.source_manifest, args.release_manifest,
+                )
+            elif args.apply:
+                require(args.plan_hash is not None, "reconcile_plan_hash_required")
+                result = apply_workstation_reconcile(
+                    Path(args.codex_home), args.source_manifest, args.release_manifest,
+                    plan_hash=args.plan_hash,
+                )
+            else:
+                require(args.plan_hash is None, "reconcile_plan_hash_unexpected")
+                result = verify_workstation_consumer(
+                    Path(args.codex_home), args.source_manifest, args.release_manifest,
                 )
             print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
         elif args.command == "validate-source-manifest":
@@ -1208,7 +2530,15 @@ def main() -> int:
         elif args.command == "render-pack":
             sys.stdout.write(render_pack(json.load(sys.stdin)))
         elif args.command == "render-cutover-plan":
-            sys.stdout.write(render_source_cutover_plan(json.load(sys.stdin)))
+            plan = json.load(sys.stdin)
+            if plan.get("contract_version") == WORKSTATION_RECONCILE_PLAN_VERSION:
+                sys.stdout.write(render_workstation_reconcile_plan(plan))
+            else:
+                sys.stdout.write(render_source_cutover_plan(plan))
+        elif args.command == "render-reconcile-plan":
+            sys.stdout.write(render_workstation_reconcile_plan(json.load(sys.stdin)))
+        elif args.command == "observe-distribution":
+            print(json.dumps(observe_distribution(Path(args.codex_home)), ensure_ascii=False, separators=(",", ":")))
         elif args.command == "validate-marketplace":
             validate_marketplace(json.load(sys.stdin))
             print(json.dumps({"status": "ok", "contract": "agent-memory-marketplace-v1"}, separators=(",", ":")))

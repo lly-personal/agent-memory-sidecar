@@ -3,7 +3,9 @@
 `agent-memory-core-v1.md` owns the active runtime contract.
 `public-distribution-v1.md` owns the active public export and release contract. `public-authority-cutover-v1.md` owns the active
 engineering-authority epochs, first-release cutover gate, and steady-state public development boundary.
-`source-authority-cutover-v2.md` owns unified workstation reconciliation and explicit migration between managed Sidecar identities.
+`source-authority-cutover-v2.md` owns the lower-level transaction for explicit migration between managed Sidecar identities.
+`workstation-reconcile-v2.md` owns the single user-facing operation that reconciles verified Release identity, Marketplace/Plugin,
+managed sources, host materialization, and new-task consumer verification.
 `global-owner-scout-delivery-v1.md` owns task-scoped Review Pack artifacts, compact receipts, and actual task-surface qualification.
 `release-promotion-v1.md` owns the deterministic inspect/apply transition from a verified draft to an attested immutable Release.
 

@@ -55,6 +55,7 @@ class ContractTests(unittest.TestCase):
                 "public-distribution-v1.md",
                 "public-authority-cutover-v1.md",
                 "source-authority-cutover-v2.md",
+                "workstation-reconcile-v2.md",
                 "global-owner-scout-delivery-v1.md",
                 "release-promotion-v1.md",
             }:
@@ -78,6 +79,8 @@ class ContractTests(unittest.TestCase):
         self.assertIn("immutable", contract)
         self.assertIn("write-once", contract)
         self.assertIn("next semantic version", contract)
+        self.assertIn("Two evidence channels", contract)
+        self.assertIn("Windows and Ubuntu", contract)
 
     def test_global_owner_scout_delivery_contract_is_fail_closed(self) -> None:
         contract = (ROOT / "specs" / "global-owner-scout-delivery-v1.md").read_text(encoding="utf-8")
@@ -123,6 +126,20 @@ class ContractTests(unittest.TestCase):
         self.assertIn("plan_hash", contract)
         self.assertIn("There is no `force` option", contract)
         self.assertIn("does not weaken the normal `sync-sources` contract", contract)
+
+    def test_workstation_reconcile_is_the_single_product_entry(self) -> None:
+        contract = (ROOT / "specs" / "workstation-reconcile-v2.md").read_text(
+            encoding="utf-8"
+        )
+        skill = (
+            ROOT / ".agents" / "skills" / "agent-memory-workstation-bootstrap" / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("one operation", contract)
+        self.assertIn("ObservedHostState", contract)
+        self.assertIn("Deployment Pack v2", contract)
+        self.assertIn("workstation-reconcile --dry-run", skill)
+        self.assertIn("workstation-reconcile --apply", skill)
+        self.assertIn("workstation-reconcile --verify-consumer", skill)
 
     def test_core_adr_is_accepted(self) -> None:
         adr = (

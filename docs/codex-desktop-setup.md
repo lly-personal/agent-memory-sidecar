@@ -3,14 +3,14 @@
 - Status: active
 - Owner layer: project_docs
 - Last verified: 2026-08-21
-- Evidence: [Core v1 contract](../specs/agent-memory-core-v1.md)、[Public distribution v1](../specs/public-distribution-v1.md)、[Source cutover v2](../specs/source-authority-cutover-v2.md)
+- Evidence: [Core v1 contract](../specs/agent-memory-core-v1.md)、[Public distribution v1](../specs/public-distribution-v1.md)、[Workstation Reconcile v2](../specs/workstation-reconcile-v2.md)
 
 ## Released consumer path
 
 Codex Desktop users register the tagged public Marketplace and install the plugin:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.7
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.8
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -19,15 +19,15 @@ The Anchor resolves the latest stable immutable Release (or an explicitly
 selected version), verifies asset digests, checksums, tag/commit and manifests,
 safely materializes its portable bundle, and runs the commit-bound Bootstrap in
 the same task. Fresh/same-source deployment completes directly. A legacy
-Sidecar identity replacement displays one path-free plan and asks for one
+Sidecar or Marketplace source identity replacement displays one path-free plan and asks for one
 confirmation before a fresh-hash atomic apply. The following task is needed
-only for reliable automatic discovery of newly installed Skills. A checkout or
-Marketplace alone does not authorize source materialization.
+only for reliable automatic discovery and consumer verification of newly installed Plugin/Skills.
+A checkout or Marketplace alone does not authorize source materialization or prove model adoption.
 
 Core-only consumers install the Release wheel and run:
 
 ```powershell
-python -m pip install .\agent_memory_sidecar-0.3.7-py3-none-any.whl
+python -m pip install .\agent_memory_sidecar-0.3.8-py3-none-any.whl
 agent-memory setup
 agent-memory setup --apply
 agent-memory doctor
@@ -53,16 +53,16 @@ The source must be a clean checkout with a resolvable commit and a canonical
 the local `~/.codex/AGENTS.md`. SQLite, events, tokens, credentials and Hook
 trust are never copied between devices.
 
-Workstation Bootstrap uses `source-cutover --dry-run` and exact-hash apply as
-the unified fresh/update/legacy transaction. Public Core sets
+Workstation Bootstrap uses `workstation-reconcile --dry-run` and exact-hash apply as
+the unified Marketplace/Plugin/source/host transaction. Public Core sets
 `canonical_owner` to `null`; a release source must bind the Sidecar ref and
 full commit SHA. On a legacy host, null preserves a clean existing Owner only
 when Core's bound source root and commit match it exactly.
 
 If an existing host has a clean managed Sidecar with a different repository
-identity, normal `sync-sources` intentionally fails closed. The unified flow
-uses `source-cutover --dry-run`, renders only `owner_action` and source changes,
-then passes the exact fresh `plan_hash` to apply after one confirmation.
+identity, normal `sync-sources` intentionally fails closed. The unified flow reads actual Codex JSON and physical component
+identities, renders only safe desired/observed changes, then passes the exact fresh `plan_hash` to apply after one confirmation.
+Apply returns `reload_required`; a refreshed task runs read-only `--verify-consumer` before reporting `ready`.
 Existing global Owner removal is not implicit and requires a separate decision.
 
 ## Contributor path

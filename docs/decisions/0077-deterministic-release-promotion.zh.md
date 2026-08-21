@@ -23,6 +23,8 @@ Tag workflow 已有意停在完整 draft，避免把管理员权限放入公共 
    来源身份替换或新的不可推导破坏性范围才再次停下确认。
 5. 远端 release tag 从首次 push 即 write-once。Tag 只能在最终版本 PR 合入、clean main 同步且本地 tag 构建通过后
    首次推送；同 commit 可重试 draft workflow，任何 source repair 必须撤回 stale draft 并提高语义版本，不修改 ruleset。
+6. 本地 tagged build 与 Ubuntu CI draft 是独立证据通道。前者证明本地构建能力，后者的原始 Release asset digest 与
+   attestation 证明实际待发布字节；跨宿主 archive hash 不假定相等，任何完成声明都必须标明所依赖的通道。
 
 ## 结果与代价
 

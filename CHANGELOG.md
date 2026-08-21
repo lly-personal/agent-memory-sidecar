@@ -3,6 +3,35 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.3.8 (2026-08-21)
+
+### Fixed
+
+- Workstation deployment no longer accepts a hand-built completion pack while Marketplace or Plugin remains on an older ref,
+  version, content hash, or enabled state. Desired Release identity and actual Codex/physical readback now determine the result.
+- Desired bundle construction now rebinds the Resolver receipt, Release/archive bytes, public tag/commit, and embedded Plugin/Skill
+  versions before any plan or mutation can proceed.
+- Dry-run and new-task verification now re-observe live Core runtime, Owner parity, Doctor, Bootstrap, and Scout state; an old green
+  cutover receipt cannot hide current host drift or produce a false `noop`/`ready`.
+- Plugin/Marketplace repair now participates in the existing source-cutover compensation transaction, so Core, Skill, Doctor, or
+  final-readback failure cannot leave a silently claimed mixed-version deployment.
+- Source-cutover now treats atomic receipt replacement as the commit point, preventing a post-commit cleanup exception from deleting
+  committed sources after an earlier rollback copy was already discarded.
+- Published Anchor 1.x `source-cutover` invocations against a complete Resolver output now route through Reconcile v2, avoiding an
+  intermediate new-Core/old-Plugin state and a second user-driven deployment cycle.
+
+### Added
+
+- `agent_memory_workstation_reconcile_plan_v2` and `agent_memory_workstation_deployment_pack_v2`, including an explicit
+  `reload_required -> new-task consumer verification -> ready` boundary.
+- An active Chinese workstation reconcile SOP covering fresh install, same-source update, identity replacement, disabled Plugin,
+  rollback, Desktop refresh, and real-second-device evidence.
+
+### Changed
+
+- The component set is Core 0.3.8, Plugin 1.5.0, Workstation Bootstrap 2.0.0, and Scout 5.6.0. Review Pack remains v4;
+  Scheduled Scout remains production-blocked.
+
 ## 0.3.7 (2026-08-21)
 
 ### Fixed
