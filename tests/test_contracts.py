@@ -76,6 +76,8 @@ class ContractTests(unittest.TestCase):
         self.assertIn("plan_hash", contract)
         self.assertIn("non-draft", contract)
         self.assertIn("immutable", contract)
+        self.assertIn("write-once", contract)
+        self.assertIn("next semantic version", contract)
 
     def test_global_owner_scout_delivery_contract_is_fail_closed(self) -> None:
         contract = (ROOT / "specs" / "global-owner-scout-delivery-v1.md").read_text(encoding="utf-8")

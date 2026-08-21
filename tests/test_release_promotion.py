@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "publish_release.py"
 COMMIT = "a" * 40
 REPOSITORY = "example/agent-memory-sidecar"
-TAG = "v0.3.6"
+TAG = "v0.3.7"
 
 
 def load_module():
@@ -29,15 +29,15 @@ def sha256(path: Path) -> str:
 
 def make_fixture(root: Path) -> Path:
     (root / "CHANGELOG.md").write_text(
-        "# Changelog\n\n## 0.3.6 (2026-08-21)\n\n- Released component set.\n\n## 0.3.5\n",
+        "# Changelog\n\n## 0.3.7 (2026-08-21)\n\n- Released component set.\n\n## 0.3.6\n",
         encoding="utf-8",
     )
     output = root / "dist" / "release"
     core = output / "core"
     core.mkdir(parents=True)
     artifacts = {
-        "core/agent_memory_sidecar-0.3.6-py3-none-any.whl": b"wheel",
-        "agent-memory-portable-0.3.6.zip": b"portable",
+        "core/agent_memory_sidecar-0.3.7-py3-none-any.whl": b"wheel",
+        "agent-memory-portable-0.3.7.zip": b"portable",
         "source-manifest.json": b"{}\n",
     }
     for relative, content in artifacts.items():
@@ -166,7 +166,7 @@ class ReleasePromotionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             asset_dir = make_fixture(root)
-            (root / "CHANGELOG.md").write_text("## 0.3.6\n\nThe unreleased component set.\n", encoding="utf-8")
+            (root / "CHANGELOG.md").write_text("## 0.3.7\n\nThe unreleased component set.\n", encoding="utf-8")
             runner = FakeRunner(self.promotion, asset_dir)
             with self.assertRaisesRegex(self.promotion.PromotionError, "promotion_stale_release_copy"):
                 self.promotion.inspect_plan(

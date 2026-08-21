@@ -3,13 +3,30 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
-## 0.3.6 (2026-08-21)
+## 0.3.7 (2026-08-21)
 
 ### Fixed
 
 - Release publication no longer depends on an unbound prose-only operator sequence. A deterministic inspect/apply gate binds the
   commit, tag, Changelog, immutable-release policy, and complete local/remote asset digests before publication, then requires
   Release and per-asset attestation verification plus immutable readback.
+- Protected release tags are now treated as write-once from their first remote push. A blocker found after tag creation withdraws
+  any stale draft and advances to a new semantic version instead of changing repository security policy or attempting to retag.
+
+### Added
+
+- `agent_memory_release_promotion_plan_v1` and `agent_memory_release_promotion_receipt_v1` for the separately authorized
+  `verified draft -> attested immutable Release` transition.
+
+### Changed
+
+- The component set is Core 0.3.7, Plugin 1.4.0, Workstation Bootstrap 1.9.0, and Scout 5.6.0. Review Pack remains v4;
+  Scheduled Scout remains production-blocked.
+
+## 0.3.6 (2026-08-21)
+
+### Fixed
+
 - Global Owner Scout no longer treats a pre-delivery Markdown verifier as proof of the actual user-visible final. Interactive
   delivery now fails closed unless the complete Review Pack is created outside the reviewed project as an immutable current-task
   artifact and the real task surface is externally read back and verified.
@@ -22,8 +39,6 @@ their own component versions in `COMPATIBILITY.md`.
 
 ### Added
 
-- `agent_memory_release_promotion_plan_v1` and `agent_memory_release_promotion_receipt_v1` for the separately authorized
-  `verified draft -> attested immutable Release` transition.
 - `global_owner_scout_delivery_v1`, task-artifact creation/readback, compact delivery receipts, and controller-side verification for
   realistic 0/1/3/6/7/8/24-card Review Packs.
 

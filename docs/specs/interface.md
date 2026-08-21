@@ -637,6 +637,10 @@ local `SHA256SUMS`/release manifest 与远端 uploaded asset 的有序 name/byte
 immutable 与未漂移资产集。成功输出 `agent_memory_release_promotion_receipt_v1 / public_published`。远端 mutation 后任一
 验证失败都不得声称回滚或仍处于 draft，必须返回 blocked 并重新只读确认实际远端状态。
 
+`refs/tags/v*` 从首次远端创建即 write-once，而不是等 Release publish 后才不可变。只有完整版本 PR 已合入 clean、
+同步的 public `main`，且本地 annotated tag 上完整 release build 通过，才首次 push tag。同 source commit 的 draft
+workflow 失败可幂等重试；任何要求新 commit 的修复都必须删除 stale draft、保留旧 tag 与 ruleset、使用下一语义版本。
+
 `agent_memory_public_release_manifest_v1.source` 顶层精确包含
 `repository, ref, commit, authority_epoch, engineering_source_commit, initial_public_release, authority_activated_at`；
 `initial_public_release` 精确包含 `ref, commit, snapshot_sha256`。seed release 使用
