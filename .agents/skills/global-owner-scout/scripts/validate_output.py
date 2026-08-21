@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate Global Owner Scout v5.5 project results and directly visible review packs."""
+"""Validate Global Owner Scout v5.6 project results and Review Packs."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from typing import Any, Callable, Iterable
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.5.0"
+SKILL_VERSION = "5.6.0"
 PROJECT_CONTRACT = "global_owner_scout_project_v4"
 REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v4"
 DISPLAY_LOCALE = "zh-CN"

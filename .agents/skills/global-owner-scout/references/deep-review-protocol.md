@@ -69,29 +69,38 @@ risky ideas to no persistence.
 Create all complete Project Cards, validate privacy/Chinese narrative/evidence refs, compute normalized evidence hash, then compute
 `project_claim_hash` over every semantic field. Validate the entire Project result before global comparison.
 
-## Phase 7: integration and visible completion
+## Phase 7: integration and task-scoped delivery
 
 Run `python -B scripts/resolve_owner_parity.py`. With matched parity, read the active host-local global Owner and verify its bytes
 against the returned hash; the equal canonical hash proves identical canonical content without revealing its physical path. With
 drift or unavailable parity, mark Owner comparison incomplete and remove confirmation. Compare semantics when proved, and use
 official/first-party research only to support or challenge existing candidates. Add one integration preview per frozen card. Recheck count/order conservation,
-privacy, and read-only fingerprints. Validate Project and Review Pack objects, then invoke `render_review.py` directly from the
-Skill scripts directory with the Review Pack on stdin and the selected surface. Every Python helper uses `python -B`; never use a dynamic import or an
-inline import that can create `__pycache__`.
+privacy, and project read-only fingerprints. Validate Project and Review Pack objects. Every Python helper uses `python -B`; never use
+a dynamic import or an inline import that can create `__pycache__`.
 
 If the resolver returns `unavailable`, remove confirmation and report the limitation. Never search upward, inspect the project-root
 `AGENTS.md` as a substitute, or guess a canonical path from the current checkout.
 
-Choose one surface before rendering: the explicit user entry uses `render_review.py --surface interactive` and
-`verify_visible_output.py --surface interactive`; only the optional Scheduled experiment uses `--surface scheduled`. Pass the exact
-renderer output to the matching verifier. Only a matching visible-body SHA-256, conserved cards/actions, surface-correct wrapper
-count, no raw JSON, and no trailing text complete the run. Return the renderer bytes unchanged after verification. If the
-renderer fails, tool output truncates, or the final bytes cannot be preserved, return `render_integrity_failed` or
-`output_budget_exceeded`; never manufacture partial or replacement Markdown.
+For the explicit user entry, resolve the current task's explicit host-generated output root. It must exist outside the reviewed
+project; never guess a system temp directory, project `.sandbox`, arbitrary `$CODEX_HOME` path, another task, or a persistent bridge.
+A host-declared task output root may physically live inside host-managed app storage; only that explicit grant is eligible. Invoke
+`prepare_delivery.py --artifact-dir <host-output-root> --protected-root <project-root>` with the Review Pack on stdin. The helper
+renders, verifies, creates, flushes and reads back the complete Markdown, then emits a compact Delivery v1 manifest.
 
-`verify_visible_output.py` is the final tool call. Do not invoke `agent-memory`, another Skill, another tool, or a post-render audit
-after it passes. The Review Pack and receipt are already the terminal memory-review artifact. Any mandatory higher-level audit stays
-silent; on Scheduled the final wrapper remains the last bytes visible to the user, while interactive output has no wrapper.
+Pre-render `open_succeeded`, `open_queued` and `open_failed` compact receipts from that manifest. Success and queued rendering receive
+the exact artifact path and host-output root and recheck direct-child containment, read-only state, bytes, hashes and visible-output conservation.
+Recheck project/Skill read-only fingerprints,
+then open the artifact with the current-task host file-preview tool as the final tool call. Return the exact success receipt only if
+the host call succeeds. An exact `queued` result returns the content-bound queued receipt and remains `surface_pending` with
+confirmation disabled; any other non-success result returns the blocked receipt. Do not copy the Review Pack into chat. Missing output root, renderer
+failure, artifact mismatch, host-open failure or inability to preserve the compact receipt returns `interactive_host_blocked`,
+`render_integrity_failed`, or `output_budget_exceeded`; never manufacture partial or replacement Markdown.
+
+The interactive artifact open is the final tool call. Do not invoke `agent-memory`, another Skill, another tool, or a post-open audit.
+The task artifact and compact receipt are already the terminal memory-review artifact. Any mandatory higher-level audit stays silent.
+A separate controller task reads the actual final and invokes `prepare_delivery.py --verify-final --artifact-root
+<host-output-root>`; `surface_pending` proves discoverability/integrity only and only `surface_observed` can qualify the host. The optional paused Scheduled path continues to use
+`render_review.py --surface scheduled` plus `verify_visible_output.py --surface scheduled` and its final wrapper.
 
 Capture the user-level Skill directory bytecode-cache baseline before helper execution and recheck it afterward. A new or changed
 `__pycache__`, `.pyc`, or `.pyo` is an external side effect and fails the run; do not delete it from inside the Scout to hide the
@@ -104,3 +113,5 @@ Terminal meanings:
 - `no_material_delta`: complete/bounded census and all search lenses produced no E2/E3 delta.
 - `failed`: execution protocol, privacy, integrity, mutation, required-source, render, or read-only failure; no cards.
 - `output_budget_exceeded`: not every card fits; no partial cards.
+- `surface_pending`: the exact artifact and final link are externally verified after a host `queued` result; content is discoverable, but the user surface remains unproved and confirmation is disabled.
+- `interactive_host_blocked`: no safe task output root, artifact/open failure, or an actual final without a verifiable opened/queued receipt; no partial cards or confirmation.

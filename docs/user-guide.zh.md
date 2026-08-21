@@ -2,8 +2,8 @@
 
 - Status: active
 - Owner layer: project_docs
-- Last verified: 2026-08-13
-- Evidence: [L3 接口规范](specs/interface.md)、[Core v1 contract](../specs/agent-memory-core-v1.md)、[ADR 0059](decisions/0059-bounded-behavior-set-evolution.zh.md)、[ADR 0070](decisions/0070-atomic-review-pack-rule-bundles.zh.md)
+- Last verified: 2026-08-21
+- Evidence: [L3 接口规范](specs/interface.md)、[Core v1 contract](../specs/agent-memory-core-v1.md)、[ADR 0059](decisions/0059-bounded-behavior-set-evolution.zh.md)、[ADR 0070](decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[ADR 0076](decisions/0076-task-scoped-review-pack-delivery.zh.md)
 
 ## 一句话
 
@@ -33,6 +33,13 @@ Global Owner Scout 的 Review Pack 可以一次精确选择一张或多张可确
 选中卡，使用一次授权把它们作为一个原子规则包提交：全部成功，或一条也不写。单卡只是大小为一的规则包。
 如果 Owner 变化导致规则关系或最终正文发生实质变化，系统先显示一次刷新后的合并预览，不直接写入。未选择卡片
 以后只需重新比对 Owner，不需要重新执行完整项目复盘，除非项目证据本身已经变化。
+
+完整 Review Pack 由当前 Scout 任务作为 Markdown artifact 打开，聊天正文只显示紧凑交付回执。artifact 不写入
+被复盘项目、Store 或 `AGENTS.md`，也不会被另一个任务自动摄取。后台任务的宿主若明确返回 `queued`，回执会保留
+“打开完整 Review Pack”链接并标记 `surface_pending`；这表示完整内容可发现但尚未证明已打开，确认保持关闭。若当前
+任务没有安全的 generated-output 表面、artifact 无法打开/排队或实际结果无法回读，系统返回
+`interactive_host_blocked`，不会用摘要或部分卡片替代。当前
+interactive Production 资格正在重新验收；只有三个真实 worktree canary 通过后才恢复。
 
 ## 什么适合成为规则
 

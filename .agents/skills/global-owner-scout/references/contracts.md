@@ -1,9 +1,9 @@
-# Global Owner Scout 5.5 contracts
+# Global Owner Scout 5.6 contracts
 
 ## Common rules
 
-- Skill `5.5.0`; Project result `global_owner_scout_project_v4`; Review Pack
-  `global_owner_scout_review_pack_v4`; user locale `zh-CN`.
+- Skill `5.6.0`; Project result `global_owner_scout_project_v4`; Review Pack
+  `global_owner_scout_review_pack_v4`; Delivery `global_owner_scout_delivery_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
 - `project_claim_hash` covers every Project Card field except itself. `review_pack_hash` covers the pack except itself.
 - Evidence references may identify owner sections, ADRs, tests, commits, or event classes. They may not contain absolute paths,
@@ -116,9 +116,47 @@ has zero wrapper, and contains no Scheduled/Inbox/14-run copy. Scheduled uses `�
 records surface, `review_pack_hash`, `visible_body_sha256`, Project Card count, visible card count, a per-card action-count vector,
 total visible action count, atomic bundle action count, and wrapper count. `verify_visible_output.py --surface ...` rejects body drift,
 lost or cross-card-moved actions, duplicate or
-non-final wrappers, raw JSON, trailing notes, and truncation. The Agent returns renderer bytes unchanged; renderer failure may not be
-repaired by hand-written Markdown. The verifier is the final tool call: no post-render Skill, tool, Agent Memory audit, or tail text
-is allowed. `output_budget_exceeded` is a whole-run failure.
+non-final wrappers, raw JSON, trailing notes, and truncation. The verifier proves renderer/artifact bytes only; it does not prove the
+actual task final. Renderer failure may not be repaired by hand-written Markdown. `output_budget_exceeded` is a whole-run failure.
+
+## Interactive Delivery
+
+`global_owner_scout_delivery_v1` has these exact fields:
+
+```text
+contract_version, status, delivery_surface, artifact_name, artifact_sha256,
+artifact_bytes, review_pack_hash, visible_body_sha256, project_cards,
+visible_cards, visible_action_counts, visible_actions, bundle_action_count,
+wrapper_count, delivery_manifest_sha256
+```
+
+Status is exactly `prepared`; surface is exactly `task_artifact`; wrapper count is zero. The artifact name is
+`global-owner-scout-review-pack-<first 16 hex of review_pack_hash>.md`. The manifest hash is canonical UTF-8 sorted compact JSON
+excluding its own hash field. The manifest contains no absolute path, task ID, Review Pack body, Owner body, evidence body, approval,
+or persistence state. `prepared` proves deterministic creation and same-file readback only; it is not `surface_observed`.
+
+Run `prepare_delivery.py --artifact-dir <host-output-root> --protected-root <project-root>` with the validated Review Pack on stdin.
+The output root must be an explicit current-task host-generated workspace, exist already, be a normal directory, and be outside every
+protected project root. The helper creates a single-link regular Markdown file exclusively; an existing identical file is idempotent,
+while any different bytes, link/reparse point, unsafe root, write failure, or readback mismatch fails closed. It does not write a
+manifest file.
+
+Pre-render compact success, queued and blocked receipts from the manifest; success and queued rendering must receive both the exact
+artifact path and artifact root and must recheck direct-child containment, read-only state, bytes, hashes and visible-output
+conservation. Then make the current-task host artifact open the final tool call. Return the exact success receipt only for an explicit
+terminal opened/success result. An exact `queued` host result returns the content-bound queued receipt with the artifact link and
+confirmation disabled; its controller result is `surface_pending`, never Production qualification. `pending`, missing, failed, or
+unobservable results use the path-free blocked receipt with confirmation disabled. A
+separate controller reads the actual task final and runs `prepare_delivery.py --verify-final --artifact-root <host-output-root>`.
+Both `surface_pending` and `surface_observed` prove that the final receipt, artifact path, manifest hash, file bytes, Review Pack/body
+hashes, cards and actions conserve; only `surface_observed` proves the user surface and qualifies the host. Until three independent
+worktree canaries pass, the
+interactive product state is `production_unproven / interactive_host_blocked`.
+The controller normalizes line endings and may remove exactly one host-added terminal blank line; every other trailing or semantic
+edit fails closed.
+The controller also binds the canary's actual installed Skill identity before execution. Repository-local source presence is not
+runtime adoption. A task that resolves another Scout version or returns the legacy inline renderer envelope is ineligible rather
+than failed/passed, and cannot contribute to Production qualification.
 
 Every Python helper invocation uses `python -B`. The installed Skill and its before/after proof contain no newly created or changed
 `__pycache__`, `.pyc`, or `.pyo`; any bytecode-cache write is an external side effect and fails read-only validation.
@@ -147,7 +185,7 @@ The only formal user invocation is `$global-owner-scout 复盘当前项目`. It 
 the current task model/reasoning/Speed, and never displays Scheduled acceptance counters. A v5.4 Scheduled Prompt contains
 Skill/mode, rolling window, contract versions, model/reasoning, and safety boundaries only. Reject
 prompts containing a fixed `project_key`, absolute path, host project ID, project allowlist, expected candidate, or full review
- protocol. The current Desktop task binding supplies project identity.
+  protocol. The current Desktop task binding supplies project identity and, when available, its distinct host-generated output root.
 
 ## Production activation gate
 

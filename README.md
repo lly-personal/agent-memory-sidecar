@@ -92,7 +92,7 @@ For normal Codex Desktop use, register the immutable repository Marketplace,
 install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.5
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.6
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -108,7 +108,7 @@ For Core-only CLI use, install the wheel from the same Release, then preview and
 apply setup:
 
 ```powershell
-python -m pip install .\agent_memory_sidecar-0.3.5-py3-none-any.whl
+python -m pip install .\agent_memory_sidecar-0.3.6-py3-none-any.whl
 agent-memory --help
 agent-memory setup
 agent-memory setup --apply
@@ -121,7 +121,7 @@ and Doctor remain available; global publication and Scout Owner parity are
 explicitly unavailable. Owner-integrated installations provide a separate clean
 Git checkout and bind it explicitly.
 
-Workstation Bootstrap 1.8 accepts `agent_memory_source_manifest_v1`. Release
+Workstation Bootstrap 1.9 accepts `agent_memory_source_manifest_v1`. Release
 manifests bind each source to both a ref and a full commit SHA; an optional
 `canonical_owner` is `null` in the public profile. On an existing host that means “the release does not distribute an Owner”, not
 “detach the current Owner”: a clean managed Owner is preserved only when Core is bound to that exact root and commit. Floating branches are a
