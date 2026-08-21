@@ -7,7 +7,7 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `1.8.0`
+- Skill version: `1.9.0`
 - Modes: `inspect`, `apply_enrollment`
 - Deployment pack: `agent_memory_workstation_deployment_pack_v1`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
@@ -42,7 +42,7 @@ not change the Host Profile. Only an explicit request to retest or configure Sch
      root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
 3. Run the exact-hash `source-cutover --apply`. The transaction uses the managed Sidecar source to run Core setup, bind the explicit
    or preserved canonical Owner, verify Doctor, and install both versioned repository Skills atomically per target while excluding
-   bytecode caches. Validate Bootstrap `1.8.0`, Scout `5.5.0`, their content hashes, and canonical/local Owner parity. Installation
+   bytecode caches. Validate Bootstrap `1.9.0`, Scout `5.6.0`, their content hashes, and canonical/local Owner parity. Installation
    evidence proves host materialization, not later model adoption. A newly installed Skill is guaranteed as a discovery input only
    after one Codex refresh or from the next task; report `available_next_turn` without asking the user to repeat deployment.
 5. Use the Codex Desktop project API to enumerate the complete visible project inventory. Do not infer a fixed project list from

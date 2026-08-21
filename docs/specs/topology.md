@@ -4,8 +4,8 @@
 - Owner layer: project_docs
 - Applies when: 判断组件职责、调用方向、持久化、Desktop 宿主或跨设备分发边界。
 - Avoid when: 只需要用户操作或字段定义；读取 [L3](interface.md)。
-- Last verified: 2026-08-14
-- Evidence: [L1](axioms.md)、用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)
+- Last verified: 2026-08-21
+- Evidence: [L1](axioms.md)、用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)
 
 ## 拓扑
 
@@ -85,8 +85,12 @@ flowchart LR
     HC --> RP["Validated review_pack_v4"]
     IP --> RP
     RP --> DR["Deterministic renderer：interactive surface + 精确多选动作"]
-    DR --> VO["Visible-output verifier：wrapper=0"]
-    VO --> U["当前任务逐字可见；用户精确选择一张或多张"]
+    DR --> VO["Visible-output verifier：交付前字节守恒"]
+    VO --> DV["Delivery v1：不可变 task artifact + manifest"]
+    DV --> HS["Host surface：当前任务打开或明确排队 artifact"]
+    HS --> EC["External controller：实际 final / artifact 回读"]
+    EC -->|"queued + bytes conserved"| SP["surface_pending：可发现、不可确认、不计 Production"]
+    EC --> U["当前任务完整可见；用户精确选择一张或多张"]
     U -->|"确认 card_id@selection_token 集合"| A["Fresh Owner 联合重算 + 所见即所签原子规则包"]
     RP -.-> CR["Sidecar 按需 central_review"]
     BS -.-> SE["可选 Scheduled Enrollment"]
@@ -122,21 +126,25 @@ flowchart LR
 | Deterministic Owner resolver | 从 Core Installation Registry 解析 canonical source，以活动 Codex home 的 global target 计算逻辑端点与 hash | 搜索项目根 Owner、猜测路径、输出物理路径或回退到项目 `AGENTS.md` |
 | Project Review Pack | 将全部 E2/E3 卡渲染为中文分层 Markdown：警告、决策索引、30 秒判断、完整依据与技术附录 | 翻译或补写项目语义、原始 JSON 用户界面、跨任务传输、行为 owner |
 | Deterministic renderer | 从 scripts 目录读取已验证 Review Pack；interactive 输出零 wrapper，scheduled 输出唯一末尾 wrapper | 动态导入、失败后手工重写、修复项目语义 |
-| Visible-output verifier | 按 surface 重新验证正文 hash、卡片、动作、wrapper 数量和无尾注 | 生成卡片、判断候选、替代 renderer |
+| Visible-output verifier | 按 surface 重新验证 renderer/artifact 字节的正文 hash、卡片、动作、wrapper 数量和无尾注 | 声称已经观察实际用户 final、生成卡片、替代 renderer |
+| Delivery v1 | 绑定 artifact 名称、完整文件 hash/bytes、Review Pack/body hash、卡片与动作守恒 | 保存绝对路径、正文、任务 ID、授权或长期状态 |
+| Task artifact | 在宿主为当前任务显式提供且位于项目外的 generated-output root 保存不可变完整 Review Pack；该 root 可位于宿主管理的 app storage | 项目文件、系统临时文件、任意猜测的 `$CODEX_HOME` 路径、Store、跨任务文件桥 |
+| Host surface / external controller | 在当前任务打开 artifact，并从另一个交互控制任务回读实际 final 与 artifact | 用内部 tool output、文件存在或模型自述冒充用户表面证明 |
 | Cache-free helper runtime | 以 `python -B` 运行 helper；Bootstrap 原子安装时排除 Python 字节码缓存 | 让 Scout 写入或自清理个人 Skill 缓存 |
 | `central_review` | 在 Sidecar 当前任务中按需读取已经可见的 Review Pack，追加跨项目关系与并列注释 | Scheduled 自动摄取、隐藏来源卡、确认前置门禁 |
 | Review draft | 为用户提供完整判断上下文 | `待确认` proposal 或长期状态 |
 
-该链路不读写七表 Store，也不依赖 Scheduled Task 之间互相读取结果。交互与自动 Scout 的隔离快照前后必须一致；出现
-diff、commit、push、外部写操作或无法证明的副作用时，该项目整包失败。活跃原工作区的并发变化只限定当前快照
-覆盖范围，不得让稳定隔离快照中的其他候选整体失效。
+该链路不读写七表 Store，也不依赖 Scheduled Task 之间互相读取结果。唯一授权写入是当前任务 host-generated
+output root 下与 Review Pack hash 绑定的 artifact；它不计入项目或外部系统 mutation。交互与自动 Scout 的隔离快照
+前后必须一致；出现项目 diff、commit、push、其他外部写操作或无法证明的副作用时，该项目整包失败。活跃原工作区
+的并发变化只限定当前快照覆盖范围，不得让稳定隔离快照中的其他候选整体失效。
 
 原生任务调用返回运行中 cell 时，Scout 必须恢复同一 cell 到终态，且终态前不得发起第二次索引调用。Project 与
-Review Pack 结构通过校验后仍未完成链路；只有 renderer 成功并且最终可见输出 verifier 证明正文、卡片、动作和
-surface-specific wrapper 数量守恒，该次结果才完成呈现。verifier 是最后一个工具调用；之后不得执行独立 memory 审计
-或追加尾注。
+Review Pack 结构通过校验后仍未完成链路；renderer 与 visible-output verifier 只证明交付前字节。interactive 必须
+继续创建并回读同任务 artifact、通过宿主工具打开，然后由外部 controller 读取实际 final/artifact 才完成呈现。
+宿主 open 是 Scout 的最后一个工具调用；之后只允许 compact Delivery receipt，不得再调用独立 memory 审计或追加尾注。
 
-Bootstrap 1.8.0 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 1.9.0 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得
@@ -157,9 +165,13 @@ Scout、测试、自动化和委派任务不计入；`eligible` 要求 Git workt
 automation-source canary 在 180 秒外部观察预算内取得原生索引终态。canary 不通过时 Host Activation Control
 复读任务为 `PAUSED` 并报告 `production_blocked`；只读 Scout 不负责自暂停。
 
-三个用户创建的普通 worktree canary 分别验证交互 Skill、Schema、renderer、只读边界与同任务动作；通过后只提升
+三个用户创建的普通 worktree canary 分别验证交互 Skill、Schema、renderer、task artifact、实际 final 回读、只读边界与同任务动作；通过后只提升
 `interactive_project_scout`。它们不拥有 Scheduled 恢复权，也不计入 Scheduled 14 次实验。automation-source canary
 通过后仍只恢复一个项目，直到一条 Scheduled Review Pack 与用户动作成立，才恢复其他 enrollment 项目。
+
+每条 canary 的前置消费者身份必须来自正式入口实际安装的 Scout version/hash，而不是待测 worktree 中同名 Skill
+文件。版本或内容身份不匹配、缺少 Delivery v1、或仍返回 legacy inline envelope 的任务统一标记为 `ineligible /
+runtime_skill_identity_mismatch`；它不会消耗三条合格样本，也不能用前台可见性单独提升结果层。
 
 交互任务继承当前任务的 model、reasoning 和 Speed；其触发语不要求用户填写资源配置。每个 Scheduled 确认项目在
 14 次有效运行期间显式固定 `gpt-5.6-sol` + `medium`；speed/service tier 不单独持久化，直接

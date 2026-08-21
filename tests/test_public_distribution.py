@@ -11,6 +11,7 @@ import sys
 import tempfile
 import tomllib
 import unittest
+import zipfile
 from pathlib import Path
 from unittest import mock
 
@@ -218,7 +219,7 @@ class PublicDistributionTests(unittest.TestCase):
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
         self.assertEqual(
-            {"core": "0.3.5", "plugin": "1.3.0", "bootstrap": "1.8.0", "scout": "5.5.0"},
+            {"core": "0.3.6", "plugin": "1.4.0", "bootstrap": "1.9.0", "scout": "5.6.0"},
             facts,
         )
         allowlist = json.loads(
@@ -526,6 +527,11 @@ class PublicDistributionTests(unittest.TestCase):
             self.assertTrue(all(manifest["verification"].values()))
             portable = release_root / f"agent-memory-portable-{version}.zip"
             self.assertTrue(portable.is_file())
+            with zipfile.ZipFile(portable) as archive:
+                self.assertIn(
+                    ".agents/skills/global-owner-scout/scripts/prepare_delivery.py",
+                    archive.namelist(),
+                )
             for line in (release_root / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
                 expected, relative = line.split("  ", 1)
                 self.assertEqual(expected, self.release.digest(release_root / relative))

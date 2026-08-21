@@ -553,6 +553,7 @@ def inspect_portable(
                 ".agents/skills/agent-memory-workstation-bootstrap/scripts/managed_sources.py",
                 ".agents/skills/agent-memory-workstation-bootstrap/scripts/enrollment.py",
                 ".agents/skills/global-owner-scout/scripts/validate_output.py",
+                ".agents/skills/global-owner-scout/scripts/prepare_delivery.py",
             }
             require(required.issubset(names), "release_portable_content_missing")
             require(
@@ -592,7 +593,13 @@ def inspect_portable(
             "--help",
         ], cwd=extracted)
         scout_scripts = extracted / ".agents/skills/global-owner-scout/scripts"
-        for name in ("validate_output.py", "render_review.py", "verify_visible_output.py", "resolve_owner_parity.py"):
+        for name in (
+            "validate_output.py",
+            "render_review.py",
+            "verify_visible_output.py",
+            "prepare_delivery.py",
+            "resolve_owner_parity.py",
+        ):
             run([sys.executable, "-B", str(scout_scripts / name), "--self-test"], cwd=scout_scripts)
 
 

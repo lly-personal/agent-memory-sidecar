@@ -55,6 +55,7 @@ class ContractTests(unittest.TestCase):
                 "public-distribution-v1.md",
                 "public-authority-cutover-v1.md",
                 "source-authority-cutover-v2.md",
+                "global-owner-scout-delivery-v1.md",
             }:
                 continue
             heading = "\n".join(
@@ -65,6 +66,14 @@ class ContractTests(unittest.TestCase):
                 heading,
                 path.name,
             )
+
+    def test_global_owner_scout_delivery_contract_is_fail_closed(self) -> None:
+        contract = (ROOT / "specs" / "global-owner-scout-delivery-v1.md").read_text(encoding="utf-8")
+        self.assertIn("Status: Accepted", contract)
+        self.assertIn("global_owner_scout_delivery_v1", contract)
+        self.assertIn("surface_observed", contract)
+        self.assertIn("interactive_host_blocked", contract)
+        self.assertIn("0/1/3/6/7/8/24-card", contract)
 
     def test_public_distribution_contract_is_active_and_fail_closed(self) -> None:
         contract = (ROOT / "specs" / "public-distribution-v1.md").read_text(

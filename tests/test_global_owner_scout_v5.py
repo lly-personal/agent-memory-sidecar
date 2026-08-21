@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,7 @@ SCOUT_SCRIPTS = ROOT / ".agents" / "skills" / "global-owner-scout" / "scripts"
 SCOUT_VALIDATOR = SCOUT_SCRIPTS / "validate_output.py"
 SCOUT_RENDERER = SCOUT_SCRIPTS / "render_review.py"
 SCOUT_VISIBLE_VERIFIER = SCOUT_SCRIPTS / "verify_visible_output.py"
+SCOUT_DELIVERY = SCOUT_SCRIPTS / "prepare_delivery.py"
 SCOUT_OWNER_RESOLVER = SCOUT_SCRIPTS / "resolve_owner_parity.py"
 
 
@@ -803,7 +805,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_deployment_pack_keeps_proof_layers_separate(self) -> None:
         pack = self.managed_sources.valid_pack()
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("1.8.0", validated["bootstrap_version"])
+        self.assertEqual("1.9.0", validated["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
         for label in ("可移植分发", "能力源同步", "主机物化", "项目启用"):
             self.assertIn(label, rendered)
@@ -849,7 +851,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 json.loads(text),
                 expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
             )
-            self.assertEqual("v0.3.5", value["plugins"][0]["source"]["ref"])
+            self.assertEqual("v0.3.6", value["plugins"][0]["source"]["ref"])
         else:
             self.assertTrue(
                 (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()
@@ -858,7 +860,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             self.assertTrue((ROOT / "LICENSE").is_file())
 
     def test_scout_validator_renderer_and_visible_verifier_self_tests(self) -> None:
-        for script in (SCOUT_VALIDATOR, SCOUT_RENDERER, SCOUT_VISIBLE_VERIFIER, SCOUT_OWNER_RESOLVER):
+        for script in (SCOUT_VALIDATOR, SCOUT_RENDERER, SCOUT_VISIBLE_VERIFIER, SCOUT_DELIVERY, SCOUT_OWNER_RESOLVER):
             result = subprocess.run(
                 [sys.executable, "-B", str(script), "--self-test"], cwd=SCOUT_SCRIPTS,
                 capture_output=True, text=True, encoding="utf-8", check=True,
@@ -959,7 +961,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_v5_prompt_has_no_fixed_binding(self) -> None:
         prompt = (
             "Use $global-owner-scout in project_scout mode for the current bound project; rolling 72 hours; "
-            "Skill 5.5.0; global_owner_scout_project_v4; global_owner_scout_review_pack_v4; "
+            "Skill 5.6.0; global_owner_scout_project_v4; global_owner_scout_review_pack_v4; "
             "gpt-5.6-sol; medium; read-only."
         )
         self.bootstrap.validate_prompt(prompt)
@@ -1031,6 +1033,374 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                     self.assertIn("一次确认多张", rendered)
                     self.assertIn("全部成功，或整包零写入", rendered)
 
+    def test_task_artifact_delivery_conserves_realistic_pack_sizes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = root / "project"
+            output = root / "task-output"
+            project.mkdir()
+            output.mkdir()
+            for count in (0, 1, 3, 6, 7, 8, 24):
+                manifest_result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-B",
+                        str(SCOUT_DELIVERY),
+                        "--artifact-dir",
+                        str(output),
+                        "--protected-root",
+                        str(project),
+                    ],
+                    cwd=SCOUT_SCRIPTS,
+                    input=self._review_pack_json(count),
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    check=True,
+                )
+                manifest = json.loads(manifest_result.stdout)
+                artifact = output / manifest["artifact_name"]
+                self.assertTrue(artifact.is_file())
+                self.assertEqual(count, manifest["project_cards"])
+                self.assertEqual(count, manifest["visible_cards"])
+                self.assertEqual(artifact.stat().st_size, manifest["artifact_bytes"])
+
+                receipt_result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-B",
+                        str(SCOUT_DELIVERY),
+                        "--render-receipt",
+                        "open_succeeded",
+                        "--artifact-path",
+                        str(artifact),
+                        "--artifact-root",
+                        str(output),
+                    ],
+                    cwd=SCOUT_SCRIPTS,
+                    input=json.dumps(manifest, ensure_ascii=False),
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    check=True,
+                )
+                observed_result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-B",
+                        str(SCOUT_DELIVERY),
+                        "--verify-final",
+                        "--artifact-root",
+                        str(output),
+                    ],
+                    cwd=SCOUT_SCRIPTS,
+                    input=receipt_result.stdout,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    check=True,
+                )
+                observed = json.loads(observed_result.stdout)
+                self.assertEqual("surface_observed", observed["status"])
+                self.assertEqual(count, observed["visible_cards"])
+                self.assertTrue(observed["confirmation_eligible"])
+
+                queued_result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-B",
+                        str(SCOUT_DELIVERY),
+                        "--render-receipt",
+                        "open_queued",
+                        "--artifact-path",
+                        str(artifact),
+                        "--artifact-root",
+                        str(output),
+                    ],
+                    cwd=SCOUT_SCRIPTS,
+                    input=json.dumps(manifest, ensure_ascii=False),
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    check=True,
+                )
+                pending_result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-B",
+                        str(SCOUT_DELIVERY),
+                        "--verify-final",
+                        "--artifact-root",
+                        str(output),
+                    ],
+                    cwd=SCOUT_SCRIPTS,
+                    input=queued_result.stdout,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    check=True,
+                )
+                pending = json.loads(pending_result.stdout)
+                self.assertEqual("surface_pending", pending["status"])
+                self.assertEqual(count, pending["visible_cards"])
+                self.assertFalse(pending["confirmation_eligible"])
+
+                host_enveloped_result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-B",
+                        str(SCOUT_DELIVERY),
+                        "--verify-final",
+                        "--artifact-root",
+                        str(output),
+                    ],
+                    cwd=SCOUT_SCRIPTS,
+                    input=queued_result.stdout + "\n",
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    check=True,
+                )
+                self.assertEqual(pending, json.loads(host_enveloped_result.stdout))
+
+    def test_task_artifact_delivery_rejects_project_root_and_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = root / "project"
+            output = root / "task-output"
+            project.mkdir()
+            output.mkdir()
+            linked_output = root / "linked-output"
+            try:
+                linked_output.symlink_to(output, target_is_directory=True)
+            except OSError:
+                linked_output = None
+            if linked_output is not None:
+                linked = subprocess.run(
+                    [
+                        sys.executable,
+                        "-B",
+                        str(SCOUT_DELIVERY),
+                        "--artifact-dir",
+                        str(linked_output),
+                        "--protected-root",
+                        str(project),
+                    ],
+                    cwd=SCOUT_SCRIPTS,
+                    input=self._review_pack_json(1),
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                )
+                self.assertNotEqual(0, linked.returncode)
+                self.assertIn("must not be a link or reparse point", linked.stderr)
+                linked_output.unlink()
+            rejected = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(SCOUT_DELIVERY),
+                    "--artifact-dir",
+                    str(project),
+                    "--protected-root",
+                    str(project),
+                ],
+                cwd=SCOUT_SCRIPTS,
+                input=self._review_pack_json(1),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+            self.assertNotEqual(0, rejected.returncode)
+            self.assertIn("outside every protected-root", rejected.stderr)
+
+            prepared = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(SCOUT_DELIVERY),
+                    "--artifact-dir",
+                    str(output),
+                    "--protected-root",
+                    str(project),
+                ],
+                cwd=SCOUT_SCRIPTS,
+                input=self._review_pack_json(1),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            )
+            manifest = json.loads(prepared.stdout)
+            artifact = output / manifest["artifact_name"]
+            receipt = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(SCOUT_DELIVERY),
+                    "--render-receipt",
+                    "open_succeeded",
+                    "--artifact-path",
+                    str(artifact),
+                    "--artifact-root",
+                    str(output),
+                ],
+                cwd=SCOUT_SCRIPTS,
+                input=json.dumps(manifest),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            ).stdout
+            outside = root / "outside"
+            outside.mkdir()
+            outside_artifact = outside / artifact.name
+            outside_artifact.write_bytes(artifact.read_bytes())
+            path_start = receipt.index("](<") + 3
+            path_end = receipt.index(">)", path_start)
+            escaped_receipt = receipt[:path_start] + outside_artifact.resolve().as_posix() + receipt[path_end:]
+            escaped = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(SCOUT_DELIVERY),
+                    "--verify-final",
+                    "--artifact-root",
+                    str(output),
+                ],
+                cwd=SCOUT_SCRIPTS,
+                input=escaped_receipt,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+            self.assertNotEqual(0, escaped.returncode)
+            self.assertIn("direct child of artifact-root", escaped.stderr)
+
+            editable_receipt = receipt.replace("confirmation_eligible=true", "confirmation_eligible=false")
+            edited = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(SCOUT_DELIVERY),
+                    "--verify-final",
+                    "--artifact-root",
+                    str(output),
+                ],
+                cwd=SCOUT_SCRIPTS,
+                input=editable_receipt,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+            self.assertNotEqual(0, edited.returncode)
+            self.assertIn("not an exact opened or queued Delivery receipt", edited.stderr)
+
+            excessive_envelope = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(SCOUT_DELIVERY),
+                    "--verify-final",
+                    "--artifact-root",
+                    str(output),
+                ],
+                cwd=SCOUT_SCRIPTS,
+                input=receipt + "\n\n",
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+            self.assertNotEqual(0, excessive_envelope.returncode)
+            self.assertIn("not an exact opened or queued Delivery receipt", excessive_envelope.stderr)
+
+            hardlink = output / "artifact-hardlink.md"
+            os.link(artifact, hardlink)
+            linked_artifact = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(SCOUT_DELIVERY),
+                    "--render-receipt",
+                    "open_succeeded",
+                    "--artifact-path",
+                    str(artifact),
+                    "--artifact-root",
+                    str(output),
+                ],
+                cwd=SCOUT_SCRIPTS,
+                input=json.dumps(manifest),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+            self.assertNotEqual(0, linked_artifact.returncode)
+            self.assertIn("exactly one hard link", linked_artifact.stderr)
+            hardlink.chmod(0o600)
+            hardlink.unlink()
+
+            artifact.chmod(0o600)
+            writable = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(SCOUT_DELIVERY),
+                    "--render-receipt",
+                    "open_succeeded",
+                    "--artifact-path",
+                    str(artifact),
+                    "--artifact-root",
+                    str(output),
+                ],
+                cwd=SCOUT_SCRIPTS,
+                input=json.dumps(manifest),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+            self.assertNotEqual(0, writable.returncode)
+            self.assertIn("artifact must be read-only", writable.stderr)
+
+            artifact.write_text("tampered", encoding="utf-8")
+            rerun = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(SCOUT_DELIVERY),
+                    "--artifact-dir",
+                    str(output),
+                    "--protected-root",
+                    str(project),
+                ],
+                cwd=SCOUT_SCRIPTS,
+                input=self._review_pack_json(1),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+            self.assertNotEqual(0, rerun.returncode)
+            self.assertIn("existing artifact bytes do not match", rerun.stderr)
+
+    def test_installed_scout_contains_and_runs_delivery_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / "global-owner-scout"
+            source = ROOT / ".agents" / "skills" / "global-owner-scout"
+            installed = self.bootstrap.install_skill(source, target)
+            self.assertEqual("5.6.0", installed["version"])
+            helper = target / "scripts" / "prepare_delivery.py"
+            self.assertTrue(helper.is_file())
+            result = subprocess.run(
+                [sys.executable, "-B", str(helper), "--self-test"],
+                cwd=helper.parent,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            )
+            self.assertEqual("global_owner_scout_delivery_v1", json.loads(result.stdout)["delivery"])
+            self.assertEqual([], list(target.rglob("__pycache__")))
+            self.assertEqual([], list(target.rglob("*.pyc")))
+
     def test_visible_verifier_rejects_manual_body_rewrite(self) -> None:
         rendered = subprocess.run(
             [sys.executable, "-B", str(SCOUT_RENDERER), "--surface", "interactive"],
@@ -1094,7 +1464,8 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         protocol = (ROOT / ".agents" / "skills" / "global-owner-scout" / "references" / "deep-review-protocol.md").read_text(encoding="utf-8")
         self.assertIn("turnLimit=10", skill + protocol)
         self.assertIn("maxOutputCharsPerItem=20000", skill + protocol)
-        self.assertIn("invoke no other Skill or tool", skill)
+        self.assertIn("artifact open is the final tool call", skill)
+        self.assertIn("global_owner_scout_delivery_v1", combined + skill + protocol)
         self.assertIn("python -B", skill + protocol)
 
     def test_owner_resolver_uses_installed_binding_without_path_output(self) -> None:

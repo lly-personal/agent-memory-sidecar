@@ -1,21 +1,23 @@
 ---
 name: global-owner-scout
-description: Run an explicitly requested, evidence-first, read-only 30-day review in the currently bound Codex project and render a directly visible Chinese Review Pack. Use only when the user invokes $global-owner-scout or for a separately configured Scheduled experiment; never trigger for ordinary project work.
+description: Run an explicitly requested, evidence-first, project-read-only 30-day review in the currently bound Codex project and deliver a complete Chinese Review Pack through a task-scoped host artifact. Use only when the user invokes $global-owner-scout or for a separately configured Scheduled experiment; never trigger for ordinary project work.
 ---
 
 # Global Owner Scout
 
 ## Contract
 
-- Skill version: `5.5.0`
+- Skill version: `5.6.0`
 - Project result: `global_owner_scout_project_v4`
 - User review: `global_owner_scout_review_pack_v4`
 - Mode: `project_scout`; interactive-only `central_review` remains optional.
 - Read [references/contracts.md](references/contracts.md) and execute
   [references/deep-review-protocol.md](references/deep-review-protocol.md) completely.
 
-This Skill creates read-only review drafts. It never creates proposals, approval refs, Owner mutations, files containing review
-results, database rows, commits, pushes, or external writes. The formal product entry is the exact explicit invocation
+This Skill creates project-read-only review drafts. It never creates proposals, approval refs, Owner mutations, project files,
+database rows, commits, pushes, or external-system writes. Its only output write is an immutable Review Pack artifact under the
+current task's explicit host-generated output root, outside the reviewed project and every capability/state root not explicitly
+granted as that task output surface. The formal product entry is the exact explicit invocation
 `$global-owner-scout 复盘当前项目` in a new independent worktree task. It always uses `manual_30d`, never reads automation memory,
 and inherits that task's model, reasoning, and Speed. The current Desktop project binding is authoritative; no Prompt may contain a
 project name, path, project ID, candidate hint, or the deep-review procedure.
@@ -40,14 +42,34 @@ project name, path, project ID, candidate hint, or the deep-review procedure.
    canonical source hash and exact integration preview.
 6. Re-capture read-only proof. Any project mutation, privacy leak, integrity failure, or unauthorized external write fails closed.
 7. From the Skill `scripts` directory, execute every Python helper with bytecode writes disabled (`python -B`). For the formal user
-   entry run `render_review.py --surface interactive` and `verify_visible_output.py --surface interactive`; for the paused
-   Scheduled experiment use `--surface scheduled` for both. Pass the validated Review Pack on stdin, then return renderer bytes
-   unchanged. Interactive output has no Inbox wrapper or 14-run copy; Scheduled output has exactly one final wrapper. Never
-   dynamically import the renderer, hand-write replacement Markdown, append a tail note, or use raw JSON as the user interface.
+   entry, resolve an explicit host-generated output root from the current task context and require it to be outside the reviewed
+   project. If none exists, return `interactive_host_blocked`; do not guess a temp, project, or arbitrary Codex-home path. A host may
+   physically place its declared output root inside host-managed app storage; the explicit task grant, not the path prefix, is the
+   authority. Pass the validated
+   Review Pack to `prepare_delivery.py --artifact-dir <host-output-root> --protected-root <project-root>`. This creates and reads
+   back the exact renderer bytes, verifies them, and returns `global_owner_scout_delivery_v1` without an absolute path.
+8. Before the final host call, use the manifest with `prepare_delivery.py --render-receipt open_succeeded --artifact-path
+   <host-output-root>/<artifact_name> --artifact-root <host-output-root>` and also pre-render the `open_queued` receipt with the same
+   artifact arguments plus the path-free `open_failed` receipt. This step
+   rechecks the artifact root, read-only state, bytes, hash and visible-output conservation. Recheck the project/Skill read-only baseline,
+   then open the artifact in the current Codex task with the host file-preview tool. This open is the final tool call. On success,
+   return the pre-rendered compact success receipt unchanged only for an explicit terminal opened/success state. An exact host
+   `queued` result returns only the content-bound queued receipt with the artifact link, `surface_observation=open_queued` and
+   `confirmation_eligible=false`; it is externally verifiable as `surface_pending` but does not qualify the host. `pending`, missing,
+   failed, or unobservable results use only the pre-rendered blocked receipt. Never copy
+   the full Review Pack into chat, dynamically import the renderer, hand-write replacement Markdown, append a tail note, or expose
+   raw JSON as the user interface. The paused Scheduled experiment retains its existing renderer/verifier path.
 
-The verifier is the final tool call. After it passes, invoke no other Skill or tool and emit no independent memory audit. A
-higher-level Agent Memory requirement is satisfied by the already-rendered cards and receipt; it remains silent and may not append
-text after the wrapper.
+The interactive host artifact open is the final tool call. After it returns, invoke no other Skill or tool and emit no independent
+memory audit. A higher-level Agent Memory requirement is satisfied by the artifact cards and compact receipt; it remains silent.
+An external controller task—not the Scout itself—must read the actual final and run `prepare_delivery.py --verify-final
+--artifact-root <host-output-root>` before any production claim. `surface_pending` proves artifact discoverability and integrity only;
+only `surface_observed` can count. Until three real worktree canaries pass, report
+`interactive_project_scout=production_unproven / interactive_host_blocked`.
+Before creating a canary, the controller must bind the formal entry's actually installed Scout Skill version and content identity.
+A worktree containing newer Skill source does not make that source the runtime consumer. Any task that resolves a different Skill
+version, omits Delivery v1, or returns the legacy inline Review Pack is `ineligible / runtime_skill_identity_mismatch` and does not
+count toward the three canaries.
 
 Python bytecode caches are external writes. Do not import helper modules through an inline interpreter without `-B`, and do not
 create or clean `__pycache__` during a Scout run. Any new cache is a read-only failure; installation excludes caches atomically.

@@ -3,7 +3,29 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
-## Unreleased
+## 0.3.6 (2026-08-21)
+
+### Fixed
+
+- Global Owner Scout no longer treats a pre-delivery Markdown verifier as proof of the actual user-visible final. Interactive
+  delivery now fails closed unless the complete Review Pack is created outside the reviewed project as an immutable current-task
+  artifact and the real task surface is externally read back and verified.
+- A real background-worktree canary showed that the Desktop host may return `queued` for a valid task artifact. Scout now preserves
+  the content-bound artifact link as externally verifiable `surface_pending`, while keeping confirmation disabled and Production
+  qualification blocked until an explicit opened surface is observed.
+- A foreground canary showed that a worktree-local Scout 5.6 source does not override the formally installed Scout 5.5 consumer.
+  Canary qualification now requires the actual installed Skill version/content identity; legacy inline results are ineligible and
+  cannot be counted as Delivery v1 evidence.
+
+### Added
+
+- `global_owner_scout_delivery_v1`, task-artifact creation/readback, compact delivery receipts, and controller-side verification for
+  realistic 0/1/3/6/7/8/24-card Review Packs.
+
+### Changed
+
+- The unreleased component set is Core 0.3.6, Plugin 1.4.0, Workstation Bootstrap 1.9.0, and Scout 5.6.0. Review Pack remains v4;
+  Scheduled Scout remains production-blocked.
 
 ## 0.3.5 (2026-08-14)
 

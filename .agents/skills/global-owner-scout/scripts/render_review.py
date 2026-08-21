@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a validated Global Owner Scout v5.5 Review Pack as deterministic Chinese Markdown."""
+"""Render a validated Global Owner Scout v5.6 Review Pack as deterministic Chinese Markdown."""
 
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the exact user-visible Global Owner Scout v5.5 Markdown envelope."""
+"""Verify exact Global Owner Scout v5.6 renderer or artifact Markdown bytes."""
 
 from __future__ import annotations
 

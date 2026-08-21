@@ -10,7 +10,7 @@
         "source": "git-subdir",
         "url": "https://github.com/lly-personal/agent-memory-sidecar.git",
         "path": "./plugins/agent-memory-sidecar",
-        "ref": "v0.3.5"
+        "ref": "v0.3.6"
       },
       "policy": {
         "installation": "AVAILABLE",

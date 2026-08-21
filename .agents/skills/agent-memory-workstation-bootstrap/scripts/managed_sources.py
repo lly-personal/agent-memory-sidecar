@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Atomic managed-source sync and deployment-pack contracts for Bootstrap 1.8."""
+"""Atomic managed-source sync and deployment-pack contracts for Bootstrap 1.9."""
 
 from __future__ import annotations
 
@@ -21,8 +21,8 @@ from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 
-BOOTSTRAP_VERSION = "1.8.0"
-SCOUT_VERSION = "5.5.0"
+BOOTSTRAP_VERSION = "1.9.0"
+SCOUT_VERSION = "5.6.0"
 PACK_VERSION = "agent_memory_workstation_deployment_pack_v1"
 SOURCE_MANIFEST_VERSION = "agent_memory_source_manifest_v1"
 SOURCE_CUTOVER_PLAN_VERSION = "agent_memory_source_cutover_plan_v2"

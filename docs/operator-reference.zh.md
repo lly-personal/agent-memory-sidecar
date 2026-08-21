@@ -2,8 +2,8 @@
 
 - Status: active
 - Owner layer: project_docs
-- Last verified: 2026-08-14
-- Evidence: [Core v1 contract](../specs/agent-memory-core-v1.md)、[ADR 0057](decisions/0057-agent-memory-core-v1.zh.md)、[ADR 0059](decisions/0059-bounded-behavior-set-evolution.zh.md)、[Public distribution v1](../specs/public-distribution-v1.md)、[Public authority cutover v1](../specs/public-authority-cutover-v1.md)
+- Last verified: 2026-08-21
+- Evidence: [Core v1 contract](../specs/agent-memory-core-v1.md)、[ADR 0057](decisions/0057-agent-memory-core-v1.zh.md)、[ADR 0059](decisions/0059-bounded-behavior-set-evolution.zh.md)、[ADR 0076](decisions/0076-task-scoped-review-pack-delivery.zh.md)、[Public distribution v1](../specs/public-distribution-v1.md)、[Public authority cutover v1](../specs/public-authority-cutover-v1.md)
 
 ## 所有权
 
@@ -63,6 +63,12 @@ Review Pack 多选使用 `rule deploy-bundle` 与 `rule_revision_bundle_v2`。Bu
 整包零写入。Fresh 检查已知目标时使用
 `rule list --target global_agents|project_agents`。
 
+Scout 5.6 的 interactive 交付由 `prepare_delivery.py` 内部完成：output root 必须由当前任务宿主显式提供且位于项目
+外；artifact 成功打开后只返回 compact receipt；宿主明确返回 `queued` 时返回带同一 artifact 链接的 pending
+receipt，确认关闭。生产验收控制任务从实际 Scout final 读取 artifact 路径，并以
+`prepare_delivery.py --verify-final --artifact-root <host-output-root>` 验证；内部 renderer/verifier 输出或文件存在不
+能替代 `surface_observed`。`surface_pending` 只证明完整内容可发现且字节守恒，不计 Production。
+
 每条渲染后不超过 1 KiB；每个完整 managed block 不超过 8 KiB。超限整次拒绝且不消费授权，错误详情返回
 `before_bytes`、`projected_bytes` 与 `budget_bytes`。`rule list` 的 `targets` 返回 managed、budget、
 remaining、完整文档字节和规则数；8 KiB 不约束块外正文。
@@ -108,10 +114,10 @@ Hook 命令只引用 immutable artifact，不引用 editable checkout。遇到 l
   global binding/Owner parity 明确 unavailable。若该主机已存在 global binding，Bootstrap 必须以
   `public_core_existing_global_binding` 阻断并等待显式解绑/迁移决定，不得把旧绑定伪报为 unavailable。
 - `owner_integrated` 另外提供 clean、commit-bound canonical Owner；未配置时不得搜索替代 Owner。
-- Workstation Bootstrap 1.8.0 以 `source-cutover --dry-run` 与 exact-hash apply 统一 fresh/update/legacy；底层
+- Workstation Bootstrap 1.9.0 以 `source-cutover --dry-run` 与 exact-hash apply 统一 fresh/update/legacy；底层
   `sync-sources` 与 `materialize-host` 继续保持严格、无隐式换源能力。release source 同时绑定 ref 与完整 commit，
   ref 漂移整次失败。
-- 正常 Desktop 首跳固定为 `codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.5` 后
+- 正常 Desktop 首跳固定为 `codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.6` 后
   `codex plugin add agent-memory-sidecar@agent-memory`。Marketplace 只提供 Anchor；Anchor 的 Resolver 验证 stable immutable
   Release、tag/commit、asset digest、checksums 与 manifest，安全展开 portable，并在同一任务执行正式 Bootstrap。
 - 已有受管 Sidecar identity 不同时，普通 `sync-sources` 必须继续失败。统一入口只展示一次短计划并取得一次确认，
