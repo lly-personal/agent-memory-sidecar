@@ -5,6 +5,7 @@
 engineering-authority epochs, first-release cutover gate, and steady-state public development boundary.
 `source-authority-cutover-v2.md` owns unified workstation reconciliation and explicit migration between managed Sidecar identities.
 `global-owner-scout-delivery-v1.md` owns task-scoped Review Pack artifacts, compact receipts, and actual task-surface qualification.
+`release-promotion-v1.md` owns the deterministic inspect/apply transition from a verified draft to an attested immutable Release.
 
 All other Markdown contracts in this directory are retained historical contracts. `public-export-allowlist-v1.json` is the
 machine-owned allowlist for the active public distribution contract. Historical files are

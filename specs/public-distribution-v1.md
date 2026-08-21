@@ -62,6 +62,11 @@ reproducible-rebuild, CLI, Skill self-test, source-manifest, portable-content, a
 
 Neither stage changes repository visibility, Git history, tags, Releases, registries, local Codex state, or private Owner state.
 
+The tag workflow remains draft-only. The only supported publication transition is
+[`release-promotion-v1`](release-promotion-v1.md): a separately authorized operator first generates a read-only, commit- and
+asset-bound plan hash, then applies that exact plan and verifies the Release plus every asset attestation before accepting
+`non-draft + immutable`. Publication never implies workstation deployment or later-task adoption.
+
 The repository marketplace and both byte-identical Bootstrap Anchors are discovery surfaces. The Anchor's Release Resolver accepts
 the latest stable immutable GitHub Release or an explicit version and verifies the release tag/commit, GitHub asset digests,
 `SHA256SUMS`, release/source manifests, and portable embedded manifests before installation. Resolution failure is

@@ -5,7 +5,7 @@
 - Applies when: 判断组件职责、调用方向、持久化、Desktop 宿主或跨设备分发边界。
 - Avoid when: 只需要用户操作或字段定义；读取 [L3](interface.md)。
 - Last verified: 2026-08-21
-- Evidence: [L1](axioms.md)、用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)
+- Evidence: [L1](axioms.md)、用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[确定性 Release 发布 ADR](../decisions/0077-deterministic-release-promotion.zh.md)
 
 ## 拓扑
 
@@ -307,9 +307,11 @@ flowchart LR
     REL --> CORE["Core wheel / sdist"]
     REL --> PORT["versioned Plugin / Skills bundle"]
     REL --> MAN["release manifest + checksums"]
+    MAN --> DRAFT["verified draft + attestations"]
+    DRAFT --> PROMOTE["release_promotion_v1 exact plan hash"]
     CORE --> INST["public_install_verified"]
     PORT --> INST
-    MAN --> PUBLISHED["public_published + immutable readback"]
+    PROMOTE --> PUBLISHED["public_published + immutable readback"]
     INST --> CUT["独立人工 authority cutover"]
     PUBLISHED --> CUT
     CUT --> ACTIVE["public_active：public main 唯一工程权威"]
@@ -334,6 +336,11 @@ GitHub 托管 Runner 的独立性能 job 只记录三轮环境观测，不授予
 Python wheel/sdist 只拥有 Core。Plugin/Bootstrap/Scout 是独立 portable bundle；release manifest 和兼容矩阵连接两种
 分发物，但不能把“wheel 可安装”冒充“完整工作站已安装”。实际 public repository、tag、Release 和 registry 写入
 仍是独立外部授权面。
+
+Tag workflow 只生成并核对 draft；`release_promotion_v1` 是唯一 `draft -> immutable` 边。inspect 将 clean
+HEAD、annotated local tag、remote main/tag、版本 Changelog、immutable policy 和 local/remote asset digest 固定为一个
+计划 hash；apply 重算同一计划并在发布后验证 Release/逐资产 attestation 与 immutable readback。该边不拥有构建、tag
+移动、PyPI 或本机部署。
 
 公开分发还具有与产品证据正交的工程权威轴。`private_engineering` 与 `public_candidate` 都由私有工程仓库唯一拥有
 产品事实；候选公开仓库只能运行 CI、首发构建与干净安装验收，公开 PR 不在此期间独立演进。只有安装、发布回读和

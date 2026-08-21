@@ -38,12 +38,14 @@ ACTIVE_DOCUMENTS = (
     ROOT / "docs" / "decisions" / "0074-public-operations-closure.zh.md",
     ROOT / "docs" / "decisions" / "0075-unified-workstation-reconcile.zh.md",
     ROOT / "docs" / "decisions" / "0076-task-scoped-review-pack-delivery.zh.md",
+    ROOT / "docs" / "decisions" / "0077-deterministic-release-promotion.zh.md",
     ROOT / "specs" / "README.md",
     ROOT / "specs" / "agent-memory-core-v1.md",
     ROOT / "specs" / "public-distribution-v1.md",
     ROOT / "specs" / "public-authority-cutover-v1.md",
     ROOT / "specs" / "source-authority-cutover-v2.md",
     ROOT / "specs" / "global-owner-scout-delivery-v1.md",
+    ROOT / "specs" / "release-promotion-v1.md",
 )
 LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 

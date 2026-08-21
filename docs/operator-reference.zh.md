@@ -132,10 +132,19 @@ Hook 命令只引用 immutable artifact，不引用 editable checkout。遇到 l
 - seed 阶段 release builder 要求 export receipt 与 tracked snapshot 精确相同；`public_active` 后改为验证 marker、
   初始 Release tag/commit 和祖先关系，后续版本直接从公开 Git 演进，不再刷新私有 export receipt。
 - Tag workflow 只在 public repository 创建/恢复 draft 并上传、比对全部资产；它不持有管理员 Token，也不自动
-  publish。阶段 C 的独立管理员操作在发布前验证 immutable releases，复读资产，发布后逐资产验证 attestation 并
-  回读 non-draft/immutable。PyPI 不属于该首发链。
+  publish。阶段 C 只使用 `publish_release.py inspect` 生成绑定 commit、Changelog、immutable policy 与完整资产摘要的
+  `plan_hash`；`apply --plan-hash <hash>` 重算同一计划，发布后逐资产验证 attestation 并回读
+  non-draft/immutable。PyPI 不属于该首发链。
 - 远端 tag 只能在版本化 Changelog、组件兼容行和包元数据一致后创建。先在目标公开 commit 上建立本地 annotated
   tag，并从该 clean tag/HEAD 执行完整 `build_release_artifacts.py`；只有本地发行构建成功后才能推送同一 tag。
+
+```powershell
+python scripts/publish_release.py inspect --asset-dir dist/release --repository lly-personal/agent-memory-sidecar --tag v0.3.6 --expected-commit <full-sha>
+python scripts/publish_release.py apply --asset-dir dist/release --repository lly-personal/agent-memory-sidecar --tag v0.3.6 --expected-commit <full-sha> --plan-hash <hash>
+```
+
+Inspect 零远端写入。Apply 仅在本次用户授权覆盖公开发布且 hash 仍 fresh 时执行；成功回执只证明
+`public_published`，不能升级为本机部署、Skill 发现或真实新任务采用。
 
 ## Global 双目标事务
 

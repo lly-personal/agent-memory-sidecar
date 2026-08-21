@@ -227,6 +227,9 @@ class PublicDistributionTests(unittest.TestCase):
         )
         self.assertNotIn("AGENTS.md", allowlist["copy"])
         self.assertEqual("AGENTS.md", allowlist["map"]["templates/public/AGENTS.md"])
+        self.assertIn("scripts/publish_release.py", allowlist["copy"])
+        self.assertIn("specs/release-promotion-v1.md", allowlist["copy"])
+        self.assertIn("docs/decisions/0077-deterministic-release-promotion.zh.md", allowlist["copy"])
 
     def test_repo_and_plugin_anchor_are_byte_identical(self) -> None:
         repo_anchor = ROOT / ".agents" / "skills" / "agent-memory-bootstrap-anchor"
