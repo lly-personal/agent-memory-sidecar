@@ -208,3 +208,8 @@ and configured runtime at their own evidence layer. Only real new Codex Desktop
 tasks can prove rule adoption and post-revoke continuity. Export verification,
 repository visibility, a version tag, a Release, registry publication, and
 engineering-authority cutover remain separately verified facts.
+
+Release CI intentionally stops at a complete draft. Maintainers promote it only through
+[`release-promotion-v1`](specs/release-promotion-v1.md), whose read-only inspect binds the exact commit and asset set to a
+`plan_hash`; apply consumes that hash and accepts success only after Release/per-asset attestation verification and immutable
+readback.

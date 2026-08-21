@@ -5,7 +5,7 @@
 - Applies when: 实现或验收规则、proposal、状态、CLI、失败反馈和迁移操作。
 - Avoid when: 判断产品公理或组件所有权；读取 [L1](axioms.md)与 [L2](topology.md)。
 - Last verified: 2026-08-21
-- Evidence: 用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)
+- Evidence: 用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[确定性 Release 发布 ADR](../decisions/0077-deterministic-release-promotion.zh.md)
 
 ## 七字段提案
 
@@ -627,6 +627,15 @@ GitHub Tag workflow 只允许在 public repository 创建/恢复 draft，随后�
 管理员操作必须在 publish 前确认 enabled，复读 draft 资产，publish 后逐资产验证 attestation，并回读非 draft 且
 immutable。失败可以保留 draft 重试；immutable Release 发布后不得移动或复用 tag/asset，修复使用新版本。PyPI 是
 另一个独立授权面。
+
+该管理员操作固定为 `release_promotion_v1`。`inspect` 必须保持零写入，并输出
+`agent_memory_release_promotion_plan_v1 / authorization_required`；计划精确绑定 public repository、vSemVer tag、full
+commit、clean HEAD、annotated local tag、remote main/peeled tag、Changelog release section、immutable-releases enabled、
+local `SHA256SUMS`/release manifest 与远端 uploaded asset 的有序 name/bytes/SHA-256 集合，以及
+`is_draft=false / is_immutable=true` 目标。`apply` 只接受 fresh exact `plan_hash`，随后只执行一次 draft publication；
+成功前必须验证 Release attestation、每个本地资产的 Release attestation，并回读 publication timestamp、non-draft、
+immutable 与未漂移资产集。成功输出 `agent_memory_release_promotion_receipt_v1 / public_published`。远端 mutation 后任一
+验证失败都不得声称回滚或仍处于 draft，必须返回 blocked 并重新只读确认实际远端状态。
 
 `agent_memory_public_release_manifest_v1.source` 顶层精确包含
 `repository, ref, commit, authority_epoch, engineering_source_commit, initial_public_release, authority_activated_at`；

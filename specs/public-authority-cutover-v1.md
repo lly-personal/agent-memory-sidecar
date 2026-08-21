@@ -82,6 +82,8 @@ Checking repository immutable-release settings requires administration-read auth
 have. The workflow therefore never receives or stores an administrator token and never publishes the draft. In the separately
 authorized publication operation, an administrator checks that immutable releases are enabled, re-reads the draft asset set,
 publishes it, verifies each local asset against the release attestation, and reads back the Release as non-draft and immutable.
+That operation is implemented by the deterministic inspect/apply contract in
+[`release-promotion-v1.md`](release-promotion-v1.md); it must not be reconstructed as an unbound sequence of shell commands.
 
 A failed workflow may leave a draft for an idempotent retry. Once an immutable Release is published, its tag or assets must not be
 moved, replaced, or reused; a correction uses a new semantic version.

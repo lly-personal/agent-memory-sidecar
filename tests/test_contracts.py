@@ -56,6 +56,7 @@ class ContractTests(unittest.TestCase):
                 "public-authority-cutover-v1.md",
                 "source-authority-cutover-v2.md",
                 "global-owner-scout-delivery-v1.md",
+                "release-promotion-v1.md",
             }:
                 continue
             heading = "\n".join(
@@ -66,6 +67,15 @@ class ContractTests(unittest.TestCase):
                 heading,
                 path.name,
             )
+
+    def test_release_promotion_contract_binds_plan_and_terminal_readback(self) -> None:
+        contract = (ROOT / "specs" / "release-promotion-v1.md").read_text(encoding="utf-8")
+        self.assertIn("Status: Accepted", contract)
+        self.assertIn("agent_memory_release_promotion_plan_v1", contract)
+        self.assertIn("agent_memory_release_promotion_receipt_v1", contract)
+        self.assertIn("plan_hash", contract)
+        self.assertIn("non-draft", contract)
+        self.assertIn("immutable", contract)
 
     def test_global_owner_scout_delivery_contract_is_fail_closed(self) -> None:
         contract = (ROOT / "specs" / "global-owner-scout-delivery-v1.md").read_text(encoding="utf-8")
