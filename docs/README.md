@@ -5,7 +5,7 @@
 - Applies when: 定位 Agent Memory Core v1 的当前规范、操作文档、实现契约或历史理由。
 - Avoid when: 小范围源码查找即可回答。
 - Last verified: 2026-08-21
-- Evidence: [L1](specs/axioms.md)、[L2](specs/topology.md)、[L3](specs/interface.md)、[ADR 0057](decisions/0057-agent-memory-core-v1.zh.md)、[ADR 0058](decisions/0058-persistent-runtime-journal.zh.md)、[ADR 0059](decisions/0059-bounded-behavior-set-evolution.zh.md)、[ADR 0070](decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[ADR 0072](decisions/0072-allowlisted-public-distribution-lane.zh.md)、[ADR 0073](decisions/0073-public-engineering-authority-cutover.zh.md)、[ADR 0074](decisions/0074-public-operations-closure.zh.md)、[ADR 0075](decisions/0075-unified-workstation-reconcile.zh.md)、[ADR 0076](decisions/0076-task-scoped-review-pack-delivery.zh.md)、[ADR 0077](decisions/0077-deterministic-release-promotion.zh.md)
+- Evidence: [L1](specs/axioms.md)、[L2](specs/topology.md)、[L3](specs/interface.md)、[ADR 0057](decisions/0057-agent-memory-core-v1.zh.md)、[ADR 0058](decisions/0058-persistent-runtime-journal.zh.md)、[ADR 0059](decisions/0059-bounded-behavior-set-evolution.zh.md)、[ADR 0070](decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[ADR 0072](decisions/0072-allowlisted-public-distribution-lane.zh.md)、[ADR 0073](decisions/0073-public-engineering-authority-cutover.zh.md)、[ADR 0074](decisions/0074-public-operations-closure.zh.md)、[ADR 0075](decisions/0075-unified-workstation-reconcile.zh.md)、[ADR 0076](decisions/0076-task-scoped-review-pack-delivery.zh.md)、[ADR 0077](decisions/0077-deterministic-release-promotion.zh.md)、[ADR 0078](decisions/0078-workstation-reconcile-v2-observed-state.zh.md)
 
 ## 当前 Core v1 权威路径
 
@@ -37,6 +37,9 @@
 18. [`release-promotion-v1.md`](../specs/release-promotion-v1.md) 与
     [`ADR 0077`](decisions/0077-deterministic-release-promotion.zh.md)：verified draft 到 attested immutable Release 的
     确定性 inspect/apply 与终态回读。
+19. [`workstation-reconcile-v2.md`](../specs/workstation-reconcile-v2.md)、
+    [`ADR 0078`](decisions/0078-workstation-reconcile-v2-observed-state.zh.md) 与
+    [`工作站调和 SOP`](sops/workstation-reconcile.zh.md)：统一期望身份、真实分发读回、补偿事务与新任务采用门。
 
 Global Owner Scout 的确认交接还必须读取 [`ADR 0070`](decisions/0070-atomic-review-pack-rule-bundles.zh.md)：用户可以
 精确多选，同一 target 以一个原子规则包提交；逐卡只是批次大小为一的兼容形式。

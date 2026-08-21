@@ -7,20 +7,20 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `1.9.0`
-- Modes: `inspect`, `apply_enrollment`
-- Deployment pack: `agent_memory_workstation_deployment_pack_v1`
+- Skill version: `2.0.0`
+- Modes: `inspect`, `verify_consumer`, `apply_enrollment`
+- Deployment pack: `agent_memory_workstation_deployment_pack_v2`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
 - Host profile: `global_owner_scout_host_profile_v1`
 - Read [references/contracts.md](references/contracts.md) completely before either mode.
 
-This Skill separates four facts that must never be collapsed:
+This Skill separates five facts that must never be collapsed:
 
-1. **portable distribution**: a private continuity-enabled repository may expose a repo marketplace; the public lane instead
-   requires the checksummed portable release bundle and its commit-bound source manifest;
-2. **source synchronization**: this host has clean managed snapshots of the Sidecar and canonical Global Owner sources;
-3. **host materialization**: Core, global binding, Bootstrap, Scout, and Doctor are installed and verified on this host;
-4. **project activation**: the interactive entry or optional Scheduled experiment is available for a particular host/project.
+1. **desired bundle identity**: one verified Release binds Core, Plugin, Bootstrap, Scout, source commit, and content hashes;
+2. **observed distribution**: Codex JSON state and physical readback identify the actual Marketplace and Plugin version/ref/hash/enabled state;
+3. **source synchronization**: this host has clean managed snapshots of the Sidecar and canonical Global Owner sources;
+4. **host materialization**: Core, global binding, Bootstrap, Scout, and Doctor are installed and verified on this host;
+5. **consumer adoption**: a refreshed new task actually loaded the installed Bootstrap before the interactive entry is called ready.
 
 A normal deployment request always enters `inspect`. It must not create, update, pause, resume, or delete Scheduled tasks and must
 not change the Host Profile. Only an explicit request to retest or configure Scheduled capability enters `apply_enrollment`.
@@ -33,18 +33,23 @@ not change the Host Profile. Only an explicit request to retest or configure Sch
      entry alone is not source authority. Execute this Skill's deterministic scripts from the Resolver's safely materialized portable
      root. Never default to a floating branch, ask for project IDs/model settings/project lists, or invent a source.
    - Authentication or source failure ends as `source_sync_blocked`; do not claim the capability is synchronized.
-2. Run `python -B scripts/managed_sources.py source-cutover --dry-run --codex-home <active-codex-home>
-   --source-manifest <release-manifest>` as the unified fresh/update/legacy inspection. It only targets reconstructable managed
+2. Run `python -B scripts/managed_sources.py workstation-reconcile --dry-run --codex-home <active-codex-home>
+   --source-manifest <resolved-source-manifest> --release-manifest <resolved-release-manifest>` as the unified
+   fresh/update/legacy inspection. It only targets Agent Memory Marketplace/Plugin and reconstructable managed
    sources under the active Codex home and never resets, cleans, pulls, or overwrites an active project checkout.
-   - a plan containing only `:install`, or `noop`, is covered by the user's deployment request and may consume the exact plan.
-   - any `:replace` requires `render-cutover-plan`, one confirmation, another dry-run, and only the fresh hash may apply.
+   - a plan containing fresh installs, same-source ref/version repairs, or `noop` is covered by the user's deployment request.
+   - any Sidecar or Marketplace source identity replacement requires `render-reconcile-plan`, one confirmation, another dry-run,
+     and only the fresh hash may apply.
+   - an explicitly disabled Plugin is a blocker; never silently enable it or call another layer ready.
    - a public manifest with `canonical_owner=null` preserves a clean existing Owner only when its checkout and Core binding
      root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
-3. Run the exact-hash `source-cutover --apply`. The transaction uses the managed Sidecar source to run Core setup, bind the explicit
-   or preserved canonical Owner, verify Doctor, and install both versioned repository Skills atomically per target while excluding
-   bytecode caches. Validate Bootstrap `1.9.0`, Scout `5.6.0`, their content hashes, and canonical/local Owner parity. Installation
-   evidence proves host materialization, not later model adoption. A newly installed Skill is guaranteed as a discovery input only
-   after one Codex refresh or from the next task; report `available_next_turn` without asking the user to repeat deployment.
+3. Run exact-hash `workstation-reconcile --apply`. Marketplace/Plugin mutation participates in the source-cutover rollback
+   transaction. The transaction then runs Core setup, binds the explicit or preserved canonical Owner, verifies Doctor, installs
+   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.0.0`, Scout `5.6.0`,
+   and every desired identity. The result is `reload_required`; it proves host materialization, not model adoption.
+4. Ask for exactly one Codex Desktop refresh. In a new task that loaded this installed Skill, run the same command with
+   `--verify-consumer` and no plan hash. Only an exact no-op host may become `ready`. Do not ask the user to repeat source choices,
+   paths, versions, or deployment commands.
 5. Use the Codex Desktop project API to enumerate the complete visible project inventory. Do not infer a fixed project list from
    repository names, paths, old automation names, another host's profile, or the repositories used as capability sources.
 6. Enumerate recent tasks with the host-supported bound. Classify a task as natural only when native metadata proves it was
@@ -55,13 +60,21 @@ not change the Host Profile. Only an explicit request to retest or configure Sch
    Non-Git and remote-less projects receive host-local identity only and are ineligible for periodic enrollment.
 8. Read current Scheduled tasks only to report historical state. The interactive Scout remains the product path; Scheduled remains
    a separate paused/optional experiment unless the user explicitly asks to retest it.
-9. Build and validate one `agent_memory_workstation_deployment_pack_v1`, render it with
+9. Build and validate one `agent_memory_workstation_deployment_pack_v2` from the reconciler's exact readback, render it with
    `python -B scripts/managed_sources.py render-pack`, and return the Chinese Markdown. Separately render an Enrollment Pack only
    when project discovery is useful to the user's request. Do not make enrollment a prerequisite for interactive Scout use.
 
-The final deployment result reports `portable distribution / source synchronization / host materialization / project activation`
-separately. A same-machine clean-profile simulation may prove deterministic cold start, but it must remain distinct from a real
-second-device result.
+The final deployment result reports `desired release / Plugin distribution / source synchronization / host materialization /
+consumer adoption` separately. A same-machine clean-profile simulation may prove deterministic cold start, but it must remain
+distinct from a real second-device result.
+
+## Mode: `verify_consumer`
+
+Enter only from a refreshed new task that actually loaded Bootstrap 2.0.0 after an `inspect` result requested reload. Run
+`workstation-reconcile --verify-consumer` against the same Resolver output. This mode is read-only: it requires an exact no-op plan,
+re-observes current managed sources, Core runtime, Owner parity, Doctor, installed Bootstrap/Scout bytes, and distribution identities,
+and then renders the only `ready` Pack. A historical cutover receipt is never accepted as current host evidence.
+Any drift returns to `inspect`; never patch or infer readiness inside this mode.
 
 ## Mode: `apply_enrollment`
 

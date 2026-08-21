@@ -79,6 +79,29 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         finally:
             connection.close()
 
+    @staticmethod
+    def materialization_result(source_commit: str) -> dict[str, object]:
+        return {
+            "core": {
+                "status": "verified",
+                "version": "0.3.8",
+                "source_commit": source_commit,
+                "artifact_sha256": "a" * 64,
+            },
+            "global_binding": "verified",
+            "doctor": "verified",
+            "bootstrap_skill": {
+                "status": "unchanged",
+                "version": "2.0.0",
+                "content_sha256": "b" * 64,
+            },
+            "scout_skill": {
+                "status": "unchanged",
+                "version": "5.6.0",
+                "content_sha256": "c" * 64,
+            },
+        }
+
     def test_skill_chain_only_tolerates_os_owned_top_level_aliases(self) -> None:
         predicate = getattr(self.bootstrap, "_is_trusted_host_directory_alias")
         root_owned_link = SimpleNamespace(st_mode=0o120777, st_uid=0)
@@ -234,6 +257,9 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             )
             enrollment.parent.mkdir(parents=True)
             enrollment.write_text("# fixture\n", encoding="utf-8")
+            core_init = sidecar / "src" / "agent_memory_sidecar" / "__init__.py"
+            core_init.parent.mkdir(parents=True)
+            core_init.write_text('__version__ = "0.3.8"\n', encoding="utf-8")
             calls = []
 
             def successful(command, *, cwd, env):
@@ -250,6 +276,10 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                     "data": {
                         "status": "ok",
                         "doctor": {"status": "ok"},
+                        "runtime": {
+                            "source_commit": "a" * 40,
+                            "artifact_sha256": "sha256:" + "b" * 64,
+                        },
                     },
                     "error": None,
                 }
@@ -282,6 +312,9 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             )
             enrollment.parent.mkdir(parents=True)
             enrollment.write_text("# fixture\n", encoding="utf-8")
+            core_init = sidecar / "src" / "agent_memory_sidecar" / "__init__.py"
+            core_init.parent.mkdir(parents=True)
+            core_init.write_text('__version__ = "0.3.8"\n', encoding="utf-8")
             owner.mkdir(parents=True)
             owner_commit = "b" * 40
             self.bind_managed_owner(
@@ -302,7 +335,14 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                     "status": "ok",
                     "scope": None,
                     "target": None,
-                    "data": {"status": "ok", "doctor": {"status": "ok"}},
+                    "data": {
+                        "status": "ok",
+                        "doctor": {"status": "ok"},
+                        "runtime": {
+                            "source_commit": "a" * 40,
+                            "artifact_sha256": "sha256:" + "b" * 64,
+                        },
+                    },
                     "error": None,
                 }
 
@@ -447,7 +487,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             with mock.patch.object(
                 self.managed_sources,
                 "materialize_host",
-                return_value={"status": "ok", "doctor": "verified"},
+                return_value=self.materialization_result(desired_specs[0].expected_commit),
             ):
                 receipt = self.managed_sources.apply_source_cutover(
                     codex_home, desired_specs, plan_hash=plan["plan_hash"],
@@ -529,7 +569,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             with mock.patch.object(
                 self.managed_sources,
                 "materialize_host",
-                return_value={"status": "ok", "doctor": "verified"},
+                return_value=self.materialization_result(desired_specs[0].expected_commit),
             ) as materialize:
                 receipt = self.managed_sources.apply_source_cutover(
                     codex_home,
@@ -803,11 +843,38 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             self.assertEqual([], list(external.iterdir()))
 
     def test_deployment_pack_keeps_proof_layers_separate(self) -> None:
-        pack = self.managed_sources.valid_pack()
+        desired = {
+            "release_ref": "v0.3.8", "source_commit": "a" * 40,
+            "core_version": "0.3.8", "plugin_version": "1.5.0", "plugin_sha256": "b" * 64,
+            "bootstrap_version": "2.0.0", "bootstrap_sha256": "c" * 64,
+            "scout_version": "5.6.0", "scout_sha256": "d" * 64,
+        }
+        source_sha = "e" * 64
+        pack = self.managed_sources.build_deployment_pack_v2(
+            desired=desired,
+            observed_distribution={
+                "marketplace": {"status": "present", "source_sha256": source_sha, "ref": "v0.3.8", "commit": "a" * 40},
+                "plugin": {"status": "installed", "source_sha256": source_sha, "ref": "v0.3.8", "version": "1.5.0", "content_sha256": "b" * 64, "enabled": True},
+            },
+            desired_source_sha256=source_sha,
+            source_sync={
+                "sidecar": {"status": "unchanged", "ref": "v0.3.8", "commit": "a" * 40},
+                "canonical_owner": {"status": "unavailable", "ref": "unavailable", "commit": "unavailable"},
+            },
+            host_materialization={
+                "core": {"status": "verified", "version": "0.3.8", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
+                "global_binding": "unavailable", "doctor": "verified",
+                "bootstrap_skill": {"status": "unchanged", "version": "2.0.0", "content_sha256": "c" * 64},
+                "scout_skill": {"status": "unchanged", "version": "5.6.0", "content_sha256": "d" * 64},
+            },
+            requires_reload=True,
+            consumer_verified=False,
+            generated_at="2026-08-21T12:00:00+08:00",
+        )
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("1.9.0", validated["bootstrap_version"])
+        self.assertEqual("2.0.0", validated["desired_bundle"]["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
-        for label in ("可移植分发", "能力源同步", "主机物化", "项目启用"):
+        for label in ("期望发行身份", "Plugin 分发", "能力源同步", "主机物化", "消费者采用"):
             self.assertIn(label, rendered)
         self.assertIn("真实第二台设备", rendered)
 
@@ -840,8 +907,8 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             self.assertNotIn("projectId", text)
             self.assertNotIn("pdg-multi-level-partition-infra", text)
             self.assertNotIn("feishu-agent-lab", text)
-            self.assertIn("source-cutover --dry-run", text)
-            self.assertIn("do not defer host deployment", text)
+            self.assertIn("workstation-reconcile --dry-run", text)
+            self.assertIn("workstation-reconcile --verify-consumer", text)
             self.assertNotIn("In that task, invoke", text)
         marketplace = ROOT / ".agents" / "plugins" / "marketplace.json"
         if marketplace.is_file():
@@ -851,7 +918,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 json.loads(text),
                 expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
             )
-            self.assertEqual("v0.3.7", value["plugins"][0]["source"]["ref"])
+            self.assertEqual("v0.3.8", value["plugins"][0]["source"]["ref"])
         else:
             self.assertTrue(
                 (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()
@@ -1458,7 +1525,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         self.assertIn("$global-owner-scout 复盘当前项目", combined)
         self.assertIn("interactive_project_scout", combined)
         self.assertIn("冷启动", combined)
-        self.assertIn("agent_memory_workstation_deployment_pack_v1", combined)
+        self.assertIn("agent_memory_workstation_deployment_pack_v2", combined)
 
         skill = (ROOT / ".agents" / "skills" / "global-owner-scout" / "SKILL.md").read_text(encoding="utf-8")
         protocol = (ROOT / ".agents" / "skills" / "global-owner-scout" / "references" / "deep-review-protocol.md").read_text(encoding="utf-8")

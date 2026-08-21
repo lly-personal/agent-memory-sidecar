@@ -18,17 +18,22 @@ When the user says `同步并部署本机 Agent Memory`:
    GitHub API metadata may use an explicit `GITHUB_TOKEN`/`GH_TOKEN` or existing non-interactive `gh` authentication. Never render,
    persist, or pass that token to release asset URLs; rate limiting or invalid authentication remains a visible blocker.
 2. Read `portable_root` from the verified result and execute the formal Bootstrap script only from that safely materialized portable
-   directory. Run `managed_sources.py source-cutover --dry-run` with the resolved `source-manifest.json` for the active Codex home.
-   This is the unified fresh/update/legacy inspection path:
-   - a plan containing only `:install`, or `noop`, is already authorized by the user's deployment request; consume the exact plan
-     hash immediately.
-   - any `:replace` changes an existing source identity. Pipe the plan to `managed_sources.py render-cutover-plan`, ask for the one
-     rendered confirmation, then rerun dry-run and apply only the fresh hash.
-   - any Owner ambiguity, dirty source, unresolved ref, or stale plan stops the operation. Never ask the user to assemble a combined
-     private/public manifest merely to preserve an already healthy Owner.
-3. `source-cutover --apply` owns source synchronization, Core/global Owner materialization, Doctor, and atomic Bootstrap/Scout
-   installation. Return one Chinese layered receipt. Explain that one Codex refresh or new task is required only for automatic
-   discovery of newly installed Skills; do not defer host deployment to that task.
+   directory. Run `managed_sources.py workstation-reconcile --dry-run` with the resolved `source-manifest.json` and
+   `release-manifest.json` for the active Codex home. This one plan compares desired Release identity with actual Marketplace,
+   Plugin, managed source, runtime, and Skill state:
+   - fresh installs and same-source ref/version repairs are authorized by the user's deployment request;
+   - a Sidecar or Marketplace source identity replacement requires `render-reconcile-plan`, one rendered confirmation, another
+     dry-run, and only the fresh hash may apply;
+   - an explicitly disabled Plugin, Owner ambiguity, unreadable state, dirty tracked source, unresolved ref, or stale plan stops.
+3. `workstation-reconcile --apply` owns Plugin/Marketplace compensation, source synchronization, Core/global Owner materialization,
+   Doctor, atomic Bootstrap/Scout installation, and exact readback. Return its Chinese Deployment Pack v2. A successful mutation
+   ends at `reload_required`; ask for exactly one Codex Desktop refresh, not another source choice or command sequence.
+4. In the refreshed new task, resolve the same current Release and rerun dry-run. When the plan is exact `noop`, run
+   `workstation-reconcile --verify-consumer` instead of apply. Only that read-only new-task check may return `ready`.
+
+Compatibility: published Anchor 1.x calls `source-cutover` after resolving a Release. Bootstrap 2.0 recognizes only that complete
+Resolver directory shape and routes the legacy command and renderer through this same Workstation Reconcile v2 plan/transaction.
+Do not ask the user to run an intermediate migration or perform a second refresh.
 
 Fixed boundaries:
 

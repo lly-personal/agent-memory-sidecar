@@ -5,7 +5,7 @@
 - Applies when: 判断组件职责、调用方向、持久化、Desktop 宿主或跨设备分发边界。
 - Avoid when: 只需要用户操作或字段定义；读取 [L3](interface.md)。
 - Last verified: 2026-08-21
-- Evidence: [L1](axioms.md)、用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[确定性 Release 发布 ADR](../decisions/0077-deterministic-release-promotion.zh.md)
+- Evidence: [L1](axioms.md)、用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[确定性 Release 发布 ADR](../decisions/0077-deterministic-release-promotion.zh.md)、[真实读回工作站调和 ADR](../decisions/0078-workstation-reconcile-v2-observed-state.zh.md)
 
 ## 拓扑
 
@@ -108,8 +108,8 @@ flowchart LR
 | Public Release Resolver | 解析 latest stable 或指定版本，验证 immutable Release、tag/commit、asset digest、checksums、manifest 与 portable，并把普通文件安全展开到新目录 | 回退 `main`、跟随 archive alias、把 Marketplace 当 source authority、后台自动升级 |
 | Managed capability sources | 在 `$CODEX_HOME` 保存 Sidecar 与 canonical Owner 的 clean、可重建安装快照 | 活跃项目工作区、任务历史、候选或第二 Owner |
 | Workstation Bootstrap Skill | 同步受管源并物化 Core/global binding/Bootstrap/Scout/Doctor；只有用户明确要求 Scheduled 实验时才生成 Enrollment Pack 和调和 Host Profile | 把内容同步冒充主机激活、清理活跃工程、自动选择新项目、修改 Owner |
-| Workstation Reconcile / Source Authority Cutover | 统一 fresh/update/legacy 调和；identity 变化时用一次确认和 fresh `plan_hash` 原子替换 Sidecar，并保留 identity 一致的 Owner | 放宽普通 sync、隐式移除 Owner、修改项目 checkout 或 Scheduled |
-| Deployment Pack | 以中文分层报告可移植分发、源同步、主机物化和项目激活 | 用前一层成功替代后一层、声称未验收的第二台设备成功 |
+| Workstation Reconcile / Source Authority Cutover | 从 Release 构造统一期望身份，真实读取 Marketplace/Plugin/source/runtime/Skills，并以一次确认和 fresh `plan_hash` 共同调和分发与主机物化 | 放宽普通 sync、隐式启用已禁用 Plugin、移除 Owner、修改项目 checkout 或 Scheduled |
+| Deployment Pack v2 | 只从执行后 exact readback 构造中文分层结果，并把 Desktop reload 与新任务采用独立报告 | 接受调用方手填 Plugin 状态、用安装替代模型采用、声称未验收的第二台设备成功 |
 | Interactive Worktree Task | 在当前绑定项目承载 30 天手动复盘并把结果留在同一任务 | 隐式触发、修改活跃工作区、计入 Scheduled 14 次实验 |
 | Project Discovery | 关联 Desktop 项目、自然任务、Git 内容 identity 与安全资格 | 根据固定项目名或路径决定启用 |
 | Enrollment Pack | 用中文完整显示发现、活动覆盖、安全条件、现有状态和建议动作 | 未确认即创建 Scheduled Task |
@@ -144,7 +144,7 @@ Review Pack 结构通过校验后仍未完成链路；renderer 与 visible-outpu
 继续创建并回读同任务 artifact、通过宿主工具打开，然后由外部 controller 读取实际 final/artifact 才完成呈现。
 宿主 open 是 Scout 的最后一个工具调用；之后只允许 compact Delivery receipt，不得再调用独立 memory 审计或追加尾注。
 
-Bootstrap 1.9.0 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 2.0.0 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得
@@ -152,11 +152,14 @@ pull/reset/clean 任何 Desktop 项目。随后从受管源运行 Core setup、g
 Bootstrap/Scout。新安装 Skill 只从下一任务保证自动发现，但主机物化不得被推迟到下一任务。相同主机空
 CODEX_HOME 验收和真实第二设备验收分别报告，不得互相替代。
 
-普通 `sync-sources` 不拥有 identity 换源能力。工作站调和先区分 fresh、同 identity 与存量换源；只有换源才向用户
-显示一次不含路径/URL 的计划并等待一次确认。内部 Source Authority Cutover v2 dry-run 解析目标 ref、读取 clean 当前
-状态并生成计划；apply 重算并消费 exact hash。manifest 显式 Owner 时按 commit 物化；manifest 不携带 Owner 时，若
-现有 clean Owner checkout 与 Core binding 的 root/commit 精确一致则原样保留，二者都不存在才进入 public Core，其他
-组合一律阻断。任一 source、Core setup、Doctor 或 Skill 安装失败都恢复切换前状态。
+普通 `sync-sources` 不拥有 identity 换源能力。`workstation-reconcile` 从 Release/source manifest 与 portable 内容构造
+唯一期望身份，再通过 Codex JSON CLI、Codex Marketplace install metadata、clean tracked snapshot、Plugin cache、runtime
+identity 与 Skill hash 构造真实主机状态。fresh 与同 identity 更新由一次部署请求覆盖；Sidecar 或 Marketplace identity
+变化才显示一次不含路径/URL 的计划并等待确认。apply 把 Plugin/Marketplace 作为 Source Authority Cutover v2 的事务参与者，
+在最终读回与 Deployment Pack v2 校验前保留全部 rollback。显式禁用 Plugin 保持不变并阻断；任一 distribution、source、
+host 或 readback 漂移都不能产生 `ready`。已发布 Anchor 1.x 的旧命令只在完整 Resolver 输出目录下兼容路由到该统一事务，
+避免首次升级形成新 Core/Skill 与旧 Plugin 的中间完成声明；普通 source-cutover 调用不变。
+Core setup、Doctor、Skill 或读回失败都恢复本轮触碰的受管状态。
 
 Bootstrap 安装并验证 Skill 后，交互入口不需要 Host Enrollment。只有用户明确要求 Scheduled 实验时，Bootstrap
 才为用户确认的 `active + eligible` 项目建立 Host Enrollment。`active` 来自滚动 30 天自然用户任务，

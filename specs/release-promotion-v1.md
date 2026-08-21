@@ -18,6 +18,19 @@ that local annotated tag before its first push. Once pushed, neither the tag-pro
 rework. A same-commit workflow retry may resume the draft and replace its incomplete assets. A repair that changes source commit
 withdraws the stale draft and advances to a new semantic version.
 
+## Two evidence channels
+
+Release qualification keeps two deliberately separate byte-evidence channels:
+
+- the local tagged build proves that the selected commit can satisfy the release builder, package, manifest, and consumer checks on
+  the operator host before the write-once tag is pushed;
+- the CI draft assets are the publication bytes. Promotion inspect compares the downloaded/raw GitHub asset digests and attestation
+  facts against the operator's asset directory representing that exact draft set.
+
+Archive bytes produced independently on Windows and Ubuntu are not assumed identical merely because both builders pass. A local
+tag build cannot substitute for CI draft-asset byte identity, and CI draft assets cannot substitute for the pre-push local build
+capability gate. The operator must label which channel supplied each claim.
+
 ## Plan
 
 `scripts/publish_release.py inspect` is read-only and returns `agent_memory_release_promotion_plan_v1`. It requires:
@@ -57,3 +70,4 @@ rebuilt or replaced; corrections use a new semantic version.
 - Success requires Release and per-asset attestation verification plus `non-draft + immutable` readback.
 - CI retains minimum permissions and remains unable to publish; operator credentials and runtime receipts are never committed.
 - A protected remote tag is never updated or deleted; post-tag source repair uses the next semantic version.
+- Local tag-build qualification and CI draft-asset byte qualification remain separately named; neither hash channel upgrades the other.

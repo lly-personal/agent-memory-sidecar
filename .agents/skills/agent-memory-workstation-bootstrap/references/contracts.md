@@ -1,4 +1,4 @@
-# Workstation Bootstrap 1.9 contracts
+# Workstation Bootstrap 2.0 contracts
 
 This reference owns the external Bootstrap workflow's Deployment Pack, Enrollment Pack, and Host Profile contracts. It does not
 extend the Core v1 public contract surface.
@@ -17,15 +17,27 @@ Bootstrap materializes clean, reconstructable source snapshots only under the ac
 source must have the expected normalized origin and a clean worktree; identity mismatch or dirty state fails closed. Active project
 checkouts are never reset, cleaned, pulled, or overwritten.
 
-All workstation deployment uses `source-cutover --dry-run` followed by exact-hash apply. Fresh install and `noop` are covered by the
-user's deployment request; an existing Sidecar identity replacement requires one visible plan and one confirmation. The plan exposes
-only hashed source identities and binds the current state, desired release commits, and `keep_owner`/`public_core` action. There is
-no force path. An omitted public Owner preserves an existing Owner only when its clean checkout exactly matches Core's bound root and
-commit. One-sided, dirty, or mismatched state fails closed. Apply retains source and Skill rollbacks until strict Doctor succeeds.
+All workstation deployment uses `workstation-reconcile --dry-run` followed by exact-hash apply. The reconciler constructs one desired
+bundle from the Resolver receipt, byte-matching Release/source manifests and archive, embedded component versions, and portable hashes,
+then observes actual Marketplace/Plugin/source/runtime/
+Skill state. Fresh install, same-source repair, and `noop` are covered by the user's deployment request; Sidecar or Marketplace source
+identity replacement requires one visible plan and one confirmation. There is no force path. An explicitly disabled Plugin is preserved
+and blocks the reconcile. An omitted public Owner preserves an existing Owner only when its clean checkout exactly matches Core's bound
+root and commit. One-sided, dirty, or mismatched state fails closed.
 
-`managed_sources.py source-cutover` owns the unified source and host transaction: deterministic Core setup, global binding, Doctor,
-and per-target atomic Bootstrap/Scout installation. `sync-sources` and `materialize-host` remain lower-level strict contracts and do
-not gain implicit identity replacement or Owner discovery. Agent-authored shell sequences are not an alternative production contract.
+`managed_sources.py workstation-reconcile` owns the unified distribution, source, and host transaction: deterministic Codex JSON
+readback, Plugin/Marketplace compensation, Core setup, global binding, Doctor, and per-target atomic Bootstrap/Scout installation.
+It validates Deployment Pack v2 before releasing rollback state. `source-cutover`, `sync-sources`, and `materialize-host` remain lower-level
+strict contracts and do not gain standalone production status. Agent-authored shell sequences are not an alternative contract.
+The atomic source receipt replacement is the transaction commit point; a post-commit snapshot-cleanup failure is visible but must
+not roll back after a recovery copy may already have been discarded.
+Dry-run and consumer verification also run a live read-only host observer through the exact managed Sidecar: current Doctor/runtime
+identity, Owner parity, and physical installed Skill versions/hashes must all match. A prior receipt cannot make a drifted host `noop`
+or `ready`.
+
+The one compatibility exception is a published Anchor 1.x invocation of `source-cutover` against a complete Resolver output layout.
+Bootstrap 2.0 recognizes that layout and routes the legacy subcommand and renderer to Workstation Reconcile v2, so the first upgrade
+also reconciles Plugin/Marketplace. Standalone source manifests retain strict lower-level behavior.
 
 The source manifest binds each configured source to a credential-free remote identity, ref, and full commit. Public Core mode sets
 `canonical_owner=null`; on a fresh host this keeps global parity unavailable without blocking project-scope Core, while a legacy host
@@ -34,30 +46,44 @@ authenticate is `source_sync_blocked`, not a request for project paths and not p
 installed plugin or Skill is guaranteed automatically discoverable only after one Codex refresh or from a new task; host
 materialization finishes in the current deployment task.
 
-## Deployment Pack
+## Reconcile Plan and Deployment Pack
 
-`agent_memory_workstation_deployment_pack_v1` has these exact top-level fields:
+`agent_memory_workstation_reconcile_plan_v2` has these exact top-level fields:
 
 ```text
-contract_version, status, display_locale, bootstrap_version, generated_at,
-portable_distribution, source_sync, host_materialization, project_activation,
-limitations, pack_hash
+contract_version, bootstrap_version, status, desired_bundle, observed_distribution,
+source_plan_hash, changes, blockers, confirmation_required, requires_reload, plan_hash
 ```
 
-- `status`: `ready`, `reload_required`, `source_sync_blocked`, or `host_materialization_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `1.9.0`.
-- `portable_distribution` exact fields are `repo_anchor`, `plugin`, and `marketplace`; values are `verified`, `installed`,
-  `unavailable`, or `failed`.
+`desired_bundle` exact fields are `release_ref, source_commit, core_version, plugin_version, plugin_sha256,
+bootstrap_version, bootstrap_sha256, scout_version, scout_sha256`. `observed_distribution.marketplace` exact fields are
+`status, source_sha256, ref, commit`; `plugin` exact fields are `status, source_sha256, ref, version, content_sha256, enabled`.
+The observer uses Codex JSON output and physical readback. None of these fields may be filled from a fixture or Agent assertion.
+
+`agent_memory_workstation_deployment_pack_v2` has these exact top-level fields:
+
+```text
+contract_version, status, display_locale, generated_at, desired_bundle, distribution,
+source_sync, host_materialization, consumer_activation, limitations, pack_hash
+```
+
+- `status`: `ready`, `reload_required`, `distribution_reconcile_blocked`, `source_sync_blocked`, or
+  `host_materialization_blocked`.
+- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.0.0`.
+- `distribution` is an exact post-operation re-observation with the same Marketplace and Plugin fields as the plan.
 - `source_sync` contains exact `sidecar` and `canonical_owner` receipts. Each receipt has `status`, `ref`, and `commit`; status is
   `synced`, `unchanged`, `unavailable`, or `failed`.
-- `host_materialization` contains Core setup, global binding, Doctor, Bootstrap Skill, and Scout Skill states plus exact versions.
-- `project_activation` reports `interactive_entry` independently from `scheduled`. Interactive values are
-  `available_next_turn`, `verified`, or `blocked`; Scheduled values are `paused`, `not_configured`, or `unchanged`.
+- `host_materialization.core` contains `status, version, source_commit, artifact_sha256`; each Skill contains
+  `status, version, content_sha256`; global binding and Doctor remain separate.
+- `consumer_activation` reports `desktop_reload`, `interactive_entry`, and unchanged Scheduled state. Apply returns
+  `available_next_task`; only read-only `--verify-consumer` from a newly loaded Bootstrap task may return `verified` and `ready`.
+  Any blocked status returns `interactive_entry=blocked`, does not request a reload, and cannot route the user to Project Scout.
 - `limitations` must explicitly retain the real-second-device proof boundary when only a same-host clean-profile test exists.
 - `pack_hash` is SHA-256 of canonical UTF-8 JSON excluding `pack_hash`.
 
-The renderer produces one Chinese result table ordered as `portable distribution / source synchronization / host materialization /
-project activation`. It never exposes source URLs, absolute paths, project IDs, automation IDs, raw JSON, or credentials.
+The renderer produces one Chinese result table ordered as `desired release / Plugin distribution / source synchronization /
+host materialization / consumer adoption`. It never exposes source URLs, absolute paths, project IDs, automation IDs, raw JSON,
+or credentials.
 
 ## Enrollment Pack
 
@@ -70,7 +96,7 @@ automation_change_count, allowed_actions, limitations, pack_hash
 ```
 
 - `status`: `ready`, `bounded`, or `host_activation_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `1.9.0`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `2.0.0`.
 - `portable_layer` exact fields: `sidecar`, `canonical_owner`, `core_setup`, `doctor`, `scout_skill_version`,
   `scout_skill_hash`. State values are `synced`, `unchanged`, `installed`, `verified`, `failed`, or `unavailable`.
 - `discovery` exact fields: `inventory_status`, `activity_status`, `desktop_project_count`, `accessible_count`,

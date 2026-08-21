@@ -5,7 +5,7 @@
 - Applies when: 实现或验收规则、proposal、状态、CLI、失败反馈和迁移操作。
 - Avoid when: 判断产品公理或组件所有权；读取 [L1](axioms.md)与 [L2](topology.md)。
 - Last verified: 2026-08-21
-- Evidence: 用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[确定性 Release 发布 ADR](../decisions/0077-deterministic-release-promotion.zh.md)
+- Evidence: 用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[确定性 Release 发布 ADR](../decisions/0077-deterministic-release-promotion.zh.md)、[真实读回工作站调和 ADR](../decisions/0078-workstation-reconcile-v2-observed-state.zh.md)
 
 ## 七字段提案
 
@@ -250,11 +250,12 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。可靠自动发现边界仍是一次 Codex 刷新或下一任务，但 source/host 物化必须在当前部署任务完成。
 
-`agent-memory-workstation-bootstrap` Skill 1.9.0 提供两个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.0.0 提供两个显式模式：
 
-- `inspect`：统一识别 fresh、同 identity 与 legacy source。fresh/同 identity 直接同步并部署；只有任一既有 source identity 变化时
-  显示一份人类可读计划并等待一次确认，再消费 fresh hash 原子 apply。随后验证 Core、global binding 与 versioned Skills；Skill
-  安装通过后从下一任务保证交互 Scout 可用，无需 Host Enrollment。项目发现和
+- `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
+  Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
+  显示一份人类可读计划并等待一次确认，再消费 fresh hash 原子 apply。显式禁用 Plugin 保持不变并阻断。随后验证 Core、
+  global binding、Doctor 与 versioned Skills；Skill 安装通过后从下一任务保证交互 Scout 可用，无需 Host Enrollment。项目发现和
   `global_owner_scout_enrollment_pack_v1` 继续作为信息面；Scheduled 阻断时不得要求
   用户处理新的 enrollment 建议，也不得改变 Scheduled Task 或 Host Profile。
 - `apply_enrollment`：只在用户明确要求复测或配置 Scheduled 实验时，消费当前 Enrollment Pack 的明确选择并原子调和
@@ -282,35 +283,56 @@ remote identity 和 primary folder 的仓库内相对位置共同输入 SHA-256�
 
 `inspect` 使用的能力源是固定 authority identity，不是固定项目集合。它把两个源 staging 到当前 Codex home 下的
 受管 source root，验证期望 remote identity、clean worktree 和 commit 后才替换；两个源中任何一个失败时不得把
-部分同步声明为部署完成。活跃项目 checkout 永远不是更新目标。生产命令固定为 `managed_sources.py sync-sources`
-和 `managed_sources.py materialize-host`；后一命令从受管源执行 Core setup、global binding、Doctor 与两项 Skill
-安装，Agent 不得用临时手工命令序列替代该契约后再宣称完整物化。
+部分同步声明为部署完成。活跃项目 checkout 永远不是更新目标。`managed_sources.py sync-sources` 和
+`managed_sources.py materialize-host` 是统一事务内部的严格底层命令，不具备独立完成语义；Agent 不得用临时手工命令
+序列替代统一入口后再宣称完整物化。
 
-已有受管源 identity 与 release manifest 不一致时，普通 sync 继续失败关闭。唯一换源入口为：
+已有受管源 identity 与 release manifest 不一致时，普通 sync 继续失败关闭。统一生产入口为：
 
 ```text
-managed_sources.py source-cutover --dry-run --codex-home <home> --source-manifest <manifest>
-managed_sources.py source-cutover --apply --codex-home <home> --source-manifest <manifest> --plan-hash <hash>
+managed_sources.py workstation-reconcile --dry-run --codex-home <home> --source-manifest <source> --release-manifest <release>
+managed_sources.py workstation-reconcile --apply --codex-home <home> --source-manifest <source> --release-manifest <release> --plan-hash <hash>
+managed_sources.py workstation-reconcile --verify-consumer --codex-home <home> --source-manifest <source> --release-manifest <release>
 ```
 
-计划精确遵循 [`source-authority-cutover-v2`](../../specs/source-authority-cutover-v2.md)。无 `--force`；apply 前重算完整
+计划精确遵循 [`workstation-reconcile-v2`](../../specs/workstation-reconcile-v2.md)，内部 source 事务仍遵循
+[`source-authority-cutover-v2`](../../specs/source-authority-cutover-v2.md)。无 `--force`；apply 前重算完整
 状态。`canonical_owner` 存在时按 manifest 物化；值为 `null` 且已有 clean Owner checkout 与 Core binding 的
 root/commit 精确一致时为 `keep_owner`，二者都不存在时为 `public_core`，其他组合
-`source_cutover_owner_state_ambiguous` 阻断。成功 receipt 只证明本机 source sync 与 materialization，不证明当前任务
-加载或跨主机连续性。
+`source_cutover_owner_state_ambiguous` 阻断。Plugin/Marketplace mutation 在 source rollback 释放前完成 exact readback；
+任一参与者失败共同恢复。apply receipt 只证明本机 distribution/source/materialization，不证明当前任务加载或跨主机连续性。
+为承接已发布 Anchor 1.x，旧命令名 `source-cutover` 在输入同时包含 Resolver 生成的 sibling
+`release-manifest.json`、`resolution.json` 与 `portable/` 时兼容路由到上述统一入口；缺少该完整形态时仍执行底层
+Source Authority Cutover，不得把任意 source manifest 升级为发行授权。
 
-`agent_memory_workstation_deployment_pack_v1` 顶层精确包含：
+`agent_memory_workstation_reconcile_plan_v2` 顶层精确包含：
 
 ```text
-contract_version, status, display_locale, bootstrap_version, generated_at,
-portable_distribution, source_sync, host_materialization, project_activation,
-limitations, pack_hash
+contract_version, bootstrap_version, status, desired_bundle, observed_distribution,
+source_plan_hash, changes, blockers, confirmation_required, requires_reload, plan_hash
 ```
 
-`status` 只允许 `ready`、`reload_required`、`source_sync_blocked` 或 `host_materialization_blocked`。中文 renderer 固定
-先显示四层结果表，再显示未证明事项与唯一下一步。`portable_distribution` 不能证明 `source_sync`；源同步不能证明
-Core/Owner/Skill 已物化；物化不能证明当前任务已加载或另一台机器已通过。仅完成当前主机空 profile 测试时，必须
-保留“真实第二台设备未证明”。
+`DesiredBundleIdentity` 精确包含 `release_ref, source_commit, core_version, plugin_version, plugin_sha256,
+bootstrap_version, bootstrap_sha256, scout_version, scout_sha256`。`observed_distribution` 精确包含 Marketplace 的
+`status, source_sha256, ref, commit` 与 Plugin 的 `status, source_sha256, ref, version, content_sha256, enabled`。只允许
+从 Resolver receipt 与逐字节匹配的 Release 资产构造期望身份；实际状态只允许从 Codex JSON CLI、Marketplace install
+metadata、clean tracked checkout 和 physical Plugin cache 构造，不得由 Agent 填写。
+当 managed source 已 exact 时，dry-run 还必须通过该受管 Sidecar 执行只读 Doctor，并读取 live runtime identity、Owner
+parity 和物理安装的 Bootstrap/Scout version/hash。任一漂移生成 `host:materialize`；历史 cutover receipt 不参与当前
+`noop` 或 `ready` 判定。
+
+`agent_memory_workstation_deployment_pack_v2` 顶层精确包含：
+
+```text
+contract_version, status, display_locale, generated_at, desired_bundle, distribution,
+source_sync, host_materialization, consumer_activation, limitations, pack_hash
+```
+
+`status` 只允许 `ready`、`reload_required`、`distribution_reconcile_blocked`、`source_sync_blocked` 或
+`host_materialization_blocked`。中文 renderer 固定先显示期望发行、Plugin 分发、源同步、主机物化、消费者采用，再显示
+未证明事项与唯一下一步。apply 固定不越过模型采用层，返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.0.0
+Bootstrap 的新任务执行只读 `--verify-consumer` 且所有读回仍 exact，才允许 `ready`。任何本机结果都保留真实第二台设备、
+Scheduled、连续性与产品收益未证明边界。
 
 `global_owner_scout_enrollment_pack_v1` 顶层精确包含：
 

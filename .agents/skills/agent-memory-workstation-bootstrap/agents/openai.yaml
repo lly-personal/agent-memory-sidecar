@@ -1,6 +1,6 @@
 interface:
   display_name: "Agent Memory Workstation Bootstrap"
   short_description: "冷启动并对齐本机 Agent Memory"
-  default_prompt: "Use $agent-memory-workstation-bootstrap in inspect mode to synchronize canonical Agent Memory sources, materialize Core/Owner/Skills, and show a Chinese deployment result without changing Scheduled tasks or Host Profile."
+  default_prompt: "Use $agent-memory-workstation-bootstrap to reconcile the verified Release with actual Marketplace, Plugin, sources, Core/Owner/Skills, and consumer state, then show one Chinese result without changing Scheduled tasks or Host Profile."
 policy:
   allow_implicit_invocation: true
