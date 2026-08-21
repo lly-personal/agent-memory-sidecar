@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.3.7 | 0.3.7 | 1.4.0 | 1.9.0 | 5.6.0 | v4 | 3.11–3.13 |
 | v0.3.6 | 0.3.6 | 1.4.0 | 1.9.0 | 5.6.0 | v4 | 3.11–3.13 |
 | v0.3.5 | 0.3.5 | 1.3.0 | 1.8.0 | 5.5.0 | v4 | 3.11–3.13 |
 | v0.3.3 | 0.3.3 | 1.2.1 | 1.7.1 | 5.5.0 | v4 | 3.11–3.13 |
@@ -17,3 +18,5 @@ Scout 5.6 keeps Review Pack v4 and adds the separate `global_owner_scout_deliver
 version is not claimed supported until it enters this matrix, even if its installer accepts the package metadata.
 
 `v0.3.4` is an unpublished Git tag. Its release build stopped before artifact creation, so it is not an installable release lane.
+`v0.3.6` is a protected unpublished Git tag. Its stale draft was withdrawn after a post-tag release-process repair; the tag was
+not moved, and the corrected public lane advances to `v0.3.7`.

@@ -117,7 +117,7 @@ Hook 命令只引用 immutable artifact，不引用 editable checkout。遇到 l
 - Workstation Bootstrap 1.9.0 以 `source-cutover --dry-run` 与 exact-hash apply 统一 fresh/update/legacy；底层
   `sync-sources` 与 `materialize-host` 继续保持严格、无隐式换源能力。release source 同时绑定 ref 与完整 commit，
   ref 漂移整次失败。
-- 正常 Desktop 首跳固定为 `codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.6` 后
+- 正常 Desktop 首跳固定为 `codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.7` 后
   `codex plugin add agent-memory-sidecar@agent-memory`。Marketplace 只提供 Anchor；Anchor 的 Resolver 验证 stable immutable
   Release、tag/commit、asset digest、checksums 与 manifest，安全展开 portable，并在同一任务执行正式 Bootstrap。
 - 已有受管 Sidecar identity 不同时，普通 `sync-sources` 必须继续失败。统一入口只展示一次短计划并取得一次确认，
@@ -136,11 +136,13 @@ Hook 命令只引用 immutable artifact，不引用 editable checkout。遇到 l
   `plan_hash`；`apply --plan-hash <hash>` 重算同一计划，发布后逐资产验证 attestation 并回读
   non-draft/immutable。PyPI 不属于该首发链。
 - 远端 tag 只能在版本化 Changelog、组件兼容行和包元数据一致后创建。先在目标公开 commit 上建立本地 annotated
-  tag，并从该 clean tag/HEAD 执行完整 `build_release_artifacts.py`；只有本地发行构建成功后才能推送同一 tag。
+  tag，并从该 clean tag/HEAD 执行完整 `build_release_artifacts.py`；只有本地发行构建成功后才能首次推送同一 tag。
+  受保护远端 tag 从首次推送即 write-once，与 Release 是否仍为 draft 无关。同 commit 的 workflow 可重试；若修复改变
+  source commit，删除 stale draft 并提高语义版本，禁止修改 ruleset 或更新/删除旧 tag。
 
 ```powershell
-python scripts/publish_release.py inspect --asset-dir dist/release --repository lly-personal/agent-memory-sidecar --tag v0.3.6 --expected-commit <full-sha>
-python scripts/publish_release.py apply --asset-dir dist/release --repository lly-personal/agent-memory-sidecar --tag v0.3.6 --expected-commit <full-sha> --plan-hash <hash>
+python scripts/publish_release.py inspect --asset-dir dist/release --repository lly-personal/agent-memory-sidecar --tag v0.3.7 --expected-commit <full-sha>
+python scripts/publish_release.py apply --asset-dir dist/release --repository lly-personal/agent-memory-sidecar --tag v0.3.7 --expected-commit <full-sha> --plan-hash <hash>
 ```
 
 Inspect 零远端写入。Apply 仅在本次用户授权覆盖公开发布且 hash 仍 fresh 时执行；成功回执只证明

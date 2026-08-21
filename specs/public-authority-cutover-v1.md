@@ -85,8 +85,10 @@ publishes it, verifies each local asset against the release attestation, and rea
 That operation is implemented by the deterministic inspect/apply contract in
 [`release-promotion-v1.md`](release-promotion-v1.md); it must not be reconstructed as an unbound sequence of shell commands.
 
-A failed workflow may leave a draft for an idempotent retry. Once an immutable Release is published, its tag or assets must not be
-moved, replaced, or reused; a correction uses a new semantic version.
+A failed workflow may leave a draft for an idempotent same-commit retry. Protected release tags are write-once from their first
+remote push, even while the Release remains draft. If repair changes the source commit, withdraw the stale draft and use a new
+semantic version; do not change the tag ruleset or move, delete, replace, or reuse the tag. Once an immutable Release is published,
+its assets are equally final.
 
 ## Ongoing development
 
