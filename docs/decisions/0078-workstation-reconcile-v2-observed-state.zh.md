@@ -15,9 +15,10 @@ ref、Plugin version/hash/enabled 的情况下构造 `ready`。因此真实主�
 
 1. 引入唯一 `DesiredBundleIdentity`，由已验证 Release manifest、source manifest 与 portable 内容共同生成；Core、Plugin、
    Bootstrap、Scout、source ref/commit 和组件 hash 不再分别猜测。
-2. `ObservedHostState` 必须通过 Codex JSON CLI、Marketplace install metadata、clean tracked checkout、Plugin cache、source
-   live runtime identity、Skill hash 与 Doctor 真实读回构造。历史 source-cutover receipt 只能证明当时事务，不能替代当前
-   主机观察。删除 `valid_pack()` 生产式 fixture。
+2. `ObservedHostState` 必须通过 Codex JSON CLI、clean tracked Marketplace checkout、tracked manifest、可选 legacy install
+   metadata、Plugin cache、source live runtime identity、Skill hash 与 Doctor 真实读回构造。当前 Codex CLI 未生成 legacy
+   metadata 时仍以 tracked manifest 解析 ref；metadata 存在时继续严格校验。历史 source-cutover receipt 只能证明当时事务，
+   不能替代当前主机观察。删除 `valid_pack()` 生产式 fixture。
 3. Plugin/Marketplace 更新加入 Source Authority Cutover 的同一补偿事务；最终 exact readback 与 Deployment Pack v2 校验
    在 rollback 状态释放前完成。
    原子 source receipt 替换是 commit point；其后的快照清理失败只报告 post-commit cleanup，不得在部分 recovery copy
