@@ -84,7 +84,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         return {
             "core": {
                 "status": "verified",
-                "version": "0.3.8",
+                "version": "0.3.9",
                 "source_commit": source_commit,
                 "artifact_sha256": "a" * 64,
             },
@@ -92,7 +92,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.0.0",
+                "version": "2.0.1",
                 "content_sha256": "b" * 64,
             },
             "scout_skill": {
@@ -259,7 +259,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             enrollment.write_text("# fixture\n", encoding="utf-8")
             core_init = sidecar / "src" / "agent_memory_sidecar" / "__init__.py"
             core_init.parent.mkdir(parents=True)
-            core_init.write_text('__version__ = "0.3.8"\n', encoding="utf-8")
+            core_init.write_text('__version__ = "0.3.9"\n', encoding="utf-8")
             calls = []
 
             def successful(command, *, cwd, env):
@@ -314,7 +314,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             enrollment.write_text("# fixture\n", encoding="utf-8")
             core_init = sidecar / "src" / "agent_memory_sidecar" / "__init__.py"
             core_init.parent.mkdir(parents=True)
-            core_init.write_text('__version__ = "0.3.8"\n', encoding="utf-8")
+            core_init.write_text('__version__ = "0.3.9"\n', encoding="utf-8")
             owner.mkdir(parents=True)
             owner_commit = "b" * 40
             self.bind_managed_owner(
@@ -844,27 +844,27 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
 
     def test_deployment_pack_keeps_proof_layers_separate(self) -> None:
         desired = {
-            "release_ref": "v0.3.8", "source_commit": "a" * 40,
-            "core_version": "0.3.8", "plugin_version": "1.5.0", "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.0.0", "bootstrap_sha256": "c" * 64,
+            "release_ref": "v0.3.9", "source_commit": "a" * 40,
+            "core_version": "0.3.9", "plugin_version": "1.5.1", "plugin_sha256": "b" * 64,
+            "bootstrap_version": "2.0.1", "bootstrap_sha256": "c" * 64,
             "scout_version": "5.6.0", "scout_sha256": "d" * 64,
         }
         source_sha = "e" * 64
         pack = self.managed_sources.build_deployment_pack_v2(
             desired=desired,
             observed_distribution={
-                "marketplace": {"status": "present", "source_sha256": source_sha, "ref": "v0.3.8", "commit": "a" * 40},
-                "plugin": {"status": "installed", "source_sha256": source_sha, "ref": "v0.3.8", "version": "1.5.0", "content_sha256": "b" * 64, "enabled": True},
+                "marketplace": {"status": "present", "source_sha256": source_sha, "ref": "v0.3.9", "commit": "a" * 40},
+                "plugin": {"status": "installed", "source_sha256": source_sha, "ref": "v0.3.9", "version": "1.5.1", "content_sha256": "b" * 64, "enabled": True},
             },
             desired_source_sha256=source_sha,
             source_sync={
-                "sidecar": {"status": "unchanged", "ref": "v0.3.8", "commit": "a" * 40},
+                "sidecar": {"status": "unchanged", "ref": "v0.3.9", "commit": "a" * 40},
                 "canonical_owner": {"status": "unavailable", "ref": "unavailable", "commit": "unavailable"},
             },
             host_materialization={
-                "core": {"status": "verified", "version": "0.3.8", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
+                "core": {"status": "verified", "version": "0.3.9", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
                 "global_binding": "unavailable", "doctor": "verified",
-                "bootstrap_skill": {"status": "unchanged", "version": "2.0.0", "content_sha256": "c" * 64},
+                "bootstrap_skill": {"status": "unchanged", "version": "2.0.1", "content_sha256": "c" * 64},
                 "scout_skill": {"status": "unchanged", "version": "5.6.0", "content_sha256": "d" * 64},
             },
             requires_reload=True,
@@ -872,7 +872,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             generated_at="2026-08-21T12:00:00+08:00",
         )
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("2.0.0", validated["desired_bundle"]["bootstrap_version"])
+        self.assertEqual("2.0.1", validated["desired_bundle"]["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
         for label in ("期望发行身份", "Plugin 分发", "能力源同步", "主机物化", "消费者采用"):
             self.assertIn(label, rendered)
@@ -918,7 +918,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 json.loads(text),
                 expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
             )
-            self.assertEqual("v0.3.8", value["plugins"][0]["source"]["ref"])
+            self.assertEqual("v0.3.9", value["plugins"][0]["source"]["ref"])
         else:
             self.assertTrue(
                 (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()

@@ -1,6 +1,6 @@
 {
   "name": "agent-memory-sidecar",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Cold-start anchor for portable Agent Memory workstation capability.",
   "author": {
     "name": "IIyaqoo",

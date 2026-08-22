@@ -36,11 +36,13 @@
 
 1. Anchor 必须先用 Resolver 验证 stable immutable Release、tag/commit、asset digest、checksums、release/source manifest
    与 portable bundle。失败停止，不回退 branch、checkout 或猜测资产。
-2. 从 Resolver output 的 portable 运行 Bootstrap 2.0.0，执行 `workstation-reconcile --dry-run`。不得手工拼接多个安装命令
+2. 从 Resolver output 的 portable 运行 Bootstrap 2.0.1，执行 `workstation-reconcile --dry-run`。不得手工拼接多个安装命令
    后声称完整部署。
 3. Fresh install、同一来源的 ref/version/hash 修复由本次部署请求覆盖；Sidecar 或 Marketplace source identity 改变时，
    只显示 renderer 生成的无路径、无 URL 计划，并等待一次确认。
-4. Plugin 显式禁用时保持用户选择并显示阻断；不得自动启用。Marketplace/Plugin 状态不可读时失败关闭。
+4. Marketplace 观察以 Codex JSON、clean tracked checkout 与 tracked manifest 为基础；旧版 install metadata 存在时严格
+   校验，不存在时不得把当前 CLI 的正常 checkout 误报为 unavailable。Plugin 显式禁用时保持用户选择并显示阻断；
+   不得自动启用。Marketplace/Plugin 状态不可读时失败关闭。
 5. apply 必须使用 fresh `plan_hash`。Plugin/Marketplace、受管 source、Core/Owner、Bootstrap/Scout、Doctor 与最终读回属于
    同一补偿边界；任一失败都不能返回完成。
 6. apply 成功只返回 `reload_required`。只要求一次 Desktop 刷新，不要求用户重新选择来源或执行命令。
@@ -57,7 +59,7 @@
 | `source_sync_blocked` | Release 与 distribution 读回可用 | source/host/采用 | 修复来源访问或 ambiguity 后重试 |
 | `host_materialization_blocked` | distribution 与 source 已验证或已恢复 | 完整 Core/Skill/Doctor、采用 | 根据唯一错误重试，不手工补步骤 |
 | `reload_required` | 当前主机 distribution/source/Core/Skills/Doctor exact | 当前任务模型采用、第二设备、连续性 | 刷新一次 Desktop，新建任务并发送同一句入口 |
-| `ready` | 当前主机 exact，且新任务已加载 Bootstrap 2.0.0 | 第二设备、Scheduled、连续性、产品收益 | 可在目标工程新任务运行 Project Scout |
+| `ready` | 当前主机 exact，且新任务已加载 Bootstrap 2.0.1 | 第二设备、Scheduled、连续性、产品收益 | 可在目标工程新任务运行 Project Scout |
 
 任何 blocked 状态都不得同时要求刷新 Desktop 或引导运行 Project Scout；先修复矩阵中第一层失效事实。
 
@@ -71,7 +73,7 @@
 
 ## 验收清单
 
-- Fresh host、exact no-op、旧 Plugin + 新 Skills、新 Plugin + 旧 source、Marketplace identity drift。
+- Fresh host、exact no-op、旧 Plugin + 新 Skills、新 Plugin + 旧 source、Marketplace identity drift，以及含/不含 legacy metadata 的 clean checkout。
 - Plugin cache 缺失、CLI 状态不可读、显式禁用、执行中失败、最终读回不一致。
 - 任一失败后的 Marketplace/Plugin/source/Skill target 与执行前一致。
 - apply 只到 `reload_required`；刷新后真实新任务才到 `ready`。

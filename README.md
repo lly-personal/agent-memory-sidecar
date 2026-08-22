@@ -92,7 +92,7 @@ For normal Codex Desktop use, register the immutable repository Marketplace,
 install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.8
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.9
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -108,7 +108,7 @@ For Core-only CLI use, install the wheel from the same Release, then preview and
 apply setup:
 
 ```powershell
-python -m pip install .\agent_memory_sidecar-0.3.8-py3-none-any.whl
+python -m pip install .\agent_memory_sidecar-0.3.9-py3-none-any.whl
 agent-memory --help
 agent-memory setup
 agent-memory setup --apply

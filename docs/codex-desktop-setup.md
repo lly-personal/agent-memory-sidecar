@@ -2,7 +2,7 @@
 
 - Status: active
 - Owner layer: project_docs
-- Last verified: 2026-08-21
+- Last verified: 2026-08-22
 - Evidence: [Core v1 contract](../specs/agent-memory-core-v1.md)、[Public distribution v1](../specs/public-distribution-v1.md)、[Workstation Reconcile v2](../specs/workstation-reconcile-v2.md)
 
 ## Released consumer path
@@ -10,7 +10,7 @@
 Codex Desktop users register the tagged public Marketplace and install the plugin:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.8
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.9
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -27,7 +27,7 @@ A checkout or Marketplace alone does not authorize source materialization or pro
 Core-only consumers install the Release wheel and run:
 
 ```powershell
-python -m pip install .\agent_memory_sidecar-0.3.8-py3-none-any.whl
+python -m pip install .\agent_memory_sidecar-0.3.9-py3-none-any.whl
 agent-memory setup
 agent-memory setup --apply
 agent-memory doctor

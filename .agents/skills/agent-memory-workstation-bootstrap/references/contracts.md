@@ -58,7 +58,9 @@ source_plan_hash, changes, blockers, confirmation_required, requires_reload, pla
 `desired_bundle` exact fields are `release_ref, source_commit, core_version, plugin_version, plugin_sha256,
 bootstrap_version, bootstrap_sha256, scout_version, scout_sha256`. `observed_distribution.marketplace` exact fields are
 `status, source_sha256, ref, commit`; `plugin` exact fields are `status, source_sha256, ref, version, content_sha256, enabled`.
-The observer uses Codex JSON output and physical readback. None of these fields may be filled from a fixture or Agent assertion.
+The observer uses Codex JSON output and physical readback. A current Codex clean tracked Marketplace checkout may omit the legacy
+`.codex-marketplace-install.json`; when that metadata exists it remains strictly validated, and otherwise the ref comes from the
+validated tracked Marketplace manifest. None of these fields may be filled from a fixture or Agent assertion.
 
 `agent_memory_workstation_deployment_pack_v2` has these exact top-level fields:
 
@@ -69,7 +71,7 @@ source_sync, host_materialization, consumer_activation, limitations, pack_hash
 
 - `status`: `ready`, `reload_required`, `distribution_reconcile_blocked`, `source_sync_blocked`, or
   `host_materialization_blocked`.
-- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.0.0`.
+- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.0.1`.
 - `distribution` is an exact post-operation re-observation with the same Marketplace and Plugin fields as the plan.
 - `source_sync` contains exact `sidecar` and `canonical_owner` receipts. Each receipt has `status`, `ref`, and `commit`; status is
   `synced`, `unchanged`, `unavailable`, or `failed`.
@@ -96,7 +98,7 @@ automation_change_count, allowed_actions, limitations, pack_hash
 ```
 
 - `status`: `ready`, `bounded`, or `host_activation_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `2.0.0`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `2.0.1`.
 - `portable_layer` exact fields: `sidecar`, `canonical_owner`, `core_setup`, `doctor`, `scout_skill_version`,
   `scout_skill_hash`. State values are `synced`, `unchanged`, `installed`, `verified`, `failed`, or `unavailable`.
 - `discovery` exact fields: `inventory_status`, `activity_status`, `desktop_project_count`, `accessible_count`,

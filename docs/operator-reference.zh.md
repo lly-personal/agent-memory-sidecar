@@ -2,7 +2,7 @@
 
 - Status: active
 - Owner layer: project_docs
-- Last verified: 2026-08-21
+- Last verified: 2026-08-22
 - Evidence: [Core v1 contract](../specs/agent-memory-core-v1.md)、[ADR 0057](decisions/0057-agent-memory-core-v1.zh.md)、[ADR 0059](decisions/0059-bounded-behavior-set-evolution.zh.md)、[ADR 0076](decisions/0076-task-scoped-review-pack-delivery.zh.md)、[Public distribution v1](../specs/public-distribution-v1.md)、[Public authority cutover v1](../specs/public-authority-cutover-v1.md)
 
 ## 所有权
@@ -114,10 +114,10 @@ Hook 命令只引用 immutable artifact，不引用 editable checkout。遇到 l
   global binding/Owner parity 明确 unavailable。若该主机已存在 global binding，Bootstrap 必须以
   `public_core_existing_global_binding` 阻断并等待显式解绑/迁移决定，不得把旧绑定伪报为 unavailable。
 - `owner_integrated` 另外提供 clean、commit-bound canonical Owner；未配置时不得搜索替代 Owner。
-- Workstation Bootstrap 2.0.0 以 `workstation-reconcile --dry-run` 与 exact-hash apply 统一 Marketplace/Plugin/source/host；
+- Workstation Bootstrap 2.0.1 以 `workstation-reconcile --dry-run` 与 exact-hash apply 统一 Marketplace/Plugin/source/host；
   底层 `source-cutover`、`sync-sources` 与 `materialize-host` 继续保持严格、无独立完成声明。期望 Release 身份与真实
   Codex/物理读回不一致时不得生成 `ready`。
-- 正常 Desktop 首跳固定为 `codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.8` 后
+- 正常 Desktop 首跳固定为 `codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.9` 后
   `codex plugin add agent-memory-sidecar@agent-memory`。Marketplace 只提供 Anchor；Anchor 的 Resolver 验证 stable immutable
   Release、tag/commit、asset digest、checksums 与 manifest，安全展开 portable，并在同一任务执行正式 Bootstrap。
 - 已有受管 Sidecar identity 不同时，普通 `sync-sources` 必须继续失败。统一入口只展示一次短计划并取得一次确认，
@@ -144,8 +144,8 @@ Hook 命令只引用 immutable artifact，不引用 editable checkout。遇到 l
   不得用本地 hash 替代 CI 资产逐字节读回，也不得用 CI 绿色替代 tag 首次推送前的本地构建能力门禁。
 
 ```powershell
-python scripts/publish_release.py inspect --asset-dir dist/release --repository lly-personal/agent-memory-sidecar --tag v0.3.8 --expected-commit <full-sha>
-python scripts/publish_release.py apply --asset-dir dist/release --repository lly-personal/agent-memory-sidecar --tag v0.3.8 --expected-commit <full-sha> --plan-hash <hash>
+python scripts/publish_release.py inspect --asset-dir dist/release --repository lly-personal/agent-memory-sidecar --tag v0.3.9 --expected-commit <full-sha>
+python scripts/publish_release.py apply --asset-dir dist/release --repository lly-personal/agent-memory-sidecar --tag v0.3.9 --expected-commit <full-sha> --plan-hash <hash>
 ```
 
 Inspect 零远端写入。Apply 仅在本次用户授权覆盖公开发布且 hash 仍 fresh 时执行；成功回执只证明

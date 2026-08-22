@@ -22,7 +22,7 @@ from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
 
 
-BOOTSTRAP_VERSION = "2.0.0"
+BOOTSTRAP_VERSION = "2.0.1"
 SCOUT_VERSION = "5.6.0"
 PACK_VERSION = "agent_memory_workstation_deployment_pack_v2"
 WORKSTATION_RECONCILE_PLAN_VERSION = "agent_memory_workstation_reconcile_plan_v2"
@@ -479,8 +479,8 @@ def source_identity(spec: SourceSpec) -> dict[str, str]:
     }
 
 
-def inspect_marketplace_checkout(path: Path) -> dict[str, str]:
-    """Inspect the Codex-owned marketplace snapshot and its install metadata."""
+def inspect_marketplace_checkout(path: Path) -> dict[str, str | None]:
+    """Inspect a clean Codex-owned marketplace snapshot and optional legacy metadata."""
     value = path.lstat()
     require(
         stat.S_ISDIR(value.st_mode) and not stat.S_ISLNK(value.st_mode) and not _is_reparse(value),
@@ -499,33 +499,40 @@ def inspect_marketplace_checkout(path: Path) -> dict[str, str]:
         "marketplace_tracked_tree_dirty",
     )
     untracked = set(filter(None, run_git(["ls-files", "--others", "--exclude-standard"], cwd=path).splitlines()))
-    require(untracked == {".codex-marketplace-install.json"}, "marketplace_untracked_state_invalid")
-    metadata = _load_json_file(
-        path / ".codex-marketplace-install.json", "marketplace_install_metadata_unreadable",
-    )
-    exact(
-        metadata,
-        {"source_type", "source", "ref_name", "sparse_paths", "revision"},
-        "$.marketplace_install_metadata",
-    )
     require(
-        metadata["source_type"] == "git"
-        and isinstance(metadata["source"], str)
-        and isinstance(metadata["ref_name"], str)
-        and isinstance(metadata["sparse_paths"], list)
-        and metadata["revision"] == run_git(["rev-parse", "HEAD"], cwd=path).casefold()
-        and SHA40.fullmatch(str(metadata["revision"])) is not None,
-        "marketplace_install_metadata_invalid",
+        untracked in (set(), {".codex-marketplace-install.json"}),
+        "marketplace_untracked_state_invalid",
     )
+    commit = run_git(["rev-parse", "HEAD"], cwd=path).casefold()
+    require(SHA40.fullmatch(commit) is not None, "marketplace_commit_invalid")
     actual_remote = run_git(["remote", "get-url", "origin"], cwd=path)
-    require(
-        normalize_remote(actual_remote) == normalize_remote(str(metadata["source"])),
-        "marketplace_install_source_mismatch",
-    )
+    metadata_ref: str | None = None
+    if untracked:
+        metadata = _load_json_file(
+            path / ".codex-marketplace-install.json", "marketplace_install_metadata_unreadable",
+        )
+        exact(
+            metadata,
+            {"source_type", "source", "ref_name", "sparse_paths", "revision"},
+            "$.marketplace_install_metadata",
+        )
+        require(
+            metadata["source_type"] == "git"
+            and isinstance(metadata["source"], str)
+            and isinstance(metadata["ref_name"], str)
+            and isinstance(metadata["sparse_paths"], list)
+            and metadata["revision"] == commit,
+            "marketplace_install_metadata_invalid",
+        )
+        require(
+            normalize_remote(actual_remote) == normalize_remote(str(metadata["source"])),
+            "marketplace_install_source_mismatch",
+        )
+        metadata_ref = str(metadata["ref_name"])
     return {
         "remote_sha256": hashlib.sha256(normalize_remote(actual_remote).encode("utf-8")).hexdigest(),
-        "ref": str(metadata["ref_name"]),
-        "commit": str(metadata["revision"]),
+        "metadata_ref": metadata_ref,
+        "commit": commit,
     }
 
 
@@ -1225,11 +1232,12 @@ def _observe_distribution_with_private(
             )
             validate_marketplace(marketplace_value, expected_remote=remote)
             source = marketplace_value["plugins"][0]["source"]
-            require(checkout["ref"] == source["ref"], "marketplace_ref_mismatch")
+            if checkout["metadata_ref"] is not None:
+                require(checkout["metadata_ref"] == source["ref"], "marketplace_ref_mismatch")
             marketplace_state = {
                 "status": "present",
                 "source_sha256": checkout["remote_sha256"],
-                "ref": checkout["ref"],
+                "ref": source["ref"],
                 "commit": checkout["commit"],
             }
             private["marketplace"] = {

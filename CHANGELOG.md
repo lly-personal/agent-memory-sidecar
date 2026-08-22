@@ -3,6 +3,21 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.3.9 (2026-08-22)
+
+### Fixed
+
+- Workstation reconciliation now recognizes the clean Marketplace checkout produced by current Codex CLI versions even when the
+  legacy `.codex-marketplace-install.json` is absent. Existing metadata remains strictly validated, while the tracked Marketplace
+  manifest supplies the ref for metadata-free snapshots, preventing a successful install from being misreported as unavailable.
+- Distribution rollback now observes the same current-CLI checkout shape as the forward path, so a later host-materialization failure
+  can restore the previous Marketplace instead of stopping on a false identity conflict.
+
+### Changed
+
+- The component set is Core 0.3.9, Plugin 1.5.1, Workstation Bootstrap 2.0.1, and Scout 5.6.0. Review Pack remains v4;
+  Scheduled Scout remains production-blocked.
+
 ## 0.3.8 (2026-08-21)
 
 ### Fixed
