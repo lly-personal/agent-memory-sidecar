@@ -6,7 +6,7 @@
 - Avoid when: 判断产品公理或组件所有权；读取 [L1](axioms.md)与 [L2](topology.md)。
 - Last verified: 2026-09-01
 - Evidence: 用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[确定性 Release 发布 ADR](../decisions/0077-deterministic-release-promotion.zh.md)、[真实读回工作站调和 ADR](../decisions/0078-workstation-reconcile-v2-observed-state.zh.md)
-- Extended by: [项目任务前门与确定性终态 ADR](../decisions/0079-project-session-front-door-and-scout-terminal-contract.zh.md)
+- Extended by: [项目任务前门与确定性终态 ADR](../decisions/0079-project-session-front-door-and-scout-terminal-contract.zh.md)、[消费者可见 Skill 范围 ADR](../decisions/0080-consumer-visible-skill-scope-reconciliation.zh.md)
 
 ## 七字段提案
 
@@ -251,7 +251,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。可靠自动发现边界仍是一次 Codex 刷新或下一任务，但 source/host 物化必须在当前部署任务完成。
 
-`agent-memory-workstation-bootstrap` Skill 2.1.0 提供两个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.2.0 提供两个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
@@ -293,7 +293,7 @@ remote identity 和 primary folder 的仓库内相对位置共同输入 SHA-256�
 ```text
 managed_sources.py workstation-reconcile --dry-run --codex-home <home> --source-manifest <source> --release-manifest <release>
 managed_sources.py workstation-reconcile --apply --codex-home <home> --source-manifest <source> --release-manifest <release> --plan-hash <hash>
-managed_sources.py workstation-reconcile --verify-consumer --codex-home <home> --source-manifest <source> --release-manifest <release>
+managed_sources.py workstation-reconcile --verify-consumer --codex-home <home> --source-manifest <source> --release-manifest <release> --desktop-project-inventory <inventory>
 ```
 
 计划精确遵循 [`workstation-reconcile-v2`](../../specs/workstation-reconcile-v2.md)，内部 source 事务仍遵循
@@ -323,17 +323,32 @@ Marketplace checkout、可选 legacy install metadata 和 physical Plugin cache 
 parity 和物理安装的 Bootstrap/Scout version/hash。任一漂移生成 `host:materialize`；历史 cutover receipt 不参与当前
 `noop` 或 `ready` 判定。
 
-`agent_memory_workstation_deployment_pack_v2` 顶层精确包含：
+`agent_memory_workstation_deployment_pack_v3` 顶层精确包含：
 
 ```text
 contract_version, status, display_locale, generated_at, desired_bundle, distribution,
-source_sync, host_materialization, consumer_activation, limitations, pack_hash
+source_sync, host_materialization, consumer_scope, consumer_activation, limitations, pack_hash
 ```
 
-`status` 只允许 `ready`、`reload_required`、`distribution_reconcile_blocked`、`source_sync_blocked` 或
-`host_materialization_blocked`。中文 renderer 固定先显示期望发行、Plugin 分发、源同步、主机物化、消费者采用，再显示
-未证明事项与唯一下一步。apply 固定不越过模型采用层，返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.1.0
-Bootstrap 的新任务执行只读 `--verify-consumer` 且所有读回仍 exact，才允许 `ready`。任何本机结果都保留真实第二台设备、
+`consumer_scope` 精确包含：
+
+```text
+status, inventory_status, desktop_project_count, scanned_project_count,
+matching_skill_count, projects, limitations
+```
+
+每个 project 精确包含 `project_ref, display_name, status, skills`；每个 Skill 精确包含
+`name, scope_level, version, content_sha256, relation`。临时输入 `agent_memory_desktop_project_inventory_v1` 顶层精确包含
+`contract_version, inventory_status, projects`，每项只含 `display_name, path, is_git_repository`；无本机 primary folder
+时 `path=null`。路径只供本轮只读检查，不得进入输出、Pack hash、Git 或持久状态。Git 项目从 primary folder 到 repo
+root 逐级检查两个产品同名 `.agents/skills`，非 Git 项目只检查 primary folder；缺失不是漂移，路径不可用、物理树别名、
+超出 512 文件系统条目或 8 MiB 读取预算、读取中变化、不可读或版本不可解析使范围为 `bounded`。
+
+`status` 只允许 `ready`、`reload_required`、`consumer_scope_drift`、`consumer_scope_bounded`、
+`distribution_reconcile_blocked`、`source_sync_blocked` 或 `host_materialization_blocked`。中文 renderer 固定先显示期望发行、
+Plugin 分发、源同步、主机物化、消费者范围、消费者采用，再显示未证明事项与唯一下一步。apply 固定不越过模型采用层，
+返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.2.0 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
+读回仍 exact、Desktop 项目枚举完整且项目级同名 Skill 全部 exact，才允许 `ready`。任何本机结果都保留真实第二台设备、
 Scheduled、连续性与产品收益未证明边界。
 
 `global_owner_scout_enrollment_pack_v1` 顶层精确包含：

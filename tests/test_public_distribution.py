@@ -219,7 +219,7 @@ class PublicDistributionTests(unittest.TestCase):
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
         self.assertEqual(
-            {"core": "0.3.10", "plugin": "1.5.1", "bootstrap": "2.1.0", "scout": "5.7.0"},
+            {"core": "0.3.11", "plugin": "1.5.2", "bootstrap": "2.2.0", "scout": "5.7.0"},
             facts,
         )
         allowlist = json.loads(
@@ -232,6 +232,7 @@ class PublicDistributionTests(unittest.TestCase):
         self.assertIn("specs/workstation-reconcile-v2.md", allowlist["copy"])
         self.assertIn("docs/decisions/0077-deterministic-release-promotion.zh.md", allowlist["copy"])
         self.assertIn("docs/decisions/0078-workstation-reconcile-v2-observed-state.zh.md", allowlist["copy"])
+        self.assertIn("docs/decisions/0080-consumer-visible-skill-scope-reconciliation.zh.md", allowlist["copy"])
         self.assertIn("docs/sops/workstation-reconcile.zh.md", allowlist["copy"])
 
     def test_repo_and_plugin_anchor_are_byte_identical(self) -> None:

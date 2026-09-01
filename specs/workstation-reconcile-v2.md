@@ -76,7 +76,7 @@ Plugin/Marketplace mutation is a participant in Source Authority Cutover v2, not
 3. removes/re-adds only the Agent Memory Plugin and Marketplace when the plan requires it;
 4. materializes Core, optional exact Owner binding, Bootstrap, Scout, and Doctor;
 5. reads Plugin/Marketplace, source receipts, runtime identity, and Skill content hashes back exactly;
-6. constructs and validates Deployment Pack v2 before committing the source receipt;
+6. constructs and validates Deployment Pack v3 before committing the source receipt;
 7. only then discards source, Skill, and distribution rollback state.
 
 Any failure before commit restores all touched managed sources, Skill targets, and Agent Memory distribution surfaces. It never
@@ -84,6 +84,9 @@ resets or cleans a user project checkout.
 The atomic source receipt replacement is the commit point. A later rollback-snapshot cleanup failure is reported as
 `source_cutover_postcommit_cleanup_failed` and never attempts a second rollback after any recovery copy may already have been
 discarded; the next run must re-observe the committed state.
+
+Successful apply returns `agent_memory_workstation_reconcile_receipt_v3` with exact
+`contract_version, status, plan_hash, deployment_pack`; its embedded Pack must be Deployment Pack v3.
 
 ## Published-anchor compatibility
 
@@ -93,21 +96,38 @@ Bootstrap 2.0 routes its dry-run/apply and renderer to Workstation Reconcile v2.
 new Core/Skills behind an old Plugin or requiring a second migration cycle. A standalone source manifest without that Resolver
 shape retains the lower-level Source Authority Cutover v2 behavior.
 
-## Deployment Pack v2
+## Deployment Pack v3
 
-`agent_memory_workstation_deployment_pack_v2` has exact fields:
+`agent_memory_workstation_deployment_pack_v3` has exact fields:
 
 ```text
 contract_version, status, display_locale, generated_at, desired_bundle, distribution,
-source_sync, host_materialization, consumer_activation, limitations, pack_hash
+source_sync, host_materialization, consumer_scope, consumer_activation, limitations, pack_hash
 ```
 
-Statuses are `ready`, `reload_required`, `distribution_reconcile_blocked`, `source_sync_blocked`, or
-`host_materialization_blocked`. `ready` requires exact distribution, exact managed Sidecar commit, verified runtime/Doctor,
-exact Bootstrap and Scout hashes, and a new task that loaded the installed Bootstrap. An apply task therefore ends at
-`reload_required`; after one Desktop refresh, `--verify-consumer` in the newly loaded Bootstrap task may produce `ready`.
+Statuses are `ready`, `reload_required`, `consumer_scope_drift`, `consumer_scope_bounded`,
+`distribution_reconcile_blocked`, `source_sync_blocked`, or `host_materialization_blocked`. `ready` requires exact distribution,
+exact managed Sidecar commit, verified runtime/Doctor, exact installed Bootstrap and Scout hashes, a new task that loaded the
+installed Bootstrap, and an exact `consumer_scope` from a complete current Desktop project inventory. An apply task therefore ends
+at `reload_required`; after one Desktop refresh, `--verify-consumer` in the newly loaded Bootstrap task may produce `ready` only
+when the project scope is also exact.
 Any blocked Pack sets the interactive entry to `blocked` and does not ask for Desktop refresh or Project Scout; it routes only to
 the first invalid layer.
+
+`consumer_scope` has exact fields:
+
+```text
+status, inventory_status, desktop_project_count, scanned_project_count,
+matching_skill_count, projects, limitations
+```
+
+Each project has `project_ref, display_name, status, skills`; each Skill has
+`name, scope_level, version, content_sha256, relation`. The project inventory input is ephemeral
+`agent_memory_desktop_project_inventory_v1` with exact `contract_version, inventory_status, projects`, where each project contains
+only `display_name, path, is_git_repository`. `path` may be null for an enumerated project without a local primary folder. Paths are
+used for the current read and must never appear in Pack output or persisted state. Git projects are scanned from the primary folder
+through the repository root; non-Git projects scan only the primary folder. Project-controlled trees have fixed file/byte budgets
+and a repeated version/hash read; overflow or concurrent change is bounded rather than accepted.
 
 `ready` never proves Scheduled activation, another workstation, continuity, or product effect.
 
@@ -115,6 +135,9 @@ the first invalid layer.
 
 - Fresh host: install Marketplace, Plugin, managed source, Core, Skills, and Doctor; return `reload_required`.
 - Exact live host: plan is `noop`; read-only new-task verification re-observes it and may return `ready`.
+- Exact host with a stale project-level same-name Skill: return `consumer_scope_drift`, identify the project/Skill without paths,
+  and do not modify the checkout.
+- Incomplete Desktop inventory or unreadable project/Skill tree: return `consumer_scope_bounded`; never infer `ready`.
 - Missing or drifted Core/Doctor/Bootstrap/Scout: plan contains `host:materialize`; a prior green receipt cannot suppress repair.
 - Old Marketplace/Plugin plus new sources/Skills: plan replaces both distribution surfaces; v1-style `ready` is impossible.
 - New Plugin plus old source/Skills: source/materialization changes remain visible and block `ready` until exact.

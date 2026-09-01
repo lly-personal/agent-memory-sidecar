@@ -138,7 +138,7 @@ class ContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("one operation", contract)
         self.assertIn("ObservedHostState", contract)
-        self.assertIn("Deployment Pack v2", contract)
+        self.assertIn("Deployment Pack v3", contract)
         self.assertIn("workstation-reconcile --dry-run", skill)
         self.assertIn("workstation-reconcile --apply", skill)
         self.assertIn("workstation-reconcile --verify-consumer", skill)

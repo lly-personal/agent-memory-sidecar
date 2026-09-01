@@ -5,7 +5,7 @@
 - Applies when: 命名 Agent Memory 的产品、规则、授权、运行时、作用域、状态与证据。
 - Avoid when: 只需执行普通项目工作。
 - Last verified: 2026-09-01
-- Evidence: [L1](docs/specs/axioms.md)、[L2](docs/specs/topology.md)、[L3](docs/specs/interface.md)、[ADR 0057](docs/decisions/0057-agent-memory-core-v1.zh.md)、[ADR 0059](docs/decisions/0059-bounded-behavior-set-evolution.zh.md)、[ADR 0069](docs/decisions/0069-cross-device-cold-start-continuity.zh.md)、[ADR 0070](docs/decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[ADR 0071](docs/decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[ADR 0072](docs/decisions/0072-allowlisted-public-distribution-lane.zh.md)、[ADR 0073](docs/decisions/0073-public-engineering-authority-cutover.zh.md)、[ADR 0076](docs/decisions/0076-task-scoped-review-pack-delivery.zh.md)
+- Evidence: [L1](docs/specs/axioms.md)、[L2](docs/specs/topology.md)、[L3](docs/specs/interface.md)、[ADR 0057](docs/decisions/0057-agent-memory-core-v1.zh.md)、[ADR 0059](docs/decisions/0059-bounded-behavior-set-evolution.zh.md)、[ADR 0069](docs/decisions/0069-cross-device-cold-start-continuity.zh.md)、[ADR 0070](docs/decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[ADR 0071](docs/decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[ADR 0072](docs/decisions/0072-allowlisted-public-distribution-lane.zh.md)、[ADR 0073](docs/decisions/0073-public-engineering-authority-cutover.zh.md)、[ADR 0076](docs/decisions/0076-task-scoped-review-pack-delivery.zh.md)、[ADR 0080](docs/decisions/0080-consumer-visible-skill-scope-reconciliation.zh.md)
 
 本文件只统一当前 Core v1 语言，不定义额外行为。字段名、协议名与 CLI 标识保留英文。
 
@@ -64,6 +64,12 @@
   快照；不等同于活跃项目工作区或行为 Owner。
 - `deployment_pack`：按可移植分发、源同步、主机物化、项目激活四层展示本机部署事实的中文回执；前一层不能
   证明后一层。
+- `consumer_scope`：本轮由 Desktop 原生项目清单界定、对各 primary folder 到 Git repo root 的产品同名项目级 Skill
+  进行只读检查的消费者可见范围；它不拥有项目 checkout，也不授权自动更新项目。
+- `consumer_scope_drift`：托管分发和主机物化可以 exact，但至少一个 Desktop 可见项目级同名 Skill 与期望发行的
+  版本或物理内容 hash 不同；不得把该状态压缩为本机全部同步完成。
+- `consumer_scope_bounded`：Desktop 项目清单不完整，或至少一个项目/Skill 无法安全、完整地只读检查；未观察部分
+  保持未知，不得推断 exact。
 - `portable_global_instruction_source`：私有 Git 中完整 global `AGENTS.md` 的 canonical source；负责跨设备分发，不决定本机生效。
 - `global_instruction_binding`：本机保存的 source path、commit 与完整文件 hash 元数据；用于漂移校验，不保存规则正文。
 - `global_instruction_parity`：canonical source 与本机 global target 的完整文件 hash 相同；它只证明文件分发一致性。

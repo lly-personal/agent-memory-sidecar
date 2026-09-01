@@ -7,9 +7,9 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `2.1.0`
+- Skill version: `2.2.0`
 - Modes: `inspect`, `verify_consumer`, `apply_enrollment`
-- Deployment pack: `agent_memory_workstation_deployment_pack_v2`
+- Deployment pack: `agent_memory_workstation_deployment_pack_v3`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
 - Host profile: `global_owner_scout_host_profile_v1`
 - Read [references/contracts.md](references/contracts.md) completely before either mode.
@@ -45,11 +45,14 @@ not change the Host Profile. Only an explicit request to retest or configure Sch
      root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
 3. Run exact-hash `workstation-reconcile --apply`. Marketplace/Plugin mutation participates in the source-cutover rollback
    transaction. The transaction then runs Core setup, binds the explicit or preserved canonical Owner, verifies Doctor, installs
-   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.1.0`, Scout `5.7.0`,
-   and every desired identity. The result is `reload_required`; it proves host materialization, not model adoption.
-4. Ask for exactly one Codex Desktop refresh. In a new task that loaded this installed Skill, run the same command with
-   `--verify-consumer` and no plan hash. Only an exact no-op host may become `ready`. Do not ask the user to repeat source choices,
-   paths, versions, or deployment commands.
+   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.2.0`, Scout `5.7.0`,
+   and every desired identity. The result is `reload_required`; it proves host materialization, not model adoption or project-level
+   same-name Skill parity.
+4. Ask for exactly one Codex Desktop refresh. In a new task that loaded this installed Skill, enumerate the complete current Desktop
+   project inventory, create the ephemeral inventory input inside a fresh mode-0700 temporary directory, and run the same command
+   with `--verify-consumer --desktop-project-inventory <inventory>` and no plan hash. Only an exact no-op host plus exact consumer
+   scope may become `ready`. Delete the temporary directory after the command. Do not ask the user to repeat source choices, paths,
+   versions, or deployment commands.
 5. Use the Codex Desktop project API to enumerate the complete visible project inventory. Do not infer a fixed project list from
    repository names, paths, old automation names, another host's profile, or the repositories used as capability sources.
 6. Enumerate recent tasks with the host-supported bound. Classify a task as natural only when native metadata proves it was
@@ -60,7 +63,7 @@ not change the Host Profile. Only an explicit request to retest or configure Sch
    Non-Git and remote-less projects receive host-local identity only and are ineligible for periodic enrollment.
 8. Read current Scheduled tasks only to report historical state. The interactive Scout remains the product path; Scheduled remains
    a separate paused/optional experiment unless the user explicitly asks to retest it.
-9. Build and validate one `agent_memory_workstation_deployment_pack_v2` from the reconciler's exact readback, render it with
+9. Build and validate one `agent_memory_workstation_deployment_pack_v3` from the reconciler's exact readback, render it with
    `python -B scripts/managed_sources.py render-pack`, and return the Chinese Markdown. Separately render an Enrollment Pack only
    when project discovery is useful to the user's request. Do not make enrollment a prerequisite for interactive Scout use.
 
@@ -70,11 +73,16 @@ distinct from a real second-device result.
 
 ## Mode: `verify_consumer`
 
-Enter only from a refreshed new task that actually loaded Bootstrap 2.1.0 after an `inspect` result requested reload. Run
-`workstation-reconcile --verify-consumer` against the same Resolver output. This mode is read-only: it requires an exact no-op plan,
-re-observes current managed sources, Core runtime, Owner parity, Doctor, installed Bootstrap/Scout bytes, and distribution identities,
-and then renders the only `ready` Pack. A historical cutover receipt is never accepted as current host evidence.
-Any drift returns to `inspect`; never patch or infer readiness inside this mode.
+Enter only from a refreshed new task that actually loaded Bootstrap 2.2.0 after an `inspect` result requested reload. Use the Codex
+Desktop project API in this task to obtain the complete visible project inventory. Write only the exact temporary
+`agent_memory_desktop_project_inventory_v1` input required by the reconciler inside a fresh mode-0700 directory, then run
+`workstation-reconcile --verify-consumer --desktop-project-inventory <inventory>` against the same Resolver output. This mode is read-only: it requires an exact no-op plan,
+re-observes current managed sources, Core runtime, Owner parity, Doctor, installed Bootstrap/Scout bytes, distribution identities,
+and physically checks product same-name Skills from each local primary folder through its Git repository root (or only the primary
+folder for non-Git projects). Preserve enumerated projects without a local path as bounded entries. Delete the temporary directory
+after the command. A historical cutover receipt is never accepted as current host evidence. Project-level drift returns
+`consumer_scope_drift`; incomplete inventory or unsafe/unreadable scope returns `consumer_scope_bounded`. Neither state authorizes
+patching, pulling, deleting, or overwriting a project checkout.
 
 ## Mode: `apply_enrollment`
 

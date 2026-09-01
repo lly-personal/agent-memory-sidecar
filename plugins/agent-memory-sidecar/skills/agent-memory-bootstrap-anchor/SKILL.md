@@ -26,7 +26,7 @@ When the user says `同步并部署本机 Agent Memory`:
      dry-run, and only the fresh hash may apply;
    - an explicitly disabled Plugin, Owner ambiguity, unreadable state, dirty tracked source, unresolved ref, or stale plan stops.
 3. `workstation-reconcile --apply` owns Plugin/Marketplace compensation, source synchronization, Core/global Owner materialization,
-   Doctor, atomic Bootstrap/Scout installation, and exact readback. Return its Chinese Deployment Pack v2. A successful mutation
+   Doctor, atomic Bootstrap/Scout installation, and exact readback. Return its Chinese Deployment Pack v3. A successful mutation
    ends at `reload_required`; ask for exactly one Codex Desktop refresh, not another source choice or command sequence.
 4. In the refreshed new task, resolve the same current Release and rerun dry-run. When the plan is exact `noop`, run
    `workstation-reconcile --verify-consumer` instead of apply. Only that read-only new-task check may return `ready`.
