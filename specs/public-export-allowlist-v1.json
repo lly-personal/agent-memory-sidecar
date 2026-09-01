@@ -55,6 +55,7 @@
     "docs/decisions/0075-unified-workstation-reconcile.zh.md",
     "docs/decisions/0077-deterministic-release-promotion.zh.md",
     "docs/decisions/0078-workstation-reconcile-v2-observed-state.zh.md",
+    "docs/decisions/0080-consumer-visible-skill-scope-reconciliation.zh.md",
     "docs/qdr/0001-scout-v4-compatibility-adapter.md",
     ".agents/skills/agent-memory-bootstrap-anchor/**",
     ".agents/skills/agent-memory-workstation-bootstrap/**",

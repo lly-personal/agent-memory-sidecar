@@ -114,7 +114,8 @@ flowchart LR
 | Managed capability sources | 在 `$CODEX_HOME` 保存 Sidecar 与 canonical Owner 的 clean、可重建安装快照 | 活跃项目工作区、任务历史、候选或第二 Owner |
 | Workstation Bootstrap Skill | 同步受管源并物化 Core/global binding/Bootstrap/Scout/Doctor；只有用户明确要求 Scheduled 实验时才生成 Enrollment Pack 和调和 Host Profile | 把内容同步冒充主机激活、清理活跃工程、自动选择新项目、修改 Owner |
 | Workstation Reconcile / Source Authority Cutover | 从 Release 构造统一期望身份，真实读取 Marketplace/Plugin/source/runtime/Skills，并以一次确认和 fresh `plan_hash` 共同调和分发与主机物化 | 放宽普通 sync、隐式启用已禁用 Plugin、移除 Owner、修改项目 checkout 或 Scheduled |
-| Deployment Pack v2 | 只从执行后 exact readback 构造中文分层结果，并把 Desktop reload 与新任务采用独立报告 | 接受调用方手填 Plugin 状态、用安装替代模型采用、声称未验收的第二台设备成功 |
+| Deployment Pack v3 | 只从执行后 exact readback 与本轮 Desktop 项目清单构造中文分层结果，并把 Desktop reload、新任务采用、项目级同名 Skill 范围独立报告 | 接受调用方手填 Plugin 状态、用用户级安装替代项目消费者范围、自动修改项目 checkout、声称未验收的第二台设备成功 |
+| Consumer Scope Observer | 只读检查 Desktop primary folder 到 Git repo root 各层产品同名 `.agents/skills` 的版本与物理 hash，输出无路径 exact/drifted/bounded 报告 | 扫描固定仓库名单、读取 UI 文本、持久化路径或项目 ID、更新/删除项目 Skill |
 | Project Session Front Door | 接受当前绑定 Git 项目中的唯一正式调用，以 `preflight_v1` 先做无路径 Git 快照，并把 Local 调用自动投影到携带初始 prompt 的唯一隔离任务 | 要求用户手工创建 worktree、先深挖后检查环境、创建空子任务、复制 prompt |
 | Isolated Review Executor | 在宿主创建的独立 worktree 承载 30 天手动复盘并把结果留在该执行任务 | 修改活跃 Local、计入 Scheduled 14 次实验、重新询问项目身份 |
 | Host-native created-task surface | 在前门任务中把用户直接带到或链接到唯一 executor；只证明 `routed` | 冒充 Review Pack 已完成、要求用户复制 prompt、在前门输出部分结果 |
@@ -155,7 +156,7 @@ Review Pack 结构通过校验后仍未完成链路；renderer 与 visible-outpu
 继续创建并回读同任务 artifact、通过宿主工具打开，然后由外部 controller 读取实际 final/artifact 才完成呈现。
 宿主 open 是 Scout 的最后一个工具调用；之后只允许 compact Delivery receipt，不得再调用独立 memory 审计或追加尾注。
 
-Bootstrap 2.1.0 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 2.2.0 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得
@@ -168,10 +169,16 @@ CODEX_HOME 验收和真实第二设备验收分别报告，不得互相替代。
 runtime identity 与 Skill hash 构造真实主机状态。当前 CLI 的 metadata-free clean snapshot 与旧版 metadata snapshot
 是同一 Marketplace 观察模型：metadata 存在时严格校验，否则 ref 取自已校验的 tracked manifest。fresh 与同 identity 更新由一次部署请求覆盖；Sidecar 或 Marketplace identity
 变化才显示一次不含路径/URL 的计划并等待确认。apply 把 Plugin/Marketplace 作为 Source Authority Cutover v2 的事务参与者，
-在最终读回与 Deployment Pack v2 校验前保留全部 rollback。显式禁用 Plugin 保持不变并阻断；任一 distribution、source、
+在最终读回与 Deployment Pack v3 校验前保留全部 rollback。显式禁用 Plugin 保持不变并阻断；任一 distribution、source、
 host 或 readback 漂移都不能产生 `ready`。已发布 Anchor 1.x 的旧命令只在完整 Resolver 输出目录下兼容路由到该统一事务，
 避免首次升级形成新 Core/Skill 与旧 Plugin 的中间完成声明；普通 source-cutover 调用不变。
 Core setup、Doctor、Skill 或读回失败都恢复本轮触碰的受管状态。
+
+刷新后的 consumer verification 还必须消费本轮 Codex Desktop project API 的完整项目清单。Observer 只读每个 primary
+folder 到 Git repo root 的 `.agents/skills/agent-memory-workstation-bootstrap` 与 `.agents/skills/global-owner-scout`；
+非 Git 项目只检查 primary folder。它不遍历固定路径，也不触碰 checkout。完整清单下无同名 Skill 或所有同名 Skill
+与期望版本/hash 相同才是 `exact`；任一差异为 `drifted`；
+清单不完整、项目不可访问或物理树不可安全读取为 `bounded`。只有 `exact` 可与新任务采用共同产生 `ready`。
 
 Bootstrap 安装并验证 Skill 后，交互入口不需要 Host Enrollment。只有用户明确要求 Scheduled 实验时，Bootstrap
 才为用户确认的 `active + eligible` 项目建立 Host Enrollment。`active` 来自滚动 30 天自然用户任务，

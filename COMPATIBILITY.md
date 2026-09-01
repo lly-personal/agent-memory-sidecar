@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.3.11 | 0.3.11 | 1.5.2 | 2.2.0 | 5.7.0 | v4 | 3.11–3.13 |
 | v0.3.10 | 0.3.10 | 1.5.1 | 2.1.0 | 5.7.0 | v4 | 3.11–3.13 |
 | v0.3.9 | 0.3.9 | 1.5.1 | 2.0.1 | 5.6.0 | v4 | 3.11–3.13 |
 | v0.3.8 | 0.3.8 | 1.5.0 | 2.0.0 | 5.6.0 | v4 | 3.11–3.13 |
@@ -19,6 +20,8 @@ the release manifest, package metadata, Plugin manifest, Skill contracts, archiv
 Scout 5.6 keeps Review Pack v4 and adds the separate `global_owner_scout_delivery_v1` task-surface contract.
 Scout 5.7 keeps Review Pack v4, adds `global_owner_scout_terminal_v1`, and moves the user front door from a manually created
 worktree task to automatic host-managed isolation from the current project task.
+Bootstrap 2.2 upgrades Deployment Pack to v3 and gates `ready` on a complete read-only observation of Desktop-visible project-level
+same-name Skills; drift and bounded coverage remain explicit and never mutate project checkouts.
 `requires-python >=3.11` expresses install eligibility; the table records the versions actually supported and tested. A newer Python
 version is not claimed supported until it enters this matrix, even if its installer accepts the package metadata.
 

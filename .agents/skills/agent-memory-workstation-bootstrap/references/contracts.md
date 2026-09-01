@@ -62,30 +62,42 @@ The observer uses Codex JSON output and physical readback. A current Codex clean
 `.codex-marketplace-install.json`; when that metadata exists it remains strictly validated, and otherwise the ref comes from the
 validated tracked Marketplace manifest. None of these fields may be filled from a fixture or Agent assertion.
 
-`agent_memory_workstation_deployment_pack_v2` has these exact top-level fields:
+`agent_memory_workstation_deployment_pack_v3` has these exact top-level fields:
 
 ```text
 contract_version, status, display_locale, generated_at, desired_bundle, distribution,
-source_sync, host_materialization, consumer_activation, limitations, pack_hash
+source_sync, host_materialization, consumer_scope, consumer_activation, limitations, pack_hash
 ```
 
-- `status`: `ready`, `reload_required`, `distribution_reconcile_blocked`, `source_sync_blocked`, or
-  `host_materialization_blocked`.
-- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.1.0`.
+An apply result uses `agent_memory_workstation_reconcile_receipt_v3` with exact
+`contract_version, status, plan_hash, deployment_pack`; `deployment_pack` must validate as v3.
+
+- `status`: `ready`, `reload_required`, `consumer_scope_drift`, `consumer_scope_bounded`,
+  `distribution_reconcile_blocked`, `source_sync_blocked`, or `host_materialization_blocked`.
+- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.2.0`.
+- `consumer_scope`: exact fields `status, inventory_status, desktop_project_count, scanned_project_count,
+  matching_skill_count, projects, limitations`; status is `not_observed`, `exact`, `drifted`, or `bounded`.
+- Each consumer project has exact `project_ref, display_name, status, skills`; each Skill has exact
+  `name, scope_level, version, content_sha256, relation`, where relation is `exact`, `drifted`, or `unreadable`.
+- The ephemeral input `agent_memory_desktop_project_inventory_v1` has exact `contract_version, inventory_status, projects`; each
+  item has only `display_name, path, is_git_repository`; path may be null when the native inventory has no local primary folder.
+  Input paths never enter Pack output or persisted state. Git projects scan each discovery directory from primary folder through
+  repository root; non-Git projects scan only primary folder. Unsafe, oversized, concurrently changing, or unreadable trees are bounded.
 - `distribution` is an exact post-operation re-observation with the same Marketplace and Plugin fields as the plan.
 - `source_sync` contains exact `sidecar` and `canonical_owner` receipts. Each receipt has `status`, `ref`, and `commit`; status is
   `synced`, `unchanged`, `unavailable`, or `failed`.
 - `host_materialization.core` contains `status, version, source_commit, artifact_sha256`; each Skill contains
   `status, version, content_sha256`; global binding and Doctor remain separate.
 - `consumer_activation` reports `desktop_reload`, `interactive_entry`, and unchanged Scheduled state. Apply returns
-  `available_next_task`; only read-only `--verify-consumer` from a newly loaded Bootstrap task may return `verified` and `ready`.
-  Any blocked status returns `interactive_entry=blocked`, does not request a reload, and cannot route the user to Project Scout.
+  `available_next_task`; only read-only `--verify-consumer` from a newly loaded Bootstrap task with complete exact consumer scope
+  may return `verified` and `ready`. Drift returns `ambiguous`; bounded coverage returns `unproven`. Managed-layer blocked status
+  returns `blocked`, does not request a reload, and cannot route the user to Project Scout.
 - `limitations` must explicitly retain the real-second-device proof boundary when only a same-host clean-profile test exists.
 - `pack_hash` is SHA-256 of canonical UTF-8 JSON excluding `pack_hash`.
 
 The renderer produces one Chinese result table ordered as `desired release / Plugin distribution / source synchronization /
-host materialization / consumer adoption`. It never exposes source URLs, absolute paths, project IDs, automation IDs, raw JSON,
-or credentials.
+host materialization / project consumer scope / consumer adoption`. It never exposes source URLs, absolute paths, project IDs,
+automation IDs, raw JSON, or credentials.
 
 ## Enrollment Pack
 
@@ -98,7 +110,7 @@ automation_change_count, allowed_actions, limitations, pack_hash
 ```
 
 - `status`: `ready`, `bounded`, or `host_activation_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `2.1.0`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `2.2.0`.
 - `portable_layer` exact fields: `sidecar`, `canonical_owner`, `core_setup`, `doctor`, `scout_skill_version`,
   `scout_skill_hash`. State values are `synced`, `unchanged`, `installed`, `verified`, `failed`, or `unavailable`.
 - `discovery` exact fields: `inventory_status`, `activity_status`, `desktop_project_count`, `accessible_count`,

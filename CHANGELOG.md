@@ -3,6 +3,28 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.3.11 (2026-09-01)
+
+### Fixed
+
+- Workstation reconciliation no longer treats exact Marketplace/Plugin/managed-source/user-level Skill state as proof that every
+  Skill visible in Codex Desktop is current. Refreshed consumer verification now consumes the current Desktop project inventory and
+  read-only checks project-level same-name Bootstrap/Scout versions and physical hashes.
+- A stale or locally divergent project Skill now revokes only the affected completion layer as `consumer_scope_drift`; incomplete
+  inventory, unreadable projects, or unsafe Skill trees return `consumer_scope_bounded`. Neither path pulls, resets, deletes, or
+  overwrites a project checkout, and output does not retain absolute paths or project IDs.
+
+### Added
+
+- `agent_memory_workstation_deployment_pack_v3` with an explicit `consumer_scope` evidence layer and deterministic Chinese rendering.
+- ADR 0080 and a regression matrix for old versions, same-version byte drift, empty/exact scopes, bounded inventory, unsafe aliases,
+  path privacy, and `ready` revocation.
+
+### Changed
+
+- The component set is Core 0.3.11, Plugin 1.5.2, Workstation Bootstrap 2.2.0, and Scout 5.7.0. Review Pack remains v4;
+  Scheduled Scout remains production-blocked.
+
 ## 0.3.10 (2026-09-01)
 
 ### Fixed

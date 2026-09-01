@@ -22,10 +22,12 @@ from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
 
 
-BOOTSTRAP_VERSION = "2.1.0"
+BOOTSTRAP_VERSION = "2.2.0"
 SCOUT_VERSION = "5.7.0"
-PACK_VERSION = "agent_memory_workstation_deployment_pack_v2"
+PACK_VERSION = "agent_memory_workstation_deployment_pack_v3"
+DESKTOP_PROJECT_INVENTORY_VERSION = "agent_memory_desktop_project_inventory_v1"
 WORKSTATION_RECONCILE_PLAN_VERSION = "agent_memory_workstation_reconcile_plan_v2"
+WORKSTATION_RECONCILE_RECEIPT_VERSION = "agent_memory_workstation_reconcile_receipt_v3"
 SOURCE_MANIFEST_VERSION = "agent_memory_source_manifest_v1"
 RELEASE_MANIFEST_VERSION = "agent_memory_public_release_manifest_v1"
 RELEASE_RESOLUTION_VERSION = "agent_memory_release_resolution_v1"
@@ -55,8 +57,8 @@ RELEASE_ASSET_FIELDS = {"sha256", "bytes"}
 SAFE_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$")
 PACK_FIELDS = {
     "contract_version", "status", "display_locale", "generated_at", "desired_bundle",
-    "distribution", "source_sync", "host_materialization", "consumer_activation",
-    "limitations", "pack_hash",
+    "distribution", "source_sync", "host_materialization", "consumer_scope",
+    "consumer_activation", "limitations", "pack_hash",
 }
 RECONCILE_PLAN_FIELDS = {
     "contract_version", "bootstrap_version", "status", "desired_bundle",
@@ -81,6 +83,22 @@ MATERIALIZATION_FIELDS = {
 CORE_STATE_FIELDS = {"status", "version", "source_commit", "artifact_sha256"}
 SKILL_STATE_FIELDS = {"status", "version", "content_sha256"}
 ACTIVATION_FIELDS = {"desktop_reload", "interactive_entry", "scheduled"}
+DESKTOP_PROJECT_INVENTORY_FIELDS = {"contract_version", "inventory_status", "projects"}
+DESKTOP_PROJECT_INPUT_FIELDS = {"display_name", "path", "is_git_repository"}
+CONSUMER_SCOPE_FIELDS = {
+    "status", "inventory_status", "desktop_project_count", "scanned_project_count",
+    "matching_skill_count", "projects", "limitations",
+}
+CONSUMER_PROJECT_FIELDS = {"project_ref", "display_name", "status", "skills"}
+CONSUMER_SKILL_FIELDS = {"name", "scope_level", "version", "content_sha256", "relation"}
+CONSUMER_SKILLS = {
+    "agent-memory-workstation-bootstrap": ("bootstrap_version", "bootstrap_sha256"),
+    "global-owner-scout": ("scout_version", "scout_sha256"),
+}
+CONSUMER_SKILL_MAX_ENTRIES = 512
+CONSUMER_SKILL_MAX_BYTES = 8 * 1024 * 1024
+DESKTOP_PROJECT_MAX_COUNT = 500
+STREAM_CHUNK_BYTES = 64 * 1024
 MARKETPLACE_FIELDS = {"name", "interface", "plugins"}
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA64 = re.compile(r"^[0-9a-f]{64}$")
@@ -848,6 +866,75 @@ def physical_tree_hash(
     return digest.hexdigest()
 
 
+def bounded_physical_tree_hash(root: Path, *, max_entries: int, max_bytes: int) -> str:
+    """Hash an untrusted project Skill with bounded traversal and streaming reads."""
+    root_state = root.lstat()
+    require(
+        stat.S_ISDIR(root_state.st_mode) and not stat.S_ISLNK(root_state.st_mode) and not _is_reparse(root_state),
+        "component_root_invalid",
+    )
+    files: list[Path] = []
+    pending = [root]
+    entry_count = 0
+    while pending:
+        current = pending.pop()
+        try:
+            with os.scandir(current) as iterator:
+                entries = sorted(iterator, key=lambda entry: entry.name)
+        except OSError as exc:
+            raise BootstrapError("component_tree_unreadable") from exc
+        for entry in entries:
+            entry_count += 1
+            require(entry_count <= max_entries, "component_tree_entry_budget_exceeded")
+            value = entry.stat(follow_symlinks=False)
+            require(not entry.is_symlink() and not _is_reparse(value), "component_tree_alias_forbidden")
+            if stat.S_ISDIR(value.st_mode):
+                if entry.name not in {".git", "__pycache__"}:
+                    pending.append(Path(entry.path))
+            elif stat.S_ISREG(value.st_mode) and value.st_nlink == 1:
+                item = Path(entry.path)
+                if item.suffix.casefold() not in {".pyc", ".pyo"}:
+                    files.append(item)
+            else:
+                raise BootstrapError("component_tree_entry_invalid")
+    require(files, "component_tree_empty")
+    digest = hashlib.sha256()
+    total_bytes = 0
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    binary = getattr(os, "O_BINARY", 0)
+    for item in sorted(files, key=lambda candidate: candidate.relative_to(root).as_posix()):
+        relative = item.relative_to(root).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        descriptor = os.open(item, os.O_RDONLY | nofollow | binary)
+        try:
+            opened = os.fstat(descriptor)
+            require(
+                stat.S_ISREG(opened.st_mode) and not _is_reparse(opened) and opened.st_nlink == 1,
+                "component_tree_entry_invalid",
+            )
+            with os.fdopen(descriptor, "rb", closefd=False) as handle:
+                while True:
+                    chunk = handle.read(STREAM_CHUNK_BYTES)
+                    if not chunk:
+                        break
+                    total_bytes += len(chunk)
+                    require(total_bytes <= max_bytes, "component_tree_byte_budget_exceeded")
+                    digest.update(chunk)
+        finally:
+            os.close(descriptor)
+        digest.update(b"\0")
+    ending_root = root.lstat()
+    require(
+        stat.S_ISDIR(ending_root.st_mode)
+        and not stat.S_ISLNK(ending_root.st_mode)
+        and not _is_reparse(ending_root)
+        and (ending_root.st_dev, ending_root.st_ino) == (root_state.st_dev, root_state.st_ino),
+        "component_root_changed_during_read",
+    )
+    return digest.hexdigest()
+
+
 def _restore_skill_targets(root: Path, snapshots: list[tuple[Path, Path | None]]) -> None:
     for target, backup in reversed(snapshots):
         if target.exists() or target.is_symlink():
@@ -1352,6 +1439,256 @@ def _observe_installed_skill(codex_home: Path, name: str) -> dict[str, Any]:
         }
     except (BootstrapError, OSError, UnicodeError):
         return _unavailable_skill_state()
+
+
+def _not_observed_consumer_scope() -> dict[str, Any]:
+    return {
+        "status": "not_observed",
+        "inventory_status": "not_observed",
+        "desktop_project_count": 0,
+        "scanned_project_count": 0,
+        "matching_skill_count": 0,
+        "projects": [],
+        "limitations": ["当前任务尚未执行 Desktop 项目级同名 Skill 检查。"],
+    }
+
+
+def validate_consumer_scope(value: Any) -> dict[str, Any]:
+    exact(value, CONSUMER_SCOPE_FIELDS, "$.consumer_scope")
+    require(value["status"] in {"not_observed", "exact", "drifted", "bounded"}, "consumer scope status invalid")
+    require(
+        value["inventory_status"] in {"not_observed", "complete", "bounded"},
+        "consumer inventory status invalid",
+    )
+    for field in ("desktop_project_count", "scanned_project_count", "matching_skill_count"):
+        require(isinstance(value[field], int) and value[field] >= 0, f"consumer scope {field} invalid")
+    require(value["scanned_project_count"] <= value["desktop_project_count"], "consumer scope project count invalid")
+    require(isinstance(value["projects"], list), "consumer scope projects invalid")
+    require(isinstance(value["limitations"], list), "consumer scope limitations invalid")
+    seen_refs: set[str] = set()
+    matching_skill_count = 0
+    has_drift = False
+    has_bounded = False
+    for index, project in enumerate(value["projects"]):
+        exact(project, CONSUMER_PROJECT_FIELDS, f"$.consumer_scope.projects[{index}]")
+        safe_text(project["project_ref"], f"$.consumer_scope.projects[{index}].project_ref", 80)
+        safe_text(project["display_name"], f"$.consumer_scope.projects[{index}].display_name", 160)
+        require(project["project_ref"] not in seen_refs, "consumer project ref duplicated")
+        seen_refs.add(project["project_ref"])
+        require(project["status"] in {"exact", "drifted", "bounded"}, "consumer project status invalid")
+        require(isinstance(project["skills"], list), "consumer project skills invalid")
+        project_relations: set[str] = set()
+        skill_identities: set[tuple[str, int]] = set()
+        for skill_index, skill in enumerate(project["skills"]):
+            exact(skill, CONSUMER_SKILL_FIELDS, f"$.consumer_scope.projects[{index}].skills[{skill_index}]")
+            require(skill["name"] in CONSUMER_SKILLS, "consumer skill name invalid")
+            require(isinstance(skill["scope_level"], int) and skill["scope_level"] >= 0, "consumer skill scope level invalid")
+            skill_identity = (skill["name"], skill["scope_level"])
+            require(skill_identity not in skill_identities, "consumer skill duplicated")
+            skill_identities.add(skill_identity)
+            require(skill["relation"] in {"exact", "drifted", "unreadable"}, "consumer skill relation invalid")
+            if skill["relation"] == "unreadable":
+                require(skill["version"] == "unavailable", "unreadable consumer skill version invalid")
+                require(skill["content_sha256"] == "unavailable", "unreadable consumer skill hash invalid")
+            else:
+                require(SEMVER.fullmatch(str(skill["version"])) is not None, "consumer skill version invalid")
+                require(SHA64.fullmatch(str(skill["content_sha256"])) is not None, "consumer skill hash invalid")
+            project_relations.add(skill["relation"])
+            matching_skill_count += 1
+        expected_project_status = (
+            "bounded" if "unreadable" in project_relations or project["status"] == "bounded"
+            else ("drifted" if "drifted" in project_relations else "exact")
+        )
+        require(project["status"] == expected_project_status, "consumer project status inconsistent")
+        has_drift = has_drift or "drifted" in project_relations
+        has_bounded = has_bounded or project["status"] == "bounded"
+    require(value["matching_skill_count"] == matching_skill_count, "consumer skill count invalid")
+    if value["status"] == "not_observed":
+        require(value["inventory_status"] == "not_observed", "unobserved consumer inventory invalid")
+        require(
+            value["desktop_project_count"] == 0
+            and value["scanned_project_count"] == 0
+            and value["matching_skill_count"] == 0
+            and value["projects"] == [],
+            "unobserved consumer scope must be empty",
+        )
+    else:
+        expected_status = (
+            "bounded" if value["inventory_status"] == "bounded" or has_bounded
+            else ("drifted" if has_drift else "exact")
+        )
+        require(value["status"] == expected_status, "consumer scope status inconsistent")
+        if value["status"] in {"exact", "drifted"}:
+            require(value["inventory_status"] == "complete", "qualified consumer scope requires complete inventory")
+            require(
+                value["scanned_project_count"] == value["desktop_project_count"],
+                "qualified consumer scope requires complete project read",
+            )
+    for index, item in enumerate(value["limitations"]):
+        safe_text(item, f"$.consumer_scope.limitations[{index}]", 300)
+    return value
+
+
+def _consumer_discovery_roots(project_root: Path, *, is_git_repository: bool) -> list[Path]:
+    if not is_git_repository:
+        return [project_root]
+    repository_root = Path(run_git(["rev-parse", "--show-toplevel"], cwd=project_root)).resolve()
+    require(
+        repository_root == project_root or repository_root in project_root.parents,
+        "consumer_repository_root_invalid",
+    )
+    roots: list[Path] = []
+    current = project_root
+    while True:
+        roots.append(current)
+        if current == repository_root:
+            return roots
+        current = current.parent
+
+
+def observe_consumer_scope(inventory: Any, *, desired: dict[str, Any]) -> dict[str, Any]:
+    """Read product same-name project Skills from one ephemeral Desktop inventory."""
+    desired = validate_desired_bundle(desired)
+    exact(inventory, DESKTOP_PROJECT_INVENTORY_FIELDS, "$.desktop_project_inventory")
+    require(
+        inventory["contract_version"] == DESKTOP_PROJECT_INVENTORY_VERSION,
+        "desktop project inventory contract invalid",
+    )
+    require(inventory["inventory_status"] in {"complete", "bounded"}, "desktop project inventory status invalid")
+    require(
+        isinstance(inventory["projects"], list)
+        and len(inventory["projects"]) <= DESKTOP_PROJECT_MAX_COUNT,
+        "desktop project inventory invalid",
+    )
+    normalized: list[tuple[str, Path | None, bool]] = []
+    seen_paths: set[str] = set()
+    for index, project in enumerate(inventory["projects"]):
+        exact(project, DESKTOP_PROJECT_INPUT_FIELDS, f"$.desktop_project_inventory.projects[{index}]")
+        safe_text(project["display_name"], f"$.desktop_project_inventory.projects[{index}].display_name", 160)
+        require(not re.search(r"[\r\n]", project["display_name"]), "desktop project display name invalid")
+        require(isinstance(project["is_git_repository"], bool), "desktop project Git state invalid")
+        raw_path = project["path"]
+        if raw_path is None:
+            resolved = None
+        else:
+            require(isinstance(raw_path, str) and raw_path.strip(), "desktop project path invalid")
+            path = Path(raw_path).expanduser()
+            require(path.is_absolute(), "desktop project path must be absolute")
+            resolved = path.resolve()
+            identity = os.path.normcase(str(resolved))
+            require(identity not in seen_paths, "desktop project path duplicated")
+            seen_paths.add(identity)
+        normalized.append((project["display_name"].strip(), resolved, project["is_git_repository"]))
+    normalized.sort(
+        key=lambda item: (
+            item[0].casefold(), "" if item[1] is None else os.path.normcase(str(item[1])), item[2],
+        )
+    )
+
+    projects: list[dict[str, Any]] = []
+    scanned_project_count = 0
+    for index, (display_name, project_root, is_git_repository) in enumerate(normalized):
+        project_ref = "desktop-project-" + hashlib.sha256(
+            canonical({"display_name": display_name, "ordinal": index})
+        ).hexdigest()[:16]
+        project_status = "exact"
+        skills: list[dict[str, Any]] = []
+        try:
+            require(project_root is not None, "consumer_project_unavailable")
+            root_state = project_root.lstat()
+            require(stat.S_ISDIR(root_state.st_mode) and not _is_reparse(root_state), "consumer_project_unreadable")
+            scanned_project_count += 1
+            discovery_roots = _consumer_discovery_roots(
+                project_root, is_git_repository=is_git_repository,
+            )
+            for scope_level, scope_root in enumerate(discovery_roots):
+                agents_root = scope_root / ".agents"
+                skills_root = agents_root / "skills"
+                if agents_root.exists() or agents_root.is_symlink():
+                    agents_state = agents_root.lstat()
+                    require(
+                        stat.S_ISDIR(agents_state.st_mode) and not stat.S_ISLNK(agents_state.st_mode) and not _is_reparse(agents_state),
+                        "consumer_skill_parent_unsafe",
+                    )
+                if not skills_root.exists() and not skills_root.is_symlink():
+                    continue
+                skills_state = skills_root.lstat()
+                require(
+                    stat.S_ISDIR(skills_state.st_mode) and not stat.S_ISLNK(skills_state.st_mode) and not _is_reparse(skills_state),
+                    "consumer_skill_parent_unsafe",
+                )
+                for name, (version_field, hash_field) in CONSUMER_SKILLS.items():
+                    skill_root = skills_root / name
+                    if not skill_root.exists() and not skill_root.is_symlink():
+                        continue
+                    try:
+                        version = _skill_version(skill_root)
+                        content_sha256 = bounded_physical_tree_hash(
+                            skill_root,
+                            max_entries=CONSUMER_SKILL_MAX_ENTRIES,
+                            max_bytes=CONSUMER_SKILL_MAX_BYTES,
+                        )
+                        require(version == _skill_version(skill_root), "consumer_skill_changed_during_read")
+                        require(
+                            content_sha256 == bounded_physical_tree_hash(
+                                skill_root,
+                                max_entries=CONSUMER_SKILL_MAX_ENTRIES,
+                                max_bytes=CONSUMER_SKILL_MAX_BYTES,
+                            ),
+                            "consumer_skill_changed_during_read",
+                        )
+                        relation = (
+                            "exact"
+                            if version == desired[version_field] and content_sha256 == desired[hash_field]
+                            else "drifted"
+                        )
+                    except (BootstrapError, OSError, UnicodeError):
+                        version = "unavailable"
+                        content_sha256 = "unavailable"
+                        relation = "unreadable"
+                    skills.append({
+                        "name": name,
+                        "scope_level": scope_level,
+                        "version": version,
+                        "content_sha256": content_sha256,
+                        "relation": relation,
+                    })
+            relations = {item["relation"] for item in skills}
+            project_status = (
+                "bounded" if "unreadable" in relations
+                else ("drifted" if "drifted" in relations else "exact")
+            )
+        except (BootstrapError, OSError):
+            project_status = "bounded"
+        if skills or project_status == "bounded":
+            projects.append({
+                "project_ref": project_ref,
+                "display_name": display_name,
+                "status": project_status,
+                "skills": skills,
+            })
+
+    has_bounded = any(project["status"] == "bounded" for project in projects)
+    has_drift = any(project["status"] == "drifted" for project in projects)
+    status = (
+        "bounded" if inventory["inventory_status"] == "bounded" or has_bounded
+        else ("drifted" if has_drift else "exact")
+    )
+    limitations: list[str] = []
+    if inventory["inventory_status"] == "bounded":
+        limitations.append("Desktop 项目清单不完整；未枚举的消费者范围保持未知。")
+    if has_bounded:
+        limitations.append("至少一个项目或同名 Skill 无法安全完整读取；该消费者范围保持未知。")
+    result = {
+        "status": status,
+        "inventory_status": inventory["inventory_status"],
+        "desktop_project_count": len(normalized),
+        "scanned_project_count": scanned_project_count,
+        "matching_skill_count": sum(len(project["skills"]) for project in projects),
+        "projects": projects,
+        "limitations": limitations,
+    }
+    return validate_consumer_scope(result)
 
 
 def _unavailable_host_materialization(*, owner_expected: bool) -> dict[str, Any]:
@@ -1972,7 +2309,7 @@ def apply_workstation_reconcile(
             or materialization["bootstrap_skill"]["status"] == "installed"
             or materialization["scout_skill"]["status"] == "installed"
         )
-        pack_holder["value"] = build_deployment_pack_v2(
+        pack_holder["value"] = build_deployment_pack(
             desired=context["desired"],
             observed_distribution=observed_after,
             desired_source_sha256=context["source_sha256"],
@@ -1993,7 +2330,7 @@ def apply_workstation_reconcile(
     )
     require("value" in pack_holder, "deployment_pack_not_built")
     return {
-        "contract_version": "agent_memory_workstation_reconcile_receipt_v2",
+        "contract_version": WORKSTATION_RECONCILE_RECEIPT_VERSION,
         "status": "applied",
         "plan_hash": plan["plan_hash"],
         "deployment_pack": pack_holder["value"],
@@ -2023,12 +2360,17 @@ def verify_workstation_consumer(
     codex_home: Path,
     source_manifest_path: Path | str,
     release_manifest_path: Path | str,
+    desktop_project_inventory_path: Path | str,
 ) -> dict[str, Any]:
     plan, context = _workstation_reconcile_context(
         codex_home, source_manifest_path, release_manifest_path,
     )
     require(plan["status"] == "noop", "consumer_verification_requires_exact_host")
-    return build_deployment_pack_v2(
+    inventory = _load_json_file(
+        Path(desktop_project_inventory_path), "desktop_project_inventory_unreadable",
+    )
+    consumer_scope = observe_consumer_scope(inventory, desired=context["desired"])
+    return build_deployment_pack(
         desired=context["desired"],
         observed_distribution=context["observed"],
         desired_source_sha256=context["source_sha256"],
@@ -2037,6 +2379,7 @@ def verify_workstation_consumer(
         requires_reload=False,
         consumer_verified=True,
         generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        consumer_scope=consumer_scope,
     )
 
 
@@ -2098,7 +2441,7 @@ def _host_is_exact(
     )
 
 
-def build_deployment_pack_v2(
+def build_deployment_pack(
     *,
     desired: dict[str, Any],
     observed_distribution: dict[str, Any],
@@ -2108,12 +2451,16 @@ def build_deployment_pack_v2(
     requires_reload: bool,
     consumer_verified: bool,
     generated_at: str,
+    consumer_scope: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     desired = validate_desired_bundle(desired)
     observed = validate_observed_distribution(observed_distribution)
     require(SHA64.fullmatch(desired_source_sha256) is not None, "desired source identity invalid")
     source_sync = _validate_source_sync(source_sync)
     material = _validate_host_materialization(host_materialization)
+    scope = validate_consumer_scope(
+        _not_observed_consumer_scope() if consumer_scope is None else consumer_scope
+    )
     distribution_exact = _distribution_is_exact(
         desired, observed, desired_source_sha256=desired_source_sha256,
     )
@@ -2136,18 +2483,30 @@ def build_deployment_pack_v2(
         status = "host_materialization_blocked"
     elif requires_reload or not consumer_verified:
         status = "reload_required"
+    elif scope["status"] == "drifted":
+        status = "consumer_scope_drift"
+    elif scope["status"] != "exact":
+        status = "consumer_scope_bounded"
     else:
         status = "ready"
     blocked = status in {
         "distribution_reconcile_blocked", "source_sync_blocked", "host_materialization_blocked",
     }
     activation_pending = not blocked and (requires_reload or not consumer_verified)
-    interactive_entry = (
-        "blocked" if blocked else ("available_next_task" if activation_pending else "verified")
-    )
+    if blocked:
+        interactive_entry = "blocked"
+    elif activation_pending:
+        interactive_entry = "available_next_task"
+    elif status == "consumer_scope_drift":
+        interactive_entry = "ambiguous"
+    elif status == "consumer_scope_bounded":
+        interactive_entry = "unproven"
+    else:
+        interactive_entry = "verified"
     limitations = ["真实第二台设备的首次部署与项目续接仍需独立验收。"]
     if not consumer_verified and not blocked:
         limitations.insert(0, "当前任务未证明新版本已被模型加载；需在一次 Desktop 刷新后的新任务中验收。")
+    limitations = [*scope["limitations"], *limitations]
     pack = {
         "contract_version": PACK_VERSION,
         "status": status,
@@ -2157,6 +2516,7 @@ def build_deployment_pack_v2(
         "distribution": observed,
         "source_sync": source_sync,
         "host_materialization": material,
+        "consumer_scope": scope,
         "consumer_activation": {
             "desktop_reload": "required" if activation_pending else "not_required",
             "interactive_entry": interactive_entry,
@@ -2177,6 +2537,7 @@ def validate_pack(value: Any) -> dict[str, Any]:
         value["status"] in {
             "ready", "reload_required", "distribution_reconcile_blocked",
             "source_sync_blocked", "host_materialization_blocked",
+            "consumer_scope_drift", "consumer_scope_bounded",
         },
         "deployment pack status invalid",
     )
@@ -2185,10 +2546,11 @@ def validate_pack(value: Any) -> dict[str, Any]:
     validate_observed_distribution(value["distribution"])
     _validate_source_sync(value["source_sync"])
     _validate_host_materialization(value["host_materialization"])
+    validate_consumer_scope(value["consumer_scope"])
     activation = value["consumer_activation"]
     exact(activation, ACTIVATION_FIELDS, "$.consumer_activation")
     require(activation["desktop_reload"] in {"required", "not_required"}, "Desktop reload state invalid")
-    require(activation["interactive_entry"] in {"available_next_task", "verified", "unproven", "blocked"}, "interactive activation invalid")
+    require(activation["interactive_entry"] in {"available_next_task", "verified", "ambiguous", "unproven", "blocked"}, "interactive activation invalid")
     require(activation["scheduled"] == "unchanged", "Scheduled activation invalid")
     if value["status"] == "reload_required":
         require(activation["desktop_reload"] == "required", "reload-required pack must require Desktop reload")
@@ -2196,6 +2558,15 @@ def validate_pack(value: Any) -> dict[str, Any]:
     if value["status"] == "ready":
         require(activation["desktop_reload"] == "not_required", "ready pack cannot require Desktop reload")
         require(activation["interactive_entry"] == "verified", "ready pack requires verified interactive entry")
+        require(value["consumer_scope"]["status"] == "exact", "ready pack requires exact consumer scope")
+    if value["status"] == "consumer_scope_drift":
+        require(activation["desktop_reload"] == "not_required", "consumer drift cannot request Desktop reload")
+        require(activation["interactive_entry"] == "ambiguous", "consumer drift must expose ambiguous entry")
+        require(value["consumer_scope"]["status"] == "drifted", "consumer drift pack requires drift evidence")
+    if value["status"] == "consumer_scope_bounded":
+        require(activation["desktop_reload"] == "not_required", "bounded consumer scope cannot request Desktop reload")
+        require(activation["interactive_entry"] == "unproven", "bounded consumer scope must remain unproven")
+        require(value["consumer_scope"]["status"] == "bounded", "bounded pack requires bounded scope")
     if value["status"].endswith("_blocked"):
         require(activation["desktop_reload"] == "not_required", "blocked pack cannot request Desktop reload")
         require(activation["interactive_entry"] == "blocked", "blocked pack must block interactive entry")
@@ -2243,11 +2614,17 @@ def validate_marketplace(
     return value
 
 
+def _markdown_table_text(value: str) -> str:
+    return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("|", "\\|")
+
+
 def render_pack(value: Any) -> str:
     pack = validate_pack(value)
     status = {
-        "ready": "本机能力与新任务入口已对齐",
+        "ready": "本机托管能力、新任务入口与 Desktop 项目消费者范围已对齐",
         "reload_required": "能力已对齐到磁盘，需一次 Desktop 刷新后在新任务验收",
+        "consumer_scope_drift": "托管能力已对齐，但 Desktop 可见项目存在不同版本或内容的同名 Skill",
+        "consumer_scope_bounded": "托管能力已对齐，但 Desktop 项目消费者范围尚未完整观察",
         "distribution_reconcile_blocked": "Plugin 或 Marketplace 尚未精确对齐",
         "source_sync_blocked": "远端能力源同步受阻",
         "host_materialization_blocked": "本机能力物化受阻",
@@ -2256,6 +2633,7 @@ def render_pack(value: Any) -> str:
     distribution = pack["distribution"]
     sources = pack["source_sync"]
     material = pack["host_materialization"]
+    scope = pack["consumer_scope"]
     activation = pack["consumer_activation"]
     lines = [
         "# Agent Memory 本机部署结果",
@@ -2268,14 +2646,27 @@ def render_pack(value: Any) -> str:
         f"| Plugin 分发 | Marketplace `{distribution['marketplace']['status']}` / Plugin `{distribution['plugin']['status']}` | Ref `{distribution['plugin']['ref']}` / enabled `{str(distribution['plugin']['enabled']).lower()}` |",
         f"| 能力源同步 | Sidecar `{sources['sidecar']['status']}` / Global Owner `{sources['canonical_owner']['status']}` | 只更新本机受管缓存，不清理活跃工程 |",
         f"| 主机物化 | Core `{material['core']['status']}` / Doctor `{material['doctor']}` / Scout `{material['scout_skill']['status']}` | Bootstrap {material['bootstrap_skill']['version']}；Scout {material['scout_skill']['version']} |",
+        f"| 项目消费者范围 | `{scope['status']}` | Desktop 项目 {scope['desktop_project_count']}；已读 {scope['scanned_project_count']}；同名 Skill {scope['matching_skill_count']} |",
         f"| 消费者采用 | Desktop 刷新 `{activation['desktop_reload']}` / 交互入口 `{activation['interactive_entry']}` | Scheduled `{activation['scheduled']}`，项目集合仍由当前主机和用户决定 |",
     ]
+    if scope["projects"]:
+        lines.extend(["", "## Desktop 可见项目级同名 Skill", "", "| 项目 | Skill | 版本 | 关系 |", "|---|---|---|---|"])
+        for project in scope["projects"]:
+            display_name = _markdown_table_text(project["display_name"])
+            if not project["skills"]:
+                lines.append(f"| {display_name} | 无法完整读取 | unavailable | `{project['status']}` |")
+            for skill in project["skills"]:
+                lines.append(
+                    f"| {display_name} | `{skill['name']}@scope-{skill['scope_level']}` | `{skill['version']}` | `{skill['relation']}` |"
+                )
     if pack["limitations"]:
         lines.extend(["", "## 尚未证明", ""])
         lines.extend(f"> {item}" for item in pack["limitations"])
     next_step = {
         "reload_required": "下一步：刷新一次 Codex Desktop，并在新任务中再次发送“同步并部署本机 Agent Memory”完成采用验收。",
         "ready": "下一步：可在目标工程的新任务中发送 `$global-owner-scout 复盘当前项目`。",
+        "consumer_scope_drift": "下一步：先判断上表项目级同名 Skill 是待发布开发版本还是陈旧副本；更新或移除该项目来源后重新验收。调和器不会自动修改 checkout。",
+        "consumer_scope_bounded": "下一步：恢复完整 Desktop 项目枚举与只读访问后，在新任务重新执行同一句部署入口。",
         "distribution_reconcile_blocked": "下一步：处理上表显示的 Plugin/Marketplace 唯一阻断后，再发送“同步并部署本机 Agent Memory”。",
         "source_sync_blocked": "下一步：恢复期望来源的只读访问或消除来源歧义后，再发送“同步并部署本机 Agent Memory”。",
         "host_materialization_blocked": "下一步：保留当前失败现场并重试同一句部署入口；不得手工跳过 Core、Doctor 或 Skill 步骤。",
@@ -2350,7 +2741,7 @@ def self_test() -> None:
         "scout_version": SCOUT_VERSION, "scout_sha256": "d" * 64,
     }
     source_identity_hash = "e" * 64
-    pack = build_deployment_pack_v2(
+    pack = build_deployment_pack(
         desired=desired,
         observed_distribution={
             "marketplace": {
@@ -2468,6 +2859,7 @@ def main() -> int:
     reconcile_mode.add_argument("--apply", action="store_true")
     reconcile_mode.add_argument("--verify-consumer", action="store_true")
     reconcile.add_argument("--plan-hash")
+    reconcile.add_argument("--desktop-project-inventory")
     validate_source = sub.add_parser("validate-source-manifest")
     validate_source.add_argument("--path", required=True)
     sub.add_parser("validate-pack")
@@ -2514,19 +2906,23 @@ def main() -> int:
         elif args.command == "workstation-reconcile":
             if args.dry_run:
                 require(args.plan_hash is None, "reconcile_plan_hash_unexpected")
+                require(args.desktop_project_inventory is None, "desktop_project_inventory_unexpected")
                 result = inspect_workstation_reconcile(
                     Path(args.codex_home), args.source_manifest, args.release_manifest,
                 )
             elif args.apply:
                 require(args.plan_hash is not None, "reconcile_plan_hash_required")
+                require(args.desktop_project_inventory is None, "desktop_project_inventory_unexpected")
                 result = apply_workstation_reconcile(
                     Path(args.codex_home), args.source_manifest, args.release_manifest,
                     plan_hash=args.plan_hash,
                 )
             else:
                 require(args.plan_hash is None, "reconcile_plan_hash_unexpected")
+                require(args.desktop_project_inventory is not None, "desktop_project_inventory_required")
                 result = verify_workstation_consumer(
                     Path(args.codex_home), args.source_manifest, args.release_manifest,
+                    args.desktop_project_inventory,
                 )
             print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
         elif args.command == "validate-source-manifest":

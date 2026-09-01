@@ -36,7 +36,7 @@
 
 1. Anchor 必须先用 Resolver 验证 stable immutable Release、tag/commit、asset digest、checksums、release/source manifest
    与 portable bundle。失败停止，不回退 branch、checkout 或猜测资产。
-2. 从 Resolver output 的 portable 运行 Bootstrap 2.1.0，执行 `workstation-reconcile --dry-run`。不得手工拼接多个安装命令
+2. 从 Resolver output 的 portable 运行 Bootstrap 2.2.0，执行 `workstation-reconcile --dry-run`。不得手工拼接多个安装命令
    后声称完整部署。
 3. Fresh install、同一来源的 ref/version/hash 修复由本次部署请求覆盖；Sidecar 或 Marketplace source identity 改变时，
    只显示 renderer 生成的无路径、无 URL 计划，并等待一次确认。
@@ -46,8 +46,10 @@
 5. apply 必须使用 fresh `plan_hash`。Plugin/Marketplace、受管 source、Core/Owner、Bootstrap/Scout、Doctor 与最终读回属于
    同一补偿边界；任一失败都不能返回完成。
 6. apply 成功只返回 `reload_required`。只要求一次 Desktop 刷新，不要求用户重新选择来源或执行命令。
-7. 刷新后的新任务再次收到同一句入口时，若 dry-run 为 exact `noop`，执行只读 `--verify-consumer`。只有此时可返回
-   `ready`；该检查必须重新读取 live Core/Doctor/Owner/Skills，不得复用历史完成回执。若出现漂移，回到调和计划。
+7. 刷新后的新任务再次收到同一句入口时，先通过 Codex Desktop project API 取得本轮完整项目清单，再把临时清单交给
+   只读 `--verify-consumer --desktop-project-inventory <inventory>`。只有 dry-run 为 exact `noop`、live
+   Core/Doctor/Owner/用户级 Skills 仍 exact，且所有 Desktop 可见项目级同名 Skill 也 exact 时才返回 `ready`。
+   项目同名 Skill 差异返回 `consumer_scope_drift`；清单或读取不完整返回 `consumer_scope_bounded`。两者都不自动修改项目。
 8. 已发布的 Anchor 1.x 会调用旧命令名；当且仅当输入是 Resolver 的完整目录形态时，Bootstrap 2.0 自动把该命令路由
    到 v2 计划与事务。用户不需要先迁移 Anchor、重复部署或刷新两次。
 
@@ -59,7 +61,9 @@
 | `source_sync_blocked` | Release 与 distribution 读回可用 | source/host/采用 | 修复来源访问或 ambiguity 后重试 |
 | `host_materialization_blocked` | distribution 与 source 已验证或已恢复 | 完整 Core/Skill/Doctor、采用 | 根据唯一错误重试，不手工补步骤 |
 | `reload_required` | 当前主机 distribution/source/Core/Skills/Doctor exact | 当前任务模型采用、第二设备、连续性 | 刷新一次 Desktop，新建任务并发送同一句入口 |
-| `ready` | 当前主机 exact，且新任务已加载 Bootstrap 2.1.0 | 第二设备、Scheduled、连续性、产品收益 | 可在目标工程新任务运行 Project Scout |
+| `consumer_scope_drift` | 托管主机层 exact、新任务已采用 | Desktop 可见项目级同名 Skill 全部对齐 | 按回执处理首个项目级来源；不自动更新 checkout |
+| `consumer_scope_bounded` | 托管主机层 exact、新任务已采用 | 未完整观察的项目消费者范围 | 恢复完整项目枚举/只读访问后重新验收 |
+| `ready` | 当前主机 exact，且新任务已加载 Bootstrap 2.2.0，项目消费者范围 exact | 第二设备、Scheduled、连续性、产品收益 | 可在目标工程新任务运行 Project Scout |
 
 任何 blocked 状态都不得同时要求刷新 Desktop 或引导运行 Project Scout；先修复矩阵中第一层失效事实。
 
@@ -69,11 +73,13 @@
 - 不用新 Skill 文件、Doctor、测试或 Deployment Pack fixture 替代新任务模型采用。
 - 不把当前主机结果外推到真实第二台设备。
 - 不修改 Desktop 活跃项目 checkout，不创建/恢复 Scheduled，不写 Host Profile，不移除私有 Owner。
+- Desktop project inventory 只作为本轮临时输入；回执不得包含绝对路径、project ID 或原始 source。
 - 不增加 daemon、后台更新器、数据库、UI scraper 或第二行为 Owner。
 
 ## 验收清单
 
 - Fresh host、exact no-op、旧 Plugin + 新 Skills、新 Plugin + 旧 source、Marketplace identity drift，以及含/不含 legacy metadata 的 clean checkout。
+- 完整清单且无项目同名 Skill、完整清单且同名 Skill exact、旧版本/同版本不同 hash、项目不可访问、物理树别名、bounded 清单。
 - Plugin cache 缺失、CLI 状态不可读、显式禁用、执行中失败、最终读回不一致。
 - 任一失败后的 Marketplace/Plugin/source/Skill target 与执行前一致。
 - apply 只到 `reload_required`；刷新后真实新任务才到 `ready`。

@@ -44,7 +44,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "core_version": "0.3.10",
             "plugin_version": "1.5.1",
             "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.1.0",
+            "bootstrap_version": "2.2.0",
             "bootstrap_sha256": "c" * 64,
             "scout_version": "5.7.0",
             "scout_sha256": "d" * 64,
@@ -93,12 +93,209 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "unavailable",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.1.0", "content_sha256": "c" * 64,
+                "status": "unchanged", "version": "2.2.0", "content_sha256": "c" * 64,
             },
             "scout_skill": {
                 "status": "unchanged", "version": "5.7.0", "content_sha256": "d" * 64,
             },
         }
+
+    def desktop_inventory(self, *projects: tuple[str, Path], status: str = "complete") -> dict[str, object]:
+        return {
+            "contract_version": "agent_memory_desktop_project_inventory_v1",
+            "inventory_status": status,
+            "projects": [
+                {"display_name": display_name, "path": str(path), "is_git_repository": False}
+                for display_name, path in projects
+            ],
+        }
+
+    def test_consumer_scope_detects_stale_project_skill_without_mutation_or_path_leak(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary) / "active-project"
+            skill = project / ".agents" / "skills" / "agent-memory-workstation-bootstrap"
+            skill.mkdir(parents=True)
+            skill_file = skill / "SKILL.md"
+            skill_file.write_text("# Bootstrap\n\n- Skill version: `1.9.0`\n", encoding="utf-8")
+            before = skill_file.read_bytes()
+
+            scope = self.reconcile.observe_consumer_scope(
+                self.desktop_inventory(("Active Project", project)),
+                desired=self.desired_bundle(),
+            )
+
+            self.assertEqual("drifted", scope["status"])
+            self.assertEqual("drifted", scope["projects"][0]["skills"][0]["relation"])
+            self.assertEqual(before, skill_file.read_bytes())
+            self.assertNotIn(str(project), json.dumps(scope, ensure_ascii=False))
+
+    def test_consumer_scope_requires_complete_inventory_and_exact_skill_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary) / "project"
+            project.mkdir()
+            bounded = self.reconcile.observe_consumer_scope(
+                self.desktop_inventory(("Project", project), status="bounded"),
+                desired=self.desired_bundle(),
+            )
+            self.assertEqual("bounded", bounded["status"])
+
+            exact = self.reconcile.observe_consumer_scope(
+                self.desktop_inventory(("Project", project)),
+                desired=self.desired_bundle(),
+            )
+            self.assertEqual("exact", exact["status"])
+            self.assertEqual(0, exact["matching_skill_count"])
+
+    def test_consumer_scope_distinguishes_exact_bytes_from_same_version_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary) / "project"
+            skill = project / ".agents" / "skills" / "agent-memory-workstation-bootstrap"
+            skill.mkdir(parents=True)
+            skill_file = skill / "SKILL.md"
+            skill_file.write_text("# Bootstrap\n\n- Skill version: `2.2.0`\n", encoding="utf-8")
+            desired = self.desired_bundle()
+            desired["bootstrap_sha256"] = self.reconcile.physical_tree_hash(skill)
+
+            exact = self.reconcile.observe_consumer_scope(
+                self.desktop_inventory(("Project", project)), desired=desired,
+            )
+            self.assertEqual("exact", exact["status"])
+
+            skill_file.write_text("# Bootstrap\n\n- Skill version: `2.2.0`\n\nChanged.\n", encoding="utf-8")
+            drifted = self.reconcile.observe_consumer_scope(
+                self.desktop_inventory(("Project", project)), desired=desired,
+            )
+            self.assertEqual("drifted", drifted["status"])
+            self.assertEqual("2.2.0", drifted["projects"][0]["skills"][0]["version"])
+
+    def test_consumer_scope_fails_bounded_on_project_skill_parent_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = root / "project"
+            project.mkdir()
+            external = root / "external-agents"
+            (external / "skills").mkdir(parents=True)
+            try:
+                (project / ".agents").symlink_to(external, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"directory symbolic links unavailable: {exc}")
+
+            scope = self.reconcile.observe_consumer_scope(
+                self.desktop_inventory(("Project", project)), desired=self.desired_bundle(),
+            )
+
+            self.assertEqual("bounded", scope["status"])
+            self.assertEqual("bounded", scope["projects"][0]["status"])
+            self.assertEqual([], scope["projects"][0]["skills"])
+
+    def test_consumer_scope_counts_remote_or_unavailable_project_as_bounded(self) -> None:
+        inventory = {
+            "contract_version": "agent_memory_desktop_project_inventory_v1",
+            "inventory_status": "complete",
+            "projects": [{
+                "display_name": "Remote Project", "path": None, "is_git_repository": True,
+            }],
+        }
+
+        scope = self.reconcile.observe_consumer_scope(inventory, desired=self.desired_bundle())
+
+        self.assertEqual("bounded", scope["status"])
+        self.assertEqual(1, scope["desktop_project_count"])
+        self.assertEqual(0, scope["scanned_project_count"])
+        self.assertEqual("Remote Project", scope["projects"][0]["display_name"])
+
+    def test_consumer_scope_scans_from_primary_folder_to_repository_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary) / "repository"
+            primary = repository / "nested" / "primary"
+            primary.mkdir(parents=True)
+            self.reconcile.run_git(["init", "-q", "-b", "main"], cwd=repository)
+            skill = repository / ".agents" / "skills" / "agent-memory-workstation-bootstrap"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text(
+                "# Bootstrap\n\n- Skill version: `1.9.0`\n", encoding="utf-8",
+            )
+            inventory = {
+                "contract_version": "agent_memory_desktop_project_inventory_v1",
+                "inventory_status": "complete",
+                "projects": [{
+                    "display_name": "Nested Project", "path": str(primary), "is_git_repository": True,
+                }],
+            }
+
+            scope = self.reconcile.observe_consumer_scope(inventory, desired=self.desired_bundle())
+
+            self.assertEqual("drifted", scope["status"])
+            self.assertEqual(2, scope["projects"][0]["skills"][0]["scope_level"])
+
+    def test_consumer_scope_bounds_project_controlled_skill_tree_size(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary) / "project"
+            skill = project / ".agents" / "skills" / "agent-memory-workstation-bootstrap"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text(
+                "# Bootstrap\n\n- Skill version: `2.2.0`\n", encoding="utf-8",
+            )
+            for index in range(self.reconcile.CONSUMER_SKILL_MAX_ENTRIES):
+                (skill / f"extra-{index:03d}.txt").write_text("x", encoding="utf-8")
+
+            scope = self.reconcile.observe_consumer_scope(
+                self.desktop_inventory(("Project", project)), desired=self.desired_bundle(),
+            )
+
+            self.assertEqual("bounded", scope["status"])
+            self.assertEqual("unreadable", scope["projects"][0]["skills"][0]["relation"])
+
+    def test_pack_revokes_ready_for_drifted_or_bounded_consumer_scope(self) -> None:
+        exact_scope = {
+            "status": "exact", "inventory_status": "complete",
+            "desktop_project_count": 0, "scanned_project_count": 0,
+            "matching_skill_count": 0, "projects": [], "limitations": [],
+        }
+        source_sync = {
+            "sidecar": {"status": "unchanged", "ref": "v0.3.10", "commit": "a" * 40},
+            "canonical_owner": {"status": "unavailable", "ref": "unavailable", "commit": "unavailable"},
+        }
+        common = {
+            "desired": self.desired_bundle(),
+            "observed_distribution": self.exact_distribution(),
+            "desired_source_sha256": "e" * 64,
+            "source_sync": source_sync,
+            "host_materialization": self.exact_host(),
+            "requires_reload": False,
+            "consumer_verified": True,
+            "generated_at": "2026-09-01T12:00:00+08:00",
+        }
+        ready = self.reconcile.build_deployment_pack(**common, consumer_scope=exact_scope)
+        self.assertEqual("ready", ready["status"])
+
+        drifted_scope = {
+            **exact_scope,
+            "status": "drifted", "desktop_project_count": 1, "scanned_project_count": 1,
+            "matching_skill_count": 1,
+            "projects": [{
+                "project_ref": "desktop-project-example", "display_name": "<Project>|Name", "status": "drifted",
+                "skills": [{
+                    "name": "agent-memory-workstation-bootstrap", "version": "1.9.0",
+                    "scope_level": 0, "content_sha256": "9" * 64, "relation": "drifted",
+                }],
+            }],
+        }
+        drifted = self.reconcile.build_deployment_pack(**common, consumer_scope=drifted_scope)
+        self.assertEqual("consumer_scope_drift", drifted["status"])
+        self.assertEqual("ambiguous", drifted["consumer_activation"]["interactive_entry"])
+        rendered = self.reconcile.render_pack(drifted)
+        self.assertIn("&lt;Project&gt;\\|Name", rendered)
+        self.assertNotIn("<Project>", rendered)
+
+        bounded_scope = {
+            **exact_scope,
+            "status": "bounded", "inventory_status": "bounded",
+            "limitations": ["Desktop 项目清单不完整；未枚举的消费者范围保持未知。"],
+        }
+        bounded = self.reconcile.build_deployment_pack(**common, consumer_scope=bounded_scope)
+        self.assertEqual("consumer_scope_bounded", bounded["status"])
+        self.assertEqual("unproven", bounded["consumer_activation"]["interactive_entry"])
 
     def test_real_regression_detects_stale_marketplace_and_plugin(self) -> None:
         observed = self.exact_distribution()
@@ -231,7 +428,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.1.0",
+                "version": "2.2.0",
                 "content_sha256": "c" * 64,
             },
             "scout_skill": {
@@ -245,7 +442,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "canonical_owner": {"status": "unchanged", "ref": "preserved", "commit": "3" * 40},
         }
 
-        pack = self.reconcile.build_deployment_pack_v2(
+        pack = self.reconcile.build_deployment_pack(
             desired=self.desired_bundle(),
             observed_distribution=self.exact_distribution(),
             desired_source_sha256="e" * 64,
@@ -270,7 +467,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "verified",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.1.0", "content_sha256": "c" * 64,
+                "status": "unchanged", "version": "2.2.0", "content_sha256": "c" * 64,
             },
             "scout_skill": {
                 "status": "unchanged", "version": "5.7.0", "content_sha256": "d" * 64,
@@ -281,7 +478,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "canonical_owner": {"status": "unchanged", "ref": "preserved", "commit": "3" * 40},
         }
 
-        pack = self.reconcile.build_deployment_pack_v2(
+        pack = self.reconcile.build_deployment_pack(
             desired=self.desired_bundle(),
             observed_distribution=self.exact_distribution(),
             desired_source_sha256="e" * 64,
@@ -306,7 +503,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "canonical_owner": {"status": "unavailable", "ref": "unavailable", "commit": "unavailable"},
         }
 
-        pack = self.reconcile.build_deployment_pack_v2(
+        pack = self.reconcile.build_deployment_pack(
             desired=self.desired_bundle(),
             observed_distribution=distribution,
             desired_source_sha256="e" * 64,
@@ -338,7 +535,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             plugin_manifest.parent.mkdir()
             plugin_manifest.write_text(json.dumps({"version": "1.5.1"}), encoding="utf-8")
             (bootstrap / "SKILL.md").write_text(
-                "# Bootstrap\n\n- Skill version: `2.1.0`\n", encoding="utf-8",
+                "# Bootstrap\n\n- Skill version: `2.2.0`\n", encoding="utf-8",
             )
             (scout / "SKILL.md").write_text(
                 "# Scout\n\n- Skill version: `5.7.0`\n", encoding="utf-8",
@@ -367,7 +564,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 },
                 "versions": {
                     "core": "0.3.10", "plugin": "1.5.1",
-                    "bootstrap": "2.1.0", "scout": "5.7.0",
+                    "bootstrap": "2.2.0", "scout": "5.7.0",
                 },
                 "artifacts": [],
                 "verification": {},
@@ -400,7 +597,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
 
             self.assertEqual("v0.3.10", desired["release_ref"])
             self.assertEqual("1.5.1", desired["plugin_version"])
-            self.assertEqual("2.1.0", desired["bootstrap_version"])
+            self.assertEqual("2.2.0", desired["bootstrap_version"])
             self.assertEqual("a" * 40, sidecar.expected_commit)
             self.assertRegex(source_hash, r"^[0-9a-f]{64}$")
             self.assertRegex(desired["plugin_sha256"], r"^[0-9a-f]{64}$")
@@ -534,7 +731,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             codex_home = root / "codex-home"
             self.reconcile.sync_sources(codex_home, spec)
             for name, version in (
-                ("agent-memory-workstation-bootstrap", "2.1.0"),
+                ("agent-memory-workstation-bootstrap", "2.2.0"),
                 ("global-owner-scout", "5.7.0"),
             ):
                 skill = codex_home / "skills" / name
@@ -565,7 +762,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             self.assertEqual("verified", observed["core"]["status"])
             self.assertEqual(commit, observed["core"]["source_commit"])
             self.assertEqual("verified", observed["doctor"])
-            self.assertEqual("2.1.0", observed["bootstrap_skill"]["version"])
+            self.assertEqual("2.2.0", observed["bootstrap_skill"]["version"])
             self.assertRegex(observed["scout_skill"]["content_sha256"], r"^[0-9a-f]{64}$")
 
     def test_distribution_participant_rolls_back_with_source_transaction(self) -> None:
@@ -668,15 +865,21 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         )
         self.assertEqual("noop", plan["status"])
 
-        with mock.patch.object(
-            self.reconcile, "_workstation_reconcile_context", return_value=(plan, context),
-        ):
-            pack = self.reconcile.verify_workstation_consumer(
-                Path("unused"), Path("source.json"), Path("release.json"),
+        with tempfile.TemporaryDirectory() as temporary:
+            inventory = Path(temporary) / "inventory.json"
+            inventory.write_text(
+                json.dumps(self.desktop_inventory()), encoding="utf-8",
             )
+            with mock.patch.object(
+                self.reconcile, "_workstation_reconcile_context", return_value=(plan, context),
+            ):
+                pack = self.reconcile.verify_workstation_consumer(
+                    Path("unused"), Path("source.json"), Path("release.json"), inventory,
+                )
 
         self.assertEqual("ready", pack["status"])
         self.assertEqual("verified", pack["consumer_activation"]["interactive_entry"])
+        self.assertEqual("exact", pack["consumer_scope"]["status"])
 
     def test_apply_pack_uses_post_materialization_live_host_readback(self) -> None:
         stale_host = self.exact_host()
@@ -726,6 +929,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             )
 
         self.assertEqual("reload_required", receipt["deployment_pack"]["status"])
+        self.assertEqual("agent_memory_workstation_reconcile_receipt_v3", receipt["contract_version"])
         self.assertEqual("unchanged", receipt["deployment_pack"]["host_materialization"]["scout_skill"]["status"])
         self.assertEqual(self.exact_host(), source_receipt["materialization"])
 
