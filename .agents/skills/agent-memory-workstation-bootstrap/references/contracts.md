@@ -71,7 +71,7 @@ source_sync, host_materialization, consumer_activation, limitations, pack_hash
 
 - `status`: `ready`, `reload_required`, `distribution_reconcile_blocked`, `source_sync_blocked`, or
   `host_materialization_blocked`.
-- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.0.1`.
+- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.1.0`.
 - `distribution` is an exact post-operation re-observation with the same Marketplace and Plugin fields as the plan.
 - `source_sync` contains exact `sidecar` and `canonical_owner` receipts. Each receipt has `status`, `ref`, and `commit`; status is
   `synced`, `unchanged`, `unavailable`, or `failed`.
@@ -98,7 +98,7 @@ automation_change_count, allowed_actions, limitations, pack_hash
 ```
 
 - `status`: `ready`, `bounded`, or `host_activation_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `2.0.1`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `2.1.0`.
 - `portable_layer` exact fields: `sidecar`, `canonical_owner`, `core_setup`, `doctor`, `scout_skill_version`,
   `scout_skill_hash`. State values are `synced`, `unchanged`, `installed`, `verified`, `failed`, or `unavailable`.
 - `discovery` exact fields: `inventory_status`, `activity_status`, `desktop_project_count`, `accessible_count`,

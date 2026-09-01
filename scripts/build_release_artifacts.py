@@ -554,6 +554,7 @@ def inspect_portable(
                 ".agents/skills/agent-memory-workstation-bootstrap/scripts/enrollment.py",
                 ".agents/skills/global-owner-scout/scripts/validate_output.py",
                 ".agents/skills/global-owner-scout/scripts/prepare_delivery.py",
+                ".agents/skills/global-owner-scout/scripts/scout.py",
             }
             require(required.issubset(names), "release_portable_content_missing")
             require(
@@ -601,6 +602,7 @@ def inspect_portable(
             "resolve_owner_parity.py",
         ):
             run([sys.executable, "-B", str(scout_scripts / name), "--self-test"], cwd=scout_scripts)
+        run([sys.executable, "-B", str(scout_scripts / "scout.py"), "--help"], cwd=scout_scripts)
 
 
 def _spdx_package(

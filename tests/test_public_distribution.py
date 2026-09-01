@@ -219,7 +219,7 @@ class PublicDistributionTests(unittest.TestCase):
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
         self.assertEqual(
-            {"core": "0.3.9", "plugin": "1.5.1", "bootstrap": "2.0.1", "scout": "5.6.0"},
+            {"core": "0.3.10", "plugin": "1.5.1", "bootstrap": "2.1.0", "scout": "5.7.0"},
             facts,
         )
         allowlist = json.loads(
@@ -536,6 +536,10 @@ class PublicDistributionTests(unittest.TestCase):
             with zipfile.ZipFile(portable) as archive:
                 self.assertIn(
                     ".agents/skills/global-owner-scout/scripts/prepare_delivery.py",
+                    archive.namelist(),
+                )
+                self.assertIn(
+                    ".agents/skills/global-owner-scout/scripts/scout.py",
                     archive.namelist(),
                 )
             for line in (release_root / "SHA256SUMS").read_text(encoding="utf-8").splitlines():

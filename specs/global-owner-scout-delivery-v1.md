@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Owner: project_docs
-- Applies to: Scout 5.6 interactive delivery
+- Applies to: Scout 5.7 interactive delivery
 - Decision: [ADR 0076](../docs/decisions/0076-task-scoped-review-pack-delivery.zh.md)
 
 ## Purpose
@@ -38,7 +38,7 @@ selection payload, credentials, or persistence state.
 
 ## Preparation
 
-`prepare_delivery.py --artifact-dir <host-output-root> --protected-root <project-root>` accepts the complete Review Pack on stdin.
+`python -B scripts/scout.py prepare-delivery --artifact-dir <host-output-root> --protected-root <project-root>` accepts the complete Review Pack on stdin.
 The output root must already exist, be absolute, be a normal directory rather than a link/reparse point, and be outside every
 protected root. The helper renders and verifies the complete interactive Markdown, creates a single-link regular artifact with
 exclusive semantics, flushes it, reads it back, reruns visible-output verification, and emits the manifest on stdout. An existing
@@ -69,7 +69,7 @@ the user surface opened. It is not success, does not enable confirmation, and do
 ## External qualification
 
 A separate controller reads the actual Scout task final and runs
-`prepare_delivery.py --verify-final --artifact-root <host-output-root>`. It must parse the exact opened or queued compact receipt,
+`python -B scripts/scout.py verify-final --artifact-root <host-output-root>`. It must parse the exact opened or queued compact receipt,
 constrain the linked file to that root, validate the reconstructed manifest hash, read and hash the artifact, and rerun visible-output
 verification. `status=surface_pending` proves an intact, discoverable artifact but not an opened user surface. Only
 `status=surface_observed` proves this task's delivery surface. Internal validation, `prepared`, file existence, queued host-open, or
@@ -78,14 +78,16 @@ host-open invocation alone does not prove Production.
 The controller normalizes CRLF/CR to LF and may remove exactly one additional terminal blank line observed in the Desktop final
 envelope. It rejects three or more terminal newlines, spaces, tail notes, field changes, missing fields, or any other receipt rewrite.
 
-`interactive_project_scout` remains `production_unproven / interactive_host_blocked` until three independent worktree canaries pass
-the exact user entry, artifact open, actual-final readback, artifact verification, and project/Owner/Store/Git read-only checks.
+`interactive_project_scout` remains `production_unproven / interactive_host_blocked` until the five-scenario entry matrix passes:
+Local clean automatic projection, Local dirty automatic projection, already-worktree execution, explicit thread-page terminal
+degradation, and missing-output-root Terminal v1. Happy-path cases additionally require artifact open, actual-final readback,
+artifact verification, and project/Owner/Store/Git read-only checks.
 Scheduled Scout remains independently production-blocked.
 
 Before task creation, the external controller must bind the exact installed Scout version and content identity resolved by the
 formal `$global-owner-scout` entry. A newer Skill file in the task worktree is not runtime adoption. A task that resolves another
 version, lacks Delivery v1, or returns the legacy inline renderer envelope is `ineligible / runtime_skill_identity_mismatch` and
-does not count toward the three canaries.
+does not count toward the five-scenario matrix.
 
 ## Acceptance criteria
 
@@ -100,3 +102,37 @@ does not count toward the three canaries.
 7. Review Pack v4 and `selection_token` remain unchanged; user confirmation continues through `rule_revision_bundle_v2` Fresh
    recomputation.
 8. Canary eligibility binds the installed runtime Skill identity before task creation; mismatched or legacy consumers never count.
+
+## Manifest-free terminal
+
+Failures before a valid Delivery manifest use `global_owner_scout_terminal_v1` rather than a Delivery receipt. Its exact fields are:
+
+```text
+contract_version, status, phase, reason_code, project_state,
+confirmation_eligible
+```
+
+`confirmation_eligible=false`; phase, status, reason, and project state are closed enums validated by the active runtime. The Scout
+passes this object to `python -B scripts/scout.py render-terminal`, which emits a path-free Chinese terminal receipt bound to the
+canonical object hash. It never shows partial cards. Calling `render-receipt` without a Delivery manifest or hand-writing a failure
+receipt is a contract violation.
+
+The exact reason mappings are:
+
+```text
+project_binding_unavailable -> interactive_entry_blocked / preflight / unverified
+git_worktree_ineligible -> interactive_entry_blocked / preflight / unverified
+worktree_projection_unavailable -> interactive_entry_blocked / preflight / unchanged|unverified
+execution_protocol_failed -> failed / session_census / unchanged|unverified
+read_only_violation -> failed / project_review / changed
+privacy_or_contract_failed -> failed / project_review / unchanged|unverified
+output_root_unavailable -> interactive_host_blocked / delivery / unchanged|unverified
+render_integrity_failed -> render_integrity_failed / delivery / unchanged|unverified
+output_budget_exceeded -> output_budget_exceeded / project_review / unchanged|unverified
+```
+
+A host-open failure occurs after manifest creation and uses the manifest-bound blocked receipt. It is not a Terminal v1 reason.
+
+The active Skill calls validators, Owner resolution, rendering, visible verification, delivery, receipts, terminal rendering, and
+controller verification only through `scripts/scout.py`. Frozen v4 helpers remain historical compatibility inputs, not competing
+active command surfaces.

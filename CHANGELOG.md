@@ -3,6 +3,32 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.3.10 (2026-09-01)
+
+### Fixed
+
+- Global Owner Scout no longer makes users create a worktree before invoking the project review. The current bound project task is
+  now the single front door: a front-loaded preflight step runs before any deep read, Local tasks automatically project the same
+  invocation into a host-managed worktree executor, already-isolated tasks continue in place, and the front door reports only the
+  native routed-task surface rather than mislabeling task creation as review completion.
+- Explicit native thread-page terminal failures now produce honest degraded Session coverage while retaining cards independently
+  supported by project Owners, ADRs, Git, tests, or acceptance. Unresumed cells and invalid execution sequences remain hard protocol
+  failures and cannot be disguised as degraded coverage.
+- Failures before a Delivery manifest exists now use deterministic `global_owner_scout_terminal_v1` receipts. Missing output roots,
+  preflight blockers, and render/contract failures no longer call a manifest-only receipt helper or rely on hand-written recovery.
+
+### Added
+
+- A single active `scripts/scout.py` dispatcher for Scout validation, Owner parity, rendering, visible verification, delivery,
+  terminal receipts, and controller verification.
+- A five-scenario real-entry acceptance matrix covering Local clean, Local dirty, already-worktree, thread-page terminal failure,
+  and missing-output-root behavior.
+
+### Changed
+
+- The component set is Core 0.3.10, Plugin 1.5.1, Workstation Bootstrap 2.1.0, and Scout 5.7.0. Review Pack remains v4;
+  Scheduled Scout remains production-blocked.
+
 ## 0.3.9 (2026-08-22)
 
 ### Fixed

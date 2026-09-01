@@ -4,7 +4,7 @@
 - Owner layer: project_docs
 - Applies when: 命名 Agent Memory 的产品、规则、授权、运行时、作用域、状态与证据。
 - Avoid when: 只需执行普通项目工作。
-- Last verified: 2026-08-21
+- Last verified: 2026-09-01
 - Evidence: [L1](docs/specs/axioms.md)、[L2](docs/specs/topology.md)、[L3](docs/specs/interface.md)、[ADR 0057](docs/decisions/0057-agent-memory-core-v1.zh.md)、[ADR 0059](docs/decisions/0059-bounded-behavior-set-evolution.zh.md)、[ADR 0069](docs/decisions/0069-cross-device-cold-start-continuity.zh.md)、[ADR 0070](docs/decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[ADR 0071](docs/decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[ADR 0072](docs/decisions/0072-allowlisted-public-distribution-lane.zh.md)、[ADR 0073](docs/decisions/0073-public-engineering-authority-cutover.zh.md)、[ADR 0076](docs/decisions/0076-task-scoped-review-pack-delivery.zh.md)
 
 本文件只统一当前 Core v1 语言，不定义额外行为。字段名、协议名与 CLI 标识保留英文。
@@ -47,11 +47,17 @@
   用于跨设备识别同一内容工程，不包含本机路径或 Codex `projectId`。
 - `host_project_id`：当前 Codex Desktop 对本机项目的执行标识；只用于当前主机绑定，不进入 Git 或跨设备 identity。
 - `host_enrollment`：用户确认当前主机是否为一个已发现项目运行 Global Owner Scout 的本机配置；不是行为 Owner。
+- `project_session_front_door`：当前绑定 Git 项目任务中的唯一 Scout 用户入口；负责显式意图、Fresh 项目绑定、Git
+  资格、执行上下文 preflight 与自动隔离路由，不负责在 Local 执行项目深挖。
+- `isolated_review_executor`：由宿主从项目任务自动投影的 worktree 任务；继承同一正式调用并完成只读 Project Scout，
+  不要求用户重复项目、路径或 prompt。
 - `enrollment_pack`：Bootstrap 对本机项目发现、自然活动覆盖、隔离资格、现有状态和建议动作的中文确认界面。
 - `task_review_artifact`：当前 Scout 任务在宿主显式 generated-output root 中创建的不可变完整 Review Pack；它位于
   被复盘项目外，只在当前任务展示，不被跨任务发现或摄取，不是 Store、Inbox、数据库、Manifest 或行为 Owner。
 - `scout_delivery_manifest`：`global_owner_scout_delivery_v1` 的紧凑控制面；绑定 task artifact 的名称、字节 hash/长度、
   Review Pack/body hash 与卡片/动作守恒，不包含绝对路径、任务 ID、Owner 正文、项目证据正文或长期状态。
+- `scout_terminal_result`：`global_owner_scout_terminal_v1` 的 manifest-free 失败控制面；在完整 Review Pack 尚未形成时
+  绑定 phase、reason、项目状态与不可确认结果，不是部分 Review Pack、Delivery manifest 或长期状态。
 - `repo_bootstrap_anchor`：连续性工程内的极小冷启动 Skill；验证不可变发行物并从安全展开的 portable 在同一任务
   调用正式 Bootstrap，不复制实现、不保存主机状态，也不是行为 Owner。
 - `managed_capability_source`：当前 Codex home 下 identity 固定、clean、可重建的 Sidecar 或 canonical Owner 安装

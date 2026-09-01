@@ -21,6 +21,7 @@ from verify_visible_output import verify_visible_output
 
 
 DELIVERY_CONTRACT = "global_owner_scout_delivery_v1"
+TERMINAL_CONTRACT = "global_owner_scout_terminal_v1"
 DELIVERY_SURFACE = "task_artifact"
 DELIVERY_STATUS = "prepared"
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -49,6 +50,65 @@ FINAL_QUEUED_RECEIPT_RE = re.compile(
     r"`surface_observation=open_queued`；`confirmation_eligible=false`。\n$"
 )
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
+TERMINAL_REASON_MAPPINGS = {
+    "project_binding_unavailable": (
+        "interactive_entry_blocked",
+        "preflight",
+        {"unverified"},
+        "当前任务没有可验证的目标工程绑定。",
+    ),
+    "git_worktree_ineligible": (
+        "interactive_entry_blocked",
+        "preflight",
+        {"unverified"},
+        "当前目标不是可投影到隔离执行快照的 Git 工程。",
+    ),
+    "worktree_projection_unavailable": (
+        "interactive_entry_blocked",
+        "preflight",
+        {"unchanged", "unverified"},
+        "当前宿主无法把本次调用自动投影到隔离 worktree 任务。",
+    ),
+    "execution_protocol_failed": (
+        "failed",
+        "session_census",
+        {"unchanged", "unverified"},
+        "原生任务调用没有按协议取得可分类终态。",
+    ),
+    "read_only_violation": (
+        "failed",
+        "project_review",
+        {"changed"},
+        "复盘前后项目只读指纹不一致。",
+    ),
+    "privacy_or_contract_failed": (
+        "failed",
+        "project_review",
+        {"unchanged", "unverified"},
+        "项目结果或 Review Pack 未通过隐私与契约校验。",
+    ),
+    "output_root_unavailable": (
+        "interactive_host_blocked",
+        "delivery",
+        {"unchanged", "unverified"},
+        "当前任务没有安全且明确授权的宿主输出根目录。",
+    ),
+    "render_integrity_failed": (
+        "render_integrity_failed",
+        "delivery",
+        {"unchanged", "unverified"},
+        "Review Pack 渲染或字节守恒校验失败。",
+    ),
+    "output_budget_exceeded": (
+        "output_budget_exceeded",
+        "project_review",
+        {"unchanged", "unverified"},
+        "完整 Review Pack 超出当前输出预算。",
+    ),
+}
+TERMINAL_STATUSES = {mapping[0] for mapping in TERMINAL_REASON_MAPPINGS.values()}
+TERMINAL_PHASES = {mapping[1] for mapping in TERMINAL_REASON_MAPPINGS.values()}
+TERMINAL_PROJECT_STATES = {state for mapping in TERMINAL_REASON_MAPPINGS.values() for state in mapping[2]}
 
 
 def require(condition: bool, message: str) -> None:
@@ -68,6 +128,46 @@ def delivery_manifest_sha256(value: dict[str, Any]) -> str:
     payload = dict(value)
     payload.pop("delivery_manifest_sha256", None)
     return sha256_bytes(canonical_json(payload).encode("utf-8"))
+
+
+def validate_terminal_result(value: Any) -> dict[str, Any]:
+    require(isinstance(value, dict), "terminal result must be an object")
+    expected_keys = {
+        "contract_version",
+        "status",
+        "phase",
+        "reason_code",
+        "project_state",
+        "confirmation_eligible",
+    }
+    require(set(value) == expected_keys, "terminal result fields are invalid")
+    require(value["contract_version"] == TERMINAL_CONTRACT, "terminal result contract is invalid")
+    require(value["status"] in TERMINAL_STATUSES, "terminal result status is invalid")
+    require(value["phase"] in TERMINAL_PHASES, "terminal result phase is invalid")
+    require(value["reason_code"] in TERMINAL_REASON_MAPPINGS, "terminal result reason_code is invalid")
+    require(value["project_state"] in TERMINAL_PROJECT_STATES, "terminal result project_state is invalid")
+    require(value["confirmation_eligible"] is False, "terminal result cannot enable confirmation")
+    expected_status, expected_phase, allowed_project_states, _ = TERMINAL_REASON_MAPPINGS[value["reason_code"]]
+    require(value["status"] == expected_status, "terminal result status does not match reason_code")
+    require(value["phase"] == expected_phase, "terminal result phase does not match reason_code")
+    require(value["project_state"] in allowed_project_states, "terminal result project_state does not match reason_code")
+    return value
+
+
+def terminal_result_sha256(value: dict[str, Any]) -> str:
+    return sha256_bytes(canonical_json(validate_terminal_result(value)).encode("utf-8"))
+
+
+def render_terminal_receipt(value: dict[str, Any]) -> str:
+    value = validate_terminal_result(value)
+    return (
+        "# Global Owner Scout · 未形成完整审阅包\n\n"
+        f"{TERMINAL_REASON_MAPPINGS[value['reason_code']][3]} 本次未展示部分卡片，确认入口保持关闭。\n\n"
+        f"终态回执：`contract={TERMINAL_CONTRACT}`；`status={value['status']}`；"
+        f"`phase={value['phase']}`；`reason_code={value['reason_code']}`；"
+        f"`project_state={value['project_state']}`；`confirmation_eligible=false`；"
+        f"`terminal_result_sha256={terminal_result_sha256(value)}`。\n"
+    )
 
 
 def is_reparse(stat_result: os.stat_result) -> bool:
@@ -451,6 +551,40 @@ def run_self_test() -> None:
         else:
             raise AssertionError("tampered delivery manifest was accepted")
 
+        terminal = {
+            "contract_version": TERMINAL_CONTRACT,
+            "status": "interactive_host_blocked",
+            "phase": "delivery",
+            "reason_code": "output_root_unavailable",
+            "project_state": "unchanged",
+            "confirmation_eligible": False,
+        }
+        terminal_receipt = render_terminal_receipt(terminal)
+        assert TERMINAL_CONTRACT in terminal_receipt
+        assert terminal_result_sha256(terminal) in terminal_receipt
+        assert "confirmation_eligible=false" in terminal_receipt
+        tests += 1
+
+        for reason_code, (status, phase, project_states, _) in TERMINAL_REASON_MAPPINGS.items():
+            candidate = {
+                "contract_version": TERMINAL_CONTRACT,
+                "status": status,
+                "phase": phase,
+                "reason_code": reason_code,
+                "project_state": sorted(project_states)[0],
+                "confirmation_eligible": False,
+            }
+            validate_terminal_result(candidate)
+            invalid = dict(candidate)
+            invalid["phase"] = next(item for item in TERMINAL_PHASES if item != phase)
+            try:
+                validate_terminal_result(invalid)
+            except ContractError:
+                pass
+            else:
+                raise AssertionError(f"terminal mapping accepted an invalid phase for {reason_code}")
+        tests += 1
+
     print(json.dumps({"status": "ok", "tests": tests, "delivery": DELIVERY_CONTRACT}, separators=(",", ":")))
 
 
@@ -468,6 +602,7 @@ def main() -> int:
     parser.add_argument("--artifact-dir", type=Path)
     parser.add_argument("--protected-root", action="append", type=Path, default=[])
     parser.add_argument("--render-receipt", choices=("open_succeeded", "open_queued", "open_failed"))
+    parser.add_argument("--render-terminal", action="store_true")
     parser.add_argument("--artifact-path", type=Path)
     parser.add_argument("--artifact-root", type=Path)
     parser.add_argument("--verify-final", action="store_true")
@@ -478,6 +613,8 @@ def main() -> int:
         elif args.verify_final:
             require(args.artifact_root is not None, "--artifact-root is required with --verify-final")
             print(json.dumps(verify_final_receipt(sys.stdin.read(), artifact_root=args.artifact_root), ensure_ascii=False, separators=(",", ":")))
+        elif args.render_terminal:
+            print(render_terminal_receipt(load_stdin_json()), end="")
         elif args.render_receipt is not None:
             manifest = validate_delivery_manifest(load_stdin_json())
             if args.render_receipt == "open_succeeded":

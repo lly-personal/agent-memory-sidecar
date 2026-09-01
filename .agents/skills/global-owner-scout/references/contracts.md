@@ -1,15 +1,21 @@
-# Global Owner Scout 5.6 contracts
+# Global Owner Scout 5.7 contracts
 
 ## Common rules
 
-- Skill `5.6.0`; Project result `global_owner_scout_project_v4`; Review Pack
-  `global_owner_scout_review_pack_v4`; Delivery `global_owner_scout_delivery_v1`; user locale `zh-CN`.
+- Skill `5.7.0`; Project result `global_owner_scout_project_v4`; Review Pack
+  `global_owner_scout_review_pack_v4`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
+  `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
 - `project_claim_hash` covers every Project Card field except itself. `review_pack_hash` covers the pack except itself.
 - Evidence references may identify owner sections, ADRs, tests, commits, or event classes. They may not contain absolute paths,
   raw dialogue, complete commands, accounts, tokens, raw remotes, project IDs, automation IDs, or diagnostic bodies.
 - E1 remains an observation. Every E2/E3 card is shown; no fixed project denominator, count cap, ranking, or silent truncation.
 - Human Context is Simplified Chinese and project-specific; Rule Projection is abstract and Owner-ready.
+
+`global_owner_scout_preflight_v1` has exact fields
+`contract_version, git_repository, execution_context, head, status_sha256, staged_diff_sha256, unstaged_diff_sha256,
+untracked_files_sha256, context_snapshot_sha256`. It emits no path. `execution_context` is `local` or `linked_worktree`; the snapshot
+hash covers every other field. Invoke it only through `python -B scripts/scout.py inspect-context` before any deep read.
 
 ## Project result
 
@@ -31,7 +37,12 @@ git_worktree_eligible, binding_status
 
 Identity kind is `content` or `host_local`; binding is `bound`, `rebound`, or `ambiguous`. Raw local project IDs, paths, and remotes
 are forbidden. A Scheduled v5 run requires `content`, worktree eligibility, and non-ambiguous binding. The formal interactive entry
-also runs in an independent Git worktree and uses `manual_30d`.
+starts in the current bound Git project task, performs preflight before all deep reads, and automatically projects Local into one
+independent host worktree executor. This formal invocation authorizes that one read-only executor task. Use a native project-task
+creation operation carrying the exact invocation as its initial prompt; never create an empty child or shell worktree. The user never
+creates that worktree or repeats the invocation. The front-door task exposes only the host-native created-task surface after a
+successful projection; that state is `routed`, not a completed review. The executor uses `manual_30d` and owns the Review Pack or
+Terminal result.
 
 Status is `ok`, `degraded`, `no_material_delta`, `failed`, or `output_budget_exceeded`. Coverage exact fields are:
 
@@ -46,13 +57,17 @@ protocol, not degraded coverage. `discovery_methods` contains only terminal enum
 
 ```text
 native_index_completed, native_index_host_cap, native_index_terminal_failure,
-native_thread_pages_completed, execution_protocol_failed
+native_thread_pages_completed, native_thread_pages_terminal_failure,
+execution_protocol_failed
 ```
 
 Complete requires `native_index_completed + native_thread_pages_completed`, all selected tasks read, and no truncation. Bounded
 requires `native_index_host_cap + native_thread_pages_completed`, a proved host cap, and all selected tasks read. Degraded requires
-an explicit `native_index_terminal_failure`. `execution_protocol_failed` requires Project status `failed` and cannot coexist with
-an index terminal result. `no_material_delta` requires complete/bounded coverage and candidate exhaustion.
+an explicit `native_index_terminal_failure` or one proved index terminal result plus
+`native_thread_pages_terminal_failure`; the latter requires truncation and fewer fully read than selected tasks. In either degraded
+case, cards independently supported by formal project evidence remain. `execution_protocol_failed` requires Project status
+`failed`; it may preserve one previously proved index terminal result, but never thread-pages completed and never cards.
+`no_material_delta` requires complete/bounded coverage and candidate exhaustion.
 
 Each Project Card has exact fields:
 
@@ -110,11 +125,11 @@ sorted `supersedes`, instruction target, and the current canonical source hash. 
 Owner and Skill routes recommend `keep_project` and `make_skill`. Drift removes confirmation but never a card.
 
 Renderer order: warnings; surface-specific decision index; every card's 30-second view; complete evidence and Rule Projection;
-technical appendix; validation receipt; and only for Scheduled, one final Inbox wrapper. Invoke `render_review.py --surface
-interactive|scheduled` directly from the scripts directory with the validated Pack on stdin. Interactive uses `本次需要判断`,
+technical appendix; validation receipt; and only for Scheduled, one final Inbox wrapper. Invoke `python -B scripts/scout.py
+render-review --surface interactive|scheduled` from the Skill root with the validated Pack on stdin. Interactive uses `本次需要判断`,
 has zero wrapper, and contains no Scheduled/Inbox/14-run copy. Scheduled uses `今日需要判断` and exactly one wrapper. The receipt
 records surface, `review_pack_hash`, `visible_body_sha256`, Project Card count, visible card count, a per-card action-count vector,
-total visible action count, atomic bundle action count, and wrapper count. `verify_visible_output.py --surface ...` rejects body drift,
+total visible action count, atomic bundle action count, and wrapper count. `python -B scripts/scout.py verify-visible --surface ...` rejects body drift,
 lost or cross-card-moved actions, duplicate or
 non-final wrappers, raw JSON, trailing notes, and truncation. The verifier proves renderer/artifact bytes only; it does not prove the
 actual task final. Renderer failure may not be repaired by hand-written Markdown. `output_budget_exceeded` is a whole-run failure.
@@ -135,7 +150,7 @@ Status is exactly `prepared`; surface is exactly `task_artifact`; wrapper count 
 excluding its own hash field. The manifest contains no absolute path, task ID, Review Pack body, Owner body, evidence body, approval,
 or persistence state. `prepared` proves deterministic creation and same-file readback only; it is not `surface_observed`.
 
-Run `prepare_delivery.py --artifact-dir <host-output-root> --protected-root <project-root>` with the validated Review Pack on stdin.
+Run `python -B scripts/scout.py prepare-delivery --artifact-dir <host-output-root> --protected-root <project-root>` with the validated Review Pack on stdin.
 The output root must be an explicit current-task host-generated workspace, exist already, be a normal directory, and be outside every
 protected project root. The helper creates a single-link regular Markdown file exclusively; an existing identical file is idempotent,
 while any different bytes, link/reparse point, unsafe root, write failure, or readback mismatch fails closed. It does not write a
@@ -147,10 +162,10 @@ conservation. Then make the current-task host artifact open the final tool call.
 terminal opened/success result. An exact `queued` host result returns the content-bound queued receipt with the artifact link and
 confirmation disabled; its controller result is `surface_pending`, never Production qualification. `pending`, missing, failed, or
 unobservable results use the path-free blocked receipt with confirmation disabled. A
-separate controller reads the actual task final and runs `prepare_delivery.py --verify-final --artifact-root <host-output-root>`.
+separate controller reads the actual task final and runs `python -B scripts/scout.py verify-final --artifact-root <host-output-root>`.
 Both `surface_pending` and `surface_observed` prove that the final receipt, artifact path, manifest hash, file bytes, Review Pack/body
-hashes, cards and actions conserve; only `surface_observed` proves the user surface and qualifies the host. Until three independent
-worktree canaries pass, the
+hashes, cards and actions conserve; only `surface_observed` proves the user surface and qualifies the host. Until the five-scenario
+entry matrix passes, the
 interactive product state is `production_unproven / interactive_host_blocked`.
 The controller normalizes line endings and may remove exactly one host-added terminal blank line; every other trailing or semantic
 edit fails closed.
@@ -160,6 +175,39 @@ than failed/passed, and cannot contribute to Production qualification.
 
 Every Python helper invocation uses `python -B`. The installed Skill and its before/after proof contain no newly created or changed
 `__pycache__`, `.pyc`, or `.pyo`; any bytecode-cache write is an external side effect and fails read-only validation.
+
+## Manifest-free terminal
+
+`global_owner_scout_terminal_v1` has these exact fields:
+
+```text
+contract_version, status, phase, reason_code, project_state,
+confirmation_eligible
+```
+
+`confirmation_eligible` is exactly false. Phase is `preflight`, `session_census`, `project_review`, or `delivery`; project state is
+`unchanged`, `changed`, or `unverified`. Status is `interactive_entry_blocked`, `interactive_host_blocked`,
+`render_integrity_failed`, `output_budget_exceeded`, or `failed`. Reason is a closed enum implemented by the dispatcher and cannot
+contain a path, task ID, evidence body, or free-form diagnostic. Before a valid Delivery manifest exists, pass this object to
+`python -B scripts/scout.py render-terminal`. Never call `render-receipt` without a manifest, hand-write replacement Markdown,
+display partial cards, or enable confirmation.
+
+Every reason has one exact status and phase; only its listed project states are legal:
+
+| reason_code | status | phase | project_state |
+|---|---|---|---|
+| `project_binding_unavailable` | `interactive_entry_blocked` | `preflight` | `unverified` |
+| `git_worktree_ineligible` | `interactive_entry_blocked` | `preflight` | `unverified` |
+| `worktree_projection_unavailable` | `interactive_entry_blocked` | `preflight` | `unchanged` or `unverified` |
+| `execution_protocol_failed` | `failed` | `session_census` | `unchanged` or `unverified` |
+| `read_only_violation` | `failed` | `project_review` | `changed` |
+| `privacy_or_contract_failed` | `failed` | `project_review` | `unchanged` or `unverified` |
+| `output_root_unavailable` | `interactive_host_blocked` | `delivery` | `unchanged` or `unverified` |
+| `render_integrity_failed` | `render_integrity_failed` | `delivery` | `unchanged` or `unverified` |
+| `output_budget_exceeded` | `output_budget_exceeded` | `project_review` | `unchanged` or `unverified` |
+
+`host-open` happens after a valid manifest and therefore uses the manifest-bound blocked/queued/opened receipt path, never
+Terminal v1.
 
 ## User actions
 
@@ -181,11 +229,16 @@ tasks prove adoption and revocation.
 
 ## Entry and Prompt gate
 
-The only formal user invocation is `$global-owner-scout 复盘当前项目`. It selects `manual_30d`, uses no automation memory, inherits
-the current task model/reasoning/Speed, and never displays Scheduled acceptance counters. A v5.4 Scheduled Prompt contains
+The only formal user invocation is `$global-owner-scout 复盘当前项目` in the current bound target Git project task. It selects
+`manual_30d`, uses no automation memory, never asks for resource settings, and never displays Scheduled acceptance counters. When
+Local requires an isolated executor, the Scout supplies no model/thinking override; the executor's host-resolved requested and
+actual settings remain subject to the model-observation contract. A v5.4 Scheduled Prompt contains
 Skill/mode, rolling window, contract versions, model/reasoning, and safety boundaries only. Reject
 prompts containing a fixed `project_key`, absolute path, host project ID, project allowlist, expected candidate, or full review
   protocol. The current Desktop task binding supplies project identity and, when available, its distinct host-generated output root.
+The project task is the user-facing front door; Local is automatically forked to a host worktree executor before any deep read, while
+an already-worktree task continues in place. Projection failure is a preflight Terminal v1 result, not a request for the user to
+create a worktree.
 
 ## Production activation gate
 
