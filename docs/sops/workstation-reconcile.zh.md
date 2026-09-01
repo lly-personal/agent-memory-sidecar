@@ -36,7 +36,7 @@
 
 1. Anchor 必须先用 Resolver 验证 stable immutable Release、tag/commit、asset digest、checksums、release/source manifest
    与 portable bundle。失败停止，不回退 branch、checkout 或猜测资产。
-2. 从 Resolver output 的 portable 运行 Bootstrap 2.0.1，执行 `workstation-reconcile --dry-run`。不得手工拼接多个安装命令
+2. 从 Resolver output 的 portable 运行 Bootstrap 2.1.0，执行 `workstation-reconcile --dry-run`。不得手工拼接多个安装命令
    后声称完整部署。
 3. Fresh install、同一来源的 ref/version/hash 修复由本次部署请求覆盖；Sidecar 或 Marketplace source identity 改变时，
    只显示 renderer 生成的无路径、无 URL 计划，并等待一次确认。
@@ -59,7 +59,7 @@
 | `source_sync_blocked` | Release 与 distribution 读回可用 | source/host/采用 | 修复来源访问或 ambiguity 后重试 |
 | `host_materialization_blocked` | distribution 与 source 已验证或已恢复 | 完整 Core/Skill/Doctor、采用 | 根据唯一错误重试，不手工补步骤 |
 | `reload_required` | 当前主机 distribution/source/Core/Skills/Doctor exact | 当前任务模型采用、第二设备、连续性 | 刷新一次 Desktop，新建任务并发送同一句入口 |
-| `ready` | 当前主机 exact，且新任务已加载 Bootstrap 2.0.1 | 第二设备、Scheduled、连续性、产品收益 | 可在目标工程新任务运行 Project Scout |
+| `ready` | 当前主机 exact，且新任务已加载 Bootstrap 2.1.0 | 第二设备、Scheduled、连续性、产品收益 | 可在目标工程新任务运行 Project Scout |
 
 任何 blocked 状态都不得同时要求刷新 Desktop 或引导运行 Project Scout；先修复矩阵中第一层失效事实。
 

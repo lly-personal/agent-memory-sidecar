@@ -4,8 +4,9 @@
 - Owner layer: project_docs
 - Applies when: 判断组件职责、调用方向、持久化、Desktop 宿主或跨设备分发边界。
 - Avoid when: 只需要用户操作或字段定义；读取 [L3](interface.md)。
-- Last verified: 2026-08-22
+- Last verified: 2026-09-01
 - Evidence: [L1](axioms.md)、用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[确定性 Release 发布 ADR](../decisions/0077-deterministic-release-promotion.zh.md)、[真实读回工作站调和 ADR](../decisions/0078-workstation-reconcile-v2-observed-state.zh.md)
+- Extended by: [项目任务前门与确定性终态 ADR](../decisions/0079-project-session-front-door-and-scout-terminal-contract.zh.md)
 
 ## 拓扑
 
@@ -70,8 +71,12 @@ flowchart LR
     GS["能力权威：Sidecar + Canonical Owner"] --> MS["$CODEX_HOME 受管 clean sources"]
     BS --> MS
     MS --> HM["Host materialization：Core / binding / Skills / Doctor"]
-    HM --> IT["用户在目标工程新建 Worktree 任务"]
-    IT --> EX["显式调用 $global-owner-scout"]
+    HM --> PF["项目任务前门：显式调用 $global-owner-scout"]
+    PF --> PCF["前置 preflight：binding / Git / context / baseline"]
+    PCF -->|"Local"| WP["宿主原生项目 worktree task；携带初始 prompt"]
+    PCF -->|"already worktree"| EX["隔离 Review Executor"]
+    WP --> EX
+    PCF -->|"不可投影"| TR["Terminal v1：早停、不可确认"]
     EX --> NI["原生任务索引：yield / wait / terminal"]
     NI --> TP["相关自然任务分页到窗口边界或 EOF"]
     TP --> SS["Global Owner Scout Skill：project_scout"]
@@ -110,7 +115,9 @@ flowchart LR
 | Workstation Bootstrap Skill | 同步受管源并物化 Core/global binding/Bootstrap/Scout/Doctor；只有用户明确要求 Scheduled 实验时才生成 Enrollment Pack 和调和 Host Profile | 把内容同步冒充主机激活、清理活跃工程、自动选择新项目、修改 Owner |
 | Workstation Reconcile / Source Authority Cutover | 从 Release 构造统一期望身份，真实读取 Marketplace/Plugin/source/runtime/Skills，并以一次确认和 fresh `plan_hash` 共同调和分发与主机物化 | 放宽普通 sync、隐式启用已禁用 Plugin、移除 Owner、修改项目 checkout 或 Scheduled |
 | Deployment Pack v2 | 只从执行后 exact readback 构造中文分层结果，并把 Desktop reload 与新任务采用独立报告 | 接受调用方手填 Plugin 状态、用安装替代模型采用、声称未验收的第二台设备成功 |
-| Interactive Worktree Task | 在当前绑定项目承载 30 天手动复盘并把结果留在同一任务 | 隐式触发、修改活跃工作区、计入 Scheduled 14 次实验 |
+| Project Session Front Door | 接受当前绑定 Git 项目中的唯一正式调用，以 `preflight_v1` 先做无路径 Git 快照，并把 Local 调用自动投影到携带初始 prompt 的唯一隔离任务 | 要求用户手工创建 worktree、先深挖后检查环境、创建空子任务、复制 prompt |
+| Isolated Review Executor | 在宿主创建的独立 worktree 承载 30 天手动复盘并把结果留在该执行任务 | 修改活跃 Local、计入 Scheduled 14 次实验、重新询问项目身份 |
+| Host-native created-task surface | 在前门任务中把用户直接带到或链接到唯一 executor；只证明 `routed` | 冒充 Review Pack 已完成、要求用户复制 prompt、在前门输出部分结果 |
 | Project Discovery | 关联 Desktop 项目、自然任务、Git 内容 identity 与安全资格 | 根据固定项目名或路径决定启用 |
 | Enrollment Pack | 用中文完整显示发现、活动覆盖、安全条件、现有状态和建议动作 | 未确认即创建 Scheduled Task |
 | Host Profile | 保存当前主机的 enrollment 决策、内容 identity hash、host project/automation 映射与 cadence | 证据、候选、Review Pack、Owner 正文、跨主机租约 |
@@ -118,6 +125,7 @@ flowchart LR
 | Capability canary | 在真实 Scheduled 来源只验证独立任务创建与原生任务索引终态 | Project Scout 深挖、卡片生成、长期任务、用普通任务替代生产入口 |
 | Standalone Scheduled Task | 为一个已确认项目创建独立运行、绑定证据窗口和隔离 worktree | 复用活跃任务上下文、修改工作区、决定项目集合 |
 | Native task execution | 以固定上限 50 请求索引；若 yield 则恢复同一 cell 到终态；以 turn limit 10、单项输出 20000 字符分页读取所有选中任务 | 用重复索引调用替代 wait、探测更大分页、把运行中解释为 unavailable |
+| Scout runtime dispatcher | 以 `python -B scripts/scout.py <operation>` 统一进入活动 validator、resolver、renderer、delivery 与 terminal receipt | 让模型从相邻 helper 名推断入口、把 pre-manifest 失败交给 manifest receipt |
 | `project_scout` | 项目任务普查、事实重建、因果复盘、候选穷举、反证、抽象、证据等级与本地 owner 建议 | 授权、proposal、持久化候选、global owner 修订 |
 | Project Card | 以 `project_claim_hash` 同时固定中文 Human Context、项目事实、因果、证据、抽象、Rule Projection 与本地 owner 判断 | global owner 写入、中央结论 |
 | Human Context | 使用简体中文和脱敏项目业务语境解释真实事件、成本、建议、行为变化与最大风险 | 抽象规则写入、翻译后补、私有细节泄漏 |
@@ -128,6 +136,7 @@ flowchart LR
 | Deterministic renderer | 从 scripts 目录读取已验证 Review Pack；interactive 输出零 wrapper，scheduled 输出唯一末尾 wrapper | 动态导入、失败后手工重写、修复项目语义 |
 | Visible-output verifier | 按 surface 重新验证 renderer/artifact 字节的正文 hash、卡片、动作、wrapper 数量和无尾注 | 声称已经观察实际用户 final、生成卡片、替代 renderer |
 | Delivery v1 | 绑定 artifact 名称、完整文件 hash/bytes、Review Pack/body hash、卡片与动作守恒 | 保存绝对路径、正文、任务 ID、授权或长期状态 |
+| Terminal v1 | 在没有 Delivery manifest 时绑定 phase、reason、项目状态与不可确认终态 | 生成部分卡片、替代 Review Pack、声称安装或用户表面成功 |
 | Task artifact | 在宿主为当前任务显式提供且位于项目外的 generated-output root 保存不可变完整 Review Pack；该 root 可位于宿主管理的 app storage | 项目文件、系统临时文件、任意猜测的 `$CODEX_HOME` 路径、Store、跨任务文件桥 |
 | Host surface / external controller | 在当前任务打开 artifact，并从另一个交互控制任务回读实际 final 与 artifact | 用内部 tool output、文件存在或模型自述冒充用户表面证明 |
 | Cache-free helper runtime | 以 `python -B` 运行 helper；Bootstrap 原子安装时排除 Python 字节码缓存 | 让 Scout 写入或自清理个人 Skill 缓存 |
@@ -139,12 +148,14 @@ output root 下与 Review Pack hash 绑定的 artifact；它不计入项目或�
 前后必须一致；出现项目 diff、commit、push、其他外部写操作或无法证明的副作用时，该项目整包失败。活跃原工作区
 的并发变化只限定当前快照覆盖范围，不得让稳定隔离快照中的其他候选整体失效。
 
-原生任务调用返回运行中 cell 时，Scout 必须恢复同一 cell 到终态，且终态前不得发起第二次索引调用。Project 与
+项目任务前门必须在任何任务索引之前通过 `scripts/scout.py inspect-context` 完成 preflight；Local 入口通过宿主原生、
+携带初始 prompt 的项目 worktree 任务自动续跑，已在
+worktree 才直接进入 executor。原生任务调用返回运行中 cell 时，Scout 必须恢复同一 cell 到终态，且终态前不得发起第二次索引调用。Project 与
 Review Pack 结构通过校验后仍未完成链路；renderer 与 visible-output verifier 只证明交付前字节。interactive 必须
 继续创建并回读同任务 artifact、通过宿主工具打开，然后由外部 controller 读取实际 final/artifact 才完成呈现。
 宿主 open 是 Scout 的最后一个工具调用；之后只允许 compact Delivery receipt，不得再调用独立 memory 审计或追加尾注。
 
-Bootstrap 2.0.1 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 2.1.0 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得
@@ -169,15 +180,18 @@ Scout、测试、自动化和委派任务不计入；`eligible` 要求 Git workt
 automation-source canary 在 180 秒外部观察预算内取得原生索引终态。canary 不通过时 Host Activation Control
 复读任务为 `PAUSED` 并报告 `production_blocked`；只读 Scout 不负责自暂停。
 
-三个用户创建的普通 worktree canary 分别验证交互 Skill、Schema、renderer、task artifact、实际 final 回读、只读边界与同任务动作；通过后只提升
+五条正式项目任务入口矩阵分别验证 Local clean 自动投影、Local dirty 自动投影、already-worktree 原地执行、
+thread-page 明确终态失败降级和 missing-output-root Terminal v1；happy-path 同时验证交互 Skill、Schema、renderer、
+task artifact、实际 final 回读、只读边界与同任务动作。通过后只提升
 `interactive_project_scout`。它们不拥有 Scheduled 恢复权，也不计入 Scheduled 14 次实验。automation-source canary
 通过后仍只恢复一个项目，直到一条 Scheduled Review Pack 与用户动作成立，才恢复其他 enrollment 项目。
 
 每条 canary 的前置消费者身份必须来自正式入口实际安装的 Scout version/hash，而不是待测 worktree 中同名 Skill
 文件。版本或内容身份不匹配、缺少 Delivery v1、或仍返回 legacy inline envelope 的任务统一标记为 `ineligible /
-runtime_skill_identity_mismatch`；它不会消耗三条合格样本，也不能用前台可见性单独提升结果层。
+runtime_skill_identity_mismatch`；它不会消耗五条入口矩阵样本，也不能用前台可见性单独提升结果层。
 
-交互任务继承当前任务的 model、reasoning 和 Speed；其触发语不要求用户填写资源配置。每个 Scheduled 确认项目在
+交互入口不要求用户填写资源配置，也不为自动隔离 executor 注入 model/thinking override；使用该 executor 的宿主
+解析值并记录可观测 requested/actual。每个 Scheduled 确认项目在
 14 次有效运行期间显式固定 `gpt-5.6-sol` + `medium`；speed/service tier 不单独持久化，直接
 继承本机 Codex 当前配置。结果直接进入 Scheduled 收件箱，正常结果不得使用仅失败提醒。每个项目独立累计；
 另一项目或按需中央审阅失败不得清零其计数。共享源与 Anchor 不保存固定项目名、绝对路径、host `projectId`、automation ID

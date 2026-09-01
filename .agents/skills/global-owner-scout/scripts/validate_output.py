@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate Global Owner Scout v5.6 project results and Review Packs."""
+"""Validate Global Owner Scout v5.7 project results and Review Packs."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from typing import Any, Callable, Iterable
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.6.0"
+SKILL_VERSION = "5.7.0"
 PROJECT_CONTRACT = "global_owner_scout_project_v4"
 REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v4"
 DISPLAY_LOCALE = "zh-CN"
@@ -31,6 +31,7 @@ DISCOVERY_METHODS = {
     "native_index_host_cap",
     "native_index_terminal_failure",
     "native_thread_pages_completed",
+    "native_thread_pages_terminal_failure",
     "execution_protocol_failed",
 }
 CLASSIFICATIONS = {"already_covered", "add", "replace", "consolidate", "route_to_owner"}
@@ -362,12 +363,17 @@ def validate_session_coverage(value: Any, path: str, project_status: str) -> Non
     require(set(methods) <= DISCOVERY_METHODS, f"{path}.discovery_methods contains a non-terminal method")
     method_set = set(methods)
     protocol_failed = "execution_protocol_failed" in method_set
+    thread_pages_failed = "native_thread_pages_terminal_failure" in method_set
     if protocol_failed:
         require(project_status == "failed", f"{path} execution_protocol_failed requires project status failed")
         require(status == "degraded", f"{path} execution_protocol_failed requires degraded coverage")
         require(
-            not method_set & {"native_index_completed", "native_index_host_cap", "native_index_terminal_failure"},
-            f"{path} execution_protocol_failed cannot claim an index terminal result",
+            method_set in (
+                {"execution_protocol_failed"},
+                {"native_index_completed", "execution_protocol_failed"},
+                {"native_index_host_cap", "execution_protocol_failed"},
+            ),
+            f"{path} execution_protocol_failed may preserve only a previously proved index terminal result",
         )
     elif status == "complete":
         require(
@@ -378,6 +384,16 @@ def validate_session_coverage(value: Any, path: str, project_status: str) -> Non
         require(
             method_set == {"native_index_host_cap", "native_thread_pages_completed"},
             f"{path} bounded coverage requires explicit host cap and completed thread pages",
+        )
+    elif thread_pages_failed:
+        require(project_status == "degraded", f"{path} thread page terminal failure requires degraded project status")
+        require(obj["truncated"] and read < selected, f"{path} thread page terminal failure must expose incomplete selected-task coverage")
+        require(
+            method_set in (
+                {"native_index_completed", "native_thread_pages_terminal_failure"},
+                {"native_index_host_cap", "native_thread_pages_terminal_failure"},
+            ),
+            f"{path} thread page terminal failure requires one proved index terminal result",
         )
     else:
         require(
@@ -612,13 +628,22 @@ def validate_project(value: Any) -> dict[str, Any]:
         require_string(item, f"$.owner_snapshot.owners_read[{index}]")
     validate_session_coverage(obj["session_coverage"], "$.session_coverage", status)
     sources = require_list(obj["evidence_sources"], "$.evidence_sources", nonempty=True)
+    source_statuses: dict[str, str] = {}
     for index, raw in enumerate(sources):
         path = f"$.evidence_sources[{index}]"
         item = require_object(raw, path)
         require_exact_keys(item, {"kind", "status", "coverage"}, path)
-        require_string(item["kind"], f"{path}.kind")
+        kind = require_string(item["kind"], f"{path}.kind")
+        require(kind not in source_statuses, f"{path}.kind must be unique")
         require(item["status"] in {"available", "degraded", "unavailable"}, f"{path}.status invalid")
+        source_statuses[kind] = item["status"]
         require_string(item["coverage"], f"{path}.coverage")
+    require("sessions" in source_statuses, "$.evidence_sources must include sessions")
+    discovery_methods = set(obj["session_coverage"]["discovery_methods"])
+    if "native_thread_pages_terminal_failure" in discovery_methods:
+        require(source_statuses["sessions"] == "degraded", "$.evidence_sources sessions must be degraded after a thread-page terminal failure")
+    if discovery_methods & {"native_index_terminal_failure", "execution_protocol_failed"}:
+        require(source_statuses["sessions"] == "unavailable", "$.evidence_sources sessions must be unavailable after an index/protocol failure")
     orders: list[int] = []
     for index, raw in enumerate(require_list(obj["events"], "$.events")):
         path = f"$.events[{index}]"
@@ -945,6 +970,7 @@ def valid_project(
     observed: bool = True,
     window_kind: str = "manual_30d",
     execution_protocol_failed: bool = False,
+    thread_pages_terminal_failure: bool = False,
 ) -> dict[str, Any]:
     if status in {"no_material_delta", "failed", "output_budget_exceeded"}:
         card_count = 0
@@ -955,9 +981,15 @@ def valid_project(
         status = "failed"
         coverage = "degraded"
         card_count = 0
+    if thread_pages_terminal_failure:
+        status = "degraded"
+        coverage = "degraded"
+        truncated = True
     limitations = ["Session 索引返回明确终态错误；本轮使用了正式项目证据。"] if status == "degraded" else []
     if execution_protocol_failed:
         limitations = ["原生任务执行协议未完成，本轮没有生成可操作卡片。"]
+    if thread_pages_terminal_failure:
+        limitations = ["至少一个相关任务分页返回明确终态错误；仅保留其他正式证据独立支持的卡片。"]
     project = {
         "contract_version": PROJECT_CONTRACT,
         "mode": "project_scout",
@@ -976,13 +1008,15 @@ def valid_project(
             "discovered_task_count": discovered,
             "window_task_count": 3,
             "selected_task_count": selected,
-            "fully_read_task_count": selected if coverage != "degraded" else 0,
-            "turn_pages_read": 6 if coverage != "degraded" else 0,
+            "fully_read_task_count": selected - 1 if thread_pages_terminal_failure else selected if coverage != "degraded" else 0,
+            "turn_pages_read": 4 if thread_pages_terminal_failure else 6 if coverage != "degraded" else 0,
             "excluded": [{"task_ref": "task:unrelated", "reason": "项目身份不一致。"}],
             "truncated": truncated,
             "status": coverage,
             "discovery_methods": (
-                ["execution_protocol_failed"]
+                ["native_index_completed", "native_thread_pages_terminal_failure"]
+                if thread_pages_terminal_failure
+                else ["execution_protocol_failed"]
                 if execution_protocol_failed
                 else ["native_index_terminal_failure"]
                 if coverage == "degraded"
@@ -992,7 +1026,11 @@ def valid_project(
             ),
         },
         "evidence_sources": [
-            {"kind": "sessions", "status": "unavailable" if coverage == "degraded" else "available", "coverage": "已检查窗口任务普查和所选任务分页。"},
+            {
+                "kind": "sessions",
+                "status": "degraded" if thread_pages_terminal_failure else "unavailable" if coverage == "degraded" else "available",
+                "coverage": "已检查窗口任务普查和所选任务分页。",
+            },
             {"kind": "owners", "status": "available", "coverage": "已读取指令链和正式决策。"},
             {"kind": "acceptance", "status": "available", "coverage": "已检查测试与用户可见验收。"},
         ],
@@ -1113,6 +1151,7 @@ def run_self_test() -> None:
         valid_project(coverage="bounded"),
         valid_project(window_kind="rolling_72h"),
         valid_project(execution_protocol_failed=True),
+        valid_project(thread_pages_terminal_failure=True),
     ]
     regular_forward_test = valid_project(window_kind="rolling_72h")
     regular_forward_test["read_only_proof"]["host_automation_memory_read"] = False
@@ -1142,6 +1181,11 @@ def run_self_test() -> None:
     invalid = valid_project(status="degraded", coverage="degraded", observed=False)
     invalid["session_coverage"]["discovery_methods"] = ["native_index_completed"]
     expect_invalid(invalid, validate_project, "degraded without terminal failure")
+    tests += 1
+
+    invalid = valid_project(thread_pages_terminal_failure=True)
+    invalid["session_coverage"]["fully_read_task_count"] = invalid["session_coverage"]["selected_task_count"]
+    expect_invalid(invalid, validate_project, "thread page failure disguised as complete selected-task coverage")
     tests += 1
 
     invalid = valid_project(status="degraded", coverage="degraded", observed=False)
@@ -1369,7 +1413,7 @@ def load_stdin_json() -> Any:
 
 def main() -> int:
     configure_utf8_stdio()
-    parser = argparse.ArgumentParser(description="Validate Global Owner Scout v5.1 JSON contracts from stdin.")
+    parser = argparse.ArgumentParser(description="Validate Global Owner Scout v5.7 JSON contracts from stdin.")
     parser.add_argument("--mode", choices=("project_scout", "review_pack"))
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--hash-project-card", action="store_true")

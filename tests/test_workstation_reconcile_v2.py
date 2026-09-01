@@ -39,14 +39,14 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
 
     def desired_bundle(self) -> dict[str, object]:
         return {
-            "release_ref": "v0.3.9",
+            "release_ref": "v0.3.10",
             "source_commit": "a" * 40,
-            "core_version": "0.3.9",
+            "core_version": "0.3.10",
             "plugin_version": "1.5.1",
             "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.0.1",
+            "bootstrap_version": "2.1.0",
             "bootstrap_sha256": "c" * 64,
-            "scout_version": "5.6.0",
+            "scout_version": "5.7.0",
             "scout_sha256": "d" * 64,
         }
 
@@ -55,13 +55,13 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "marketplace": {
                 "status": "present",
                 "source_sha256": "e" * 64,
-                "ref": "v0.3.9",
+                "ref": "v0.3.10",
                 "commit": "a" * 40,
             },
             "plugin": {
                 "status": "installed",
                 "source_sha256": "e" * 64,
-                "ref": "v0.3.9",
+                "ref": "v0.3.10",
                 "version": "1.5.1",
                 "content_sha256": "b" * 64,
                 "enabled": True,
@@ -70,7 +70,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
 
     def source_plan(self) -> dict[str, object]:
         current_sidecar = {"remote_sha256": "e" * 64, "commit": "a" * 40}
-        desired_sidecar = {**current_sidecar, "ref": "v0.3.9"}
+        desired_sidecar = {**current_sidecar, "ref": "v0.3.10"}
         plan = {
             "contract_version": self.reconcile.SOURCE_CUTOVER_PLAN_VERSION,
             "bootstrap_version": self.reconcile.BOOTSTRAP_VERSION,
@@ -87,16 +87,16 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
     def exact_host(self) -> dict[str, object]:
         return {
             "core": {
-                "status": "verified", "version": "0.3.9", "source_commit": "a" * 40,
+                "status": "verified", "version": "0.3.10", "source_commit": "a" * 40,
                 "artifact_sha256": "2" * 64,
             },
             "global_binding": "unavailable",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.0.1", "content_sha256": "c" * 64,
+                "status": "unchanged", "version": "2.1.0", "content_sha256": "c" * 64,
             },
             "scout_skill": {
-                "status": "unchanged", "version": "5.6.0", "content_sha256": "d" * 64,
+                "status": "unchanged", "version": "5.7.0", "content_sha256": "d" * 64,
             },
         }
 
@@ -223,7 +223,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         materialization = {
             "core": {
                 "status": "verified",
-                "version": "0.3.9",
+                "version": "0.3.10",
                 "source_commit": "a" * 40,
                 "artifact_sha256": "2" * 64,
             },
@@ -231,17 +231,17 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.0.1",
+                "version": "2.1.0",
                 "content_sha256": "c" * 64,
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.6.0",
+                "version": "5.7.0",
                 "content_sha256": "d" * 64,
             },
         }
         source_sync = {
-            "sidecar": {"status": "unchanged", "ref": "v0.3.9", "commit": "a" * 40},
+            "sidecar": {"status": "unchanged", "ref": "v0.3.10", "commit": "a" * 40},
             "canonical_owner": {"status": "unchanged", "ref": "preserved", "commit": "3" * 40},
         }
 
@@ -264,20 +264,20 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
     def test_unverified_consumer_always_requires_one_refresh(self) -> None:
         materialization = {
             "core": {
-                "status": "verified", "version": "0.3.9", "source_commit": "a" * 40,
+                "status": "verified", "version": "0.3.10", "source_commit": "a" * 40,
                 "artifact_sha256": "2" * 64,
             },
             "global_binding": "verified",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.0.1", "content_sha256": "c" * 64,
+                "status": "unchanged", "version": "2.1.0", "content_sha256": "c" * 64,
             },
             "scout_skill": {
-                "status": "unchanged", "version": "5.6.0", "content_sha256": "d" * 64,
+                "status": "unchanged", "version": "5.7.0", "content_sha256": "d" * 64,
             },
         }
         source_sync = {
-            "sidecar": {"status": "unchanged", "ref": "v0.3.9", "commit": "a" * 40},
+            "sidecar": {"status": "unchanged", "ref": "v0.3.10", "commit": "a" * 40},
             "canonical_owner": {"status": "unchanged", "ref": "preserved", "commit": "3" * 40},
         }
 
@@ -302,7 +302,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             **distribution["plugin"], "version": "1.3.0", "content_sha256": "1" * 64,
         }
         source_sync = {
-            "sidecar": {"status": "unchanged", "ref": "v0.3.9", "commit": "a" * 40},
+            "sidecar": {"status": "unchanged", "ref": "v0.3.10", "commit": "a" * 40},
             "canonical_owner": {"status": "unavailable", "ref": "unavailable", "commit": "unavailable"},
         }
 
@@ -338,17 +338,17 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             plugin_manifest.parent.mkdir()
             plugin_manifest.write_text(json.dumps({"version": "1.5.1"}), encoding="utf-8")
             (bootstrap / "SKILL.md").write_text(
-                "# Bootstrap\n\n- Skill version: `2.0.1`\n", encoding="utf-8",
+                "# Bootstrap\n\n- Skill version: `2.1.0`\n", encoding="utf-8",
             )
             (scout / "SKILL.md").write_text(
-                "# Scout\n\n- Skill version: `5.6.0`\n", encoding="utf-8",
+                "# Scout\n\n- Skill version: `5.7.0`\n", encoding="utf-8",
             )
             source_manifest = {
                 "contract_version": "agent_memory_source_manifest_v1",
                 "distribution": "release",
                 "sidecar": {
                     "remote": "https://github.com/lly-personal/agent-memory-sidecar.git",
-                    "ref": "v0.3.9",
+                    "ref": "v0.3.10",
                     "commit": "a" * 40,
                 },
                 "canonical_owner": None,
@@ -358,7 +358,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 "status": "public_artifact_verified",
                 "source": {
                     "repository": "https://github.com/lly-personal/agent-memory-sidecar",
-                    "ref": "v0.3.9",
+                    "ref": "v0.3.10",
                     "commit": "a" * 40,
                     "authority_epoch": "public_active",
                     "engineering_source_commit": "a" * 40,
@@ -366,8 +366,8 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                     "authority_activated_at": "2026-08-21T00:00:00Z",
                 },
                 "versions": {
-                    "core": "0.3.9", "plugin": "1.5.1",
-                    "bootstrap": "2.0.1", "scout": "5.6.0",
+                    "core": "0.3.10", "plugin": "1.5.1",
+                    "bootstrap": "2.1.0", "scout": "5.7.0",
                 },
                 "artifacts": [],
                 "verification": {},
@@ -376,7 +376,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             release_path = output / "release-manifest.json"
             source_path.write_text(json.dumps(source_manifest), encoding="utf-8")
             release_path.write_text(json.dumps(release_manifest), encoding="utf-8")
-            portable_archive = output / "agent-memory-portable-0.3.9.zip"
+            portable_archive = output / "agent-memory-portable-0.3.10.zip"
             portable_archive.write_bytes(b"verified portable fixture")
             assets = {}
             for path in (source_path, release_path, portable_archive):
@@ -388,7 +388,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 "contract_version": "agent_memory_release_resolution_v1",
                 "status": "verified",
                 "repository": "lly-personal/agent-memory-sidecar",
-                "tag": "v0.3.9",
+                "tag": "v0.3.10",
                 "commit": "a" * 40,
                 "portable_root": "portable",
                 "assets": assets,
@@ -398,9 +398,9 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 source_path, release_path,
             )
 
-            self.assertEqual("v0.3.9", desired["release_ref"])
+            self.assertEqual("v0.3.10", desired["release_ref"])
             self.assertEqual("1.5.1", desired["plugin_version"])
-            self.assertEqual("2.0.1", desired["bootstrap_version"])
+            self.assertEqual("2.1.0", desired["bootstrap_version"])
             self.assertEqual("a" * 40, sidecar.expected_commit)
             self.assertRegex(source_hash, r"^[0-9a-f]{64}$")
             self.assertRegex(desired["plugin_sha256"], r"^[0-9a-f]{64}$")
@@ -435,7 +435,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                         "source": "git-subdir",
                         "url": "https://github.com/example/agent-memory-sidecar.git",
                         "path": "./plugins/agent-memory-sidecar",
-                        "ref": "v0.3.9",
+                        "ref": "v0.3.10",
                     },
                     "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
                     "category": "Productivity",
@@ -451,7 +451,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 json.dumps({
                     "source_type": "git",
                     "source": "https://github.com/example/agent-memory-sidecar.git",
-                    "ref_name": "v0.3.9",
+                    "ref_name": "v0.3.10",
                     "sparse_paths": [],
                     "revision": commit,
                 }),
@@ -488,7 +488,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                             "source": "git-subdir",
                             "url": "https://github.com/example/agent-memory-sidecar.git",
                             "path": "plugins/agent-memory-sidecar",
-                            "ref": "v0.3.9",
+                            "ref": "v0.3.10",
                         },
                     }]
                 }
@@ -514,7 +514,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 observed_without_metadata = self.reconcile.observe_distribution(codex_home)
 
             self.assertEqual("present", observed_without_metadata["marketplace"]["status"])
-            self.assertEqual("v0.3.9", observed_without_metadata["marketplace"]["ref"])
+            self.assertEqual("v0.3.10", observed_without_metadata["marketplace"]["ref"])
             self.assertEqual(commit, observed_without_metadata["marketplace"]["commit"])
 
     def test_host_observer_reads_live_doctor_and_physical_skills(self) -> None:
@@ -524,7 +524,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             work = root / "sidecar-work"
             init = work / "src" / "agent_memory_sidecar" / "__init__.py"
             init.parent.mkdir(parents=True)
-            init.write_text('__version__ = "0.3.9"\n', encoding="utf-8")
+            init.write_text('__version__ = "0.3.10"\n', encoding="utf-8")
             self.reconcile.run_git(["add", "src/agent_memory_sidecar/__init__.py"], cwd=work)
             self.reconcile.run_git(["commit", "-q", "-m", "core"], cwd=work)
             self.reconcile.run_git(["remote", "add", "origin", str(remote)], cwd=work)
@@ -534,8 +534,8 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             codex_home = root / "codex-home"
             self.reconcile.sync_sources(codex_home, spec)
             for name, version in (
-                ("agent-memory-workstation-bootstrap", "2.0.1"),
-                ("global-owner-scout", "5.6.0"),
+                ("agent-memory-workstation-bootstrap", "2.1.0"),
+                ("global-owner-scout", "5.7.0"),
             ):
                 skill = codex_home / "skills" / name
                 skill.mkdir(parents=True)
@@ -565,7 +565,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             self.assertEqual("verified", observed["core"]["status"])
             self.assertEqual(commit, observed["core"]["source_commit"])
             self.assertEqual("verified", observed["doctor"])
-            self.assertEqual("2.0.1", observed["bootstrap_skill"]["version"])
+            self.assertEqual("2.1.0", observed["bootstrap_skill"]["version"])
             self.assertRegex(observed["scout_skill"]["content_sha256"], r"^[0-9a-f]{64}$")
 
     def test_distribution_participant_rolls_back_with_source_transaction(self) -> None:
@@ -699,12 +699,12 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "source_plan": source_plan,
             "observed_host": stale_host,
             "private_distribution": {},
-            "sidecar": self.reconcile.SourceSpec("sidecar", "https://example.invalid/repo.git", "v0.3.9", "a" * 40),
+            "sidecar": self.reconcile.SourceSpec("sidecar", "https://example.invalid/repo.git", "v0.3.10", "a" * 40),
             "specs": (),
         }
         source_receipt = {
             "sources": {
-                "sidecar": {"status": "unchanged", "ref": "v0.3.9", "commit": "a" * 40},
+                "sidecar": {"status": "unchanged", "ref": "v0.3.10", "commit": "a" * 40},
                 "canonical_owner": {"status": "unavailable", "ref": "unavailable", "commit": "unavailable"},
             },
             "materialization": stale_host,

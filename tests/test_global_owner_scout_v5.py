@@ -26,6 +26,7 @@ SCOUT_RENDERER = SCOUT_SCRIPTS / "render_review.py"
 SCOUT_VISIBLE_VERIFIER = SCOUT_SCRIPTS / "verify_visible_output.py"
 SCOUT_DELIVERY = SCOUT_SCRIPTS / "prepare_delivery.py"
 SCOUT_OWNER_RESOLVER = SCOUT_SCRIPTS / "resolve_owner_parity.py"
+SCOUT_RUNTIME = SCOUT_SCRIPTS / "scout.py"
 
 
 def load_module(name: str, path: Path):
@@ -84,7 +85,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         return {
             "core": {
                 "status": "verified",
-                "version": "0.3.9",
+                "version": "0.3.10",
                 "source_commit": source_commit,
                 "artifact_sha256": "a" * 64,
             },
@@ -92,12 +93,12 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.0.1",
+                "version": "2.1.0",
                 "content_sha256": "b" * 64,
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.6.0",
+                "version": "5.7.0",
                 "content_sha256": "c" * 64,
             },
         }
@@ -259,7 +260,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             enrollment.write_text("# fixture\n", encoding="utf-8")
             core_init = sidecar / "src" / "agent_memory_sidecar" / "__init__.py"
             core_init.parent.mkdir(parents=True)
-            core_init.write_text('__version__ = "0.3.9"\n', encoding="utf-8")
+            core_init.write_text('__version__ = "0.3.10"\n', encoding="utf-8")
             calls = []
 
             def successful(command, *, cwd, env):
@@ -314,7 +315,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             enrollment.write_text("# fixture\n", encoding="utf-8")
             core_init = sidecar / "src" / "agent_memory_sidecar" / "__init__.py"
             core_init.parent.mkdir(parents=True)
-            core_init.write_text('__version__ = "0.3.9"\n', encoding="utf-8")
+            core_init.write_text('__version__ = "0.3.10"\n', encoding="utf-8")
             owner.mkdir(parents=True)
             owner_commit = "b" * 40
             self.bind_managed_owner(
@@ -844,35 +845,35 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
 
     def test_deployment_pack_keeps_proof_layers_separate(self) -> None:
         desired = {
-            "release_ref": "v0.3.9", "source_commit": "a" * 40,
-            "core_version": "0.3.9", "plugin_version": "1.5.1", "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.0.1", "bootstrap_sha256": "c" * 64,
-            "scout_version": "5.6.0", "scout_sha256": "d" * 64,
+            "release_ref": "v0.3.10", "source_commit": "a" * 40,
+            "core_version": "0.3.10", "plugin_version": "1.5.1", "plugin_sha256": "b" * 64,
+            "bootstrap_version": "2.1.0", "bootstrap_sha256": "c" * 64,
+            "scout_version": "5.7.0", "scout_sha256": "d" * 64,
         }
         source_sha = "e" * 64
         pack = self.managed_sources.build_deployment_pack_v2(
             desired=desired,
             observed_distribution={
-                "marketplace": {"status": "present", "source_sha256": source_sha, "ref": "v0.3.9", "commit": "a" * 40},
-                "plugin": {"status": "installed", "source_sha256": source_sha, "ref": "v0.3.9", "version": "1.5.1", "content_sha256": "b" * 64, "enabled": True},
+                "marketplace": {"status": "present", "source_sha256": source_sha, "ref": "v0.3.10", "commit": "a" * 40},
+                "plugin": {"status": "installed", "source_sha256": source_sha, "ref": "v0.3.10", "version": "1.5.1", "content_sha256": "b" * 64, "enabled": True},
             },
             desired_source_sha256=source_sha,
             source_sync={
-                "sidecar": {"status": "unchanged", "ref": "v0.3.9", "commit": "a" * 40},
+                "sidecar": {"status": "unchanged", "ref": "v0.3.10", "commit": "a" * 40},
                 "canonical_owner": {"status": "unavailable", "ref": "unavailable", "commit": "unavailable"},
             },
             host_materialization={
-                "core": {"status": "verified", "version": "0.3.9", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
+                "core": {"status": "verified", "version": "0.3.10", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
                 "global_binding": "unavailable", "doctor": "verified",
-                "bootstrap_skill": {"status": "unchanged", "version": "2.0.1", "content_sha256": "c" * 64},
-                "scout_skill": {"status": "unchanged", "version": "5.6.0", "content_sha256": "d" * 64},
+                "bootstrap_skill": {"status": "unchanged", "version": "2.1.0", "content_sha256": "c" * 64},
+                "scout_skill": {"status": "unchanged", "version": "5.7.0", "content_sha256": "d" * 64},
             },
             requires_reload=True,
             consumer_verified=False,
             generated_at="2026-08-21T12:00:00+08:00",
         )
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("2.0.1", validated["desired_bundle"]["bootstrap_version"])
+        self.assertEqual("2.1.0", validated["desired_bundle"]["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
         for label in ("期望发行身份", "Plugin 分发", "能力源同步", "主机物化", "消费者采用"):
             self.assertIn(label, rendered)
@@ -918,7 +919,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 json.loads(text),
                 expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
             )
-            self.assertEqual("v0.3.9", value["plugins"][0]["source"]["ref"])
+            self.assertEqual("v0.3.10", value["plugins"][0]["source"]["ref"])
         else:
             self.assertTrue(
                 (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()
@@ -1028,7 +1029,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_v5_prompt_has_no_fixed_binding(self) -> None:
         prompt = (
             "Use $global-owner-scout in project_scout mode for the current bound project; rolling 72 hours; "
-            "Skill 5.6.0; global_owner_scout_project_v4; global_owner_scout_review_pack_v4; "
+            "Skill 5.7.0; global_owner_scout_project_v4; global_owner_scout_review_pack_v4; "
             "gpt-5.6-sol; medium; read-only."
         )
         self.bootstrap.validate_prompt(prompt)
@@ -1099,6 +1100,166 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 if count > 1:
                     self.assertIn("一次确认多张", rendered)
                     self.assertIn("全部成功，或整包零写入", rendered)
+
+    def test_thread_page_terminal_failure_preserves_independently_supported_cards(self) -> None:
+        project = self.scout_validator.valid_project(thread_pages_terminal_failure=True)
+        validated = self.scout_validator.validate_project(project)
+        self.assertEqual("degraded", validated["status"])
+        self.assertTrue(validated["session_coverage"]["truncated"])
+        self.assertLess(
+            validated["session_coverage"]["fully_read_task_count"],
+            validated["session_coverage"]["selected_task_count"],
+        )
+        self.assertGreater(len(validated["project_cards"]), 0)
+        self.assertIn(
+            "native_thread_pages_terminal_failure",
+            validated["session_coverage"]["discovery_methods"],
+        )
+        self.assertEqual(
+            "degraded",
+            next(source for source in validated["evidence_sources"] if source["kind"] == "sessions")["status"],
+        )
+
+        inconsistent_source = self.scout_validator.valid_project(thread_pages_terminal_failure=True)
+        next(source for source in inconsistent_source["evidence_sources"] if source["kind"] == "sessions")["status"] = "available"
+        with self.assertRaisesRegex(self.scout_validator.ContractError, "sessions must be degraded"):
+            self.scout_validator.validate_project(inconsistent_source)
+
+        protocol_failure = self.scout_validator.valid_project(execution_protocol_failed=True)
+        protocol_failure["session_coverage"]["discovery_methods"] = [
+            "native_index_completed",
+            "execution_protocol_failed",
+        ]
+        self.scout_validator.validate_project(protocol_failure)
+        self.assertEqual([], protocol_failure["project_cards"])
+
+    def test_single_runtime_dispatcher_renders_manifest_free_terminal(self) -> None:
+        context = subprocess.run(
+            [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=True,
+        )
+        snapshot = json.loads(context.stdout)
+        self.assertEqual("global_owner_scout_preflight_v1", snapshot["contract_version"])
+        self.assertIn(snapshot["execution_context"], {"local", "linked_worktree"})
+        self.assertNotIn(str(ROOT), context.stdout)
+        for field in (
+            "status_sha256",
+            "staged_diff_sha256",
+            "unstaged_diff_sha256",
+            "untracked_files_sha256",
+            "context_snapshot_sha256",
+        ):
+            self.assertRegex(snapshot[field], r"^[0-9a-f]{64}$")
+
+        terminal = {
+            "contract_version": "global_owner_scout_terminal_v1",
+            "status": "interactive_host_blocked",
+            "phase": "delivery",
+            "reason_code": "output_root_unavailable",
+            "project_state": "unchanged",
+            "confirmation_eligible": False,
+        }
+        result = subprocess.run(
+            [sys.executable, "-B", str(SCOUT_RUNTIME), "render-terminal"],
+            cwd=SCOUT_SCRIPTS,
+            input=json.dumps(terminal, ensure_ascii=False),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=True,
+        )
+        self.assertIn("global_owner_scout_terminal_v1", result.stdout)
+        self.assertIn("output_root_unavailable", result.stdout)
+        self.assertIn("confirmation_eligible=false", result.stdout)
+        self.assertNotIn(str(ROOT), result.stdout)
+
+        invalid_mapping = {**terminal, "phase": "preflight"}
+        rejected = subprocess.run(
+            [sys.executable, "-B", str(SCOUT_RUNTIME), "render-terminal"],
+            cwd=SCOUT_SCRIPTS,
+            input=json.dumps(invalid_mapping),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        self.assertNotEqual(0, rejected.returncode)
+        self.assertIn("phase does not match reason_code", rejected.stderr)
+
+        host_open_is_post_manifest = {**terminal, "reason_code": "host_open_failed"}
+        rejected = subprocess.run(
+            [sys.executable, "-B", str(SCOUT_RUNTIME), "render-terminal"],
+            cwd=SCOUT_SCRIPTS,
+            input=json.dumps(host_open_is_post_manifest),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        self.assertNotEqual(0, rejected.returncode)
+        self.assertIn("reason_code is invalid", rejected.stderr)
+
+        no_manifest = subprocess.run(
+            [sys.executable, "-B", str(SCOUT_RUNTIME), "render-receipt", "open_failed"],
+            cwd=SCOUT_SCRIPTS,
+            input=json.dumps(terminal),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        self.assertNotEqual(0, no_manifest.returncode)
+        self.assertIn("delivery manifest fields are invalid", no_manifest.stderr)
+
+    def test_preflight_distinguishes_linked_worktree_without_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository = root / "repository"
+            worktree = root / "worktree"
+            repository.mkdir()
+            subprocess.run(["git", "init"], cwd=repository, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "scout@example.invalid"], cwd=repository, check=True)
+            subprocess.run(["git", "config", "user.name", "Scout Test"], cwd=repository, check=True)
+            (repository / "tracked.txt").write_text("baseline\n", encoding="utf-8")
+            subprocess.run(["git", "add", "tracked.txt"], cwd=repository, check=True)
+            subprocess.run(["git", "commit", "-m", "baseline"], cwd=repository, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "worktree", "add", "--detach", str(worktree)],
+                cwd=repository,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(["git", "config", "diff.external", "missing-scout-external-diff"], cwd=repository, check=True)
+            subprocess.run(["git", "config", "core.fsmonitor", "missing-scout-fsmonitor"], cwd=repository, check=True)
+            (worktree / "tracked.txt").write_text("dirty working tree\n", encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context"],
+                cwd=worktree,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            )
+            snapshot = json.loads(result.stdout)
+            self.assertEqual("linked_worktree", snapshot["execution_context"])
+            self.assertNotIn(str(root), result.stdout)
+
+    def test_preflight_failure_is_path_free(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            result = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context"],
+                cwd=temporary,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+            self.assertNotEqual(0, result.returncode)
+            self.assertEqual(
+                {"status": "error", "message": "git_context_unavailable"},
+                json.loads(result.stderr),
+            )
+            self.assertNotIn(temporary, result.stderr)
 
     def test_task_artifact_delivery_conserves_realistic_pack_sizes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1453,9 +1614,20 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             target = Path(temporary) / "global-owner-scout"
             source = ROOT / ".agents" / "skills" / "global-owner-scout"
             installed = self.bootstrap.install_skill(source, target)
-            self.assertEqual("5.6.0", installed["version"])
+            self.assertEqual("5.7.0", installed["version"])
             helper = target / "scripts" / "prepare_delivery.py"
+            dispatcher = target / "scripts" / "scout.py"
             self.assertTrue(helper.is_file())
+            self.assertTrue(dispatcher.is_file())
+            dispatcher_result = subprocess.run(
+                [sys.executable, "-B", str(dispatcher), "--help"],
+                cwd=dispatcher.parent,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            )
+            self.assertIn("render-terminal", dispatcher_result.stdout)
             result = subprocess.run(
                 [sys.executable, "-B", str(helper), "--self-test"],
                 cwd=helper.parent,
@@ -1519,7 +1691,11 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         combined = "\n".join(path.read_text(encoding="utf-8") for path in active_docs)
         self.assertNotIn("1/3 projects", combined)
         self.assertIn("execution_protocol_failed", combined)
-        self.assertIn("verify_visible_output.py", combined)
+        self.assertIn("native_thread_pages_terminal_failure", combined)
+        self.assertIn("global_owner_scout_terminal_v1", combined)
+        self.assertIn("global_owner_scout_preflight_v1", combined)
+        self.assertIn("Host-native created-task surface", combined)
+        self.assertIn("scripts/scout.py", combined)
         self.assertIn("automation-source canary", combined)
         self.assertIn("production_blocked", combined)
         self.assertIn("$global-owner-scout 复盘当前项目", combined)

@@ -39,7 +39,8 @@ Global Owner Scout 的 Review Pack 可以一次精确选择一张或多张可确
 “打开完整 Review Pack”链接并标记 `surface_pending`；这表示完整内容可发现但尚未证明已打开，确认保持关闭。若当前
 任务没有安全的 generated-output 表面、artifact 无法打开/排队或实际结果无法回读，系统返回
 `interactive_host_blocked`，不会用摘要或部分卡片替代。当前
-interactive Production 资格正在重新验收；只有三个真实 worktree canary 通过后才恢复。
+interactive Production 资格正在重新验收；只有 Local clean、Local dirty、already-worktree、thread-page 终态失败和
+missing-output-root 五条真实入口矩阵全部符合预期后才恢复。
 
 ## 什么适合成为规则
 

@@ -4,8 +4,9 @@
 - Owner layer: project_docs
 - Applies when: 实现或验收规则、proposal、状态、CLI、失败反馈和迁移操作。
 - Avoid when: 判断产品公理或组件所有权；读取 [L1](axioms.md)与 [L2](topology.md)。
-- Last verified: 2026-08-22
+- Last verified: 2026-09-01
 - Evidence: 用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[确定性 Release 发布 ADR](../decisions/0077-deterministic-release-promotion.zh.md)、[真实读回工作站调和 ADR](../decisions/0078-workstation-reconcile-v2-observed-state.zh.md)
+- Extended by: [项目任务前门与确定性终态 ADR](../decisions/0079-project-session-front-door-and-scout-terminal-contract.zh.md)
 
 ## 七字段提案
 
@@ -250,7 +251,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。可靠自动发现边界仍是一次 Codex 刷新或下一任务，但 source/host 物化必须在当前部署任务完成。
 
-`agent-memory-workstation-bootstrap` Skill 2.0.1 提供两个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.1.0 提供两个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
@@ -331,7 +332,7 @@ source_sync, host_materialization, consumer_activation, limitations, pack_hash
 
 `status` 只允许 `ready`、`reload_required`、`distribution_reconcile_blocked`、`source_sync_blocked` 或
 `host_materialization_blocked`。中文 renderer 固定先显示期望发行、Plugin 分发、源同步、主机物化、消费者采用，再显示
-未证明事项与唯一下一步。apply 固定不越过模型采用层，返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.0.1
+未证明事项与唯一下一步。apply 固定不越过模型采用层，返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.1.0
 Bootstrap 的新任务执行只读 `--verify-consumer` 且所有读回仍 exact，才允许 `ready`。任何本机结果都保留真实第二台设备、
 Scheduled、连续性与产品收益未证明边界。
 
@@ -371,16 +372,38 @@ Owner 内容或跨主机租约。自动化调和全部成功后才原子替换 P
 
 ### 用户主动触发入口
 
-正式交互入口只允许用户在目标 Git 工程的独立 worktree 任务中显式发送：
+正式交互入口只允许用户在目标 Git 工程的当前项目任务中显式发送：
 
 ```text
 $global-owner-scout 复盘当前项目
 ```
 
-Skill 禁止隐式触发，固定 `evidence_window.kind=manual_30d`，且
+Skill 禁止隐式触发。入口必须先于任务索引、线程分页、Owner 比较和项目深挖完成一次前置 preflight：Fresh
+解析当前 Desktop 项目绑定，并通过 `python -B scripts/scout.py inspect-context` 取得无路径
+`global_owner_scout_preflight_v1` Git/只读快照。已在独立 worktree 时原地继续；该正式调用授权恰好一个只读 executor；位于
+Local 时必须使用宿主原生项目任务创建能力，把当前 working-tree state 与同一正式调用作为初始 prompt 一次性投影，
+并在隔离任务继续，用户不重复输入。不得创建空子任务、不得用
+shell 手工创建 worktree、猜测路径或先执行部分复盘再检查上下文。项目非 Git、绑定不可验证或宿主无法投影时，
+入口在 preflight 阶段通过 `global_owner_scout_terminal_v1` 失败关闭。
+投影成功时，前门任务只返回宿主原生 created-task surface，把用户直接链接到唯一 executor；该状态只证明
+`routed`，不得声称复盘、Review Pack、安装采用或用户验收已经完成。完整 Review Pack 或 Terminal 只在 executor 任务产生。
+
+`global_owner_scout_preflight_v1` 精确包含：
+
+```text
+contract_version, git_repository, execution_context, head, status_sha256,
+staged_diff_sha256, unstaged_diff_sha256, untracked_files_sha256,
+context_snapshot_sha256
+```
+
+`execution_context` 只允许 `local` 或 `linked_worktree`，snapshot hash 覆盖其他全部字段，输出不含路径。它只证明 Git
+执行上下文与基线，不证明 Desktop 项目绑定、成功投影、安装采用或 Review Pack 结果。
+
+隔离执行器固定 `evidence_window.kind=manual_30d`，且
 `host_automation_memory_read=host_automation_memory_updated=false`。项目身份来自当前 Desktop 绑定；Prompt 不包含
-路径、project ID、固定项目名、Skill 版本、候选提示、模型或完整深挖协议。交互任务继承当前任务的 model、
-reasoning 与 Speed；可观测时 `actual_model/actual_reasoning` 必须等于请求值，不可观测时使用 `request_only`。
+路径、project ID、固定项目名、Skill 版本、候选提示、模型或完整深挖协议。入口不要求用户填写资源配置，也不为
+自动隔离 executor 注入 model/thinking override；使用该 executor 的宿主解析 model、reasoning 与 Speed。可观测时
+`actual_model/actual_reasoning` 必须等于该任务请求值，不可观测时使用 `request_only`。
 
 ### Project Scout：`global_owner_scout_project_v4`
 
@@ -392,15 +415,19 @@ v4 是不兼容 v3 的主机身份升级。顶层必须包含 `display_locale=zh
 是否截断，以及 `complete/bounded/degraded`。达到宿主任务索引上限、未读到窗口边界或无法继续分页时只能使用
 `bounded/degraded`，不得声称完成完整 session 复盘。
 
-Skill 5.6.0 的所有入口固定使用已验证的原生任务索引上限 `50` 作为首次且唯一的索引请求，不得先请求更大
+Skill 5.7.0 的所有入口固定使用已验证的原生任务索引上限 `50` 作为首次且唯一的索引请求，不得先请求更大
 页面探测上限。调用使用最长 60 秒的初始 yield；返回 `cell_id` 时必须对同一 cell 最多连续 wait 两次、每次最长
 60 秒。cell 未终态前禁止发起第二次索引调用，`Script running` 不得解释为 unavailable、timeout 或 degraded。
 
 `discovery_methods` 只允许终态枚举：`native_index_completed`、`native_index_host_cap`、
-`native_index_terminal_failure`、`native_thread_pages_completed`、`execution_protocol_failed`。`complete` 必须同时包含
+`native_index_terminal_failure`、`native_thread_pages_completed`、`native_thread_pages_terminal_failure`、
+`execution_protocol_failed`。`complete` 必须同时包含
 `native_index_completed` 与 `native_thread_pages_completed`；`bounded` 必须包含 `native_index_host_cap` 与
-`native_thread_pages_completed`；`degraded` 必须具有明确 `native_index_terminal_failure`。未恢复 cell、非法参数或
-执行中断一律为项目 `failed` 并记录 `execution_protocol_failed`，不得降级伪装为 Session 不可用。
+`native_thread_pages_completed`。index 明确终态失败使用 `degraded / native_index_terminal_failure`；index 已取得终态但
+至少一个已选任务分页明确终态失败时使用 `degraded / native_thread_pages_terminal_failure`，同时要求
+`truncated=true` 且完整读取数小于选择数，并保留其他正式证据独立支持的卡。未恢复 cell、非法参数或执行中断一律
+为项目 `failed` 并记录 `execution_protocol_failed`；可以同时保留此前已经证明的 index 终态，但不得声称分页完成或
+生成卡片。
 
 相关自然任务通过原生 `read_thread` 分页到窗口边界或 EOF，记录发现数、窗口数、选择数、完整读取数、读取页数和
 排除理由。每页固定使用宿主已验证的 `turnLimit=10` 与 `maxOutputCharsPerItem=20000`，不得用更大值探测能力。
@@ -468,8 +495,10 @@ preview、`recommended_action`、中文 `recommended_action_reason`、未来行�
 Project Card 数必须等于 Review Pack 卡数。每个可确认卡还必须包含由当前 canonical source hash 派生的
 `selection_token`；不可确认卡该字段为 `null`。
 
-确定性 renderer 只接受通过 validator 的 Review Pack，并且只能从 Skill `scripts` 目录直接执行
-`render_review.py --surface interactive|scheduled`、通过 stdin 输入完整对象；禁止动态 import 或 renderer 失败后的模型手工重写。它按固定顺序生成 Markdown：运行状态与覆盖/parity 警告、
+活动 Skill 的所有 Python 操作只能从 `scripts` 目录执行 `python -B scripts/scout.py <operation>`；dispatcher 复用
+validator、Owner resolver、renderer、visible verifier 与 delivery 实现。确定性 renderer 只接受通过 validator 的
+Review Pack，使用 `scout.py render-review --surface interactive|scheduled` 并通过 stdin 输入完整对象；禁止动态
+import、直接猜选相邻 helper 或 renderer 失败后的模型手工重写。它按固定顺序生成 Markdown：运行状态与覆盖/parity 警告、
 交互 surface 的`本次需要判断 N 项`或 Scheduled surface 的`今日需要判断 N 项`中文索引、全部完整决策卡、E1 与 Session/模型覆盖技术附录、简短校验回执。每张卡先显示
 项目事件、用户成本、建议、具体 before/after、最大反例和推荐动作构成的 30 秒判断，再显示完整核对依据。表格
 最多四列，before/after 使用两列表格；不得依赖 HTML 折叠、自定义 App UI 或图片。宿主文件预览只承载相同
@@ -477,14 +506,14 @@ Markdown 字节，不得改写内容或成为新的语义层。默认
 任何最终答复不得显示原始 JSON。renderer 回执包含 surface、可见正文 SHA-256、Project Card 数、可见卡数、
 逐卡动作计数向量、动作总数和 wrapper 数。interactive 不得出现 Scheduled/Inbox/`0/14`/14 次文案且 wrapper
 必须为零；scheduled 必须生成唯一且最后一个 Inbox wrapper。只读
-`verify_visible_output.py --surface ...` 校验 renderer 或 artifact 的正文 hash、卡片和动作守恒、surface-specific
+`scout.py verify-visible --surface ...` 校验 renderer 或 artifact 的正文 hash、卡片和动作守恒、surface-specific
 wrapper 数量、无原始 JSON和无手工尾注；它不证明实际用户 final。`degraded` 仍显示有独立正式证据的卡；
 `failed` 显示可见失败终态，不制造空白结果。
 
 ### Interactive Delivery：`global_owner_scout_delivery_v1`
 
 正式 interactive 入口不再把 renderer 全文交给模型搬运。它必须从 Skill scripts 目录运行
-`prepare_delivery.py --artifact-dir <host-output-root> --protected-root <project-root>`，通过 stdin 输入完整 Review Pack。
+`scout.py prepare-delivery --artifact-dir <host-output-root> --protected-root <project-root>`，通过 stdin 输入完整 Review Pack。
 `artifact-dir` 必须是当前任务上下文显式提供、已存在且位于所有 protected roots 外的 generated-output workspace；
 不得猜测或回退系统临时目录、项目 `.sandbox`、任意 `$CODEX_HOME` 路径或另一个任务目录。宿主显式授予的 task output
 root 即使物理位于其 app-managed storage 中仍然有效；资格来自当前任务 grant，而不是路径前缀。
@@ -515,6 +544,37 @@ compact Delivery receipt；工具失败或缺少该表面时返回
 所有 Python helper 固定使用 `python -B`，安装器原子排除 `__pycache__`、`.pyc` 和 `.pyo`。Scout 在执行前后复核
 个人 Skill 安装目录的字节码缓存指纹；任何新建或变化均属于外部写入并失败关闭，Scout 不得通过删除缓存掩盖失败。
 
+### Manifest-free Terminal：`global_owner_scout_terminal_v1`
+
+任何在 Delivery manifest 形成之前发生的 preflight、Session 协议、隐私/契约、只读、output root、renderer 或预算
+阻断都必须构造并校验以下精确字段：
+
+```text
+contract_version, status, phase, reason_code, project_state, confirmation_eligible
+```
+
+`confirmation_eligible` 固定为 `false`；`phase` 只允许 `preflight`、`session_census`、`project_review`、`delivery`；
+`project_state` 只允许 `unchanged`、`changed`、`unverified`。活动入口把完整对象传给
+`scout.py render-terminal`，得到含 canonical object hash 的中文终态回执。该路径不需要 Delivery manifest，不能显示
+部分卡片、路径或确认命令，也不能被手写 Markdown 替代。成功生成 manifest 后的 opened/queued/blocked receipt 继续
+使用 `scout.py render-receipt`，两条路径不得混用。
+
+`reason_code -> status / phase / allowed project_state` 固定为：
+
+```text
+project_binding_unavailable -> interactive_entry_blocked / preflight / unverified
+git_worktree_ineligible -> interactive_entry_blocked / preflight / unverified
+worktree_projection_unavailable -> interactive_entry_blocked / preflight / unchanged|unverified
+execution_protocol_failed -> failed / session_census / unchanged|unverified
+read_only_violation -> failed / project_review / changed
+privacy_or_contract_failed -> failed / project_review / unchanged|unverified
+output_root_unavailable -> interactive_host_blocked / delivery / unchanged|unverified
+render_integrity_failed -> render_integrity_failed / delivery / unchanged|unverified
+output_budget_exceeded -> output_budget_exceeded / project_review / unchanged|unverified
+```
+
+宿主 open 发生在 manifest 形成后，只能走 manifest-bound blocked/queued/opened receipt，不属于 Terminal reason。
+
 `edit` 与 `ignore` 始终可用。parity matched 且项目建议为 `global_agents` 的 `add/replace/consolidate` 卡才允许
 `confirm`；`project_owner/route_to_owner` 推荐 `keep_project`，`skill` 推荐 `make_skill`，`already_covered` 或
 `no_persistence` 推荐 `ignore`，上述卡均不提供直接确认。parity 漂移或不可用时移除所有 `confirm`。用户要改变
@@ -533,17 +593,20 @@ Agent 进入原子规则包链的起点：Agent 必须重新读取最新 global 
 
 - `session_coverage.status=bounded/degraded` 时必须精确声明未覆盖范围；项目 Git、owner 和验收事实仍可形成
   有限结果，但不得用布尔值或模糊措辞伪造完整任务普查。
-- 原生任务索引未取得终态、调用参数非法或执行协议中断时使用 `failed / execution_protocol_failed`；只有工具
-  明确返回终态错误才允许 `degraded / native_index_terminal_failure`。运行内的失败包不得把 `failed` 再描述为
+- 原生任务索引未取得终态、调用参数非法或执行协议中断时使用 `failed / execution_protocol_failed`；index 或 thread
+  page 工具明确返回终态错误才分别允许 `degraded / native_index_terminal_failure` 或
+  `degraded / native_thread_pages_terminal_failure`。运行内的失败包不得把 `failed` 再描述为
   “degraded / Session unavailable”。Scheduled 状态变更不属于只读 Scout；外部 Host Activation Control 观察到
   首次协议错误后执行并复读 `PAUSED`。没有实际控制面调用时只能报告“需要暂停”，不得声称已暂停。
 - 输入缺失、结构不合法、E1 晋升、隐私泄漏、工作区变化、未经授权的外部写操作或无法证明只读时，该项目 Review Pack
   显示失败终态；不得输出未通过校验的卡。
+- pre-manifest 失败必须通过 Terminal v1 renderer 输出，不得把失败对象交给 Delivery manifest receipt，也不得手写
+  `interactive_host_blocked`。
 - renderer、artifact 创建/回读、宿主打开或实际 final 回读失败，正文 hash/卡片/动作不守恒、surface/wrapper
   不匹配或存在手工尾注时，整次运行使用 `render_integrity_failed`、`output_budget_exceeded` 或
   `interactive_host_blocked` 失败终态；不得展示部分卡片或手工生成替代 Markdown。
 - 宿主明确返回 `queued` 时，必须保留经同一 manifest 绑定的 artifact 链接并返回 `surface_pending`；它只证明内容
-  可发现且可外部复核，确认保持关闭，也不得计入三个 Production canary。
+  可发现且可外部复核，确认保持关闭，也不得计入五条入口矩阵。
 - Python helper 产生或修改字节码缓存时按外部副作用失败；缓存清理由安装阶段负责，自动 Scout 不得自清理。
 - 当前 Scheduled 宿主强制每个 automation 读取并更新自身 memory，并在最终答复末尾追加一个 Inbox directive。
   二者是宿主控制面 wrapper，不是 Scout 证据、候选 Inbox 或去重状态。memory 只允许记录运行时间、覆盖/终态、
@@ -556,7 +619,7 @@ Agent 进入原子规则包链的起点：Agent 必须重新读取最新 global 
 - 活跃原工作区的并发变化只记录为当前隔离快照之外的限制；稳定隔离快照中的卡不得因此整体失效。
 - 2026-08-11 的三个真实 v5.1 Scheduled 运行及最小 automation-source probe 证明本主机原生任务索引未取得终态。
   每个 Host Enrollment 保持 `0/14`，自动化保持 `PAUSED`；普通 worktree 前向测试不再拥有恢复权。只有新的真实
-  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 Skill 5.6.0 项目 canary；
+  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 Skill 5.7.0 项目 canary；
   在 14 次有效运行期间必须显式请求
   `gpt-5.6-sol` 与 `medium` reasoning，并记录请求值、
   宿主可见的实际值和 telemetry 可用性。只有 request 不能证明实际模型；不可观测时诚实标记 `request_only`，
@@ -569,15 +632,17 @@ Agent 进入原子规则包链的起点：Agent 必须重新读取最新 global 
 
 状态声明固定使用以下证据阶梯，禁止跨级：`designed -> implemented -> installed -> production_proven ->
 longitudinally_effective`，并按入口分别报告。Fresh 反例已撤销旧的三个 inline canary 交付层证明；当前必须报告
-`interactive_project_scout=production_unproven / interactive_host_blocked`，直到三个真实 worktree 任务的同任务
+`interactive_project_scout=production_unproven / interactive_host_blocked`，直到五条真实入口矩阵的同任务
 artifact 与实际 final 外部回读通过；`scheduled_project_scout=production_blocked / PAUSED / 0 of
 14`，`owner_continuity=adoption_unproven`。跨设备冷启动只有空 profile 与受管源契约验收时必须报告
 `cross_host_bootstrap=implementation_verified / production_unproven`，直到真实第二台设备完成首次加载、Doctor 与
 交互 canary；不得用任一主机或入口的测试替代另一主机或入口的生产证明。
 
-真实 worktree canary 在创建前必须绑定正式入口实际解析的 installed Scout version 与 content identity。工作树包含较新
+真实入口 canary 在创建前必须绑定正式入口实际解析的 installed Scout version 与 content identity。验收矩阵至少包含
+Local clean 自动投影、Local dirty 自动投影、already-worktree 原地执行、thread-page 明确终态失败降级和缺少
+output root 的 Terminal v1 五条切片。工作树包含较新
 Skill 源码不等于该任务采用它；若任务解析旧版本、没有 Delivery v1 或返回 legacy inline Review Pack，则结果固定为
-`ineligible / runtime_skill_identity_mismatch`，不计通过、失败或三条 Production canary 分母。先由 commit-bound
+`ineligible / runtime_skill_identity_mismatch`，不计通过、失败或五条入口矩阵分母。先由 commit-bound
 Bootstrap/Release 完成安装与新任务发现，再重跑前台可见验收。
 
 ## Core cutover

@@ -7,7 +7,7 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `2.0.1`
+- Skill version: `2.1.0`
 - Modes: `inspect`, `verify_consumer`, `apply_enrollment`
 - Deployment pack: `agent_memory_workstation_deployment_pack_v2`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
@@ -45,7 +45,7 @@ not change the Host Profile. Only an explicit request to retest or configure Sch
      root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
 3. Run exact-hash `workstation-reconcile --apply`. Marketplace/Plugin mutation participates in the source-cutover rollback
    transaction. The transaction then runs Core setup, binds the explicit or preserved canonical Owner, verifies Doctor, installs
-   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.0.1`, Scout `5.6.0`,
+   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.1.0`, Scout `5.7.0`,
    and every desired identity. The result is `reload_required`; it proves host materialization, not model adoption.
 4. Ask for exactly one Codex Desktop refresh. In a new task that loaded this installed Skill, run the same command with
    `--verify-consumer` and no plan hash. Only an exact no-op host may become `ready`. Do not ask the user to repeat source choices,
@@ -70,7 +70,7 @@ distinct from a real second-device result.
 
 ## Mode: `verify_consumer`
 
-Enter only from a refreshed new task that actually loaded Bootstrap 2.0.1 after an `inspect` result requested reload. Run
+Enter only from a refreshed new task that actually loaded Bootstrap 2.1.0 after an `inspect` result requested reload. Run
 `workstation-reconcile --verify-consumer` against the same Resolver output. This mode is read-only: it requires an exact no-op plan,
 re-observes current managed sources, Core runtime, Owner parity, Doctor, installed Bootstrap/Scout bytes, and distribution identities,
 and then renders the only `ready` Pack. A historical cutover receipt is never accepted as current host evidence.

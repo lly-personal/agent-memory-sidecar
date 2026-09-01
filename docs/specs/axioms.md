@@ -4,8 +4,8 @@
 - Owner layer: project_docs
 - Applies when: 设计、评审或变更 Agent Memory 的产品目标、行为权威、授权、隐私、证据或发布边界。
 - Avoid when: 只执行普通项目工作或不改变机制语义的机械修改。
-- Last verified: 2026-08-21
-- Evidence: 用户批准的 Agent Memory Core v1 与条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[真实读回工作站调和 ADR](../decisions/0078-workstation-reconcile-v2-observed-state.zh.md)
+- Last verified: 2026-09-01
+- Evidence: 用户批准的 Agent Memory Core v1 与条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[真实读回工作站调和 ADR](../decisions/0078-workstation-reconcile-v2-observed-state.zh.md)、[项目任务前门与确定性终态 ADR](../decisions/0079-project-session-front-door-and-scout-terminal-contract.zh.md)
 
 ## 产品定义
 
@@ -76,7 +76,8 @@ SDDL 文本表现形式代替权限语义。
 ## 外部项目复盘实验
 
 Global Owner Scout 是用户显式触发的外部项目复盘 workflow，不是 Core 的默认后台治理能力。正式入口是用户在
-目标 Git 工程中新建独立 worktree 任务并发送 `$global-owner-scout 复盘当前项目`；它重建项目事实、提炼候选并
+目标 Git 工程的当前项目任务发送 `$global-owner-scout 复盘当前项目`；入口在任何深挖前自动把 Local 调用投影到
+隔离 worktree 执行任务，用户不负责创建 worktree 或重复指令。隔离执行器重建项目事实、提炼候选并
 把完整 Project Review Pack 交付到当前任务的宿主生成文件表面。任何运行都只产生 `review draft`，不得创建
 proposal token、写入七表 Store、修改任何 `AGENTS.md`、发布 Git 或调用外部写操作；唯一例外是写入项目工作树
 之外、由当前任务宿主显式提供的不可变 output artifact。Scheduled 只是暂停的可选宿主扩展，不能阻断交互结果。
@@ -108,25 +109,27 @@ integration preview，并把完整中文审阅包直接呈现给用户；用户�
    宿主可打开的 Review Pack artifact 属于直接显示，跨任务文件桥不属于。先给出中文决策索引和逐卡 30 秒判断，
    再展示完整依据，E1 与技术覆盖进入附录。内部 Project Card 数与可见 Markdown 卡数必须守恒，不得通过中央失败、
    排名、摘要或通知策略隐藏项目卡。
-7. **可见性与写入采用不同失败边界**：Session 覆盖不足只能产生醒目的 `degraded` 警告，不得删除由 Owner、ADR、
-   Git、测试或验收独立支持的卡；隐私、只读、完整性或 Owner parity 失败必须阻断相应写入动作。
+7. **可见性与写入采用不同失败边界**：Session 索引或分页明确终态失败只能产生醒目的 `degraded` 警告，不得删除
+    由 Owner、ADR、Git、测试或验收独立支持的卡；隐私、只读、完整性或 Owner parity 失败必须阻断相应写入动作。
 8. **人工精确选择、所见即所签**：复盘输出始终是草案。用户可以一次选择同一 Review Pack、scope 和 target 的
    一张或多张可确认卡；每张卡以 `card_id@selection_token` 绑定项目 claim、proposal、superseded 集合、target 与
    Fresh before。Agent 必须读取一次最新 owner、联合重算关系与聚合 before/after，并执行零或一次原子规则包修订；
    Core 必须证明当前回复逐字等于选中集合的 canonical 确认文本。单卡是大小为一的规则包；不得循环复用 approval、
    沿用旧快照、按输入顺序解释集合或留下部分成功。
-9. **资源策略随入口分层**：交互任务继承当前任务的 model、reasoning 与 Speed，并验证可观测实际值与请求一致；
-   暂停的 Scheduled 14 次实验仍固定 `gpt-5.6-sol + medium`，Speed/service tier 继承本机配置。用户触发语不携带
-   资源配置，手动运行也不计入 Scheduled 14 次实验。
+9. **资源策略随入口分层**：交互入口不要求用户填写资源配置，也不为自动隔离 executor 注入 model/thinking override；
+   使用该 executor 的宿主解析值，并验证可观测实际值与该任务请求值一致。暂停的 Scheduled 14 次实验仍固定
+   `gpt-5.6-sol + medium`，Speed/service tier 继承本机配置。手动运行不计入 Scheduled 14 次实验。
 10. **零背景状态**：不得增加候选 Inbox、transcript parser、长期候选数据库、后台规则 GC 或第二行为 owner。
 11. **证据不可跨级**：定时发现与文件写入不证明自然任务采用。采用和撤销必须由后续无答案泄漏的新任务验证。
 12. **可移植安装与可选激活分离**：Bootstrap 安装并验证 Skill 后，所有满足隔离条件的目标工程即可由用户显式
     触发，无需 Host Enrollment。只有用户明确要求 Scheduled 实验时才进入项目发现与 enrollment；共享 Prompt、
     Manifest 与 Owner 不得写入固定项目名、host `projectId` 或绝对路径。
 13. **安全资格先于推荐**：滚动 30 天自然任务决定 `active`，Git worktree 能力决定 `eligible`；Scout、测试、
-    自动化和委派任务不计入自然活动。任务来源不可证明时只能 `bounded / 建议试运行`，非 Git 项目不得默认启用。
+    自动化和委派任务不计入自然活动。交互入口中的 worktree 是宿主自动选择的隔离执行原语，不是用户前置操作；
+    任务来源不可证明时只能 `bounded / 建议试运行`，非 Git 项目不得默认启用。
 14. **原生工具必须取得终态**：任务索引或分页调用返回运行中 cell 时，必须恢复同一 cell 直到明确终态；未恢复、
-    非法参数或执行序列中断属于 `execution_protocol_failed`，不得伪装为 Session 不可用或覆盖降级。
+    非法参数或执行序列中断属于 `execution_protocol_failed`。分页工具明确返回终态错误时使用
+    `native_thread_pages_terminal_failure` 降级，并保留其他证据独立支持的卡；两者不得互相伪装。
 15. **可见结果必须逐字守恒**：只有通过校验的 Review Pack 经确定性 renderer 完整生成、写入同任务不可变
     artifact、按原字节回读，并且宿主实际表面由外部 controller 验证，才算完成呈现。内部 verifier、文件写入或
     `open` 工具成功不得单独升级为用户可见证明。interactive 聊天只返回 compact Delivery receipt；scheduled
@@ -165,8 +168,14 @@ integration preview，并把完整中文审阅包直接呈现给用户；用户�
     Manifest、中央服务或另一个任务。宿主可以把显式授予的 output root 物理放在其 app-managed storage 中；该任务级
     授权而不是路径前缀决定资格。明确 `queued` 只能成为带原 artifact 链接、确认关闭的 `surface_pending`；宿主表面缺失、失败或
     不可观察时返回 `interactive_host_blocked`，不得选择隐式后备路径，也不得把 pending 升级成已打开。
+26. **项目任务是意图前门，worktree 是内部执行快照**：同一句正式调用必须先完成项目绑定、Git 资格、执行上下文和
+    只读基线 preflight；该正式调用授权恰好一个只读执行任务，Local 由宿主原生、携带初始 prompt 的项目 worktree
+    任务创建自动投影，已隔离则原地继续。无法投影时在任何昂贵读取前
+    失败，不能把手工创建 worktree、复制 prompt 或理解 Git 拓扑重新交给用户。
+27. **失败终态不依赖成功产物**：任何发生在 Delivery manifest 之前的阻断必须通过
+    `global_owner_scout_terminal_v1` 确定性渲染；不得手写恢复 Markdown，也不得调用依赖 manifest 的 receipt 路径。
 
-该实验按入口独立停止：无法证明交互 worktree 任务取得任务索引终态、中文 Review Pack 可理解性、同任务 artifact
+该实验按入口独立停止：无法证明项目任务自动隔离投影、交互 worktree 执行器取得任务索引终态、中文 Review Pack 可理解性、同任务 artifact
 直接呈现、实际 final 回读、隔离零变化或隐私过滤时，交互入口保持
 `production_unproven / interactive_host_blocked`；无法证明 automation 执行源时只保持 Scheduled 暂停。Session 原生
 工具返回明确终态错误时可以展示其他正式证据支持的降级结果；调用持续运行但未终态时属于宿主激活阻断，既不

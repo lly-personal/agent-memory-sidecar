@@ -22,8 +22,8 @@ from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
 
 
-BOOTSTRAP_VERSION = "2.0.1"
-SCOUT_VERSION = "5.6.0"
+BOOTSTRAP_VERSION = "2.1.0"
+SCOUT_VERSION = "5.7.0"
 PACK_VERSION = "agent_memory_workstation_deployment_pack_v2"
 WORKSTATION_RECONCILE_PLAN_VERSION = "agent_memory_workstation_reconcile_plan_v2"
 SOURCE_MANIFEST_VERSION = "agent_memory_source_manifest_v1"

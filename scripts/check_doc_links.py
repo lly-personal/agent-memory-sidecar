@@ -41,6 +41,7 @@ ACTIVE_DOCUMENTS = (
     ROOT / "docs" / "decisions" / "0076-task-scoped-review-pack-delivery.zh.md",
     ROOT / "docs" / "decisions" / "0077-deterministic-release-promotion.zh.md",
     ROOT / "docs" / "decisions" / "0078-workstation-reconcile-v2-observed-state.zh.md",
+    ROOT / "docs" / "decisions" / "0079-project-session-front-door-and-scout-terminal-contract.zh.md",
     ROOT / "specs" / "README.md",
     ROOT / "specs" / "agent-memory-core-v1.md",
     ROOT / "specs" / "public-distribution-v1.md",
