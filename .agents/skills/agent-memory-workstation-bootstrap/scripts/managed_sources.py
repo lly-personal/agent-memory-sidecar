@@ -886,7 +886,10 @@ def bounded_physical_tree_hash(root: Path, *, max_entries: int, max_bytes: int) 
         for entry in entries:
             entry_count += 1
             require(entry_count <= max_entries, "component_tree_entry_budget_exceeded")
-            value = entry.stat(follow_symlinks=False)
+            # DirEntry.stat() reports zero for st_ino/st_dev/st_nlink on
+            # Windows.  The path-based call performs the metadata query that
+            # keeps the hard-link and reparse-point checks meaningful there.
+            value = os.stat(entry.path, follow_symlinks=False)
             require(not entry.is_symlink() and not _is_reparse(value), "component_tree_alias_forbidden")
             if stat.S_ISDIR(value.st_mode):
                 if entry.name not in {".git", "__pycache__"}:
