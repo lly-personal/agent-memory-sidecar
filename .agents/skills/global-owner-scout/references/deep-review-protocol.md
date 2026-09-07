@@ -95,6 +95,14 @@ evidence from at least two projects and names only opaque project refs.
 For every E2/E3 candidate find conflict, legitimate exception, project-only constraint, stronger existing Owner, and harmful
 global interpretation. Require meaningful counterevidence and a concrete Skip boundary.
 
+Challenge each projected obligation with a legitimate successful path under
+different preconditions: if the intended result is already proved, is the
+prescribed action still necessary? Separate the accepted outcome from the
+project's chosen means, count or sequence. Narrow `When`, preserve a concrete
+`Skip`, or route the method to Project/Skill; do not turn one local procedure
+into a universal gate. Apply this check to the completed projection, not just
+the source excerpt, before freezing it.
+
 Create two projections from the same evidence:
 
 - Human Context: Simplified Chinese, familiar privacy-safe project vocabulary, concrete event/cost/recommendation/before-after and
