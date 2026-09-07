@@ -495,6 +495,22 @@ def _copy_events(
     return count
 
 
+def _legacy_consumption_cutoff(source: sqlite3.Connection) -> datetime | None:
+    """Unknown legacy hashes cannot prove which older prompt was consumed."""
+    if "state" not in _table_names(source):
+        return None
+    known_keys = {
+        "approval_ref:" + hashlib.sha256(f"user_prompt:{row['id']}".encode("utf-8")).hexdigest()
+        for row in source.execute("SELECT id FROM events WHERE event_type = 'UserPromptSubmit'")
+    }
+    unknown_times = [
+        _parse_time(str(row["updated_at"]))
+        for row in source.execute("SELECT key, updated_at FROM state WHERE key LIKE 'approval_ref:%'")
+        if str(row["key"]) not in known_keys
+    ]
+    return max(unknown_times, default=None)
+
+
 def _copy_sessions(
     *,
     source: sqlite3.Connection,
@@ -503,11 +519,13 @@ def _copy_sessions(
 ) -> int:
     if "runtime_sessions" not in _table_names(source):
         return 0
+    unknown_cutoff = _legacy_consumption_cutoff(source)
     event_ids = {
-        str(row[0])
+        str(row["event_id"])
         for row in destination.conn.execute(
-            "SELECT event_id FROM prompt_events"
+            "SELECT event_id, created_at FROM prompt_events"
         )
+        if unknown_cutoff is None or _parse_time(str(row["created_at"])) > unknown_cutoff
     }
     rows = source.execute(
         """
@@ -573,9 +591,9 @@ def _copy_approvals(
         try:
             value = json.loads(str(state["value"]))
         except (TypeError, ValueError, json.JSONDecodeError):
-            continue
+            value = {}
         if not isinstance(value, dict):
-            continue
+            value = {}
         destination.conn.execute(
             """
             INSERT INTO approval_consumptions (
@@ -643,7 +661,8 @@ def _insert_cutover_approval(
     plan_hash: str,
     now: str,
 ) -> None:
-    digest = hashlib.sha256(approval_ref.encode("utf-8")).hexdigest()
+    canonical_ref = f"user_prompt:{approval['event_id']}"
+    digest = hashlib.sha256(canonical_ref.encode("utf-8")).hexdigest()
     destination.conn.execute(
         """
         INSERT INTO approval_consumptions (
@@ -678,7 +697,9 @@ def _validate_legacy_approval(
             "Core cutover requires a current user_prompt approval ref",
         )
     event_id = value[len(prefix) :].strip()
-    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
+    if approval_ref != f"user_prompt:{event_id}":
+        raise CoreError("approval_invalid", "Core cutover requires a canonical user_prompt ref")
+    digest = hashlib.sha256(f"user_prompt:{event_id}".encode("utf-8")).hexdigest()
     with _open_readonly(store_path) as source:
         tables = _table_names(source)
         if not {"events", "runtime_sessions", "state"} <= tables:
@@ -718,6 +739,12 @@ def _validate_legacy_approval(
             raise CoreError(
                 "approval_invalid",
                 "cutover approval ref was already consumed",
+            )
+        unknown_cutoff = _legacy_consumption_cutoff(source)
+        if unknown_cutoff is not None and _parse_time(str(row["created_at"])) <= unknown_cutoff:
+            raise CoreError(
+                "approval_invalid",
+                "legacy consumption cannot be attributed; capture a new approval prompt",
             )
         return {
             "event_id": event_id,

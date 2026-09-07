@@ -7,9 +7,9 @@ description: Run an explicitly requested, evidence-first, project-read-only 30-d
 
 ## Contract
 
-- Skill version: `5.7.0`
-- Project result: `global_owner_scout_project_v4`
-- User review: `global_owner_scout_review_pack_v4`
+- Skill version: `5.8.0`
+- Project result: `global_owner_scout_project_v5`
+- User review: `global_owner_scout_review_pack_v5`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
 - Preflight snapshot: `global_owner_scout_preflight_v1`
 - Mode: `project_scout`; interactive-only `central_review` remains optional.
@@ -42,7 +42,16 @@ project name, path, project ID, candidate hint, or the deep-review procedure.
    Desktop task. Record only privacy-safe opaque identity fields in the result.
 2. Capture HEAD, status, staged/unstaged fingerprints and external-write baseline. Resolve canonical/local global Owner hashes only
    through `python -B scripts/scout.py resolve-owner-parity`; never search for or guess a canonical path.
-3. Execute all seven deep-review phases. Enumerate same-project tasks with one native index request at limit 50. If the tool yields
+3. For interactive `manual_30d` delivery, confirm the host-declared current-task output root and file-preview capability before deep work. Run
+   `python -B scripts/scout.py inspect-output --artifact-dir <host-output-root> --protected-root <project-root>` without writes;
+   on failure render Terminal v1 with `output_preflight_unavailable` in phase `preflight`. Recheck at delivery. Scheduled uses its
+   existing final Inbox wrapper and visible-text verifier; it does not require a file artifact root or preview capability.
+   Execute all seven deep-review phases, including the six-category source inventory and structured signal dispositions in
+   contracts.md. Active project Owners and accepted knowledge are not limited by the recent Session window. Never treat
+   project ownership as proof that a distinct portable behavior is already covered. Empty observations cannot prove no delta.
+   Start with the current Owner's section/clause index and, before freezing, audit omissions from that source index back to
+   observations as required by deep-review-protocol.md; auditing declared cards alone cannot detect undiscovered knowledge.
+   Enumerate same-project tasks with one native index request at limit 50. If the tool yields
    a cell, resume that exact cell to a terminal result before any other index call. Page every selected natural task to the window
    boundary or EOF with native `read_thread` requests capped at `turnLimit=10` and `maxOutputCharsPerItem=20000`; report only
    terminally proven complete, bounded, degraded, or failed coverage. An explicit thread-page terminal error is
@@ -51,12 +60,12 @@ project name, path, project ID, candidate hint, or the deep-review procedure.
    proved index result but creates no cards.
 4. Build every qualified Project Card in Simplified Chinese plus its abstract Rule Projection. Freeze the full card in
    `project_claim_hash`; no global comparison may rewrite project semantics.
-5. Validate `global_owner_scout_project_v4` with `python -B scripts/scout.py validate-project`, then run
+5. Validate `global_owner_scout_project_v5` with `python -B scripts/scout.py validate-project`, then run
    `python -B scripts/scout.py resolve-owner-parity`. When parity is `matched`, read
    the active host-local global Owner and verify its bytes against the returned hash; the equal canonical hash proves the canonical
    bytes are identical without disclosing or guessing its physical path. For `drift/unavailable`, mark the Owner comparison
    incomplete, remove confirmation, and never use a project-root fallback. Build one integration preview per card and validate
-   `global_owner_scout_review_pack_v4` with `python -B scripts/scout.py validate-review-pack`. Every confirmable card must carry its deterministic `selection_token` from the current
+   `global_owner_scout_review_pack_v5` with `python -B scripts/scout.py validate-review-pack`. Every confirmable card must carry its deterministic `selection_token` from the current
    canonical source hash and exact integration preview.
 6. Re-capture read-only proof. Any project mutation, privacy leak, integrity failure, or unauthorized external write fails closed.
 7. From the Skill `scripts` directory, execute every Python helper with bytecode writes disabled (`python -B`). For the formal user

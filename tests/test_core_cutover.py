@@ -6,23 +6,85 @@ import os
 import sqlite3
 import tempfile
 import unittest
-from contextlib import contextmanager
-from datetime import UTC, datetime
+from contextlib import closing, contextmanager
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
 from agent_memory_sidecar.core_cutover import (
+    _migrate_database,
+    _validate_legacy_approval,
     apply_core_cutover,
     preview_core_cutover,
 )
 from agent_memory_sidecar.database import CORE_TABLES, CoreDatabase
+from agent_memory_sidecar.authorization import AuthorizationLedger
 from agent_memory_sidecar.errors import CoreError
 from agent_memory_sidecar.identity import ProjectIdentity
 from agent_memory_sidecar.installation import InstallationRegistry
+from agent_memory_sidecar.runtime_ledger import RuntimeLedger
 from agent_memory_sidecar.skill import SkillPlan
 
 
 class CoreCutoverTests(unittest.TestCase):
+    def test_cutover_alias_cannot_bypass_legacy_consumption(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = root / "memory.sqlite"
+            identity, ref = _legacy_store(store, root)
+            with closing(sqlite3.connect(store)) as connection:
+                connection.execute("INSERT INTO state VALUES (?, ?, ?, ?)", (
+                    "authorization", f"approval_ref:{hashlib.sha256(ref.encode()).hexdigest()}",
+                    json.dumps({"operation": "previous"}), datetime.now(UTC).isoformat(),
+                ))
+                connection.commit()
+            for alias in (ref, f" {ref} ", ref.replace(":", ": ", 1)):
+                with self.subTest(alias=alias), self.assertRaises(CoreError):
+                    _validate_legacy_approval(store_path=store, approval_ref=alias, identity=identity)
+
+    def test_legacy_alias_consumption_requires_a_new_prompt(self) -> None:
+        for timestamp_kind in ("same_time", "invalid"):
+            with self.subTest(timestamp_kind=timestamp_kind), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                store = root / "memory.sqlite"
+                identity, ref = _legacy_store(store, root)
+                alias = ref.replace(":", ": ", 1)
+                with closing(sqlite3.connect(store)) as connection:
+                    timestamp = connection.execute("SELECT created_at FROM events").fetchone()[0] if timestamp_kind == "same_time" else "invalid"
+                    connection.execute("INSERT INTO state VALUES (?, ?, ?, ?)", (
+                        "authorization", f"approval_ref:{hashlib.sha256(alias.encode()).hexdigest()}",
+                        json.dumps({"operation": "previous"}), timestamp,
+                    ))
+                    connection.commit()
+                for request in (ref, alias):
+                    with self.subTest(request=request), self.assertRaises(CoreError):
+                        _validate_legacy_approval(store_path=store, approval_ref=request, identity=identity)
+
+    def test_cutover_invalidates_other_sessions_with_unattributable_consumption(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store, destination = root / "legacy.sqlite", root / "core.sqlite"
+            identity, ref = _legacy_store(store, root)
+            now = datetime.now(UTC).replace(microsecond=0)
+            with closing(sqlite3.connect(store)) as connection:
+                connection.execute("UPDATE events SET created_at = ?", ((now - timedelta(seconds=2)).isoformat(),))
+                connection.execute("INSERT INTO state VALUES (?, ?, ?, ?)", (
+                    "authorization", f"approval_ref:{hashlib.sha256(ref.replace(':', ': ', 1).encode()).hexdigest()}",
+                    json.dumps({"operation": "previous"}), (now - timedelta(seconds=1)).isoformat(),
+                ))
+                connection.execute("INSERT INTO events SELECT 'evt_fresh', event_type, content, raw_json, 'fresh_session', cwd, repo_root, branch, scope_key, ? FROM events", (now.isoformat(),))
+                connection.execute("INSERT INTO runtime_sessions VALUES ('fresh_session', ?, 0, 'evt_fresh', ?)", (identity.scope_key, now.isoformat()))
+                connection.commit()
+            approval = _validate_legacy_approval(store_path=store, approval_ref="user_prompt:evt_fresh", identity=identity)
+            _migrate_database(source_path=store, destination_path=destination, source_schema_sha256="a" * 64,
+                              approval_ref="user_prompt:evt_fresh", approval=approval, plan_hash="b" * 64, now=now.isoformat())
+            with CoreDatabase(destination) as db:
+                with self.assertRaises(CoreError):
+                    AuthorizationLedger(db, RuntimeLedger(db)).validate(approval_ref=ref, identity=identity)
+                self.assertIsNone(db.conn.execute("SELECT last_prompt_event_id FROM runtime_sessions WHERE source_session = 'session'").fetchone()[0])
+                self.assertEqual("evt_fresh", db.conn.execute("SELECT last_prompt_event_id FROM runtime_sessions WHERE source_session = 'fresh_session'").fetchone()[0])
+                self.assertEqual(2, db.conn.execute("SELECT count(*) FROM prompt_events").fetchone()[0])
+
     def test_dry_run_is_stable_across_append_only_prompt_events(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

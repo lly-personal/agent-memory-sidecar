@@ -36,7 +36,7 @@
 
 1. Anchor 必须先用 Resolver 验证 stable immutable Release、tag/commit、asset digest、checksums、release/source manifest
    与 portable bundle。失败停止，不回退 branch、checkout 或猜测资产。
-2. 从 Resolver output 的 portable 运行 Bootstrap 2.2.0，执行 `workstation-reconcile --dry-run`。不得手工拼接多个安装命令
+2. 从 Resolver output 的 portable 运行该 Release 对应的 Bootstrap，执行 `workstation-reconcile --dry-run`。不得手工拼接多个安装命令
    后声称完整部署。
 3. Fresh install、同一来源的 ref/version/hash 修复由本次部署请求覆盖；Sidecar 或 Marketplace source identity 改变时，
    只显示 renderer 生成的无路径、无 URL 计划，并等待一次确认。
@@ -63,7 +63,7 @@
 | `reload_required` | 当前主机 distribution/source/Core/Skills/Doctor exact | 当前任务模型采用、第二设备、连续性 | 刷新一次 Desktop，新建任务并发送同一句入口 |
 | `consumer_scope_drift` | 托管主机层 exact、新任务已采用 | Desktop 可见项目级同名 Skill 全部对齐 | 按回执处理首个项目级来源；不自动更新 checkout |
 | `consumer_scope_bounded` | 托管主机层 exact、新任务已采用 | 未完整观察的项目消费者范围 | 恢复完整项目枚举/只读访问后重新验收 |
-| `ready` | 当前主机 exact，且新任务已加载 Bootstrap 2.2.0，项目消费者范围 exact | 第二设备、Scheduled、连续性、产品收益 | 可在目标工程新任务运行 Project Scout |
+| `ready` | 当前主机 exact，且新任务已加载该 Release 对应的 Bootstrap，项目消费者范围 exact | 第二设备、Scheduled、连续性、产品收益 | 可在目标工程新任务运行 Project Scout |
 
 任何 blocked 状态都不得同时要求刷新 Desktop 或引导运行 Project Scout；先修复矩阵中第一层失效事实。
 

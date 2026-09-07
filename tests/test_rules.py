@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import os
+import shutil
+import subprocess
 import tempfile
 import unittest
+from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -125,6 +131,342 @@ class RuleServiceTests(unittest.TestCase):
             )
             with self.assertRaises(CoreError):
                 service.list()
+
+    def test_approval_aliases_and_legacy_hashes_cannot_reuse_one_event(self) -> None:
+        with self._database() as db:
+            service = self._service(db)
+            approval = self._prompt(db, "remember")
+            service.deploy(proposal=_proposal(), approval_ref=approval)
+            target = self.project / "AGENTS.md"
+            before = target.read_bytes()
+            # A pre-fix Store may contain a noncanonical hash for this event.
+            db.conn.execute(
+                "UPDATE approval_consumptions SET approval_ref_sha256 = ?",
+                (hashlib.sha256(f" {approval} ".encode()).hexdigest(),),
+            )
+            for alias in (approval, f" {approval} ", approval.replace(":", ": ", 1)):
+                with self.subTest(alias=alias):
+                    with self.assertRaises(CoreError) as caught:
+                        service.deploy(proposal=_proposal(action="A different rule."), approval_ref=alias)
+                    self.assertEqual(caught.exception.code, "approval_invalid")
+                    self.assertEqual(before, target.read_bytes())
+            self.assertEqual(1, db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0])
+
+    def test_consumption_rechecks_event_after_two_validations(self) -> None:
+        with self._database() as db:
+            service = self._service(db)
+            ref = self._prompt(db, "remember")
+            first = service.authorization.validate(approval_ref=ref, identity=self.identity)
+            second = service.authorization.validate(approval_ref=f" {ref} ", identity=self.identity)
+            with db.transaction():
+                service.authorization.consume(approval=first, operation="test", request_sha256=None,
+                                              result_rule_id=None, transaction_id=None)
+            with self.assertRaises(CoreError), db.transaction():
+                service.authorization.consume(approval=second, operation="test", request_sha256=None,
+                                              result_rule_id=None, transaction_id=None)
+            self.assertEqual(1, db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0])
+
+    def test_scoped_list_never_recovers_an_uncommitted_project_journal(self) -> None:
+        with self._database() as db:
+            service = self._service(db)
+            plan = service._deploy_plans(proposal=_proposal(), supersedes=())
+            journal = service.coordinator._write_journal(transaction_id="tx_read_only", plans=plan,
+                                                         source_event_id=self._prompt(db, "interrupted").split(":", 1)[1])
+            plan[0].path.write_bytes(plan[0].after)
+            before = {p.name: p.read_bytes() for p in journal.iterdir()}
+            service.list(target="global_agents")
+            self.assertEqual(plan[0].after, plan[0].path.read_bytes())
+            self.assertEqual(before, {p.name: p.read_bytes() for p in journal.iterdir()})
+            self.assertEqual(0, db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0])
+
+    def test_post_commit_cleanup_error_preserves_result_and_reports_commit(self) -> None:
+        with self._database() as db:
+            service = self._service(db)
+            ref = self._prompt(db, "remember")
+            with patch("agent_memory_sidecar.rule_service.shutil.rmtree", side_effect=PermissionError("busy")):
+                with self.assertRaises(CoreError) as caught:
+                    service.deploy(proposal=_proposal(), approval_ref=ref)
+            self.assertEqual("instruction_cleanup_required", caught.exception.code)
+            for field in ("operation_committed", "approval_consumed", "recovery_required"):
+                self.assertIs(True, caught.exception.details[field])
+            after = (self.project / "AGENTS.md").read_bytes()
+            self.assertEqual(1, service.list(target="project_agents")["state_counts"]["生效中"])
+            self.assertEqual(1, db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0])
+            with self.assertRaises(CoreError):
+                service.deploy(proposal=_proposal(), approval_ref=ref)
+            service.coordinator.recover()
+            self.assertEqual(after, (self.project / "AGENTS.md").read_bytes())
+            self.assertFalse(service.coordinator.journal_root.exists())
+
+    def test_authorized_global_deploy_recovers_before_parity_planning(self) -> None:
+        source_root = self.root / "global-source"
+        source_file = source_root / "global" / "AGENTS.md"
+        source_file.parent.mkdir(parents=True)
+        source_file.write_bytes(b"# Global\n")
+        target = self.codex / "AGENTS.md"
+        target.write_bytes(source_file.read_bytes())
+        digest = hashlib.sha256(source_file.read_bytes()).hexdigest()
+        with self._database() as db:
+            with db.transaction():
+                InstallationRegistry(db).bind_global(source_root=source_root, source_commit="a" * 40,
+                                                    source_file_sha256=digest, target_file_sha256=digest)
+            service = self._service(db)
+            proposal = _proposal(scope="global", target="global_agents")
+            plans = service._deploy_plans(proposal=proposal, supersedes=())
+            journal = service.coordinator._write_journal(transaction_id="tx_interrupted_global", plans=plans,
+                                                         source_event_id=self._prompt(db, "interrupted").split(":", 1)[1])
+            for plan in plans:
+                plan.path.write_bytes(plan.after)
+            before = [plan.path.read_bytes() for plan in plans]
+            service.list(target="global_agents")
+            with self.assertRaises(CoreError):
+                service.deploy(proposal=proposal, approval_ref="invalid")
+            self.assertEqual(before, [plan.path.read_bytes() for plan in plans])
+            self.assertTrue(journal.is_dir())
+            result = service.deploy(proposal=proposal, approval_ref=self._prompt(db, "recover and deploy"))
+            self.assertEqual("deployed", result.action)
+            self.assertEqual(source_file.read_bytes(), target.read_bytes())
+            self.assertFalse(journal.exists())
+            self.assertEqual(1, db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0])
+
+    def test_partial_committed_cleanup_remains_retryable(self) -> None:
+        with self._database() as db:
+            service = self._service(db)
+
+            def partial_cleanup(directory, *args, **kwargs):
+                (Path(directory) / "0.before").unlink()
+                raise PermissionError("cleanup stopped after its first file")
+
+            with patch("agent_memory_sidecar.rule_service.shutil.rmtree", side_effect=partial_cleanup):
+                with self.assertRaises(CoreError) as caught:
+                    service.deploy(proposal=_proposal(), approval_ref=self._prompt(db, "remember"))
+            self.assertEqual("instruction_cleanup_required", caught.exception.code)
+            after = (self.project / "AGENTS.md").read_bytes()
+            self.assertEqual(1, service.list()["state_counts"]["生效中"])
+            result = service.deploy(proposal=_proposal(action="A second behavior."),
+                                    approval_ref=self._prompt(db, "add a second behavior"))
+            self.assertEqual("deployed", result.action)
+            self.assertEqual(2, service.list()["state_counts"]["生效中"])
+            self.assertEqual(2, db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0])
+            self.assertNotEqual(after, (self.project / "AGENTS.md").read_bytes())
+            self.assertFalse(service.coordinator.journal_root.exists())
+
+    def test_recovery_waits_before_checking_snapshots_removed_by_another_executor(self) -> None:
+        with self._database() as db:
+            service = self._service(db)
+            plans = service._deploy_plans(proposal=_proposal(), supersedes=())
+            journal = service.coordinator._write_journal(transaction_id="tx_concurrent_cleanup", plans=plans,
+                source_event_id=self._prompt(db, "interrupted").split(":", 1)[1])
+            validate = service.coordinator._validate_journal_files
+
+            def retire_before_validation(**kwargs):
+                journal.rename(journal.with_name(f".cleanup-{journal.name}"))
+                return validate(**kwargs)
+
+            with patch.object(service.coordinator, "_validate_journal_files", side_effect=retire_before_validation):
+                service.coordinator.recover()
+            self.assertFalse((self.project / "AGENTS.md").exists())
+            service.coordinator.recover()
+            self.assertFalse(service.coordinator.journal_root.exists())
+
+    def test_partial_cleanup_after_rollback_preserves_before_state(self) -> None:
+        with self._database() as db:
+            service = self._service(db)
+
+            def partial_cleanup(directory, *args, **kwargs):
+                (Path(directory) / "0.before").unlink()
+                raise PermissionError("cleanup stopped")
+
+            with patch.object(service.authorization, "consume", side_effect=RuntimeError("commit rejected")):
+                with patch("agent_memory_sidecar.rule_service.shutil.rmtree", side_effect=partial_cleanup):
+                    with self.assertRaisesRegex(RuntimeError, "commit rejected"):
+                        service.deploy(proposal=_proposal(), approval_ref=self._prompt(db, "remember"))
+            self.assertFalse((self.project / "AGENTS.md").exists())
+            self.assertEqual(0, db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0])
+            result = service.deploy(proposal=_proposal(), approval_ref=self._prompt(db, "retry"))
+            self.assertEqual("deployed", result.action)
+            self.assertEqual(1, service.list()["state_counts"]["生效中"])
+            self.assertFalse(service.coordinator.journal_root.exists())
+
+    def test_cleanup_completed_by_another_executor_reports_success(self) -> None:
+        with self._database() as db:
+            service = self._service(db)
+            remove = shutil.rmtree
+
+            def concurrent_cleanup(directory, *args, **kwargs):
+                remove(directory, *args, **kwargs)
+                raise FileNotFoundError("another executor already completed cleanup")
+
+            with patch("agent_memory_sidecar.rule_service.shutil.rmtree", side_effect=concurrent_cleanup):
+                result = service.deploy(proposal=_proposal(), approval_ref=self._prompt(db, "remember"))
+            self.assertEqual("deployed", result.action)
+            self.assertEqual(1, service.list()["state_counts"]["生效中"])
+            self.assertFalse(service.coordinator.journal_root.exists())
+
+    def test_recovery_rejects_an_aliased_journal_root_without_deleting_external_data(self) -> None:
+        external = self.root / "outside-journal-owner"
+        garbage = external / (".cleanup-tx_" + "a" * 32)
+        garbage.mkdir(parents=True)
+        sentinel = garbage / "user-data.txt"
+        sentinel.write_bytes(b"outside the journal owner")
+        with self._database() as db:
+            service = self._service(db)
+            alias = service.coordinator.journal_root
+            if os.name == "nt":
+                subprocess.run(["cmd", "/c", "mklink", "/J", str(alias), str(external)],
+                               check=True, capture_output=True)
+            else:
+                alias.symlink_to(external, target_is_directory=True)
+            with self.assertRaises(CoreError) as caught:
+                service.deploy(proposal=_proposal(), approval_ref=self._prompt(db, "remember"))
+            self.assertEqual("instruction_target_unsafe", caught.exception.code)
+            self.assertEqual(b"outside the journal owner", sentinel.read_bytes())
+            self.assertFalse((self.project / "AGENTS.md").exists())
+            self.assertEqual(0, db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0])
+
+    def test_cleanup_removed_before_physical_recheck_is_complete(self) -> None:
+        with self._database() as db:
+            service = self._service(db)
+            rename = Path.rename
+
+            def cleanup_after_rename(path, target):
+                result = rename(path, target)
+                if Path(target).name.startswith(".cleanup-tx_"):
+                    shutil.rmtree(target)
+                return result
+
+            with patch.object(Path, "rename", new=cleanup_after_rename):
+                result = service.deploy(proposal=_proposal(), approval_ref=self._prompt(db, "remember"))
+            self.assertEqual("deployed", result.action)
+            self.assertEqual(1, service.list()["state_counts"]["生效中"])
+            self.assertFalse(service.coordinator.journal_root.exists())
+
+    def test_cleanup_tolerates_a_concurrently_removed_child_on_older_python(self) -> None:
+        with self._database() as db:
+            service = self._service(db)
+            remove = shutil.rmtree
+
+            def older_python_cleanup(directory, *args, **kwargs):
+                child = Path(directory) / "0.before"
+                child.unlink()
+                error = FileNotFoundError("another executor removed this child")
+                handler = kwargs.get("onerror")
+                if handler is None:
+                    raise error
+                handler(os.unlink, str(child), (FileNotFoundError, error, None))
+                remove(directory, *args, **kwargs)
+
+            with patch("agent_memory_sidecar.rule_service.shutil.rmtree", side_effect=older_python_cleanup):
+                result = service.deploy(proposal=_proposal(), approval_ref=self._prompt(db, "remember"))
+            self.assertEqual("deployed", result.action)
+            self.assertEqual(1, service.list()["state_counts"]["生效中"])
+            self.assertFalse(service.coordinator.journal_root.exists())
+
+    def test_committed_cleanup_recovery_survives_runtime_event_retention(self) -> None:
+        self._assert_recovery_after_event_retention(committed_marker=True)
+
+    def test_recovery_preserves_unknown_commit_after_event_retention(self) -> None:
+        self._assert_recovery_after_event_retention(committed_marker=False)
+
+    def test_legacy_committed_journal_survives_runtime_retention(self) -> None:
+        self._assert_recovery_after_event_retention(committed_marker=True, legacy=True)
+
+    def test_legacy_unproven_journal_preserves_targets(self) -> None:
+        self._assert_recovery_after_event_retention(committed_marker=False, legacy=True)
+
+    def _assert_recovery_after_event_retention(self, *, committed_marker: bool, legacy: bool = False) -> None:
+        with self._database() as db:
+            service = self._service(db)
+            set_state = service.coordinator._set_journal_state
+
+            def fail_committed_marker(directory: Path, state: str) -> None:
+                if state == "committed":
+                    raise PermissionError("busy")
+                set_state(directory, state)
+
+            fault = (patch("agent_memory_sidecar.rule_service.shutil.rmtree", side_effect=PermissionError("busy"))
+                     if committed_marker else patch.object(service.coordinator, "_set_journal_state", side_effect=fail_committed_marker))
+            with fault, self.assertRaises(CoreError):
+                service.deploy(proposal=_proposal(), approval_ref=self._prompt(db, "remember"))
+            if legacy:
+                manifest_path = next(service.coordinator.journal_root.glob("*/manifest.json"))
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest["contract_version"] = "instruction_transaction_v1"
+                del manifest["source_event_id"]
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            target = self.project / "AGENTS.md"
+            after = target.read_bytes()
+            RuntimeLedger(db).capture_prompt(identity=self.identity, source_session="later", prompt="a later task", metadata={},
+                                            now=(datetime.now(UTC) + timedelta(days=8)).isoformat())
+            self.assertEqual(0, db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0])
+            if committed_marker:
+                service.coordinator.recover()
+                self.assertFalse(service.coordinator.journal_root.exists())
+            else:
+                with self.assertRaises(CoreError) as raised:
+                    service.coordinator.recover()
+                self.assertEqual("instruction_recovery_unproven", raised.exception.code)
+                self.assertTrue(service.coordinator.journal_root.exists())
+            self.assertEqual(after, target.read_bytes())
+
+    def test_recovery_rechecks_commit_after_acquiring_file_locks(self) -> None:
+        with self._database() as db:
+            service = self._service(db)
+            ref = self._prompt(db, "remember")
+            approval = service.authorization.validate(approval_ref=ref, identity=self.identity)
+            plans = service._deploy_plans(proposal=_proposal(), supersedes=())
+            transaction_id = "tx_concurrent_commit"
+            journal = service.coordinator._write_journal(transaction_id=transaction_id, plans=plans,
+                                                         source_event_id=approval.event.event_id)
+            plans[0].path.write_bytes(plans[0].after)
+            lock_paths = service.repository.lock_paths
+
+            @contextmanager
+            def commit_before_lock_is_acquired(paths):
+                with lock_paths(paths):
+                    with db.transaction():
+                        service.authorization.consume(approval=approval, operation="rule.deploy", request_sha256=None,
+                                                      result_rule_id=plans[0].rule.rule_id, transaction_id=transaction_id)
+                    service.coordinator._set_journal_state(journal, "committed")
+                    yield
+
+            with patch.object(service.repository, "lock_paths", commit_before_lock_is_acquired):
+                service.coordinator.recover()
+            self.assertEqual(plans[0].after, plans[0].path.read_bytes())
+            self.assertEqual(1, db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0])
+
+    def test_consumption_rejects_a_prompt_replaced_after_validation(self) -> None:
+        with self._database() as db:
+            service = self._service(db)
+            ref = self._prompt(db, "remember")
+            prepare = service._prepare_deploy
+
+            def replace_prompt_then_plan(**kwargs):
+                self._prompt(db, "a later request")
+                return prepare(**kwargs)
+
+            with patch.object(service, "_prepare_deploy", side_effect=replace_prompt_then_plan):
+                with self.assertRaises(CoreError) as raised:
+                    service.deploy(proposal=_proposal(), approval_ref=ref)
+            self.assertEqual("approval_invalid", raised.exception.code)
+            self.assertFalse((self.project / "AGENTS.md").exists())
+            self.assertEqual(0, db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0])
+
+    def test_recovery_empty_root_cleanup_is_idempotent(self) -> None:
+        with self._database() as db:
+            service = self._service(db)
+            rmdir = Path.rmdir
+
+            def removed_by_other_executor(path):
+                rmdir(path)
+                raise FileNotFoundError("another executor already removed the empty root")
+
+            for method in ("iterdir", "rmdir"):
+                with self.subTest(method=method):
+                    service.coordinator.journal_root.mkdir()
+                    with patch.object(Path, method, removed_by_other_executor):
+                        self.assertEqual([], service.coordinator.recover())
+                    self.assertFalse(service.coordinator.journal_root.exists())
 
     def test_approval_is_current_scope_bound_and_single_use(self) -> None:
         with self._database() as db:
@@ -1267,6 +1609,7 @@ class RuleServiceTests(unittest.TestCase):
             service.coordinator._write_journal(  # noqa: SLF001
                 transaction_id="tx_" + ("a" * 32),
                 plans=plans,
+                source_event_id=self._prompt(db, "interrupted").split(":", 1)[1],
             )
             target = self.project / "AGENTS.md"
             target.write_text("user edit after crash\n", encoding="utf-8")

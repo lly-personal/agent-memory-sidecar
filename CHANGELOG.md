@@ -3,6 +3,40 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.3.12 (2026-09-07)
+
+### Fixed
+
+- Recovery rechecks commit evidence under target locks and keeps cleanup within
+  those locks. New journals bind their source event; committed markers survive
+  runtime retention, while unprovable legacy/expired recovery preserves the
+  existing targets and journal. Authorized mutations recover before planning;
+  partial cleanup remains retryable after a settled journal is atomically retired.
+- Approval consumption atomically rechecks the current prompt and its scope/
+  expiry, including a prompt replaced after initial validation.
+
+- Authorization consumption uses resolved prompt-event identity, including historical reference hashes and the final atomic
+  consumption check. Alternate reference spellings cannot reuse one event across rule operations or proposal discard.
+- `rule list` no longer recovers file transactions. Post-commit cleanup failures report the committed mutation and consumed
+  approval explicitly, preserving the actual rule state and requiring honest cleanup reporting.
+- Interactive Scout checks its declared output root before deep reads and rechecks it at delivery. No-delta output is limited to declared
+  covered scope rather than claiming exhaustive project knowledge.
+
+### Added
+
+- Project/Review Pack v5 with six source categories, traceable event and observation dispositions, exact Owner exclusions,
+  local-versus-portable behavior judgments, and evidence/card conservation. Empty discovery cannot prove no material delta.
+  Discovery indexes current Owner clauses and checks omissions from source material before freezing suggestions.
+- A de-identified source exercise with a separately held semantic rubric for learning discovery, exact coverage, legitimate
+  project-only exclusions, and result-preserving delivery. Structural tests do not claim semantic recall or later-task adoption.
+
+### Changed
+
+- Scout review pages show a Chinese result, proposed scope, before/after summary, and available choices before technical evidence;
+  suggestions remain explicitly inactive until confirmed and successfully written.
+- Components: Core 0.3.12, Plugin 1.5.3, Bootstrap 2.2.1, Scout 5.8.0, Review Pack v5. Old v4 payloads must be rebuilt
+  from source evidence; there is no synthetic evidence migration. Publication, host deployment, and production adoption are separate.
+
 ## 0.3.11 (2026-09-01)
 
 ### Fixed

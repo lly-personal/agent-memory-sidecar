@@ -7,7 +7,7 @@
 
 ## Purpose
 
-`global_owner_scout_delivery_v1` binds a validated `global_owner_scout_review_pack_v4` to one immutable Markdown artifact in the
+`global_owner_scout_delivery_v1` binds a validated `global_owner_scout_review_pack_v5` to one immutable Markdown artifact in the
 current task's host-generated output root. It closes the boundary between deterministic renderer bytes and the actual task surface.
 It is an output contract, not a Store record, proposal, approval, Inbox, cross-task bridge, or behavior owner.
 

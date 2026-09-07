@@ -63,6 +63,10 @@ Store 相邻目录，成功后删除；它只用于崩溃恢复，不是行为�
 
 Global Owner Scout 位于 Core 拓扑之外：
 
+Project v5 在现有结果中保留六类来源覆盖、事件与结构化观察去向；事件与卡片分别守恒，所有引用回到本轮声明的
+来源。Agent 负责语义发现及反证，validator 负责引用、去向和卡片完整性；盲测样本负责发现能力评估。没有新增
+长期候选库、后台任务或规则 authority。活动工程知识与近期 Session 是并列输入，不以会话覆盖替代工程覆盖。
+
 ```mermaid
 flowchart LR
     PR["连续性工程：Repo Anchor + Marketplace"] --> PL["Git-backed Agent Memory Plugin"]
@@ -80,14 +84,14 @@ flowchart LR
     EX --> NI["原生任务索引：yield / wait / terminal"]
     NI --> TP["相关自然任务分页到窗口边界或 EOF"]
     TP --> SS["Global Owner Scout Skill：project_scout"]
-    SS --> PC["Immutable project_v4 Project Cards"]
+    SS --> PC["Immutable project_v5 Project Cards"]
     PC --> HC["Human Context：zh-CN 项目语境"]
     PC --> RPJ["Rule Projection：When / Do / Skip"]
     GB["Core global_instruction_binding"] --> OR["Deterministic Owner resolver"]
     GO["Canonical source 与本机 global target"] --> OR
     OR --> IP["Integration preview"]
     RPJ --> IP
-    HC --> RP["Validated review_pack_v4"]
+    HC --> RP["Validated review_pack_v5"]
     IP --> RP
     RP --> DR["Deterministic renderer：interactive surface + 精确多选动作"]
     DR --> VO["Visible-output verifier：交付前字节守恒"]
@@ -133,7 +137,7 @@ flowchart LR
 | Rule Projection | 删除项目路径、命令、局部阈值和业务标识，形成精确 owner-ready `When / Do / Skip` | 充当用户确认界面、保存项目故事 |
 | Integration preview | 在 Project Card 固定后读取最新 global owner，追加研究、语义关系、before/after 和动作资格 | 改写 Project Card、持久授权 |
 | Deterministic Owner resolver | 从 Core Installation Registry 解析 canonical source，以活动 Codex home 的 global target 计算逻辑端点与 hash | 搜索项目根 Owner、猜测路径、输出物理路径或回退到项目 `AGENTS.md` |
-| Project Review Pack | 将全部 E2/E3 卡渲染为中文分层 Markdown：警告、决策索引、30 秒判断、完整依据与技术附录 | 翻译或补写项目语义、原始 JSON 用户界面、跨任务传输、行为 owner |
+| Project Review Pack | 将全部 E2/E3 卡渲染为中文分层 Markdown：状态、决策索引、含范围与选择动作的决策摘要、完整依据与技术附录 | 翻译或补写项目语义、原始 JSON 用户界面、跨任务传输、行为 owner |
 | Deterministic renderer | 从 scripts 目录读取已验证 Review Pack；interactive 输出零 wrapper，scheduled 输出唯一末尾 wrapper | 动态导入、失败后手工重写、修复项目语义 |
 | Visible-output verifier | 按 surface 重新验证 renderer/artifact 字节的正文 hash、卡片、动作、wrapper 数量和无尾注 | 声称已经观察实际用户 final、生成卡片、替代 renderer |
 | Delivery v1 | 绑定 artifact 名称、完整文件 hash/bytes、Review Pack/body hash、卡片与动作守恒 | 保存绝对路径、正文、任务 ID、授权或长期状态 |
@@ -156,7 +160,7 @@ Review Pack 结构通过校验后仍未完成链路；renderer 与 visible-outpu
 继续创建并回读同任务 artifact、通过宿主工具打开，然后由外部 controller 读取实际 final/artifact 才完成呈现。
 宿主 open 是 Scout 的最后一个工具调用；之后只允许 compact Delivery receipt，不得再调用独立 memory 审计或追加尾注。
 
-Bootstrap 2.2.0 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 2.2.1 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得

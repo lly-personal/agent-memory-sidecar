@@ -93,12 +93,12 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.2.0",
+                "version": "2.2.1",
                 "content_sha256": "b" * 64,
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.7.0",
+                "version": "5.8.0",
                 "content_sha256": "c" * 64,
             },
         }
@@ -847,8 +847,8 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         desired = {
             "release_ref": "v0.3.10", "source_commit": "a" * 40,
             "core_version": "0.3.10", "plugin_version": "1.5.1", "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.2.0", "bootstrap_sha256": "c" * 64,
-            "scout_version": "5.7.0", "scout_sha256": "d" * 64,
+            "bootstrap_version": "2.2.1", "bootstrap_sha256": "c" * 64,
+            "scout_version": "5.8.0", "scout_sha256": "d" * 64,
         }
         source_sha = "e" * 64
         pack = self.managed_sources.build_deployment_pack(
@@ -865,15 +865,15 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             host_materialization={
                 "core": {"status": "verified", "version": "0.3.10", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
                 "global_binding": "unavailable", "doctor": "verified",
-                "bootstrap_skill": {"status": "unchanged", "version": "2.2.0", "content_sha256": "c" * 64},
-                "scout_skill": {"status": "unchanged", "version": "5.7.0", "content_sha256": "d" * 64},
+                "bootstrap_skill": {"status": "unchanged", "version": "2.2.1", "content_sha256": "c" * 64},
+                "scout_skill": {"status": "unchanged", "version": "5.8.0", "content_sha256": "d" * 64},
             },
             requires_reload=True,
             consumer_verified=False,
             generated_at="2026-08-21T12:00:00+08:00",
         )
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("2.2.0", validated["desired_bundle"]["bootstrap_version"])
+        self.assertEqual("2.2.1", validated["desired_bundle"]["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
         for label in ("期望发行身份", "Plugin 分发", "能力源同步", "主机物化", "项目消费者范围", "消费者采用"):
             self.assertIn(label, rendered)
@@ -919,7 +919,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 json.loads(text),
                 expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
             )
-            self.assertEqual("v0.3.11", value["plugins"][0]["source"]["ref"])
+            self.assertEqual("v0.3.12", value["plugins"][0]["source"]["ref"])
         else:
             self.assertTrue(
                 (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()
@@ -1029,7 +1029,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_v5_prompt_has_no_fixed_binding(self) -> None:
         prompt = (
             "Use $global-owner-scout in project_scout mode for the current bound project; rolling 72 hours; "
-            "Skill 5.7.0; global_owner_scout_project_v4; global_owner_scout_review_pack_v4; "
+            "Skill 5.8.0; global_owner_scout_project_v5; global_owner_scout_review_pack_v5; "
             "gpt-5.6-sol; medium; read-only."
         )
         self.bootstrap.validate_prompt(prompt)
@@ -1614,7 +1614,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             target = Path(temporary) / "global-owner-scout"
             source = ROOT / ".agents" / "skills" / "global-owner-scout"
             installed = self.bootstrap.install_skill(source, target)
-            self.assertEqual("5.7.0", installed["version"])
+            self.assertEqual("5.8.0", installed["version"])
             helper = target / "scripts" / "prepare_delivery.py"
             dispatcher = target / "scripts" / "scout.py"
             self.assertTrue(helper.is_file())

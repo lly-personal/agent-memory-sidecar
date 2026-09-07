@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from .database import CoreDatabase
 from .errors import CoreError
 from .identity import ProjectIdentity
-from .runtime_ledger import PromptEvent, RuntimeLedger
+from .runtime_ledger import EVENT_RETENTION_DAYS, PromptEvent, RuntimeLedger
 
 
 @dataclass(frozen=True)
@@ -29,13 +29,14 @@ class AuthorizationLedger:
             approval_ref=approval_ref,
             identity=identity,
         )
-        digest = hashlib.sha256(str(approval_ref).encode("utf-8")).hexdigest()
+        canonical_ref = f"user_prompt:{event.event_id}"
+        digest = hashlib.sha256(canonical_ref.encode("utf-8")).hexdigest()
         row = self.db.conn.execute(
             """
             SELECT operation FROM approval_consumptions
-            WHERE approval_ref_sha256 = ?
+            WHERE source_event_id = ?
             """,
-            (digest,),
+            (event.event_id,),
         ).fetchone()
         if row is not None:
             raise CoreError(
@@ -43,7 +44,7 @@ class AuthorizationLedger:
                 "approval ref has already been consumed",
                 prior_operation=str(row["operation"]),
             )
-        return Approval(str(approval_ref), digest, event)
+        return Approval(canonical_ref, digest, event)
 
     def consume(
         self,
@@ -59,13 +60,23 @@ class AuthorizationLedger:
             microsecond=0
         ).isoformat()
         try:
-            self.db.conn.execute(
+            cursor = self.db.conn.execute(
                 """
                 INSERT INTO approval_consumptions (
                     approval_ref_sha256, source_event_id, source_session,
                     scope_key, operation, request_sha256, result_rule_id,
                     transaction_id, consumed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM approval_consumptions WHERE source_event_id = ?
+                )
+                AND EXISTS (
+                    SELECT 1 FROM prompt_events e
+                    JOIN runtime_sessions s ON s.source_session = e.source_session
+                    WHERE e.event_id = ? AND s.last_prompt_event_id = e.event_id
+                      AND e.source_session = ? AND e.scope_key = ? AND s.scope_key = e.scope_key
+                      AND julianday(e.created_at) >= julianday(?)
+                )
                 """,
                 (
                     approval.approval_ref_sha256,
@@ -77,8 +88,15 @@ class AuthorizationLedger:
                     result_rule_id,
                     transaction_id,
                     timestamp,
+                    approval.event.event_id,
+                    approval.event.event_id,
+                    approval.event.source_session,
+                    approval.event.scope_key,
+                    (datetime.fromisoformat(timestamp) - timedelta(days=EVENT_RETENTION_DAYS)).isoformat(),
                 ),
             )
+            if cursor.rowcount != 1:
+                raise CoreError("approval_invalid", "approval event is no longer current, eligible, or unused")
         except Exception as exc:
             raise CoreError(
                 "approval_invalid",

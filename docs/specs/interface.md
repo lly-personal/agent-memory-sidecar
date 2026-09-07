@@ -126,6 +126,9 @@ agent-memory proposal discard --approval-ref <ref>
 - 成功和幂等 no-op 返回退出码 `0`。
 - 所有失败返回退出码 `1` 和非空 `error={code,message,details}`。
 - 不允许 traceback、半个 JSON 或调用开始即成功。
+- `instruction_cleanup_required` 表示规则事务已经提交，`error.details` 必须明确
+  `operation_committed=true / approval_consumed=true / recovery_required=true`；退出码 `1` 只表示清理尚未闭合。
+  此时必须先读取实际规则，不得输出“未部署 / 长期状态未变更”或复用已消费授权；后续授权 mutation 仍执行恢复。
 - Global mutation 的 `data.publication_required=true` 表示 source 已更新但 Git 发布尚未由 CLI 证明。
 - `rule list` 的 `data.targets` 对每个实际 target 返回
   `managed_block_bytes`、`managed_block_budget_bytes`、`remaining_bytes`、
@@ -162,6 +165,7 @@ Hook 输出、CLI 调用开始和将来时承诺均不算结果。尾部统一�
 | proposal create 成功 | 确认卡片最后一行使用 `记忆检查：已完成｜结论：发现新的可复用规则｜动作：已创建确认建议｜长期状态：待确认` |
 | 显式 deploy 或 confirm 成功 | 回显最终 `When / Do / Skip / 范围` 后使用 `记忆检查：已完成｜结论：规则已部署｜动作：已写入{范围}规则｜长期状态：生效中` |
 | 失败 | `记忆检查：执行失败｜结论：{已证明事实}｜动作：未保存或未部署｜长期状态：未变更` |
+| 已提交但清理未完成 | `记忆检查：清理待完成｜结论：规则操作已提交｜动作：待事务清理｜长期状态：{实际 target 读回状态，无法读回则未证明}`；优先于通用失败回执 |
 
 无动作回执只证明本轮分类被用户看见，不证明分类正确、内容持久化或后续行为采用。若关系无法可靠判断，
 展示澄清草案，并以“需要澄清 / 未创建建议 / 未变更”终态结束。
@@ -186,7 +190,7 @@ Hook 输出、CLI 调用开始和将来时承诺均不算结果。尾部统一�
 
 ### 查看、编辑、撤销
 
-- `rule list` 只读取实际 target、容量和 pending token；不读取历史 memory。
+- `rule list` 只读取实际 target、容量和 pending token；不读取历史 memory，不恢复文件事务或删除 journal。
 - 编辑产生新 `rule_id` 并原子替换旧规则；归并在同一事务中替换全部具名旧规则。
 - 撤销从实际 target 删除规则；当次返回 `已停用`，以后不建立可查询历史。
 - Global 操作同时变更 source 与本机 target；Git push 是独立 distribution 维度。
@@ -204,7 +208,9 @@ Hook 输出、CLI 调用开始和将来时承诺均不算结果。尾部统一�
 ## 失败语义
 
 任何失败都必须在保留当前任务结果的前提下使用条件可见失败尾部。proposal 或分类动作失败使用“未保存”，
-deploy、edit、consolidate 或 revoke 失败使用“未部署”，新任务采用尚未观察到时使用“未证明”；不得先声称成功。
+deploy、edit、consolidate 或 revoke 在提交前失败使用“未部署”，新任务采用尚未观察到时使用“未证明”。
+提交后清理或锁释放失败使用 `instruction_cleanup_required` 的“规则操作已提交、清理待完成”回执，并读回实际 target；
+不得把已经提交的结果说成未部署，也不得把清理未完成说成整体成功。
 
 | 失败 | 必须结果 |
 | --- | --- |
@@ -221,7 +227,9 @@ deploy、edit、consolidate 或 revoke 失败使用“未部署”，新任务�
 | Skill 安装源或目标 owner 内的 link/reparse/非普通文件/多硬链接 | `skill_target_unsafe`，不复制、不替换、不删除 alias 指向的目录 |
 | override、编码、权限或完整文件漂移 | 精确错误码，未部署 |
 | 单条或 managed block 超限 | `instruction_capacity_exceeded`，返回 before/projected/budget，未部署且不消费授权 |
-| 文件/数据库事务失败 | 恢复原状态并返回 `mutation_failed` |
+| 提交前文件/数据库事务失败 | 恢复原状态并返回 `mutation_failed` |
+| 提交后清理或锁释放失败 | `instruction_cleanup_required`，操作已提交、批准已消费、清理待完成 |
+| 恢复所需事件已过期且没有持久提交证明，或旧 journal 无法归因 | `instruction_recovery_unproven`，保留实际 target 与 journal，需有据对齐；不得推断未提交并回滚 |
 | 文件存在但新任务未采用 | `instruction_deployed`、`adoption_unproven` |
 | Global Git 未推送 | 本机可生效，但明确 `publication_required` |
 
@@ -251,7 +259,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。可靠自动发现边界仍是一次 Codex 刷新或下一任务，但 source/host 物化必须在当前部署任务完成。
 
-`agent-memory-workstation-bootstrap` Skill 2.2.0 提供两个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.2.1 提供两个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
@@ -347,7 +355,7 @@ root 逐级检查两个产品同名 `.agents/skills`，非 Git 项目只检查 p
 `status` 只允许 `ready`、`reload_required`、`consumer_scope_drift`、`consumer_scope_bounded`、
 `distribution_reconcile_blocked`、`source_sync_blocked` 或 `host_materialization_blocked`。中文 renderer 固定先显示期望发行、
 Plugin 分发、源同步、主机物化、消费者范围、消费者采用，再显示未证明事项与唯一下一步。apply 固定不越过模型采用层，
-返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.2.0 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
+返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.2.1 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
 读回仍 exact、Desktop 项目枚举完整且项目级同名 Skill 全部 exact，才允许 `ready`。任何本机结果都保留真实第二台设备、
 Scheduled、连续性与产品收益未证明边界。
 
@@ -420,17 +428,52 @@ context_snapshot_sha256
 自动隔离 executor 注入 model/thinking override；使用该 executor 的宿主解析 model、reasoning 与 Speed。可观测时
 `actual_model/actual_reasoning` 必须等于该任务请求值，不可观测时使用 `request_only`。
 
-### Project Scout：`global_owner_scout_project_v4`
+### 真实用户旅程验收
 
-v4 是不兼容 v3 的主机身份升级。顶层必须包含 `display_locale=zh-CN`、`project_identity`、运行 identity、证据窗口、模型观测、项目 owner 快照、结构化
-`session_coverage`、证据源、事件、E1 观察项、全部 E2/E3 `project_cards`、只读证明和限制。不得再用
+Scout 的用户需求闭合必须从真实使用场景、完整行为链、体验和心智模型四个维度验收。代码测试、固定语义样本、
+文件读回或安装检查只证明各自层级；新增验收标准本身不证明体验已经通过。
+
+| 维度 | 真实场景与验收行为 | 通过条件 |
+| --- | --- | --- |
+| 使用场景 | 用户在持续演进的目标工程中提出正常复盘请求，执行者从真实 Owner、决策、成功/失败及验收原文发现经验；覆盖仍生效的较早沉淀、近期新经验、已有覆盖和项目专属约束 | 不向执行者提示候选答案，不要求用户补充“请更深入”才发现已标注的关键经验；每项关键经验有正确去向及可核查依据，不按卡片数量评分 |
+| 行为链 | 从发起复盘、进入唯一执行任务、阅读结果、选择确认/修改/忽略，到准确作用域读回、后续自然任务采用、查看/修订/撤销 | 真实入口贯通实际结果；用户不重复输入或寻找多个任务，确认与结果对应；后续任务不靠重述规则或测试提示采用，撤销后新任务不再从该 Owner 获得规则 |
+| 体验 | 观察用户能否找到结果、理解建议与例外、作出决定；检查等待、降级、无法确认及失败时的可见反馈和恢复动作 | 首层内容说明发生了什么、用户成本、接受前后变化、影响范围和合法例外；状态与动作准确，已证价值可发现，无无效重试或重复确认；记录额外操作与理解困难，未实测不声称易用或耗时达标 |
+| 心智模型 | 检查用户对“当前项目的事实与规范”“待确认的通用候选”“已经生效的作用域规则”及“未发现增量/资料不足”的理解 | 用户能区分上述状态，知道何时影响未来任务以及如何查看和撤销；同类状态与动作保持一致，不要求先理解 worktree、版本、hash、parity 或协议枚举才能完成主要任务，技术核对材料按需展开 |
+
+最小场景组还必须包含：准确已有覆盖而无新候选、资料不足但保留独立有据候选、结果排队打开或打开失败、
+修改候选后再确认、忽略且不写入、作用域不适用的普通任务，以及撤销后的新任务。它们与既有宿主入口矩阵分别
+回答用户需求和执行机制问题；机制场景通过不能替代用户旅程通过。普通非复盘任务继续遵循默认安静边界。
+
+每个场景记录真实起点、用户意图、用户可见动作、系统响应、最终结果、理解或操作阻断及证据来源；
+没有对应证据时标为未验证。机器可核查的加载、写入、作用域和可见状态由 Agent 验证，理解与决策困难以真实
+使用观察或用户反馈校准；模型自评和“30 秒判断”等界面文案均不构成体验证据。控制证据只保存为该次验收产物，
+不新增长期用户行为库或第二状态 Owner。
+
+### Project Scout：`global_owner_scout_project_v5`
+
+v5 保留主机身份与顶层字段，增加严格来源与发现关联；不接收旧 v4 载荷，不允许为旧结果补造来源后迁移。
+顶层必须包含 `display_locale=zh-CN`、`project_identity`、运行 identity、证据窗口、模型观测、项目 owner 快照、结构化
+`session_coverage`、证据源、事件、结构化观察去向、全部合格 E2/E3 `project_cards`、只读证明和限制。不得再用
 `session_evidence_available` 布尔值，也不得限制项目卡数量。
+
+来源必须覆盖 `sessions / owners / decisions / successes / failures / acceptance` 六类，逐类声明读取范围、逻辑引用、
+状态与未覆盖范围；没有相关材料可以说明不适用，但 Owner 不可不适用。近期任务窗口不裁掉仍生效的工程知识。
+深读先建立当前行为 Owner 的标题/编号条款与控制 Owner 的接受/反转决策索引，再按该索引分段读取。冻结前从原文索引
+反查高价值条款和有效/无效路径的观察去向；不能只复核模型已经声明的事件。完整读取 ADR 不代表覆盖未读公理或后续纠偏，
+含可复用知识的未读范围继续限制发现资格。该步骤复用现有来源、观察和 gap，不要求逐段生成卡片，也不增设长期索引。
+每个事件都有观察去向，每张卡准确关联一个观察；来源、事件、观察和卡片的引用必须互相解析，卡片的规范证据 hash
+从本卡 `direct_evidence` 重算。观察明确项目约束、通用增量、排除理由及精确 Owner，单项目正式接受可支持 E2。
+`no_material_delta` 必须有非空的有据观察及去向，只表示已覆盖范围未发现合格增量。来源不足时降级并保留独立支持的卡。
+精确字段由 [Scout contracts](../../.agents/skills/global-owner-scout/references/contracts.md) 拥有；
+[独立语料评分](../../.agents/skills/global-owner-scout/references/discovery-evaluation/rubric.md) 验证发现能力，不能用格式校验替代。
+交互 `manual_30d` 执行器在任务普查前运行 `inspect-output`，失败使用 `output_preflight_unavailable / preflight`；最终交付仍重新校验。
+Scheduled 使用既有最终 Inbox wrapper 与可见文本校验，不增加文件输出根或预览能力依赖。
 
 `session_coverage` 至少记录任务索引上限、发现数、窗口内数量、选择数、完整读取数、turn page 数、排除理由、
 是否截断，以及 `complete/bounded/degraded`。达到宿主任务索引上限、未读到窗口边界或无法继续分页时只能使用
 `bounded/degraded`，不得声称完成完整 session 复盘。
 
-Skill 5.7.0 的所有入口固定使用已验证的原生任务索引上限 `50` 作为首次且唯一的索引请求，不得先请求更大
+Skill 5.8.0 的所有入口固定使用已验证的原生任务索引上限 `50` 作为首次且唯一的索引请求，不得先请求更大
 页面探测上限。调用使用最长 60 秒的初始 yield；返回 `cell_id` 时必须对同一 cell 最多连续 wait 两次、每次最长
 60 秒。cell 未终态前禁止发起第二次索引调用，`Script running` 不得解释为 unavailable、timeout 或 degraded。
 
@@ -485,11 +528,11 @@ Project Card 是目标工程线程的语义结论。Human Context 与 Rule Proje
 | E3 | 至少两个项目独立出现同一机制 | 是，按需中央审阅只建立关联，不得合并丢失项目差异 |
 | E4 | 已确认规则在后续自然任务中改变判断与行动 | 只证明采用，不用于发现候选 |
 
-`project_support` 在 v4 中精确包含
+`project_support` 精确包含
 `count, project_refs, basis, coverage_note`。E2 的 count 通常为 1；E3 至少为 2。refs 必须是隐私安全的 opaque
 identity，`basis` 与 `coverage_note` 必须说明独立证据与覆盖边界，不得再使用固定分母。
 
-### Project Review Pack：`global_owner_scout_review_pack_v4`
+### Project Review Pack：`global_owner_scout_review_pack_v5`
 
 Project Scout 固定全部 Project Card 后，读取同一时刻的 canonical global `AGENTS.md` source 与活动宿主的本机
 global `AGENTS.md` target，生成独立 `integration_preview`。每项 preview 只包含原卡 hash、global relation、一手调研、owner 对比、精确
@@ -513,9 +556,11 @@ Project Card 数必须等于 Review Pack 卡数。每个可确认卡还必须包
 活动 Skill 的所有 Python 操作只能从 `scripts` 目录执行 `python -B scripts/scout.py <operation>`；dispatcher 复用
 validator、Owner resolver、renderer、visible verifier 与 delivery 实现。确定性 renderer 只接受通过 validator 的
 Review Pack，使用 `scout.py render-review --surface interactive|scheduled` 并通过 stdin 输入完整对象；禁止动态
-import、直接猜选相邻 helper 或 renderer 失败后的模型手工重写。它按固定顺序生成 Markdown：运行状态与覆盖/parity 警告、
+import、直接猜选相邻 helper 或 renderer 失败后的模型手工重写。它按固定顺序生成 Markdown：中文结果状态、未执行规则变更的说明与覆盖/确认限制、
 交互 surface 的`本次需要判断 N 项`或 Scheduled surface 的`今日需要判断 N 项`中文索引、全部完整决策卡、E1 与 Session/模型覆盖技术附录、简短校验回执。每张卡先显示
-项目事件、用户成本、建议、具体 before/after、最大反例和推荐动作构成的 30 秒判断，再显示完整核对依据。表格
+项目事件、用户成本、建议范围、具体 before/after、最大反例和全部可选动作构成的决策摘要，再显示完整核对依据。
+用户可直接复制对应动作，无需先读技术材料或理解选择标识；确认仍绑定原有精确内容与令牌，不新增模糊批准入口。
+协议状态、证据等级、Owner 关系及模型信息进入核对依据或技术附录；零候选只声明已核查范围没有合格增量。表格
 最多四列，before/after 使用两列表格；不得依赖 HTML 折叠、自定义 App UI 或图片。宿主文件预览只承载相同
 Markdown 字节，不得改写内容或成为新的语义层。默认
 任何最终答复不得显示原始 JSON。renderer 回执包含 surface、可见正文 SHA-256、Project Card 数、可见卡数、
@@ -580,6 +625,7 @@ contract_version, status, phase, reason_code, project_state, confirmation_eligib
 project_binding_unavailable -> interactive_entry_blocked / preflight / unverified
 git_worktree_ineligible -> interactive_entry_blocked / preflight / unverified
 worktree_projection_unavailable -> interactive_entry_blocked / preflight / unchanged|unverified
+output_preflight_unavailable -> interactive_host_blocked / preflight / unchanged|unverified
 execution_protocol_failed -> failed / session_census / unchanged|unverified
 read_only_violation -> failed / project_review / changed
 privacy_or_contract_failed -> failed / project_review / unchanged|unverified
@@ -634,7 +680,7 @@ Agent 进入原子规则包链的起点：Agent 必须重新读取最新 global 
 - 活跃原工作区的并发变化只记录为当前隔离快照之外的限制；稳定隔离快照中的卡不得因此整体失效。
 - 2026-08-11 的三个真实 v5.1 Scheduled 运行及最小 automation-source probe 证明本主机原生任务索引未取得终态。
   每个 Host Enrollment 保持 `0/14`，自动化保持 `PAUSED`；普通 worktree 前向测试不再拥有恢复权。只有新的真实
-  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 Skill 5.7.0 项目 canary；
+  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 Skill 5.8.0 项目 canary；
   在 14 次有效运行期间必须显式请求
   `gpt-5.6-sol` 与 `medium` reasoning，并记录请求值、
   宿主可见的实际值和 telemetry 可用性。只有 request 不能证明实际模型；不可观测时诚实标记 `request_only`，

@@ -49,6 +49,19 @@ Expired events, consumed refs, replaced tokens, mismatched payloads, reused
 sessions, mismatched primary-folder scope, stale documents and changed
 superseded sets fail before file mutation.
 
+Consumption is keyed by the resolved source event, not by the spelling of its
+reference. Alternate spellings and previously stored reference hashes cannot
+authorize another operation for that event. The check also runs atomically at
+consumption, including proposal discard and migrated cutover approvals.
+Consumption also atomically rechecks current session/event, scope and expiry;
+a prompt replaced after initial validation cannot authorize the operation.
+Legacy cutover accepts only canonical refs. An unrecognized legacy consumption
+hash has no recoverable event identity: the approving prompt must be strictly
+newer than every such record, and migrated sessions whose current prompt is not
+strictly newer lose only that authorization pointer. Events and session rows
+remain. Invalid consumption timestamps fail closed; canonical consumed events
+remain consumed even if their optional legacy result metadata is malformed.
+
 An explicit Review Pack selection binds `rule_revision_bundle_v2`: one or more
 unique cards for the same scope/target, each card/project claim, seven-field
 proposal, selected superseded set and deterministic selection token, plus the
@@ -82,7 +95,28 @@ compaction.
 
 Project operations atomically mutate the primary repository `AGENTS.md`. Global
 operations lock and atomically mutate the bound complete Git source and local
-`~/.codex/AGENTS.md`; any failure restores both.
+`~/.codex/AGENTS.md`; a failure before database commit restores both. After
+commit, cleanup failure (including lock release) preserves the committed targets and consumed approval;
+it reports `instruction_cleanup_required` with `operation_committed=true`,
+`approval_consumed=true` and `recovery_required=true`. It must never report that
+the operation was not completed or suggest reusing that approval. Existing
+authorized mutation recovery retains its before/after and drift checks.
+Recovery re-reads the journal, snapshots and commit evidence after acquiring target locks; pre-lock inspection reads target identities only.
+After commit or complete rollback, while target locks are still held, atomically rename the journal to the `.cleanup-tx_` namespace
+before deleting any snapshot. That namespace contains settled transaction garbage only: retrying its partial deletion never reads or
+restores instruction targets. This keeps interrupted cleanup retryable without requiring already-deleted rollback evidence.
+If another executor has already removed the complete retired directory or a child within it, cleanup continues idempotently on
+every supported Python version. Other deletion errors, including permission failures, still report incomplete cleanup.
+The journal root and each transaction directory must have a physical directory chain; recovery, journal creation and retirement
+reject symbolic links and Windows reparse points before reading or deleting transaction contents.
+A durable committed journal remains commit proof after bounded runtime events
+expire. New `instruction_transaction_v2` journals bind `source_event_id`; absent
+consumption proves non-commit only while that event is retained. If neither a
+commit proof nor the source event survives, return `instruction_recovery_unproven`
+and preserve targets and journal. Legacy v1 journals with a committed marker or
+retained database commit remain recoverable; other legacy journals require
+explicit reconciliation instead of an inferred rollback. Event retention and
+the seven-table Store schema do not change.
 
 ### AC-5 — CLI and result
 
@@ -105,6 +139,10 @@ target. JSON output uses
 `agent_memory_result_v1`; success/idempotent no-op exits `0`, every failure exits
 `1` with an error code. `rule list --target` reads one exact instruction target
 so an unrelated target failure cannot block Fresh authorization checks.
+Listing never runs transaction recovery or removes journals. It reports actual
+target bytes; recovery runs after current approval validation (and exact bundle
+confirmation), before mutation planning reads target/binding state. Final apply
+still checks recovery and drift; an invalid approval never triggers recovery.
 
 ### AC-6 — Runtime
 

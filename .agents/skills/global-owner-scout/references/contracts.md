@@ -1,9 +1,9 @@
-# Global Owner Scout 5.7 contracts
+# Global Owner Scout 5.8 contracts
 
 ## Common rules
 
-- Skill `5.7.0`; Project result `global_owner_scout_project_v4`; Review Pack
-  `global_owner_scout_review_pack_v4`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
+- Skill `5.8.0`; Project result `global_owner_scout_project_v5`; Review Pack
+  `global_owner_scout_review_pack_v5`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
 - `project_claim_hash` covers every Project Card field except itself. `review_pack_hash` covers the pack except itself.
@@ -19,7 +19,55 @@ hash covers every other field. Invoke it only through `python -B scripts/scout.p
 
 ## Project result
 
-`global_owner_scout_project_v4` has these exact top-level fields:
+### Discovery trace (Project v5 / Review Pack v5)
+
+The v5 contracts replace v4; old payloads must be regenerated, not filled with
+synthetic evidence. Top-level fields are retained. The following nested fields
+are exact and required:
+
+- `evidence_sources`: `kind, status, coverage, refs, uncovered`. Kinds include
+  `sessions, owners, decisions, successes, failures, acceptance`; all six are
+  declared, including unavailable or not-applicable categories. Status is
+  `available, degraded, unavailable, not_applicable`. `refs` contains existing
+  `{type, ref, summary}` evidence references; `uncovered` lists concrete missing
+  scope. Available sources have refs, degraded/unavailable sources have gaps,
+  and not-applicable sources have no refs and explain why in coverage. Owners
+  cannot be not-applicable. Active knowledge is not limited by the Session window.
+- Events keep their fields. IDs are unique; direct evidence resolves to declared
+  available/degraded source refs. Every event is accounted for by an observation.
+- Observations: `observation_id, evidence_level, summary, direct_evidence,
+  event_ids, disposition`. Levels are E1/E2/E3 for signals, not automatic
+  candidate eligibility. Disposition is `kind, reason, card_ids, owner_refs,
+  local_scope, portable_delta`. Kinds are `candidate, already_covered,
+  project_only, skill_only, insufficient_evidence, not_reusable`.
+  Every observation cites declared sources and valid event IDs. Its local
+  implementation and portable behavior are compared explicitly, including why
+  no distinct portable delta exists. Existing-owner exclusions cite exact
+  declared Owner refs; weak exclusions name missing evidence in reason. E1 cannot
+  produce a card. A candidate disposition links at least one event and one or more matching-level
+  cards; all card evidence is contained in the linked events and the observation. All cards are linked
+  exactly once. Other dispositions have no cards. Routing a project-owned fact
+  does not by itself exclude a different portable behavior candidate.
+- The same ref has identical `type/ref/summary` in every source, event, observation
+  and card occurrence. Card evidence refs resolve to declared sources. `normalized_evidence_hash`
+  is the canonical SHA-256 of `direct_evidence`; all evidence used by a card must
+  be in its observation. Human-context refs are a subset of card evidence refs.
+
+Successful discovery requires available Owners and no unavailable/degraded
+non-Session category; otherwise use `degraded` with explicit limitations while
+preserving supported cards. Degraded or unavailable Sessions require at least one
+non-Session formal source on every retained card; semantic independence still needs review.
+`no_material_delta` requires nonempty observations,
+zero cards and complete/bounded Session coverage. It means only no qualified
+delta in the declared covered scope. Empty observations cannot prove exhaustion.
+Failed/preflight results may omit unvisited categories and observations.
+
+Validation proves trace consistency, not semantic completeness or truth. A
+separate blind source exercise with an independently held rubric checks important
+learning recall, correct exclusions and useful abstraction; it never imposes a
+card quota. Future-task adoption and revocation remain separate acceptance.
+
+`global_owner_scout_project_v5` has these exact top-level fields:
 
 ```text
 contract_version, mode, status, display_locale, project_key, project_identity,
@@ -67,7 +115,7 @@ an explicit `native_index_terminal_failure` or one proved index terminal result 
 `native_thread_pages_terminal_failure`; the latter requires truncation and fewer fully read than selected tasks. In either degraded
 case, cards independently supported by formal project evidence remain. `execution_protocol_failed` requires Project status
 `failed`; it may preserve one previously proved index terminal result, but never thread-pages completed and never cards.
-`no_material_delta` requires complete/bounded coverage and candidate exhaustion.
+`no_material_delta` requires complete/bounded coverage and evidenced dispositions within the declared covered scope.
 
 Each Project Card has exact fields:
 
@@ -96,7 +144,7 @@ not. `rule_payload` is exactly `trigger, action, skip_boundary, scope, why, evid
 
 ## Review Pack
 
-`global_owner_scout_review_pack_v4` exact top-level fields:
+`global_owner_scout_review_pack_v5` exact top-level fields:
 
 ```text
 contract_version, mode, status, display_locale, skill_version, project_result,

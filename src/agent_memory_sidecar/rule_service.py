@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -11,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from .authorization import Approval, AuthorizationLedger
+from .authorization import AuthorizationLedger
 from .database import CoreDatabase
 from .errors import CoreError
 from .identity import ProjectIdentity
@@ -177,20 +178,28 @@ class FileTransactionCoordinator:
         self.journal_root = db.path.parent / "transactions"
 
     def recover(self) -> list[str]:
-        if not self.journal_root.exists():
+        assert_physical_directory(self.journal_root, allow_missing=True)
+        try:
+            directories = sorted(self.journal_root.iterdir())
+        except FileNotFoundError:
             return []
         recovered: list[str] = []
-        for directory in sorted(self.journal_root.iterdir()):
+        for directory in directories:
             if not directory.is_dir():
                 continue
             manifest_path = directory / "manifest.json"
             try:
+                assert_physical_directory(directory, allow_missing=True)
+                if directory.name.startswith(".cleanup-tx_"):
+                    self._delete_retired_journal(directory)
+                    recovered.append(directory.name.removeprefix(".cleanup-"))
+                    continue
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
                 transaction_id = str(manifest["transaction_id"])
                 files = list(manifest["files"])
                 if (
                     manifest.get("contract_version")
-                    != "instruction_transaction_v1"
+                    not in {"instruction_transaction_v1", "instruction_transaction_v2"}
                     or directory.name != transaction_id
                     or manifest.get("state")
                     not in {"prepared", "files_written", "committed"}
@@ -204,11 +213,39 @@ class FileTransactionCoordinator:
                 paths = self._validate_journal_files(
                     directory=directory,
                     files=files,
-                )
-                committed = self.authorization.transaction_committed(
-                    transaction_id
+                    verify_snapshots=False,
                 )
                 with self.repository.lock_paths(paths):
+                    # Another executor may commit or finish cleanup while we wait.
+                    if not directory.exists():
+                        continue
+                    fresh = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    if (
+                        {key: value for key, value in fresh.items() if key != "state"}
+                        != {key: value for key, value in manifest.items() if key != "state"}
+                        or fresh.get("state") not in {"prepared", "files_written", "committed"}
+                    ):
+                        raise CoreError("instruction_recovery_invalid", "journal identity changed while acquiring locks")
+                    self._validate_journal_files(directory=directory, files=files)
+                    event_id = fresh.get("source_event_id")
+                    if event_id is not None and (not isinstance(event_id, str) or not event_id):
+                        raise CoreError("instruction_recovery_invalid", "journal source event is malformed")
+                    evidence = self.db.conn.execute(
+                        """
+                        SELECT EXISTS(SELECT 1 FROM approval_consumptions WHERE transaction_id = ?),
+                               EXISTS(SELECT 1 FROM prompt_events WHERE event_id = ?)
+                        """,
+                        (transaction_id, event_id),
+                    ).fetchone()
+                    committed = fresh["state"] == "committed" or bool(evidence[0])
+                    if not committed:
+                        if not evidence[1]:
+                            raise CoreError(
+                                "instruction_recovery_unproven",
+                                "retained evidence cannot prove commit state; targets and journal were preserved",
+                                recovery_required=True,
+                                transaction_id=transaction_id,
+                            )
                     for index, (item, path) in enumerate(zip(files, paths)):
                         before = (directory / f"{index}.before").read_bytes()
                         after = (directory / f"{index}.after").read_bytes()
@@ -239,25 +276,68 @@ class FileTransactionCoordinator:
                             ),
                             data=after if committed else before,
                         )
-                shutil.rmtree(directory)
-                recovered.append(transaction_id)
+                    self._discard_journal(directory)
+                    recovered.append(transaction_id)
             except CoreError:
                 raise
+            except FileNotFoundError as exc:
+                if not directory.exists():
+                    continue
+                raise CoreError(
+                    "instruction_recovery_failed",
+                    "an incomplete instruction transaction could not be read",
+                    journal=str(directory),
+                ) from exc
             except Exception as exc:
                 raise CoreError(
                     "instruction_recovery_failed",
                     "an incomplete instruction transaction could not be recovered",
                     journal=str(directory),
                 ) from exc
-        if self.journal_root.exists() and not any(self.journal_root.iterdir()):
-            self.journal_root.rmdir()
+        self._remove_empty_journal_root()
         return recovered
+
+    def _discard_journal(self, directory: Path, *, ignore_errors: bool = False) -> None:
+        # Only settled transactions reach this point, under their target locks.
+        # Retire recovery evidence atomically before destructive cleanup starts.
+        cleanup = directory.with_name(f".cleanup-{directory.name}")
+        try:
+            assert_physical_directory(directory, allow_missing=True)
+            directory.rename(cleanup)
+            self._delete_retired_journal(cleanup, ignore_errors=ignore_errors)
+        except FileNotFoundError:
+            if not ignore_errors and (directory.exists() or cleanup.exists()):
+                raise
+        except OSError:
+            if not ignore_errors:
+                raise
+
+    def _delete_retired_journal(self, directory: Path, *, ignore_errors: bool = False) -> None:
+        assert_physical_directory(directory, allow_missing=True)
+
+        def onerror(function, path, exc_info):
+            error = exc_info[1]
+            # Python 3.11/3.12 report children already removed by another cleaner.
+            if not (isinstance(error, FileNotFoundError) and Path(path) != directory):
+                raise error
+
+        shutil.rmtree(directory, ignore_errors=ignore_errors, onerror=onerror)
+
+    def _remove_empty_journal_root(self) -> None:
+        try:
+            self.journal_root.rmdir()
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            if exc.errno not in {errno.ENOTEMPTY, errno.EEXIST}:
+                raise
 
     def _validate_journal_files(
         self,
         *,
         directory: Path,
         files: list[Any],
+        verify_snapshots: bool = True,
     ) -> list[Path]:
         paths: list[Path] = []
         seen: set[str] = set()
@@ -282,7 +362,7 @@ class FileTransactionCoordinator:
                 )
             before = directory / f"{index}.before"
             after = directory / f"{index}.after"
-            if (
+            if verify_snapshots and (
                 not before.is_file()
                 or not after.is_file()
                 or _sha256(before.read_bytes())
@@ -304,58 +384,64 @@ class FileTransactionCoordinator:
         *,
         plans: tuple[FilePlan, ...],
         database_commit: Callable[[str], None],
+        source_event_id: str,
     ) -> str:
         self.recover()
         transaction_id = f"tx_{uuid.uuid4().hex}"
         paths = [plan.path for plan in plans]
-        with self.repository.lock_paths(paths):
-            self._assert_unchanged(plans)
-            journal = self._write_journal(
-                transaction_id=transaction_id,
-                plans=plans,
-            )
-            committed = False
-            try:
-                for plan in plans:
-                    if plan.after != plan.before:
-                        atomic_write(plan.path, plan.after)
-                    actual = read_document(
-                        path=plan.path,
-                        target=plan.target,
-                    )
-                    if actual.data != plan.after:
-                        raise CoreError(
-                            "instruction_write_verification_failed",
-                            "instruction target did not match planned bytes",
-                            path=str(plan.path),
-                        )
-                self._set_journal_state(journal, "files_written")
-                with self.db.transaction():
-                    database_commit(transaction_id)
-                committed = True
-                self._set_journal_state(journal, "committed")
-                shutil.rmtree(journal)
-                if (
-                    self.journal_root.exists()
-                    and not any(self.journal_root.iterdir())
-                ):
-                    self.journal_root.rmdir()
-                return transaction_id
-            except BaseException:
-                if not committed:
-                    for plan in reversed(plans):
-                        restore_file(
+        committed = False
+        try:
+            with self.repository.lock_paths(paths):
+                self._assert_unchanged(plans)
+                journal = self._write_journal(
+                    transaction_id=transaction_id,
+                    plans=plans,
+                    source_event_id=source_event_id,
+                )
+                try:
+                    for plan in plans:
+                        if plan.after != plan.before:
+                            atomic_write(plan.path, plan.after)
+                        actual = read_document(
                             path=plan.path,
-                            existed=plan.existed,
-                            data=plan.before,
+                            target=plan.target,
                         )
-                    shutil.rmtree(journal, ignore_errors=True)
-                    if (
-                        self.journal_root.exists()
-                        and not any(self.journal_root.iterdir())
-                    ):
-                        self.journal_root.rmdir()
-                raise
+                        if actual.data != plan.after:
+                            raise CoreError(
+                                "instruction_write_verification_failed",
+                                "instruction target did not match planned bytes",
+                                path=str(plan.path),
+                            )
+                    self._set_journal_state(journal, "files_written")
+                    with self.db.transaction():
+                        database_commit(transaction_id)
+                    committed = True
+                    self._set_journal_state(journal, "committed")
+                    self._discard_journal(journal)
+                    self._remove_empty_journal_root()
+                    return transaction_id
+                except BaseException:
+                    if not committed:
+                        for plan in reversed(plans):
+                            restore_file(
+                                path=plan.path,
+                                existed=plan.existed,
+                                data=plan.before,
+                            )
+                        self._discard_journal(journal, ignore_errors=True)
+                        self._remove_empty_journal_root()
+                    raise
+        except BaseException as exc:
+            if committed:
+                raise CoreError(
+                    "instruction_cleanup_required",
+                    "instruction operation committed; transaction cleanup is incomplete",
+                    operation_committed=True,
+                    approval_consumed=True,
+                    recovery_required=True,
+                    transaction_id=transaction_id,
+                ) from exc
+            raise
 
     def _assert_unchanged(self, plans: tuple[FilePlan, ...]) -> None:
         for plan in plans:
@@ -372,10 +458,14 @@ class FileTransactionCoordinator:
         *,
         transaction_id: str,
         plans: tuple[FilePlan, ...],
+        source_event_id: str,
     ) -> Path:
+        assert_physical_directory(self.journal_root.parent)
         self.journal_root.mkdir(parents=True, exist_ok=True)
+        assert_physical_directory(self.journal_root)
         directory = self.journal_root / transaction_id
         directory.mkdir(exist_ok=False)
+        assert_physical_directory(directory)
         files: list[dict[str, object]] = []
         try:
             for index, plan in enumerate(plans):
@@ -394,8 +484,9 @@ class FileTransactionCoordinator:
                     }
                 )
             manifest = {
-                "contract_version": "instruction_transaction_v1",
+                "contract_version": "instruction_transaction_v2",
                 "transaction_id": transaction_id,
+                "source_event_id": source_event_id,
                 "state": "prepared",
                 "files": files,
             }
@@ -449,7 +540,6 @@ class RuleService:
         )
 
     def list(self, *, target: str | None = None) -> dict[str, Any]:
-        self.coordinator.recover()
         if target not in {None, "global_agents", "project_agents"}:
             raise CoreError(
                 "invalid_request",
@@ -522,6 +612,7 @@ class RuleService:
             approval_ref=approval_ref,
             identity=self.identity,
         )
+        self.coordinator.recover()
         normalized, plans, revision = self._prepare_deploy(
             proposal=proposal,
             supersedes=supersedes,
@@ -563,7 +654,7 @@ class RuleService:
             if proposal.scope == "global":
                 self._update_global_binding_after(plans)
 
-        self.coordinator.apply(plans=plans, database_commit=commit)
+        self.coordinator.apply(plans=plans, database_commit=commit, source_event_id=approval.event.event_id)
         return MutationResult(
             action=action,
             rule=rule,
@@ -581,11 +672,12 @@ class RuleService:
             approval_ref=approval_ref,
             identity=self.identity,
         )
-        plans, items, revision = self._prepare_bundle_deploy(bundle=bundle)
         self.authorization.validate_prompt_content(
             approval=approval,
             expected_prompt=bundle.confirmation_text,
         )
+        self.coordinator.recover()
+        plans, items, revision = self._prepare_bundle_deploy(bundle=bundle)
 
         def commit(transaction_id: str) -> None:
             self.authorization.consume(
@@ -598,7 +690,7 @@ class RuleService:
             if bundle.scope == "global":
                 self._update_global_binding_after(plans)
 
-        self.coordinator.apply(plans=plans, database_commit=commit)
+        self.coordinator.apply(plans=plans, database_commit=commit, source_event_id=approval.event.event_id)
         return BundleMutationResult(
             items=items,
             plans=plans,
@@ -616,6 +708,7 @@ class RuleService:
             approval_ref=approval_ref,
             identity=self.identity,
         )
+        self.coordinator.recover()
         view = self.repository.find_rule(
             rule_id=rule_id,
             identity=self.identity,
@@ -633,7 +726,7 @@ class RuleService:
             if view.rule.target == "global_agents":
                 self._update_global_binding_after(plans)
 
-        self.coordinator.apply(plans=plans, database_commit=commit)
+        self.coordinator.apply(plans=plans, database_commit=commit, source_event_id=approval.event.event_id)
         return MutationResult(
             action="revoked",
             rule=view.rule,
@@ -661,7 +754,8 @@ class RuleService:
         )
 
     def discard_proposal(self, *, approval_ref: str) -> dict[str, Any]:
-        approval, token = self.runtime.pending_for_approval(
+        approval = self.authorization.validate(approval_ref=approval_ref, identity=self.identity)
+        _event, token = self.runtime.pending_for_approval(
             approval_ref=approval_ref,
             identity=self.identity,
             proposal=None,
@@ -669,13 +763,7 @@ class RuleService:
         with self.db.transaction():
             self.runtime.delete_proposal(token.token_id)
             self.authorization.consume(
-                approval=Approval(
-                    approval_ref=approval_ref,
-                    approval_ref_sha256=hashlib.sha256(
-                        approval_ref.encode("utf-8")
-                    ).hexdigest(),
-                    event=approval,
-                ),
+                approval=approval,
                 operation="proposal.discard",
                 request_sha256=token.proposal_sha256,
                 result_rule_id=None,

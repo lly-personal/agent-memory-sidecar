@@ -87,6 +87,12 @@ TERMINAL_REASON_MAPPINGS = {
         {"unchanged", "unverified"},
         "项目结果或 Review Pack 未通过隐私与契约校验。",
     ),
+    "output_preflight_unavailable": (
+        "interactive_host_blocked",
+        "preflight",
+        {"unchanged", "unverified"},
+        "深挖前未能确认当前任务的安全输出根或文件预览能力。",
+    ),
     "output_root_unavailable": (
         "interactive_host_blocked",
         "delivery",
