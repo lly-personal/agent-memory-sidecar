@@ -103,6 +103,20 @@ project's chosen means, count or sequence. Narrow `When`, preserve a concrete
 into a universal gate. Apply this check to the completed projection, not just
 the source excerpt, before freezing it.
 
+For a source-rich review spanning active Owners and accumulated decisions,
+reserve a fresh internal review context before freezing; do not wait for a user
+to identify an omission. Use an internal
+subagent when available, not another user-facing task. Give it only original
+sources, the source index/read gaps, and draft observations/projections, never
+Global Owner wording or expected candidate answers. It must audit independent
+source obligations and accepted/reversed paths, including partially represented
+ones, and challenge each projected obligation rather than attach one decorative
+counterexample to an entire compound card. Correct evidence-backed defects and
+recheck associations, privacy and semantic hashes before the final freeze.
+Preserve earlier failed evaluation records; a correction is not retroactive
+blind discovery. If independent context is unavailable, record that coverage
+limitation instead of claiming a self-review is independent qualification.
+
 Create two projections from the same evidence:
 
 - Human Context: Simplified Chinese, familiar privacy-safe project vocabulary, concrete event/cost/recommendation/before-after and
