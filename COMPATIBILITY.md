@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.3.12 | 0.3.12 | 1.5.3 | 2.2.1 | 5.8.0 | v5 | 3.11–3.13 |
 | v0.3.11 | 0.3.11 | 1.5.2 | 2.2.0 | 5.7.0 | v4 | 3.11–3.13 |
 | v0.3.10 | 0.3.10 | 1.5.1 | 2.1.0 | 5.7.0 | v4 | 3.11–3.13 |
 | v0.3.9 | 0.3.9 | 1.5.1 | 2.0.1 | 5.6.0 | v4 | 3.11–3.13 |
@@ -17,6 +18,9 @@
 
 The Python wheel/sdist contain Core only. Plugin, Bootstrap, and Scout ship in the portable bundle. A row is publishable only when
 the release manifest, package metadata, Plugin manifest, Skill contracts, archive names, and installed-runtime smoke agree.
+In v0.3.12, Scout 5.8 replaces Project/Review Pack v4 with v5 discovery provenance and
+dispositions; v4 payloads are not accepted as v5 and must be regenerated from evidence. Delivery v1 is unchanged. Bootstrap 2.2.1
+materializes the matching Scout version. The existing frozen Skill 4 compatibility lane remains governed by its QDR.
 Scout 5.6 keeps Review Pack v4 and adds the separate `global_owner_scout_delivery_v1` task-surface contract.
 Scout 5.7 keeps Review Pack v4, adds `global_owner_scout_terminal_v1`, and moves the user front door from a manually created
 worktree task to automatic host-managed isolation from the current project task.

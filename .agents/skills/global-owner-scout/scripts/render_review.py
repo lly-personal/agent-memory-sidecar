@@ -27,6 +27,19 @@ ACTION_LABELS = {
     "make_skill": "改做 Skill",
     "ignore": "忽略",
 }
+STATUS_LABELS = {
+    "ok": "建议待审阅",
+    "degraded": "部分资料未覆盖",
+    "no_material_delta": "已核查范围暂无新建议",
+    "failed": "本次复盘未完成",
+    "output_budget_exceeded": "完整结果无法交付",
+}
+SCOPE_LABELS = {
+    "project_owner": "当前项目规范",
+    "skill": "可按需使用的操作方法",
+    "global_agents": "所有适用项目的后续任务",
+    "no_persistence": "仅供本次参考",
+}
 SURFACES = {"interactive", "scheduled"}
 
 
@@ -41,7 +54,7 @@ def inbox_wrapper(pack: dict[str, Any]) -> str:
         summary = "本次没有可操作卡片，请查看完整失败终态。"
     elif pack["status"] == "no_material_delta":
         title = "Owner Scout：暂无新候选"
-        summary = "事实普查已完成，本窗口没有新的 E2/E3 候选。"
+        summary = "已核查范围内暂无新建议；未覆盖部分仍未知。"
     else:
         title = f"Owner Scout：{count} 项待判断"
         summary = "请在当前任务中审阅完整中文依据；可单选或一次选择多张可确认卡。"
@@ -100,13 +113,13 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
     lines = [
         f"## 决策卡 {ordinal}：{human['decision_title']}",
         "",
-        f"`{card['card_id']}` · `{card['classification']} / {card['evidence_level']} / {support['count']} 个项目` · Owner `{card['owner_recommendation']}`",
+        f"**建议范围**：{SCOPE_LABELS[card['owner_recommendation']]}。",
         "",
         "> [!IMPORTANT]",
         f"> **推荐动作：`{recommended_command}`**  ",
         f"> {review['recommended_action_reason']}",
         "",
-        "### 30 秒判断",
+        "### 决策摘要",
         "",
         "**项目里发生了什么**",
         "",
@@ -124,15 +137,27 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
         "| --- | --- |",
         f"| {table_cell(human['concrete_before'])} | {table_cell(human['concrete_after'])} |",
         "",
-        f"**判断依据**：{card['evidence_level']}；独立项目支持 {support['count']}；{support['coverage_note']}；直接证据 `{', '.join(human['evidence_refs'])}`。",
+        "### 你的选择",
+        "",
+        "复制对应行回复即可；忽略只跳过本次建议，不修改已有规则。",
+        "",
+    ]
+    for action in review["allowed_actions"]:
+        suffix = "（推荐）" if action == recommended else ""
+        lines.append(f"- `{action_command(action, card['card_id'], review['selection_token'])}` — {ACTION_LABELS[action]}{suffix}")
+    lines.extend([
         "",
         "### 完整核对依据",
+        "",
+        f"`{card['card_id']}` · `{card['classification']} / {card['evidence_level']} / {support['count']} 个项目` · Owner `{card['owner_recommendation']}`",
+        "",
+        f"**判断依据**：{card['evidence_level']}；独立项目支持 {support['count']}；{support['coverage_note']}；直接证据 `{', '.join(human['evidence_refs'])}`。",
         "",
         "#### 真实痛点与事件时间线",
         "",
         card["pain"],
         "",
-    ]
+    ])
     for item in card["event_timeline"]:
         lines.append(f"{item['order']}. {item['event']} → {item['outcome']}")
     lines.extend(
@@ -206,14 +231,8 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
             *bullet_lines(card["anti_examples"], prefix="  - "),
             "- 尚未证明：",
             *bullet_lines(card["unproven"], prefix="  - "),
-            "",
-            "#### 你的单卡动作",
-            "",
         ]
     )
-    for action in review["allowed_actions"]:
-        suffix = "（推荐）" if action == recommended else ""
-        lines.append(f"- `{action_command(action, card['card_id'], review['selection_token'])}` — {ACTION_LABELS[action]}{suffix}")
     return lines
 
 
@@ -238,35 +257,35 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
             raise ContractError("scheduled surface requires its bounded automation memory wrapper")
     cards_by_hash = {card["project_claim_hash"]: card for card in project["project_cards"]}
     lines = [
-        f"# Global Owner Scout · {project['project_key']}",
+        f"# 项目复盘 · {project['project_key']}",
         "",
-        f"**终态**：`{pack['status']}`  ",
+        f"**结果**：{STATUS_LABELS[pack['status']]}。  ",
         f"**决策卡**：{len(pack['review_cards'])} 张  ",
-        f"**Owner parity**：`{pack['owner_parity']['status']}`",
+        "**本次规则变更**：无。建议经明确确认并成功写入后，才会改变相应作用域的后续任务。",
         "",
     ]
     if pack["status"] == "failed":
         pass
     elif coverage["status"] == "degraded":
-        warning = "> 本次为 `degraded / session coverage unavailable`。下列卡片仍由独立 Owner、ADR、Git、测试或验收事实支持并完整展示。"
+        warning = "> 近期任务读取不完整。下列建议仍有独立的工程规范、决策或验收依据；未覆盖范围见技术附录。"
         if surface == "scheduled":
             warning += "本次不计入 14 次有效运行。"
         lines.extend(["> [!WARNING]", warning, ""])
     elif pack["status"] == "degraded":
-        warning = "> 本次为 `degraded / evidence coverage limitation`。卡片保持可见；具体限制见覆盖摘要。"
+        warning = "> 部分工程资料未能完整核查。已有独立依据的建议仍可审阅；具体限制见技术附录。"
         if surface == "scheduled":
-            warning = "> 本次为 `degraded / evidence coverage limitation`。卡片保持可见，但本次不计入 14 次有效运行；具体限制见覆盖摘要。"
+            warning += "本次不计入 14 次有效运行。"
         lines.extend(["> [!WARNING]", warning, ""])
     if pack["owner_parity"]["status"] != "matched":
         lines.extend(
             [
                 "> [!CAUTION]",
-                "> canonical/local global owner 当前不一致或不可用；所有卡片保持可见，但“确认”动作已移除。",
+                "> 当前全局规则尚未核对一致，暂不能确认。你仍可阅读、修改或忽略建议；完成规则核查并刷新建议后，才能确认。",
                 "",
             ]
         )
     if pack["status"] == "no_material_delta":
-        lines.extend(["", "## 结果", "", "已完成事实普查、候选穷举与反证；本窗口没有新的 E2/E3 候选。"])
+        lines.extend(["", "## 结果", "", "在本轮声明的已覆盖范围内未发现合格增量；未覆盖范围仍未知。来源、已检查信号与排除依据见下方发现与去向。"])
     elif pack["status"] == "failed":
         lines.extend(["", "## 失败", "", "本次运行未通过隐私、只读、完整性或来源门禁，没有输出可操作卡片。"])
     elif pack["status"] == "output_budget_exceeded":
@@ -289,9 +308,9 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
                     "",
                     "### 一次确认多张",
                     "",
-                    "选中的卡会在同一个最新 Owner 快照上联合重算，并作为一个原子规则包提交：全部成功，或整包零写入。若关系发生实质变化，只返回刷新预览，不写入。",
+                    "选中的建议会基于最新生效规则一起核查并提交：全部成功，或整包零写入。若建议关系发生实质变化，会先刷新预览，等待你重新判断。",
                     "",
-                    f"- **一次确认命令**：`确认 {'、'.join(confirmable)}` — 确认全部当前可确认卡；可删除不想选择的完整 `card_id@token` 对。",
+                    f"- **一次确认命令**：`确认 {'、'.join(confirmable)}` — 确认全部当前可确认建议。只确认部分时，可使用对应卡片的完整确认行。",
                 ]
             )
         for index, review in enumerate(pack["review_cards"], start=1):
@@ -301,6 +320,8 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         [
             "",
             "## 技术附录",
+            "",
+            f"**协议状态**：`{pack['status']}`；**Owner parity**：`{pack['owner_parity']['status']}`。",
             "",
             f"**证据窗口**：`{window['kind']}` · {window['start']} → {window['end']}  ",
             f"**模型请求**：`{model['requested_model']} + {model['requested_reasoning']}`  ",
@@ -314,12 +335,27 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
     )
     for source in project["evidence_sources"]:
         lines.append(f"- `{source['kind']} / {source['status']}`：{source['coverage']}")
+        lines.extend(bullet_lines([f"依据 {ref['ref']}：{ref['summary']}" for ref in source["refs"]]))
+        lines.extend(bullet_lines([f"未覆盖：{gap}" for gap in source["uncovered"]]))
     if project["limitations"]:
         lines.extend(["", "### 限制", "", *bullet_lines(project["limitations"])])
-    lines.extend(["", "### E1 观察项", ""])
+    lines.extend(["", "### 发现与去向", ""])
     if project["observations"]:
+        labels = {"candidate": "形成候选", "already_covered": "已有覆盖", "project_only": "留在项目",
+                  "skill_only": "归入 Skill", "insufficient_evidence": "证据不足", "not_reusable": "不适合持久化"}
         for observation in project["observations"]:
-            lines.append(f"- `{observation['observation_id']}`：{observation['summary']}（{observation['disposition']}）")
+            disposition = observation["disposition"]
+            lines.extend([
+                f"- `{observation['observation_id']}` · {observation['evidence_level']} · {labels[disposition['kind']]}：{observation['summary']}",
+                f"  - 原因：{disposition['reason']}",
+                f"  - 项目约束：{disposition['local_scope']}",
+                f"  - 通用行为判断：{disposition['portable_delta']}",
+                f"  - 依据：{'、'.join(ref['ref'] for ref in observation['direct_evidence'])}",
+            ])
+            if disposition["owner_refs"]:
+                lines.append(f"  - 已有 Owner：{'、'.join(disposition['owner_refs'])}")
+            if disposition["card_ids"]:
+                lines.append(f"  - 对应卡片：{'、'.join(disposition['card_ids'])}")
     else:
         lines.append("- 无。")
 
@@ -355,7 +391,7 @@ def run_self_test() -> None:
         project = valid_project(window_kind="rolling_72h") if surface == "scheduled" else valid_project()
         rendered = render_review_pack(valid_review_pack(project), surface=surface)
         assert rendered.count("## 决策卡 ") == 2
-        assert decision_heading in rendered and "30 秒判断" in rendered
+        assert decision_heading in rendered and "决策摘要" in rendered
         assert "完整核对依据" in rendered and "技术附录" in rendered
         assert rendered.index(decision_heading) < rendered.index("## 决策卡 1") < rendered.index("技术附录")
         assert "| 接受前 | 接受后 |" in rendered
@@ -377,7 +413,7 @@ def run_self_test() -> None:
         tests += 1
 
     degraded = render_review_pack(valid_review_pack(valid_project(status="degraded", coverage="degraded", observed=False)), surface="interactive")
-    assert "degraded / session coverage unavailable" in degraded
+    assert "近期任务读取不完整" in degraded
     assert degraded.count("## 决策卡 ") == 2
     tests += 1
 
@@ -387,7 +423,7 @@ def run_self_test() -> None:
     tests += 1
 
     no_delta = render_review_pack(valid_review_pack(valid_project(status="no_material_delta")), surface="interactive")
-    assert "本窗口没有新的 E2/E3 候选" in no_delta and "## 决策卡 " not in no_delta
+    assert "已覆盖范围内未发现合格增量" in no_delta and "## 决策卡 " not in no_delta
     tests += 1
 
     failed = render_review_pack(valid_review_pack(valid_project(status="failed")), surface="interactive")
@@ -426,7 +462,7 @@ def run_self_test() -> None:
     assert "bundle_action_count=1" in twenty_four
     tests += 1
 
-    print(json.dumps({"status": "ok", "tests": tests, "renderer": "global_owner_scout_review_pack_v4"}, separators=(",", ":")))
+    print(json.dumps({"status": "ok", "tests": tests, "renderer": "global_owner_scout_review_pack_v5"}, separators=(",", ":")))
 
 
 def load_stdin_json() -> Any:

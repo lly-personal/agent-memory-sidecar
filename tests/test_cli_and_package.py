@@ -47,6 +47,37 @@ from agent_memory_sidecar.skill import (
 
 
 class CliAndPackageTests(unittest.TestCase):
+    def test_cli_reports_committed_state_after_cleanup_failure(self) -> None:
+        self._assert_committed_cleanup_failure("agent_memory_sidecar.rule_service.shutil.rmtree")
+
+    def test_cli_reports_committed_state_after_lock_release_failure(self) -> None:
+        self._assert_committed_cleanup_failure("agent_memory_sidecar.instructions._release_file_lock")
+
+    def _assert_committed_cleanup_failure(self, fault_target: str) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project, codex, store = root / "project", root / "codex", root / "memory.sqlite"
+            project.mkdir()
+            codex.mkdir()
+            proposal = {"trigger": "When reviewing changes.", "action": "Verify the requested result.",
+                        "skip_boundary": "Skip prose-only work.", "scope": "project", "instruction_target": "project_agents",
+                        "why": "Avoid regressions.", "evidence": "An explicit test authorization."}
+            with CoreDatabase(store, create=True, now="2026-07-24T00:00:00+00:00") as db:
+                event = RuntimeLedger(db).capture_prompt(identity=resolve_identity(project), source_session="session",
+                                                       prompt="remember", metadata={})
+            output = io.StringIO()
+            with (patch.dict(os.environ, {"CODEX_HOME": str(codex)}), redirect_stdout(output),
+                  patch(fault_target, side_effect=PermissionError("busy"))):
+                code = cli.main(["--store", str(store), "--cwd", str(project), "rule", "deploy", "--from-json",
+                                 json.dumps(proposal), "--approval-ref", f"user_prompt:{event.event_id}"])
+            result = json.loads(output.getvalue())
+            self.assertEqual(1, code)
+            self.assertEqual("instruction_cleanup_required", result["error"]["code"])
+            self.assertTrue(result["error"]["details"]["operation_committed"])
+            self.assertTrue(result["error"]["details"]["approval_consumed"])
+            self.assertNotIn("without completing", result["error"]["message"])
+            self.assertIn(proposal["action"], (project / "AGENTS.md").read_text(encoding="utf-8"))
+
     def test_public_help_only_advertises_new_surface(self) -> None:
         help_text = cli.build_parser().format_help()
         self.assertIn("{rule,setup,doctor}", help_text)

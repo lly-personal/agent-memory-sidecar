@@ -1,4 +1,4 @@
-# Deep Review Protocol 5.7
+# Deep Review Protocol 5.8
 
 ## Evidence posture
 
@@ -16,6 +16,14 @@ do not create an empty child or ask
 the user to repeat it. Do not use shell-created worktrees, guessed paths, or partial Local execution. If the project is not eligible,
 binding is unavailable, or the host cannot project the task, render Terminal v1 through `python -B scripts/scout.py render-terminal`
 and stop before Phase 1.
+
+For interactive `manual_30d`, also check the host-declared current-task output root
+and file-preview capability before task census. Use `scripts/scout.py
+inspect-output --artifact-dir <host-output-root> --protected-root <project-root>`;
+it checks containment without writing. Missing capability returns Terminal v1
+before deep work. Recheck these conditions during delivery; preflight does not
+prove later writability or visibility. Scheduled checks its final Inbox wrapper
+surface instead; it has no file artifact root or file-preview prerequisite.
 
 ## Phase 1: identity and task census
 
@@ -44,6 +52,22 @@ and stop before Phase 1.
 Read the project instruction chain, L1/L2/L3 or equivalent Owners, current-status Owner, relevant ADR/specs, windowed Git changes,
 tests, failures, acceptance, and isolated snapshot. Recheck Session leads against these sources. Record each source's availability.
 
+Build the six-category `evidence_sources` inventory defined in contracts.md.
+Start from current Owners and follow their relevant references in bounded
+sections; record uncovered sections rather than treating truncated output as
+read. The 30-day limit applies to recent Sessions/Git, not still-active design
+knowledge. Explicitly inspect paired effective/ineffective paths and accepted
+decisions even when no recent Session mentions them.
+
+Before selecting detailed reads, inventory the headings and numbered normative
+clauses of current behavior Owners and the accepted/reversed decisions in the
+current-status Owner. Use that source index to plan bounded reads across the
+whole active knowledge surface; reading every ADR does not cover unread active
+axioms or later corrections. Read the full context of each selected clause,
+including its exception and linked acceptance or failure. Keep unread sections
+explicit; do not substitute an arbitrary prefix, recent entries or a keyword
+search for the current Owner's knowledge inventory.
+
 ## Phase 3: contrastive causal review
 
 For each high-signal event answer:
@@ -55,6 +79,9 @@ For each high-signal event answer:
 - 哪些只有机制证据，哪些已经达到用户或产品结果？
 
 Prefer belief-before, observed contradiction, accepted change, and current boundary over generic lessons.
+Link every high-value event to its declared source refs. Compare failed and
+successful paths under matching conditions; do not infer causality from frequency
+or task summaries alone.
 
 ## Phase 4: candidate exhaustion
 
@@ -68,6 +95,28 @@ evidence from at least two projects and names only opaque project refs.
 For every E2/E3 candidate find conflict, legitimate exception, project-only constraint, stronger existing Owner, and harmful
 global interpretation. Require meaningful counterevidence and a concrete Skip boundary.
 
+Challenge each projected obligation with a legitimate successful path under
+different preconditions: if the intended result is already proved, is the
+prescribed action still necessary? Separate the accepted outcome from the
+project's chosen means, count or sequence. Narrow `When`, preserve a concrete
+`Skip`, or route the method to Project/Skill; do not turn one local procedure
+into a universal gate. Apply this check to the completed projection, not just
+the source excerpt, before freezing it.
+
+For a source-rich review spanning active Owners and accumulated decisions,
+reserve a fresh internal review context before freezing; do not wait for a user
+to identify an omission. Use an internal
+subagent when available, not another user-facing task. Give it only original
+sources, the source index/read gaps, and draft observations/projections, never
+Global Owner wording or expected candidate answers. It must audit independent
+source obligations and accepted/reversed paths, including partially represented
+ones, and challenge each projected obligation rather than attach one decorative
+counterexample to an entire compound card. Correct evidence-backed defects and
+recheck associations, privacy and semantic hashes before the final freeze.
+Preserve earlier failed evaluation records; a correction is not retroactive
+blind discovery. If independent context is unavailable, record that coverage
+limitation instead of claiming a self-review is independent qualification.
+
 Create two projections from the same evidence:
 
 - Human Context: Simplified Chinese, familiar privacy-safe project vocabulary, concrete event/cost/recommendation/before-after and
@@ -78,10 +127,35 @@ Create two projections from the same evidence:
 Route project architecture to Project Owner, repeatable methods to Skill, cross-project behavior to global candidates, and weak or
 risky ideas to no persistence.
 
+Record each signal in `observations` with its event IDs and structured
+disposition. Separate the project implementation from the portable behavior;
+name exact Owner coverage or the missing evidence when excluding a signal.
+Single-project formal acceptance can support E2. Project ownership and absence
+of a second project are not automatic global-candidate exclusions. Account for
+every event and every card, including evidence-backed no-persistence decisions.
+An exact rule in the project Owner proves local coverage only. If its behavior
+has cross-project value, retain that portable projection for actual Global Owner
+comparison; do not exclude it here merely because the project already states it.
+
+Before freezing, perform a second omission check from the source index back to
+the observations. Revisit high-value normative clauses, accepted behavior
+changes and rejected paths whose independent obligations lack a matching
+disposition, including clauses already linked to a related observation. Preserve
+each distinct action, trigger, user cost and legitimate exception when merging
+or abstracting a compound clause; a similar topic is not semantic coverage.
+Record a justified disposition or the exact unread gap. This pass starts from source material, not
+from the model's existing event/card list. In a large Owner, an uncovered section
+that can contain reusable knowledge limits discovery qualification even when
+all declared events conserve. It does not require a card for every paragraph.
+
 ## Phase 6: freeze project semantics
 
 Create all complete Project Cards, validate privacy/Chinese narrative/evidence refs, compute normalized evidence hash, then compute
 `project_claim_hash` over every semantic field. Validate the entire Project result before global comparison.
+Compute `normalized_evidence_hash` from the exact canonical `direct_evidence`
+array. Preserve the validated project object; integration adds previews only.
+Zero cards require nonempty, evidenced dispositions; never fill a no-delta result
+with an empty inventory or claim exhaustive knowledge beyond the declared scope.
 
 ## Phase 7: integration and task-scoped delivery
 

@@ -5,9 +5,9 @@
 - Introduced: 2026-08-13
 - Review by: Core 0.4 planning
 
-The active Scout 5.6 validator and renderer retain `validate_output_v4.py` and `render_review_v4.py` so an already-created private
+The active Scout 5.8 validator and renderer retain `validate_output_v4.py` and `render_review_v4.py` so an already-created private
 pre-enrollment task can finish without changing its visible contract mid-run. Bootstrap never creates a new v4 task, and the public
-entrypoint always emits Project v4 / Review Pack v4.
+entrypoint now emits Project v5 / Review Pack v5. The frozen Skill 4 lane does not upgrade a Project v4 payload into v5.
 
 This adapter adds legacy vocabulary and code to the portable public bundle. It may be removed when all supported private hosts have
 either migrated or explicitly accepted that frozen v4 tasks are no longer resumable. Removal must delete the two adapter files, the

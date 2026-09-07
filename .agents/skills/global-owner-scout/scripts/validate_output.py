@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate Global Owner Scout v5.7 project results and Review Packs."""
+"""Validate Global Owner Scout v5.8 project results and Review Packs."""
 
 from __future__ import annotations
 
@@ -15,9 +15,9 @@ from typing import Any, Callable, Iterable
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.7.0"
-PROJECT_CONTRACT = "global_owner_scout_project_v4"
-REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v4"
+SKILL_VERSION = "5.8.0"
+PROJECT_CONTRACT = "global_owner_scout_project_v5"
+REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v5"
 DISPLAY_LOCALE = "zh-CN"
 PILOT_MODEL = "gpt-5.6-sol"
 PILOT_REASONING = "medium"
@@ -26,6 +26,8 @@ PILOT_TASK_INDEX_LIMIT = 50
 
 STATUSES = {"ok", "degraded", "no_material_delta", "failed", "output_budget_exceeded"}
 COVERAGE_STATUSES = {"complete", "bounded", "degraded"}
+SOURCE_KINDS = {"sessions", "owners", "decisions", "successes", "failures", "acceptance"}
+DISPOSITIONS = {"candidate", "already_covered", "project_only", "skill_only", "insufficient_evidence", "not_reusable"}
 DISCOVERY_METHODS = {
     "native_index_completed",
     "native_index_host_cap",
@@ -90,6 +92,8 @@ LANGUAGE_EXEMPT_PATH_PARTS = (
     ".before_after.before",
     ".before_after.after",
     ".ref",
+    ".owner_refs",
+    ".event_id",
     ".url",
     ".project_key",
     ".project_identity.",
@@ -501,6 +505,7 @@ def validate_project_card(value: Any, path: str) -> dict[str, Any]:
         require_string(item["outcome"], f"{item_path}.outcome")
     require(orders == list(range(1, len(orders) + 1)), f"{path}.event_timeline order must be contiguous")
     validate_evidence_refs(obj["direct_evidence"], f"{path}.direct_evidence")
+    require(obj["normalized_evidence_hash"] == canonical_hash(obj["direct_evidence"]), f"{path}.normalized_evidence_hash mismatch")
     validate_human_context(obj["human_context"], f"{path}.human_context", obj["direct_evidence"])
     counter = require_object(obj["counterevidence"], f"{path}.counterevidence")
     require_exact_keys(counter, {"searched", "items", "globalization_risk"}, f"{path}.counterevidence")
@@ -590,6 +595,110 @@ def validate_read_only_proof(value: Any, path: str, status: str, window_kind: st
         require(unchanged, f"{path} does not prove a read-only run")
 
 
+def validate_discovery_trace(obj: dict[str, Any]) -> None:
+    """Check declared provenance and dispositions, never infer semantic recall."""
+    declared: dict[str, dict[str, Any]] = {}
+    owner_refs: set[str] = set()
+    formal_refs: set[str] = set()
+    statuses: dict[str, str] = {}
+    for source in obj["evidence_sources"]:
+        kind, status = source["kind"], source["status"]
+        statuses[kind] = status
+        refs = require_list(source["refs"], f"{kind}.refs")
+        gaps = require_list(source["uncovered"], f"{kind}.uncovered")
+        for gap in gaps:
+            require_string(gap, f"{kind}.uncovered")
+        if refs:
+            validate_evidence_refs(refs, f"{kind}.refs")
+        if status == "available":
+            require(bool(refs) and not gaps, f"{kind}: available requires refs and no gaps")
+        elif status == "degraded":
+            require(bool(gaps), f"{kind}: degraded requires uncovered scope")
+        elif status == "unavailable":
+            require(not refs and bool(gaps), f"{kind}: unavailable requires no refs and explicit gaps")
+        else:
+            require(kind != "owners" and not refs and not gaps, f"{kind}: invalid not_applicable source")
+        source_refs = [item["ref"] for item in refs]
+        require(len(source_refs) == len(set(source_refs)), f"{kind}: duplicate source refs")
+        for item in refs:
+            require(item["ref"] not in declared or declared[item["ref"]] == item, "conflicting source evidence")
+            declared[item["ref"]] = item
+        if kind in {"owners", "decisions"}:
+            owner_refs.update(source_refs)
+        if kind in SOURCE_KINDS - {"sessions"}:
+            formal_refs.update(source_refs)
+    if obj["status"] in {"ok", "degraded", "no_material_delta"}:
+        require(SOURCE_KINDS <= statuses.keys(), "discovery requires all six source categories")
+    if obj["status"] in {"ok", "no_material_delta"}:
+        require(statuses.get("owners") == "available", "successful discovery requires available Owners")
+        require(all(status in {"available", "not_applicable"} for kind, status in statuses.items() if kind != "sessions"),
+                "incomplete project sources require degraded status")
+
+    def evidence_ids(value: Any, path: str) -> set[str]:
+        validate_evidence_refs(value, path)
+        refs = [item["ref"] for item in value]
+        require(len(refs) == len(set(refs)), f"{path}: duplicate evidence refs")
+        require(set(refs) <= declared.keys(), f"{path}: undeclared evidence")
+        require(all(item == declared[item["ref"]] for item in value), f"{path}: evidence differs from declared source")
+        return set(refs)
+
+    events: dict[str, set[str]] = {}
+    for event in obj["events"]:
+        event_id = event["event_id"]
+        require(event_id not in events, "duplicate event ID")
+        events[event_id] = evidence_ids(event["direct_evidence"], "event.direct_evidence")
+    cards = {card["card_id"]: card for card in obj["project_cards"]}
+    require(len(cards) == len(obj["project_cards"]), "duplicate card ID")
+    card_refs = {key: evidence_ids(card["direct_evidence"], "card.direct_evidence") for key, card in cards.items()}
+    if statuses.get("sessions") in {"degraded", "unavailable"}:
+        require(all(refs & formal_refs for refs in card_refs.values()), "degraded Sessions require independent non-Session evidence for each card")
+    seen_observations: set[str] = set()
+    seen_events: set[str] = set()
+    seen_cards: set[str] = set()
+    for index, observation in enumerate(obj["observations"]):
+        path = f"$.observations[{index}]"
+        key = observation["observation_id"]
+        require(key not in seen_observations, "duplicate observation ID")
+        seen_observations.add(key)
+        refs = evidence_ids(observation["direct_evidence"], f"{path}.direct_evidence")
+        linked_events = require_list(observation["event_ids"], f"{path}.event_ids")
+        for event_id in linked_events:
+            require_string(event_id, f"{path}.event_ids")
+            require(event_id in events, f"{path}: unknown event ID")
+            require(events[event_id] <= refs, f"{path}: missing event evidence")
+        require(len(linked_events) == len(set(linked_events)), f"{path}: duplicate event links")
+        seen_events.update(linked_events)
+        disposition = require_object(observation["disposition"], f"{path}.disposition")
+        require_exact_keys(disposition, {"kind", "reason", "card_ids", "owner_refs", "local_scope", "portable_delta"}, f"{path}.disposition")
+        require_string(disposition["kind"], f"{path}.disposition.kind")
+        require(disposition["kind"] in DISPOSITIONS, f"{path}: invalid disposition")
+        for field in ("reason", "local_scope", "portable_delta"):
+            require_string(disposition[field], f"{path}.disposition.{field}")
+        owners = require_list(disposition["owner_refs"], f"{path}.owner_refs")
+        for ref in owners:
+            require_string(ref, f"{path}.owner_refs")
+            require(ref in owner_refs and ref in refs, f"{path}: owner exclusion must cite declared Owner evidence")
+        linked_cards = require_list(disposition["card_ids"], f"{path}.card_ids")
+        if disposition["kind"] == "candidate":
+            require(observation["evidence_level"] in {"E2", "E3"} and bool(linked_cards), f"{path}: candidate requires qualified cards")
+            require(bool(linked_events), f"{path}: candidate requires linked events")
+        else:
+            require(not linked_cards, f"{path}: exclusion cannot contain cards")
+        if disposition["kind"] in {"already_covered", "project_only", "skill_only"}:
+            require(bool(owners), f"{path}: existing-owner exclusion requires exact Owner refs")
+        for card_id in linked_cards:
+            require_string(card_id, f"{path}.card_ids")
+            require(card_id in cards and card_id not in seen_cards, f"{path}: unknown or multiply routed card")
+            require(cards[card_id]["evidence_level"] == observation["evidence_level"], f"{path}: evidence level mismatch")
+            require(card_refs[card_id] <= refs, f"{path}: missing card evidence")
+            require(card_refs[card_id] <= set().union(*(events[event_id] for event_id in linked_events)), f"{path}: card evidence bypasses linked events")
+            seen_cards.add(card_id)
+    require(seen_events == events.keys(), "every event needs a disposition")
+    require(seen_cards == cards.keys(), "every card needs exactly one disposition")
+    if obj["status"] == "no_material_delta":
+        require(bool(obj["observations"]), "no_material_delta requires evidenced observations")
+
+
 def validate_project(value: Any) -> dict[str, Any]:
     obj = require_object(value, "$")
     require_exact_keys(
@@ -632,10 +741,10 @@ def validate_project(value: Any) -> dict[str, Any]:
     for index, raw in enumerate(sources):
         path = f"$.evidence_sources[{index}]"
         item = require_object(raw, path)
-        require_exact_keys(item, {"kind", "status", "coverage"}, path)
+        require_exact_keys(item, {"kind", "status", "coverage", "refs", "uncovered"}, path)
         kind = require_string(item["kind"], f"{path}.kind")
         require(kind not in source_statuses, f"{path}.kind must be unique")
-        require(item["status"] in {"available", "degraded", "unavailable"}, f"{path}.status invalid")
+        require(item["status"] in {"available", "degraded", "unavailable", "not_applicable"}, f"{path}.status invalid")
         source_statuses[kind] = item["status"]
         require_string(item["coverage"], f"{path}.coverage")
     require("sessions" in source_statuses, "$.evidence_sources must include sessions")
@@ -658,15 +767,16 @@ def validate_project(value: Any) -> dict[str, Any]:
     for index, raw in enumerate(require_list(obj["observations"], "$.observations")):
         path = f"$.observations[{index}]"
         item = require_object(raw, path)
-        require_exact_keys(item, {"observation_id", "evidence_level", "summary", "direct_evidence", "disposition"}, path)
+        require_exact_keys(item, {"observation_id", "evidence_level", "summary", "direct_evidence", "event_ids", "disposition"}, path)
         require_string(item["observation_id"], f"{path}.observation_id")
-        require(item["evidence_level"] == "E1", f"{path}.evidence_level must be E1")
+        require_string(item["evidence_level"], f"{path}.evidence_level")
+        require(item["evidence_level"] in {"E1", "E2", "E3"}, f"{path}.evidence_level invalid")
         require_string(item["summary"], f"{path}.summary")
         validate_evidence_refs(item["direct_evidence"], f"{path}.direct_evidence")
-        require_string(item["disposition"], f"{path}.disposition")
     cards = require_list(obj["project_cards"], "$.project_cards")
     hashes = [validate_project_card(card, f"$.project_cards[{index}]")["project_claim_hash"] for index, card in enumerate(cards)]
     require(len(hashes) == len(set(hashes)), "$.project_cards contains duplicate claim hashes")
+    validate_discovery_trace(obj)
     validate_read_only_proof(obj["read_only_proof"], "$.read_only_proof", status, window["kind"])
     limitations = require_list(obj["limitations"], "$.limitations")
     for index, item in enumerate(limitations):
@@ -958,6 +1068,7 @@ def build_card(index: int = 1, project: str = "example-project") -> dict[str, An
             "instruction_target": "global_agents",
         },
     }
+    card["normalized_evidence_hash"] = canonical_hash(card["direct_evidence"])
     card["project_claim_hash"] = project_claim_hash(card)
     return card
 
@@ -1048,6 +1159,54 @@ def valid_project(
         "read_only_proof": valid_read_only(scheduled=window_kind == "rolling_72h"),
         "limitations": limitations,
     }
+    # Synthetic contract fixtures only; never infer real discovery from cards.
+    owner_ref = {"type": "owner", "ref": "owner:current", "summary": "当前正式规则及适用边界已读取。"}
+    single_ref = {"type": "acceptance", "ref": "event:single", "summary": "目前只观察到一次独立事件。"}
+    accepted_ref = {"type": "acceptance", "ref": "event:visible-result", "summary": "最终可见结果经过了独立检查。"}
+    for source in project["evidence_sources"]:
+        source["uncovered"] = []
+        if source["status"] in {"degraded", "unavailable"}:
+            source["uncovered"] = ["相关任务记录未能完整读取。"]
+        source["refs"] = (
+            [owner_ref] if source["kind"] == "owners" else
+            [single_ref, accepted_ref] if source["kind"] == "acceptance" else
+            [] if source["status"] == "unavailable" else
+            [{"type": "session", "ref": "session:reviewed", "summary": "相关自然任务已读取到已声明边界。"}]
+        )
+    for kind in ("decisions", "successes", "failures"):
+        project["evidence_sources"].append({
+            "kind": kind, "status": "available", "coverage": "已读取相应正式来源及适用边界。",
+            "refs": [{"type": kind, "ref": f"source:{kind}", "summary": "正式项目证据已核对。"}], "uncovered": [],
+        })
+    project["events"] = [{
+        "event_id": "event:reviewed", "order": 1, "summary": "一次结果判断需要补充验收。",
+        "before_belief": "仅凭局部状态推断结果。", "observed_change": "实际结果需要独立检查。",
+        "accepted_result": "已记录当前证据边界。", "direct_evidence": [single_ref],
+    }]
+    observation = project["observations"][0]
+    observation["direct_evidence"] = [copy.deepcopy(single_ref)]
+    observation["event_ids"] = ["event:reviewed"]
+    observation["disposition"] = {
+        "kind": "insufficient_evidence", "reason": "尚缺重复、正式接受或真实验收，不能提升为规则。",
+        "card_ids": [], "owner_refs": [], "local_scope": "当前项目的单次结果判断。",
+        "portable_delta": "目前不足以证明独立的通用行为增量。",
+    }
+    for index, card in enumerate(project["project_cards"]):
+        event_id = f"event:accepted-{index + 1}"
+        project["events"].append({
+            "event_id": event_id, "order": len(project["events"]) + 1, "summary": card["pain"],
+            "before_belief": "仅凭局部状态推断结果。", "observed_change": "真实验收改变了原有判断。",
+            "accepted_result": "正式接受该行为的适用边界。", "direct_evidence": copy.deepcopy(card["direct_evidence"]),
+        })
+        project["observations"].append({
+            "observation_id": f"candidate-{index + 1}", "evidence_level": card["evidence_level"],
+            "summary": card["pain"], "direct_evidence": copy.deepcopy(card["direct_evidence"]), "event_ids": [event_id],
+            "disposition": {
+                "kind": "candidate", "reason": "真实验收支持独立通用行为候选。", "card_ids": [card["card_id"]],
+                "owner_refs": [], "local_scope": "项目当前用户表面的结果判断。",
+                "portable_delta": "先验证真实结果再声明完成，并保留诊断任务例外。",
+            },
+        })
     return project
 
 
@@ -1413,7 +1572,7 @@ def load_stdin_json() -> Any:
 
 def main() -> int:
     configure_utf8_stdio()
-    parser = argparse.ArgumentParser(description="Validate Global Owner Scout v5.7 JSON contracts from stdin.")
+    parser = argparse.ArgumentParser(description="Validate Global Owner Scout v5.8 JSON contracts from stdin.")
     parser.add_argument("--mode", choices=("project_scout", "review_pack"))
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--hash-project-card", action="store_true")

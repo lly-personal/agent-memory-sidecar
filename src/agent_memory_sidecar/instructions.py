@@ -1092,8 +1092,8 @@ def _assert_physical_parent(
     return value
 
 
-def assert_physical_directory(path: Path | str) -> None:
-    _assert_physical_parent(_logical_absolute(path))
+def assert_physical_directory(path: Path | str, *, allow_missing: bool = False) -> None:
+    _assert_physical_parent(_logical_absolute(path), allow_missing=allow_missing)
 
 
 def _assert_physical_target(

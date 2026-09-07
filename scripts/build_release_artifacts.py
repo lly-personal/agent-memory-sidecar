@@ -137,7 +137,9 @@ def version_facts(root: Path = ROOT) -> dict[str, str]:
     }
     require(all(VERSION.fullmatch(value) is not None for value in facts.values()), "release_component_version_invalid")
     compatibility = (root / "COMPATIBILITY.md").read_text(encoding="utf-8")
-    expected_row = f"| v{core} | {core} | {facts['plugin']} | {facts['bootstrap']} | {facts['scout']} | v4 | 3.11–3.13 |"
+    review_contract = re.search(r"User review:\s*`global_owner_scout_review_pack_(v\d+)`", scout_text)
+    require(review_contract is not None, "release_review_contract_missing")
+    expected_row = f"| v{core} | {core} | {facts['plugin']} | {facts['bootstrap']} | {facts['scout']} | {review_contract.group(1)} | 3.11–3.13 |"
     require(compatibility.count(expected_row) == 1, "release_compatibility_mismatch")
     return facts
 

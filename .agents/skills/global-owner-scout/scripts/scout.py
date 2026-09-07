@@ -21,6 +21,7 @@ from prepare_delivery import (
     render_queued_receipt,
     render_terminal_receipt,
     validate_delivery_manifest,
+    validate_output_root,
     verify_final_receipt,
 )
 from render_review import render_review_pack
@@ -120,6 +121,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run one active Global Owner Scout helper operation.")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("inspect-context")
+    output = commands.add_parser("inspect-output")
+    output.add_argument("--artifact-dir", type=Path, required=True)
+    output.add_argument("--protected-root", action="append", type=Path, required=True)
     commands.add_parser("validate-project")
     commands.add_parser("validate-review-pack")
     commands.add_parser("resolve-owner-parity")
@@ -142,6 +146,9 @@ def main() -> int:
     try:
         if args.command == "inspect-context":
             print(json.dumps(inspect_git_context(Path.cwd()), separators=(",", ":")))
+        elif args.command == "inspect-output":
+            validate_output_root(args.artifact_dir, args.protected_root)
+            print(json.dumps({"status": "ok", "output_root_contained": True, "writes_performed": False}))
         elif args.command == "validate-project":
             validated = validate_project(load_stdin_json())
             result = {"status": "ok", "mode": "project_scout", "contract_version": validated["contract_version"]}
@@ -176,7 +183,8 @@ def main() -> int:
             print(json.dumps(verify_final_receipt(sys.stdin.read(), artifact_root=args.artifact_root), ensure_ascii=False, separators=(",", ":")))
         return 0
     except (ContractError, AssertionError, OSError, UnicodeError, ValueError) as exc:
-        message = "git_context_unavailable" if args.command == "inspect-context" else str(exc)
+        message = ("git_context_unavailable" if args.command == "inspect-context" else
+                   "output_preflight_unavailable" if args.command == "inspect-output" else str(exc))
         print(json.dumps({"status": "error", "message": message}, ensure_ascii=False, separators=(",", ":")), file=sys.stderr)
         return 1
 

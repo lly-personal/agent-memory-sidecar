@@ -398,7 +398,7 @@ When the user confirms one or more cards from the current Global Owner Scout Rev
 
 An unambiguous explicit remember utterance is the one authorization; do not ask twice. Echo the final `When / Do / Skip / scope`, deploy directly, and use the deployed terminal outcome only after the actual target is parsed and unshadowed. A proposal confirmation follows the same success outcome. For global results, complete the ordinary private-Git commit/push workflow when `publication_required=true`; local effect and cross-device publication are separate evidence.
 
-On failure, preserve the completed task result and state only `未保存`, `未部署`, or `未证明` as supported. A current task may retain already-loaded instructions after revoke; verify a new task before claiming continuity.
+On failure, preserve the completed task result and state only `未保存`, `未部署`, or `未证明` as supported. Exception: `instruction_cleanup_required` with `operation_committed=true` means the mutation and approval consumption completed. Read actual targets with `rule list`, report their actual state plus pending transaction cleanup, and never retry the consumed approval or claim unchanged/undeployed. A current task may retain already-loaded instructions after revoke; verify a new task before claiming continuity.
 
 ## Terminal outcomes
 
@@ -413,6 +413,7 @@ The terminal artifact is the last user-facing Agent Memory block in the final re
 - Clarification required: after the draft, `记忆检查：需要澄清｜结论：尚不能确定{待澄清内容}｜动作：未创建建议｜长期状态：未变更`
 - Proposal or classification failed: `记忆检查：执行失败｜结论：{已证明事实}｜动作：未保存｜长期状态：未变更`
 - Deploy, edit, consolidate, or revoke failed: `记忆检查：执行失败｜结论：{已证明事实}｜动作：未部署｜长期状态：未变更`
+- Committed mutation with incomplete cleanup: `记忆检查：清理待完成｜结论：规则操作已提交｜动作：待事务清理｜长期状态：{实际 target 读回状态，无法读回则未证明}`. This takes precedence over the generic failure receipt.
 - Adoption is not yet observed: `记忆检查：已完成｜结论：规则已部署但后续采用尚未观察｜动作：未证明行为采用｜长期状态：生效中`
 
 For discard, edit, consolidate, and revoke, use the same four-part shape with the operation actually completed and the actual parsed target state. A no-op receipt proves only that the Agent surfaced a classification; it does not prove persistence, adoption, continuity, or product effect.
