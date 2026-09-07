@@ -50,7 +50,8 @@ project name, path, project ID, candidate hint, or the deep-review procedure.
    contracts.md. Active project Owners and accepted knowledge are not limited by the recent Session window. Never treat
    project ownership as proof that a distinct portable behavior is already covered. Empty observations cannot prove no delta.
    Start with the current Owner's section/clause index and, before freezing, audit omissions from that source index back to
-   observations as required by deep-review-protocol.md; auditing declared cards alone cannot detect undiscovered knowledge.
+   observations, including partially covered obligations, as required by deep-review-protocol.md; auditing declared cards alone
+   cannot detect undiscovered knowledge. Project-local coverage cannot decide actual Global Owner coverage.
    Enumerate same-project tasks with one native index request at limit 50. If the tool yields
    a cell, resume that exact cell to a terminal result before any other index call. Page every selected natural task to the window
    boundary or EOF with native `read_thread` requests capped at `turnLimit=10` and `maxOutputCharsPerItem=20000`; report only

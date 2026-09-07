@@ -111,11 +111,17 @@ name exact Owner coverage or the missing evidence when excluding a signal.
 Single-project formal acceptance can support E2. Project ownership and absence
 of a second project are not automatic global-candidate exclusions. Account for
 every event and every card, including evidence-backed no-persistence decisions.
+An exact rule in the project Owner proves local coverage only. If its behavior
+has cross-project value, retain that portable projection for actual Global Owner
+comparison; do not exclude it here merely because the project already states it.
 
 Before freezing, perform a second omission check from the source index back to
 the observations. Revisit high-value normative clauses, accepted behavior
-changes and rejected paths that have no observation, and record a justified
-disposition or the exact unread gap. This pass starts from source material, not
+changes and rejected paths whose independent obligations lack a matching
+disposition, including clauses already linked to a related observation. Preserve
+each distinct action, trigger, user cost and legitimate exception when merging
+or abstracting a compound clause; a similar topic is not semantic coverage.
+Record a justified disposition or the exact unread gap. This pass starts from source material, not
 from the model's existing event/card list. In a large Owner, an uncovered section
 that can contain reusable knowledge limits discovery qualification even when
 all declared events conserve. It does not require a card for every paragraph.
