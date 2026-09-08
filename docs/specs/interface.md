@@ -67,7 +67,9 @@
 - 每项 `supersedes` 独立排序去重；不同项不得覆盖同一个旧 rule ID，且所有 ID 必须存在于同一 Fresh before。
 - `selection_token` 确定性绑定 card ID、project claim、proposal hash、排序后的 superseded IDs、instruction target 与
   完整 target before hash；确认文本固定为按 card ID 排序的 `确认 <card_id>@<token>[、...]`。
-- Core 必须重算全部 token，并校验当前 approval event 的 prompt hash 与 canonical 确认文本完全一致；失败不消费 approval。
+- Core 必须重算全部 token，并校验当前 approval event 的原始 prompt hash/字节数与完整确认文本一致。允许 canonical
+  文本，或仅将其全部 `@` 分隔符写成 Markdown `\@` 的等价文本；不解析宽泛自然语言、不删附加内容，混合转义、
+  改变卡片/顺序/token 或多重转义均拒绝。两种表示绑定同一 bundle；失败不消费 approval，也不保存原始 prompt。
 - bundle 先统一移除所有 superseded rules，再稳定插入全部结果；输入排列不得改变 after bytes、错误或 receipt。
 - bundle revision hash 绑定 canonical bundle hash、instruction target、完整 target before hash 与完整 target after hash。
 - 单卡确认使用大小为一的 bundle；任一项 no-op、stale、冲突、超容量或写入失败，整包零修改且不消费 approval。
@@ -270,7 +272,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。可靠自动发现边界仍是一次 Codex 刷新或下一任务，但 source/host 物化必须在当前部署任务完成。
 
-`agent-memory-workstation-bootstrap` Skill 2.2.3 提供两个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.2.4 提供两个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
@@ -366,9 +368,13 @@ root 逐级检查两个产品同名 `.agents/skills`，非 Git 项目只检查 p
 `status` 只允许 `ready`、`reload_required`、`consumer_scope_drift`、`consumer_scope_bounded`、
 `distribution_reconcile_blocked`、`source_sync_blocked` 或 `host_materialization_blocked`。中文 renderer 固定先显示期望发行、
 Plugin 分发、源同步、主机物化、消费者范围、消费者采用，再显示未证明事项与唯一下一步。apply 固定不越过模型采用层，
-返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.2.3 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
+返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.2.4 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
 读回仍 exact、Desktop 项目枚举完整且项目级同名 Skill 全部 exact，才允许 `ready`。任何本机结果都保留真实第二台设备、
 Scheduled、连续性与产品收益未证明边界。
+
+安装交付在 `reload_required` 结束；它提示下次使用前刷新 Desktop，不要求用户立即创建新任务或重复部署。
+只有用户后续主动要求检查消费者时才进入只读 `verify_consumer`。该检查证明所声明的加载与安装范围，真实理解、
+自然采用和收益独立保留；用户延后验收不阻塞技术交付。所有 Anchor、Bootstrap、SOP 与 renderer 使用这一分工。
 
 `global_owner_scout_enrollment_pack_v1` 顶层精确包含：
 
@@ -501,7 +507,7 @@ Scheduled 使用既有最终 Inbox wrapper 与可见文本校验，不增加文�
 是否截断，以及 `complete/bounded/degraded`。达到宿主任务索引上限、未读到窗口边界或无法继续分页时只能使用
 `bounded/degraded`，不得声称完成完整 session 复盘。
 
-Skill 5.9.1 的所有入口固定使用已验证的原生任务索引上限 `50` 作为首次且唯一的索引请求，不得先请求更大
+Skill 5.9.2 的所有入口固定使用已验证的原生任务索引上限 `50` 作为首次且唯一的索引请求，不得先请求更大
 页面探测上限。调用使用最长 60 秒的初始 yield；返回 `cell_id` 时必须对同一 cell 最多连续 wait 两次、每次最长
 60 秒。cell 未终态前禁止发起第二次索引调用，`Script running` 不得解释为 unavailable、timeout 或 degraded。
 
@@ -690,6 +696,25 @@ Agent 进入原子规则包链的起点：Agent 必须重新读取最新 global 
 计算聚合 before/after。若语义关系或最终规则发生实质变化，零写入并展示刷新包；未变化时执行恰好一个
 `rule deploy-bundle`。成功后未选择 Project Card 只需刷新 integration preview，不重新执行项目复盘。
 
+### 按需方法的维护与交接
+
+`make_skill` 只交接方法建议，不产生安装或 Global Owner 更新授权。获准整理方法后，执行以下标准链路：
+
+1. 先比较当前项目契约和已有 Skill，保留能改变判断的动作与例外；可以复用既有参考时不新建入口。
+2. 为保留的方法确定一个版本化源码 Owner、适用场景、输入与结果；拒绝仅有任务附件或安装副本而无维护来源的完成声明。
+3. 使用现有 Skill 编辑流程维护源码，按受影响方法选择只读反例与非适用场景；普通方法修改不要求真实生产操作或全矩阵重验。
+4. 通过所属产品既有打包、安装和更新路径交付；分别报告源码、分发、安装、自然采用。发布与安装按对应操作授权执行。
+
+本工程拥有可选配套方法 `engineering-contract-review` 的唯一源码：
+[`plugins/agent-memory-sidecar/skills/engineering-contract-review`](../../plugins/agent-memory-sidecar/skills/engineering-contract-review/SKILL.md)。
+它随 Plugin 的版本与内容身份维护、分发和更新，Bootstrap 的 Plugin 读回覆盖其文件完整性；不新增 Core 字段、
+Store、常驻规则或独立更新器。正常工程任务按需选择方法，不经过 Scout，也不要求另装 `check` 或 `hunt`。
+该技能可在宿主现有 Skill 配置中单独停用；卸载所属 Plugin 随之移除托管副本。
+
+已有独立用户级副本不由 Bootstrap 猜测或覆盖。迁入 Plugin 时，在安装授权内先核对新 Plugin 的实际文件及旧副本
+来源/内容；只有明确属于本次迁移的未修改副本才移除，并读回只剩预期入口。用户修改过的副本保留并说明选择，
+不以同名作为删除依据。此操作使用现有文件与 Plugin 工具，不增加永久迁移登记。
+
 ### 失败与只读语义
 
 - `session_coverage.status=bounded/degraded` 时必须精确声明未覆盖范围；项目 Git、owner 和验收事实仍可形成
@@ -720,7 +745,7 @@ Agent 进入原子规则包链的起点：Agent 必须重新读取最新 global 
 - 活跃原工作区的并发变化只记录为当前隔离快照之外的限制；稳定隔离快照中的卡不得因此整体失效。
 - 2026-08-11 的三个真实 v5.1 Scheduled 运行及最小 automation-source probe 证明本主机原生任务索引未取得终态。
   每个 Host Enrollment 保持 `0/14`，自动化保持 `PAUSED`；普通 worktree 前向测试不再拥有恢复权。只有新的真实
-  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 Skill 5.9.1 项目 canary；
+  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 Skill 5.9.2 项目 canary；
   在 14 次有效运行期间必须显式请求
   `gpt-5.6-sol` 与 `medium` reasoning，并记录请求值、
   宿主可见的实际值和 telemetry 可用性。只有 request 不能证明实际模型；不可观测时诚实标记 `request_only`，

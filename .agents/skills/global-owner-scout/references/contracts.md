@@ -2,7 +2,7 @@
 
 ## Common rules
 
-- Skill `5.9.1`; Project result `global_owner_scout_project_v5`; Review Pack
+- Skill `5.9.2`; Project result `global_owner_scout_project_v5`; Review Pack
   `global_owner_scout_review_pack_v6`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
@@ -293,7 +293,8 @@ Terminal v1.
 ## User actions
 
 - `确认 <card_id>@<selection_token>[、<card_id>@<selection_token>...]`: select one or more confirm-eligible cards from the same
-  Review Pack and target. The reply must exactly equal the canonical sorted command; the user may remove whole pairs. Reread the
+  Review Pack and target. The reply must exactly equal the canonical sorted command, or that complete command with every `@`
+  escaped once as `\@`; the user may remove whole pairs before confirming. Reread the
   latest canonical/local Owner once, jointly recompute exact relations and aggregate before/after, then execute exactly one
   `rule deploy-bundle` operation. Core recomputes every token and binds the exact current prompt. The selected set is an unordered,
   all-or-nothing transaction; any stale relation, content mismatch, conflict, capacity failure, or write error

@@ -14,11 +14,16 @@ DesiredBundleIdentity
 -> ObservedHostState
 -> exact reconcile plan
 -> transactional execution and readback
--> new-task consumer verification
+-> installation delivery complete (reload required before later use)
+
+Later user-initiated consumer check
+-> read-only verification from a refreshed task
 ```
 
 No earlier fact can substitute for a later one. In particular, a verified Release, clean managed source, installed Skill, passing
 Doctor, and model adoption are separate evidence layers.
+Installation must not create acceptance tasks, demand immediate repeat deployment, or enumerate project activity/Scheduled state.
+User experience and natural adoption may be deferred. A requested consumer check still uses the existing exactness requirements.
 
 ## Desired bundle identity
 

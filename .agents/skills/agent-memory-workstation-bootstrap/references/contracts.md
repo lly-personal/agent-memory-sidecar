@@ -74,7 +74,7 @@ An apply result uses `agent_memory_workstation_reconcile_receipt_v3` with exact
 
 - `status`: `ready`, `reload_required`, `consumer_scope_drift`, `consumer_scope_bounded`,
   `distribution_reconcile_blocked`, `source_sync_blocked`, or `host_materialization_blocked`.
-- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.2.3`.
+- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.2.4`.
 - `consumer_scope`: exact fields `status, inventory_status, desktop_project_count, scanned_project_count,
   matching_skill_count, projects, limitations`; status is `not_observed`, `exact`, `drifted`, or `bounded`.
 - Each consumer project has exact `project_ref, display_name, status, skills`; each Skill has exact
@@ -110,7 +110,7 @@ automation_change_count, allowed_actions, limitations, pack_hash
 ```
 
 - `status`: `ready`, `bounded`, or `host_activation_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `2.2.3`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `2.2.4`.
 - `portable_layer` exact fields: `sidecar`, `canonical_owner`, `core_setup`, `doctor`, `scout_skill_version`,
   `scout_skill_hash`. State values are `synced`, `unchanged`, `installed`, `verified`, `failed`, or `unavailable`.
 - `discovery` exact fields: `inventory_status`, `activity_status`, `desktop_project_count`, `accessible_count`,

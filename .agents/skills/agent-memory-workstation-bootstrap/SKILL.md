@@ -7,7 +7,7 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `2.2.3`
+- Skill version: `2.2.4`
 - Modes: `inspect`, `verify_consumer`, `apply_enrollment`
 - Deployment pack: `agent_memory_workstation_deployment_pack_v3`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
@@ -45,25 +45,13 @@ not change the Host Profile. Only an explicit request to retest or configure Sch
      root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
 3. Run exact-hash `workstation-reconcile --apply`. Marketplace/Plugin mutation participates in the source-cutover rollback
    transaction. The transaction then runs Core setup, binds the explicit or preserved canonical Owner, verifies Doctor, installs
-   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.2.3`, Scout `5.9.1`,
+   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.2.4`, Scout `5.9.2`,
    and every desired identity. The result is `reload_required`; it proves host materialization, not model adoption or project-level
    same-name Skill parity.
-4. Ask for exactly one Codex Desktop refresh. In a new task that loaded this installed Skill, enumerate the complete current Desktop
-   project inventory, create the ephemeral inventory input inside a fresh mode-0700 temporary directory, and run the same command
-   with `--verify-consumer --desktop-project-inventory <inventory>` and no plan hash. Only an exact no-op host plus exact consumer
-   scope may become `ready`. Delete the temporary directory after the command. Do not ask the user to repeat source choices, paths,
-   versions, or deployment commands.
-5. Use the Codex Desktop project API to enumerate the complete visible project inventory. Do not infer a fixed project list from
-   repository names, paths, old automation names, another host's profile, or the repositories used as capability sources.
-6. Enumerate recent tasks with the host-supported bound. Classify a task as natural only when native metadata proves it was
-   user-created and belongs to the project. Scheduled, Scout, test, delegated, or automation tasks never establish activity. If
-   origin or association is ambiguous, report `bounded`; do not default-enable it.
-7. Inspect accessible projects read-only with `scripts/enrollment.py inspect-project`. Compute content identity from normalized Git
-   remote identity plus the primary folder's repository-relative location. Never display or persist raw remotes or absolute paths.
-   Non-Git and remote-less projects receive host-local identity only and are ineligible for periodic enrollment.
-8. Read current Scheduled tasks only to report historical state. The interactive Scout remains the product path; Scheduled remains
-   a separate paused/optional experiment unless the user explicitly asks to retest it.
-9. Build and validate one `agent_memory_workstation_deployment_pack_v3` from the reconciler's exact readback, render it with
+4. Finish installation delivery here. State that one Codex Desktop refresh is needed before later use; do not create a new task,
+   request an immediate acceptance run, or ask the user to repeat deployment. Consumer verification is a separate, user-initiated
+   read-only request. Do not enumerate project activity or Scheduled tasks for ordinary installation; enrollment remains optional.
+5. Build and validate one `agent_memory_workstation_deployment_pack_v3` from the reconciler's exact readback, render it with
    `python -B scripts/managed_sources.py render-pack`, and return the Chinese Markdown. Separately render an Enrollment Pack only
    when project discovery is useful to the user's request. Do not make enrollment a prerequisite for interactive Scout use.
 
@@ -73,7 +61,7 @@ distinct from a real second-device result.
 
 ## Mode: `verify_consumer`
 
-Enter only from a refreshed new task that actually loaded Bootstrap 2.2.3 after an `inspect` result requested reload. Use the Codex
+Enter only when the user asks to verify consumers, from a refreshed new task that actually loaded Bootstrap 2.2.4. Use the Codex
 Desktop project API in this task to obtain the complete visible project inventory. Write only the exact temporary
 `agent_memory_desktop_project_inventory_v1` input required by the reconciler inside a fresh mode-0700 directory, then run
 `workstation-reconcile --verify-consumer --desktop-project-inventory <inventory>` against the same Resolver output. This mode is read-only: it requires an exact no-op plan,
@@ -89,7 +77,12 @@ patching, pulling, deleting, or overwriting a project checkout.
 Enter this mode only when the user explicitly asks to retest/configure Scheduled and selects an action from the latest validated
 Enrollment Pack: `按建议启用`, `启用：…`, `暂不启用：…`, `不再建议：…`, `保持现状`, or `重新扫描`.
 
-1. Re-enumerate projects, tasks, and actual automation state. If identity, eligibility, or state changed, render a refreshed pack
+1. Enumerate the complete visible projects with the Codex Desktop project API, then recent tasks with the host-supported bound
+   and actual automation state. Never infer a fixed project list from repository names, paths, or old profiles. A natural task
+   requires native metadata proving user origin and project association; test, delegated, Scout and Scheduled tasks are excluded.
+   Inspect accessible projects read-only with `scripts/enrollment.py inspect-project`; remote-less/non-Git or ambiguous activity
+   remains bounded and never default-enabled. Do not persist or display physical paths or raw remotes.
+   If identity, eligibility, or state changed, render a refreshed pack
    and ask again; do not apply a stale decision.
 2. Resolve user-visible names to opaque project refs. `按建议启用` contains only proven `active + eligible` recommendations;
    bounded trials require explicit selection.

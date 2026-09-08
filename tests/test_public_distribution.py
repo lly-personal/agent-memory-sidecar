@@ -219,7 +219,7 @@ class PublicDistributionTests(unittest.TestCase):
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
         self.assertEqual(
-            {"core": "0.3.15", "plugin": "1.5.4", "bootstrap": "2.2.3", "scout": "5.9.1"},
+            {"core": "0.3.16", "plugin": "1.6.0", "bootstrap": "2.2.4", "scout": "5.9.2"},
             facts,
         )
         allowlist = json.loads(
@@ -417,6 +417,28 @@ class PublicDistributionTests(unittest.TestCase):
             "release_source_dirty|release_license_missing",
         ):
             self.release.validate_release_source(root=ROOT)
+
+    def test_plugin_archive_preserves_method_entry_and_references(self) -> None:
+        plugin = ROOT / "plugins" / "agent-memory-sidecar"
+        with tempfile.TemporaryDirectory() as temporary:
+            archive_path = Path(temporary) / "plugin.zip"
+            self.release.deterministic_zip(
+                output=archive_path, root=ROOT, files=[plugin], generated={},
+            )
+            with zipfile.ZipFile(archive_path) as archive:
+                installed = Path(temporary) / "installed"
+                archive.extractall(installed)
+            installed_plugin = installed / "plugins" / "agent-memory-sidecar"
+            manifest = json.loads((installed_plugin / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+            method = installed_plugin / manifest["skills"] / "engineering-contract-review"
+            self.assertTrue((method / "SKILL.md").is_file())
+            for name in ("design", "verify", "recover", "performance"):
+                relative = Path("references") / f"{name}.md"
+                self.assertEqual(
+                    (plugin / "skills" / "engineering-contract-review" / relative).read_bytes(),
+                    (method / relative).read_bytes(),
+                )
+            self.assertTrue((method / "agents" / "openai.yaml").is_file())
 
     def test_sdist_normalization_is_reproducible(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.3.16 | 0.3.16 | 1.6.0 | 2.2.4 | 5.9.2 | v6 | 3.11–3.13 |
 | v0.3.15 | 0.3.15 | 1.5.4 | 2.2.3 | 5.9.1 | v6 | 3.11–3.13 |
 | v0.3.14 | 0.3.14 | 1.5.4 | 2.2.2 | 5.9.0 | v6 | 3.11–3.13 |
 | v0.3.13 | 0.3.13 | 1.5.4 | 2.2.2 | 5.9.0 | v6 | 3.11–3.13 |
@@ -29,6 +30,9 @@ v5 packs must be re-prepared against fresh Owner bytes before offering confirmat
 Core 0.3.14 fixes UTF-8 input for Chinese previews on Windows when Python UTF-8 mode is disabled.
 Core 0.3.15 and Scout 5.9.1 clarify engineering and user-acceptance boundaries without changing rule or delivery contracts;
 Bootstrap 2.2.3 installs the matching Scout.
+Core 0.3.16 also accepts the exact full selection with uniformly Markdown-escaped `@` separators; rule/bundle wire formats and
+scope, freshness, capacity and atomicity checks are unchanged. Plugin 1.6.0 owns the optional Engineering Contract Review methods.
+Bootstrap 2.2.4 ends installation delivery before optional user-initiated consumer verification; Scout 5.9.2 documents method handoff.
 Missing or older runtime support preserves cards and removes unavailable confirmation actions. A compatibility row alone does not
 prove publication, host deployment, independent discovery recall, or user acceptance.
 Scout 5.6 keeps Review Pack v4 and adds the separate `global_owner_scout_delivery_v1` task-surface contract.

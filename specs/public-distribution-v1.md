@@ -95,6 +95,11 @@ repository or published Release does not by itself transfer engineering authorit
 The release manifest must name Core, Plugin, Bootstrap, and Scout versions separately. A release is invalid if source metadata,
 Plugin manifest, Skill contracts, compatibility matrix, archive names, and generated metadata disagree.
 
+The Plugin also owns the optional `engineering-contract-review` Skill under its `skills/` tree. Its entrypoint and referenced
+methods travel in the same Plugin/portable payload and are identified by the existing Plugin version and content hash. They do
+not enter Core wheel/sdist or introduce a separate service, Store, version field, or automatic Owner update. Method maintenance
+and standalone-copy handoff follow the [method SOP](../docs/specs/interface.md#按需方法的维护与交接).
+
 Its `source` object has exact fields:
 
 ```text

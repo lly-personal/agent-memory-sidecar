@@ -27,8 +27,10 @@
 -> exact-hash 原子 apply 与失败补偿
 -> 执行后 exact readback
 -> 返回 reload_required
--> 用户刷新一次 Desktop 并新建任务
--> 同一句入口触发只读 consumer verification
+-> 本次安装交付结束；提示下次使用前刷新 Desktop
+
+用户后续主动请求检查消费者
+-> 已刷新且加载新版的任务只读 consumer verification
 -> ready
 ```
 
@@ -45,8 +47,9 @@
    不得自动启用。Marketplace/Plugin 状态不可读时失败关闭。
 5. apply 必须使用 fresh `plan_hash`。Plugin/Marketplace、受管 source、Core/Owner、Bootstrap/Scout、Doctor 与最终读回属于
    同一补偿边界；任一失败都不能返回完成。
-6. apply 成功只返回 `reload_required`。只要求一次 Desktop 刷新，不要求用户重新选择来源或执行命令。
-7. 刷新后的新任务再次收到同一句入口时，先通过 Codex Desktop project API 取得本轮完整项目清单，再把临时清单交给
+6. apply 成功只返回 `reload_required`，本次安装交付结束。提示下次使用前刷新一次 Desktop；不创建验收任务、
+   不请求用户立即重复部署，也不为普通安装枚举项目活动或 Scheduled。用户可延后真实体验验收。
+7. 用户后续主动要求检查消费者，且当前任务已在刷新后加载新版时，先通过 Codex Desktop project API 取得本轮完整项目清单，再把临时清单交给
    只读 `--verify-consumer --desktop-project-inventory <inventory>`。只有 dry-run 为 exact `noop`、live
    Core/Doctor/Owner/用户级 Skills 仍 exact，且所有 Desktop 可见项目级同名 Skill 也 exact 时才返回 `ready`。
    项目同名 Skill 差异返回 `consumer_scope_drift`；清单或读取不完整返回 `consumer_scope_bounded`。两者都不自动修改项目。
@@ -60,7 +63,7 @@
 | `distribution_reconcile_blocked` | 已定位 Plugin/Marketplace 缺失、不可读或禁用 | source、主机物化、采用 | 只处理显示的唯一阻断 |
 | `source_sync_blocked` | Release 与 distribution 读回可用 | source/host/采用 | 修复来源访问或 ambiguity 后重试 |
 | `host_materialization_blocked` | distribution 与 source 已验证或已恢复 | 完整 Core/Skill/Doctor、采用 | 根据唯一错误重试，不手工补步骤 |
-| `reload_required` | 当前主机 distribution/source/Core/Skills/Doctor exact | 当前任务模型采用、第二设备、连续性 | 刷新一次 Desktop，新建任务并发送同一句入口 |
+| `reload_required` | 当前主机 distribution/source/Core/Skills/Doctor exact；安装交付结束 | 当前任务模型采用、第二设备、连续性 | 下次使用前刷新一次 Desktop；后续可主动请求只读消费者检查 |
 | `consumer_scope_drift` | 托管主机层 exact、新任务已采用 | Desktop 可见项目级同名 Skill 全部对齐 | 按回执处理首个项目级来源；不自动更新 checkout |
 | `consumer_scope_bounded` | 托管主机层 exact、新任务已采用 | 未完整观察的项目消费者范围 | 恢复完整项目枚举/只读访问后重新验收 |
 | `ready` | 当前主机 exact，且新任务已加载该 Release 对应的 Bootstrap，项目消费者范围 exact | 第二设备、Scheduled、连续性、产品收益 | 可在目标工程新任务运行 Project Scout |

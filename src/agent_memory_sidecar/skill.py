@@ -382,7 +382,7 @@ Show at most one card, after create succeeds:
 
 When the user confirms one or more cards from the current Global Owner Scout Review Pack, treat the exact selected card set as one operation. A single selected card is a bundle of size one.
 
-1. Accept only the exact `card_id@selection_token` pairs from the same Review Pack, scope, and instruction target. The current user reply must be the canonical `确认 <card_id>@<token>[、...]` command. Do not mix confirmation with edit, routing, or ignore actions.
+1. Accept only the exact `card_id@selection_token` pairs from the same Review Pack, scope, and instruction target. The current user reply must be the canonical `确认 <card_id>@<token>[、...]` command or that complete command with every `@` escaped once as Markdown `\\@`. Preserve the original user event; do not rewrite the prompt or mix confirmation with edit, routing, or ignore actions.
 2. Reread that target with `agent-memory rule list --target <instruction-target>`, verify canonical/local parity when global, and jointly recompute every selected card against the same Owner snapshot and against the other selected cards.
 3. If any relation, rule text, superseded set, or Owner target changes materially, execute no mutation. Show one refreshed aggregate before/after and ask once for confirmation of that changed bundle.
 4. Otherwise execute exactly one standalone command: `agent-memory rule deploy-bundle --approval-ref user_prompt:<event-id> --from-json '<rule_revision_bundle_v2-json>'`. Include each card/project claim, proposal, sorted supersedes and selection token plus the complete target before hash; Core recomputes all bindings.
