@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.3.14 (2026-09-08)
+
+- The CLI and immutable Core preview read their JSON input as UTF-8. Chinese Scout rule bundles now preserve their exact content and
+  selection bindings on Windows without depending on Python UTF-8 mode or the host locale.
+- The public CLI and immutable-runtime regression sends literal Chinese input with Python UTF-8 mode disabled and verifies
+  exact full/subset previews without Store creation or target writes. Plugin, Bootstrap, Scout, and contracts remain unchanged.
+
 ## 0.3.13 (2026-09-08)
 
 - Scout preserves source candidates while deriving confirmation from the actual Global Owner comparison and installed Core planner.
