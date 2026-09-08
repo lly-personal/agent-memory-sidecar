@@ -1,4 +1,4 @@
-# Deep Review Protocol 5.8
+# Deep Review Protocol 5.9
 
 ## Evidence posture
 
@@ -68,6 +68,14 @@ including its exception and linked acceptance or failure. Keep unread sections
 explicit; do not substitute an arbitrary prefix, recent entries or a keyword
 search for the current Owner's knowledge inventory.
 
+For an unqualified whole-project depth claim, read the complete active behavior
+axioms in bounded, non-truncated sections before selecting downstream examples.
+Give each normative clause an obligation/disposition or an exact coverage gap;
+headings alone do not cover compound clauses. The independent source pass uses
+the same full-axioms floor. Downstream implementation and history remain
+relevance-bounded. If that floor cannot be completed, retain useful candidates
+but report bounded discovery and keep the whole-project depth claim open.
+
 ## Phase 3: contrastive causal review
 
 For each high-signal event answer:
@@ -100,15 +108,19 @@ different preconditions: if the intended result is already proved, is the
 prescribed action still necessary? Separate the accepted outcome from the
 project's chosen means, count or sequence. Narrow `When`, preserve a concrete
 `Skip`, or route the method to Project/Skill; do not turn one local procedure
-into a universal gate. Apply this check to the completed projection, not just
-the source excerpt, before freezing it.
+into a universal gate. Apply this check to each completed action: a logging
+exception cannot excuse a cleanup or committed-result obligation. A compound
+source with project-specific technology still needs a separate disposition for
+its portable behavior; do not inherit one route for every action in that clause.
 
 For a source-rich review spanning active Owners and accumulated decisions,
 reserve a fresh internal review context before freezing; do not wait for a user
 to identify an omission. Use an internal
-subagent when available, not another user-facing task. Give it only original
-sources, the source index/read gaps, and draft observations/projections, never
-Global Owner wording or expected candidate answers. It must audit independent
+subagent when available, not another user-facing task. First give it only original
+sources and the source index/read gaps, never drafts, Global Owner wording or
+expected candidate answers. Freeze its own source-obligation inventory before
+providing draft observations/projections for comparison. This prevents the draft
+from defining the denominator of the independent check. It must audit independent
 source obligations and accepted/reversed paths, including partially represented
 ones, and challenge each projected obligation rather than attach one decorative
 counterexample to an entire compound card. Correct evidence-backed defects and
@@ -124,8 +136,12 @@ Create two projections from the same evidence:
 - Rule Projection: remove project names, paths, commands, product labels, local thresholds, identifiers, raw dialogue, and private
   diagnostics; retain precise `When / Do / Skip` behavior.
 
-Route project architecture to Project Owner, repeatable methods to Skill, cross-project behavior to global candidates, and weak or
-risky ideas to no persistence.
+Route project architecture to Project Owner, repeatable methods to Skill, and only necessary cross-task behavior increments to
+global candidates. Cross-project usefulness alone does not make a whole procedure an always-on instruction. Separate the short
+decision obligation from its execution method and compare the obligation with the complete current Owner, including unmanaged
+principles. A method route names its actual entry, inputs, applicable task and retained action/exception; an absent or unverified
+entry remains a delivery gap. Keep every supported source obligation visible across these destinations, even when the resulting
+global set fits. Do not relocate a mandatory behavior merely to pass capacity. Weak or risky ideas may remain without persistence.
 
 Record each signal in `observations` with its event IDs and structured
 disposition. Separate the project implementation from the portable behavior;
@@ -163,7 +179,13 @@ Run `python -B scripts/scout.py resolve-owner-parity`. With matched parity, read
 against the returned hash; the equal canonical hash proves identical canonical content without revealing its physical path. With
 drift or unavailable parity, mark Owner comparison incomplete and remove confirmation. Compare semantics when proved, and use
 official/first-party research only to support or challenge existing candidates. Add one integration preview per frozen card. Recheck count/order conservation,
-privacy, and project read-only fingerprints. Validate Project and Review Pack objects through `scripts/scout.py`. Every Python helper uses `python -B`; never use
+privacy, and project read-only fingerprints. Prepare the draft Review Pack through `scripts/scout.py prepare-review` before validating
+or rendering it. This binds single and combined confirmation actions to the actual installed Core planner; absence or failure of that
+receipt cannot be replaced with manually calculated capacity. Preserve candidates and revise exact consolidation/replacement/routing
+when needed, then repeat planning before confirmation. If that requires different Rule Projections or merged source observations,
+return to Phases 5–6 and create a new content-bound revision with every source obligation accounted for. Preserve the original
+facts, evidence and frozen artifacts; do not overwrite them or repeat an unchanged task census. Integration does not silently edit
+an existing frozen card. Validate Project and Review Pack objects through `scripts/scout.py`. Every Python helper uses `python -B`; never use
 a dynamic import or an inline import that can create `__pycache__`.
 
 If the resolver returns `unavailable`, remove confirmation and report the limitation. Never search upward, inspect the project-root

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a validated Global Owner Scout v5.6 Review Pack as deterministic Chinese Markdown."""
+"""Render a validated Global Owner Scout v5.9 Review Pack as deterministic Chinese Markdown."""
 
 from __future__ import annotations
 
@@ -88,10 +88,15 @@ def confirmable_card_selections(
     pack: dict[str, Any],
     cards_by_hash: dict[str, dict[str, Any]],
 ) -> list[str]:
+    preview = pack["selection_preview"]
+    result = preview["result"] if preview else None
+    if not result or result["combined"]["status"] != "ready":
+        return []
+    selected_ids = set(result["combined"]["card_ids"])
     return [
         f"{cards_by_hash[review['project_claim_hash']]['card_id']}@{review['selection_token']}"
         for review in pack["review_cards"]
-        if "confirm" in review["allowed_actions"]
+        if cards_by_hash[review["project_claim_hash"]]["card_id"] in selected_ids
     ]
 
 
@@ -109,33 +114,53 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
     research = preview["research"]
     before_after = preview["before_after"]
     recommended = review["recommended_action"]
-    recommended_command = action_command(recommended, card["card_id"], review["selection_token"])
+    combination_only = bool(review["selection_token"] and "confirm" not in review["allowed_actions"])
+    # Exact repeats refer to their first field; similar text is never merged.
+    shown = {rule["trigger"]: "When", rule["action"]: "Do", rule["skip_boundary"]: "Skip"}
+
+    def fact(label: str, value: str) -> str:
+        if value in shown:
+            return f"见本卡「{shown[value]}」。"
+        shown[value] = label
+        return value
+
+    exact_after = f"When: {rule['trigger']}\nDo: {rule['action']}\nSkip: {rule['skip_boundary']}"
+    shown[exact_after] = "接受后的准确规则"
     lines = [
         f"## 决策卡 {ordinal}：{human['decision_title']}",
         "",
         f"**建议范围**：{SCOPE_LABELS[card['owner_recommendation']]}。",
         "",
         "> [!IMPORTANT]",
-        f"> **推荐动作：`{recommended_command}`**  ",
+        "> **确认范围：仅上方完整组合**  " if combination_only else f"> **推荐动作：{ACTION_LABELS[recommended]}**  ",
         f"> {review['recommended_action_reason']}",
         "",
         "### 决策摘要",
         "",
         "**项目里发生了什么**",
         "",
-        human["project_story"],
+        fact("项目里发生了什么", human["project_story"]),
         "",
         "| 判断维度 | 内容 |",
         "| --- | --- |",
-        f"| 重复成本 | {table_cell(human['user_cost'])} |",
-        f"| 建议结果 | {table_cell(human['recommended_outcome'])} |",
-        f"| 最大反例 | {table_cell(human['strongest_counterpoint'])} |",
+        f"| 重复成本 | {table_cell(fact('重复成本', human['user_cost']))} |",
+        f"| 建议结果 | {table_cell(fact('建议结果', human['recommended_outcome']))} |",
+        f"| 最大反例 | {table_cell(fact('最大反例', human['strongest_counterpoint']))} |",
+        "",
+        "### 接受后的准确规则",
+        "",
+        f"- **When**：{rule['trigger']}",
+        f"- **Do**：{rule['action']}",
+        f"- **Skip**：{rule['skip_boundary']}",
+        f"- 作用域：`{rule['scope']}`；目标：`{rule['instruction_target']}`",
+        f"- 理由：{fact('规则理由', rule['why'])}",
+        f"- 证据摘要：{fact('规则证据摘要', rule['evidence'])}",
         "",
         "**接受前后**",
         "",
         "| 接受前 | 接受后 |",
         "| --- | --- |",
-        f"| {table_cell(human['concrete_before'])} | {table_cell(human['concrete_after'])} |",
+        f"| {table_cell(fact('接受前', human['concrete_before']))} | {table_cell(fact('接受后', human['concrete_after']))} |",
         "",
         "### 你的选择",
         "",
@@ -143,8 +168,10 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
         "",
     ]
     for action in review["allowed_actions"]:
-        suffix = "（推荐）" if action == recommended else ""
+        suffix = "（推荐）" if action == recommended and not combination_only else ""
         lines.append(f"- `{action_command(action, card['card_id'], review['selection_token'])}` — {ACTION_LABELS[action]}{suffix}")
+    if review["selection_token"] and "confirm" not in review["allowed_actions"]:
+        lines.append(f"- **组合确认标识**：`{card['card_id']}@{review['selection_token']}`；仅上方完整组合通过预演，此项不能单独确认。")
     lines.extend([
         "",
         "### 完整核对依据",
@@ -155,11 +182,14 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
         "",
         "#### 真实痛点与事件时间线",
         "",
-        card["pain"],
+        fact("原始痛点", card["pain"]),
         "",
     ])
     for item in card["event_timeline"]:
-        lines.append(f"{item['order']}. {item['event']} → {item['outcome']}")
+        order = item["order"]
+        event = fact(f"事件 {order}", item["event"])
+        outcome = fact(f"结果 {order}", item["outcome"])
+        lines.append(f"{order}. {event} → {outcome}")
     lines.extend(
         [
             "",
@@ -169,21 +199,21 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
             "",
             "#### 反向证据与错误全局化风险",
             "",
-            *bullet_lines(card["counterevidence"]["items"]),
-            f"- 项目判断：{card['counterevidence']['globalization_risk']}",
-            f"- 集成判断：{preview['globalization_risk']}",
+            *bullet_lines(fact(f"反向证据 {index}", item) for index, item in enumerate(card["counterevidence"]["items"], 1)),
+            f"- 项目判断：{fact('项目风险', card['counterevidence']['globalization_risk'])}",
+            f"- 集成判断：{fact('集成风险', preview['globalization_risk'])}",
             "",
             "#### 因果链与已接受变化",
             "",
-            f"- 失败或重复：{causal['failure_or_repetition']}",
-            f"- 已接受变化：{causal['accepted_change']}",
-            f"- 可预防行为：{causal['preventive_behavior']}",
-            f"- 证据边界：{causal['evidence_boundary']}",
+            f"- 失败或重复：{fact('失败或重复', causal['failure_or_repetition'])}",
+            f"- 已接受变化：{fact('已接受变化', causal['accepted_change'])}",
+            f"- 可预防行为：{fact('可预防行为', causal['preventive_behavior'])}",
+            f"- 证据边界：{fact('证据边界', causal['evidence_boundary'])}",
             "",
             "#### 从项目事实到 Rule Projection",
             "",
-            f"- 项目事实：{abstraction['project_specific']}",
-            f"- 通用行为：{abstraction['generalized_behavior']}",
+            f"- 项目事实：{fact('项目事实', abstraction['project_specific'])}",
+            f"- 通用行为：{fact('通用行为', abstraction['generalized_behavior'])}",
             "- 未晋升细节：",
             *bullet_lines(abstraction["removed_details"], prefix="  - "),
             f"- Owner 理由：{card['owner_rationale']}",
@@ -208,27 +238,18 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
             f"- 当前表达：{preview['owner_comparison']['current']}",
             f"- 缺口：{preview['owner_comparison']['gap']}",
             "",
-            "#### 精确 Rule Projection：When / Do / Skip",
-            "",
-            f"- **When**：{rule['trigger']}",
-            f"- **Do**：{rule['action']}",
-            f"- **Skip**：{rule['skip_boundary']}",
-            f"- 作用域：`{rule['scope']}`；目标：`{rule['instruction_target']}`",
-            f"- 理由：{rule['why']}",
-            f"- 证据摘要：{rule['evidence']}",
-            "",
             "#### 预期行为与精确 Owner 变更",
             "",
-            f"- 未来行为：{review['expected_behavior_change']}",
-            f"- Before：{before_after['before']}",
-            f"- After：{before_after['after']}",
+            f"- 未来行为：{fact('未来行为', review['expected_behavior_change'])}",
+            f"- Before：{fact('Owner 修改前', before_after['before'])}",
+            f"- After：{fact('Owner 修改后', before_after['after'])}",
             "- Unchanged：",
             *bullet_lines(before_after["unchanged"], prefix="  - "),
             "",
             "#### 反例、未证明事项与风险",
             "",
             "- 不应使用的反例：",
-            *bullet_lines(card["anti_examples"], prefix="  - "),
+            *bullet_lines((fact(f"反例 {index}", item) for index, item in enumerate(card["anti_examples"], 1)), prefix="  - "),
             "- 尚未证明：",
             *bullet_lines(card["unproven"], prefix="  - "),
         ]
@@ -264,6 +285,11 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         "**本次规则变更**：无。建议经明确确认并成功写入后，才会改变相应作用域的后续任务。",
         "",
     ]
+    if surface == "interactive" and pack["review_cards"]:
+        lines.extend([
+            "> **确认条件**：请以当前任务的交付回执为准。打开仍排队或交付失败时，下面的确认命令暂不可执行；可先审阅或修改建议。交付就绪后，也只可确认通过准确预演的选择。",
+            "",
+        ])
     if pack["status"] == "failed":
         pass
     elif coverage["status"] == "degraded":
@@ -297,9 +323,10 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         for index, review in enumerate(pack["review_cards"], start=1):
             card = cards_by_hash[review["project_claim_hash"]]
             support = card["project_support"]
+            recommendation = "仅组合可确认" if review["selection_token"] and "confirm" not in review["allowed_actions"] else ACTION_LABELS[review["recommended_action"]]
             lines.append(
                 f"| {index} | {table_cell(card['human_context']['decision_title'])} | "
-                f"{ACTION_LABELS[review['recommended_action']]} | {card['evidence_level']} · {support['count']} 个项目 |"
+                f"{recommendation} | {card['evidence_level']} · {support['count']} 个项目 |"
             )
         confirmable = confirmable_card_selections(pack, cards_by_hash)
         if len(confirmable) > 1:
@@ -310,9 +337,18 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
                     "",
                     "选中的建议会基于最新生效规则一起核查并提交：全部成功，或整包零写入。若建议关系发生实质变化，会先刷新预览，等待你重新判断。",
                     "",
-                    f"- **一次确认命令**：`确认 {'、'.join(confirmable)}` — 确认全部当前可确认建议。只确认部分时，可使用对应卡片的完整确认行。",
+                    f"- **一次确认命令**：`确认 {'、'.join(confirmable)}` — 确认这组已通过预演的准确建议。单项可使用卡片上提供的确认行；其他组合需先预演。",
                 ]
             )
+        preview = pack["selection_preview"]
+        if preview and not confirmable:
+            result = preview["result"]
+            if result and result["combined"]["error_code"] == "instruction_capacity_exceeded" and result["combined"]["projected_bytes"] is not None:
+                combined = result["combined"]
+                message = f"所选组合合并后需要 {combined['projected_bytes']} 字节，超过当前 {result['budget_bytes']} 字节预算。"
+            else:
+                message = "当前组合尚未通过规则预演。"
+            lines.extend(["", "**组合需先整理**：" + message + "候选和原始依据完整保留；先明确合并、替换或归属方案，再对准确选择预演。本次没有规则生效。"])
         for index, review in enumerate(pack["review_cards"], start=1):
             lines.extend(["", *render_card(cards_by_hash[review["project_claim_hash"]], review, index)])
 
@@ -462,7 +498,7 @@ def run_self_test() -> None:
     assert "bundle_action_count=1" in twenty_four
     tests += 1
 
-    print(json.dumps({"status": "ok", "tests": tests, "renderer": "global_owner_scout_review_pack_v5"}, separators=(",", ":")))
+    print(json.dumps({"status": "ok", "tests": tests, "renderer": "global_owner_scout_review_pack_v6"}, separators=(",", ":")))
 
 
 def load_stdin_json() -> Any:

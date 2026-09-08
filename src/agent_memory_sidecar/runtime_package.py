@@ -27,7 +27,9 @@ _RUNTIME_MODULES = frozenset(
         "event_policy.py",
         "file_security.py",
         "identity.py",
+        "instructions.py",
         "proposal.py",
+        "rule_preview.py",
         "runtime_hook.py",
         "runtime_ledger.py",
         "runtime_selftest.py",
@@ -89,6 +91,9 @@ def build_runtime_artifact(
                 "    raise SystemExit(main(sys.argv[2:]))\n"
                 "if sys.argv[1:2] == ['self-test']:\n"
                 "    from agent_memory_sidecar.runtime_selftest import main\n"
+                "    raise SystemExit(main(sys.argv[2:]))\n"
+                "if sys.argv[1:2] == ['preview-bundle']:\n"
+                "    from agent_memory_sidecar.rule_preview import main\n"
                 "    raise SystemExit(main(sys.argv[2:]))\n"
                 "raise SystemExit(0)\n"
             ).encode("utf-8"),

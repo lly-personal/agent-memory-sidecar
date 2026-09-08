@@ -25,6 +25,7 @@ from prepare_delivery import (
     verify_final_receipt,
 )
 from render_review import render_review_pack
+from prepare_review import prepare_review
 from resolve_owner_parity import resolve
 from utf8_stdio import configure_utf8_stdio
 from validate_output import ContractError, validate_project, validate_review_pack
@@ -126,6 +127,8 @@ def main() -> int:
     output.add_argument("--protected-root", action="append", type=Path, required=True)
     commands.add_parser("validate-project")
     commands.add_parser("validate-review-pack")
+    preview = commands.add_parser("prepare-review")
+    preview.add_argument("--select-card", action="append")
     commands.add_parser("resolve-owner-parity")
     render = commands.add_parser("render-review")
     render.add_argument("--surface", choices=("interactive", "scheduled"), required=True)
@@ -157,6 +160,10 @@ def main() -> int:
             validated = validate_review_pack(load_stdin_json())
             result = {"status": "ok", "mode": "review_pack", "contract_version": validated["contract_version"]}
             print(json.dumps(result, separators=(",", ":")))
+        elif args.command == "prepare-review":
+            configured = os.environ.get("CODEX_HOME")
+            codex_home = Path(configured).expanduser() if configured else Path.home() / ".codex"
+            print(json.dumps(prepare_review(load_stdin_json(), codex_home=codex_home, selected_card_ids=args.select_card), ensure_ascii=False, separators=(",", ":")))
         elif args.command == "resolve-owner-parity":
             configured = os.environ.get("CODEX_HOME")
             codex_home = Path(configured).expanduser() if configured else Path.home() / ".codex"

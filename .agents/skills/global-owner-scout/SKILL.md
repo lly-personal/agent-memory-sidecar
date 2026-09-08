@@ -7,9 +7,9 @@ description: Run an explicitly requested, evidence-first, project-read-only 30-d
 
 ## Contract
 
-- Skill version: `5.8.0`
+- Skill version: `5.9.0`
 - Project result: `global_owner_scout_project_v5`
-- User review: `global_owner_scout_review_pack_v5`
+- User review: `global_owner_scout_review_pack_v6`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
 - Preflight snapshot: `global_owner_scout_preflight_v1`
 - Mode: `project_scout`; interactive-only `central_review` remains optional.
@@ -52,8 +52,9 @@ project name, path, project ID, candidate hint, or the deep-review procedure.
    Start with the current Owner's section/clause index and, before freezing, audit omissions from that source index back to
    observations, including partially covered obligations, as required by deep-review-protocol.md; auditing declared cards alone
    cannot detect undiscovered knowledge. Project-local coverage cannot decide actual Global Owner coverage.
-   Challenge the completed projection with legitimate successful alternatives; a local procedure is not automatically a global obligation.
-   For source-rich reviews spanning active Owners and accumulated decisions, complete the independent internal source review required by Phase 5 before freezing.
+   Challenge each action and its own exception with legitimate successful alternatives; a compound project clause cannot hide a
+   portable obligation, and a logging exception cannot excuse required cleanup. Follow Phase 5's source-to-action review.
+   For source-rich reviews spanning active Owners and accumulated decisions, the independent reviewer first freezes obligations from original sources without seeing drafts, then compares drafts against that inventory as required by Phase 5.
    Enumerate same-project tasks with one native index request at limit 50. If the tool yields
    a cell, resume that exact cell to a terminal result before any other index call. Page every selected natural task to the window
    boundary or EOF with native `read_thread` requests capped at `turnLimit=10` and `maxOutputCharsPerItem=20000`; report only
@@ -67,9 +68,14 @@ project name, path, project ID, candidate hint, or the deep-review procedure.
    `python -B scripts/scout.py resolve-owner-parity`. When parity is `matched`, read
    the active host-local global Owner and verify its bytes against the returned hash; the equal canonical hash proves the canonical
    bytes are identical without disclosing or guessing its physical path. For `drift/unavailable`, mark the Owner comparison
-   incomplete, remove confirmation, and never use a project-root fallback. Build one integration preview per card and validate
-   `global_owner_scout_review_pack_v5` with `python -B scripts/scout.py validate-review-pack`. Every confirmable card must carry its deterministic `selection_token` from the current
-   canonical source hash and exact integration preview.
+   incomplete, remove confirmation, and never use a project-root fallback. Build one integration preview per card with
+   `selection_preview=null`, then pass the draft to `python -B scripts/scout.py prepare-review`. Use its returned pack unchanged:
+   it binds actual installed Core planning to the exact before bytes and individual/combined selections. Do not author a Core receipt
+   or infer aggregate feasibility from single cards. Validate the returned Review Pack with `python -B scripts/scout.py validate-review-pack`.
+   Actual Global Owner relation controls the next action; same-project coverage alone does not decide global coverage. Preserve every
+   candidate when planning is blocked; propose an explicit consolidation, replacement or routing before re-previewing changed selections.
+   If comparison or merging changes a projection, create a new Project/Review revision through Phases 5–6, preserving every source
+   obligation and the original frozen artifacts. Do not overwrite frozen semantics or repeat an unchanged source census.
 6. Re-capture read-only proof. Any project mutation, privacy leak, integrity failure, or unauthorized external write fails closed.
 7. From the Skill `scripts` directory, execute every Python helper with bytecode writes disabled (`python -B`). For the formal user
    entry, resolve an explicit host-generated output root from the current task context and require it to be outside the reviewed

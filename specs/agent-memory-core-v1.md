@@ -74,6 +74,18 @@ failed item leaves every target byte unchanged and does not consume approval.
 
 ### AC-4 — Instruction repository
 
+Before presenting confirmation, `rule preview-bundle --target-file <observed-owner> --from-json -` consumes the exact
+`rule_revision_bundle_v2` through stdin and runs the same bundle planner as deployment without Store, approval, locks, journals or
+file writes. The target bytes must match the bundle's before hash. `rule_bundle_preview_v1` contains
+`target_before_sha256, bundle_sha256, before_bytes, budget_bytes, items, combined`; each item has
+`card_id, status, projected_bytes, target_after_sha256, error_code`, and combined has the corresponding sorted `card_ids`.
+Ready results bind the exact after bytes; blocked results retain the planner error, with unavailable projections represented by null.
+Individual feasibility never implies combined feasibility. The installed immutable runtime exposes the same read-only
+`preview-bundle` command. Actual deployment still rechecks authorization and replans under its existing locks.
+Both preview entrypoints accept repeated `--select-card <id>` arguments for a deliberate combined subset. Without them the full
+proposed catalog is selected. IDs must be unique known members. `bundle_sha256` binds the complete input catalog, individual
+projections preserve every member, and `combined.card_ids` plus its after hash identify the exact selected combination.
+
 Persistent rules contain only derived `rule_id` and `When / Do / Skip`. One
 rendered rule is at most 1 KiB and one complete managed block is at most 8 KiB.
 The 8 KiB limit is a Sidecar edit budget for the managed block, not a Codex

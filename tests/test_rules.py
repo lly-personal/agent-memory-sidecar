@@ -32,6 +32,7 @@ from agent_memory_sidecar.proposal import (
     review_selection_token,
 )
 from agent_memory_sidecar.rule_service import RuleService
+from agent_memory_sidecar.rule_preview import preview_bundle
 from agent_memory_sidecar.runtime_ledger import RuntimeLedger
 
 
@@ -730,10 +731,13 @@ class RuleServiceTests(unittest.TestCase):
                 _proposal(action="First bundled behavior."),
                 _proposal(action="Second bundled behavior."),
             )
+            preview = preview_bundle(bundle=bundle, target_file=target)
+            self.assertEqual(preview["combined"]["status"], "ready")
             result = service.deploy_bundle(
                 bundle=bundle,
                 approval_ref=self._prompt(db, bundle.confirmation_text),
             )
+            self.assertEqual(preview["combined"]["target_after_sha256"], hashlib.sha256(target.read_bytes()).hexdigest())
             self.assertEqual(
                 [item.action for item in result.items],
                 ["deployed", "deployed"],

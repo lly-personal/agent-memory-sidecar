@@ -2,12 +2,12 @@
 
 - Status: Accepted
 - Owner: project_docs
-- Applies to: Scout 5.7 interactive delivery
+- Applies to: Scout 5.9 interactive delivery
 - Decision: [ADR 0076](../docs/decisions/0076-task-scoped-review-pack-delivery.zh.md)
 
 ## Purpose
 
-`global_owner_scout_delivery_v1` binds a validated `global_owner_scout_review_pack_v5` to one immutable Markdown artifact in the
+`global_owner_scout_delivery_v1` binds a validated `global_owner_scout_review_pack_v6` to one immutable Markdown artifact in the
 current task's host-generated output root. It closes the boundary between deterministic renderer bytes and the actual task surface.
 It is an output contract, not a Store record, proposal, approval, Inbox, cross-task bridge, or behavior owner.
 
@@ -65,6 +65,11 @@ preview to open the exact artifact. That host call is the last tool call.
 
 The full Review Pack is never copied into the chat final. `surface_pending` restores artifact discoverability without claiming that
 the user surface opened. It is not success, does not enable confirmation, and does not count toward Production qualification.
+The artifact explains that its commands are conditional on the current task's delivery state and a valid exact preview. The queued
+receipt explicitly says in Chinese that its confirm commands cannot yet execute. The final shows the artifact link, a deterministic
+Chinese state, and only `delivery_manifest_sha256`, `surface_observation`, and `confirmation_eligible`; the unchanged manifest's
+remaining fields are reconstructed from the exact artifact bytes and visible-output receipt. No duplicated counts or content hashes
+need to be copied into the user-facing final. The interpreter remains content-bound and rejects changed text or binding.
 
 ## External qualification
 
@@ -75,7 +80,7 @@ verification. `status=surface_pending` proves an intact, discoverable artifact b
 `status=surface_observed` proves this task's delivery surface. Internal validation, `prepared`, file existence, queued host-open, or
 host-open invocation alone does not prove Production.
 
-The controller normalizes CRLF/CR to LF and may remove exactly one additional terminal blank line observed in the Desktop final
+The controller normalizes CRLF/CR to LF and accepts zero, one, or two terminal LF characters observed in the Desktop final
 envelope. It rejects three or more terminal newlines, spaces, tail notes, field changes, missing fields, or any other receipt rewrite.
 
 `interactive_project_scout` remains `production_unproven / interactive_host_blocked` until the five-scenario entry matrix passes:
@@ -97,9 +102,9 @@ does not count toward the five-scenario matrix.
 3. No failure path emits partial cards or enables confirmation.
 4. An exact queued receipt remains content-bound, externally verifies as `surface_pending`, exposes the complete artifact link, and
    never enables confirmation or counts toward Production qualification.
-5. One host-added terminal blank line is the only accepted final-envelope normalization; any other trailing or semantic edit fails.
+5. Zero, one, or two terminal LF characters are accepted after CRLF/CR normalization; other trailing or semantic edits fail.
 6. The reviewed project, Owner, Store, Git state, and installed Skill cache remain unchanged.
-7. Review Pack v4 and `selection_token` remain unchanged; user confirmation continues through `rule_revision_bundle_v2` Fresh
+7. Review Pack v6 and `selection_token` remain unchanged; user confirmation continues through `rule_revision_bundle_v2` Fresh
    recomputation.
 8. Canary eligibility binds the installed runtime Skill identity before task creation; mismatched or legacy consumers never count.
 

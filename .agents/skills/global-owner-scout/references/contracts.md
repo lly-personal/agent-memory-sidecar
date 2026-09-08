@@ -1,9 +1,9 @@
-# Global Owner Scout 5.8 contracts
+# Global Owner Scout 5.9 contracts
 
 ## Common rules
 
-- Skill `5.8.0`; Project result `global_owner_scout_project_v5`; Review Pack
-  `global_owner_scout_review_pack_v5`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
+- Skill `5.9.0`; Project result `global_owner_scout_project_v5`; Review Pack
+  `global_owner_scout_review_pack_v6`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
 - `project_claim_hash` covers every Project Card field except itself. `review_pack_hash` covers the pack except itself.
@@ -130,6 +130,10 @@ owner_rationale, anti_examples, privacy_check, unproven, rule_payload
 one. E2 normally has one project; E3 requires at least two independently evidenced project refs. It never implies a fixed total.
 Classifications are `already_covered`, `add`, `replace`, `consolidate`, `route_to_owner`; owner recommendations are
 `project_owner`, `skill`, `global_agents`, `no_persistence`.
+Cross-project reuse is not sufficient for `global_agents`: compare the necessary cross-task decision with the complete current
+Owner and keep task-specific procedures in their actual method entry. Method routing preserves the source action and exception,
+names the applicable task and inputs, and distinguishes a tested entry from a draft or missing capability. Capacity never proves
+semantic coverage or authorizes relocating a mandatory behavior.
 
 `human_context` exact fields:
 
@@ -144,11 +148,11 @@ not. `rule_payload` is exactly `trigger, action, skip_boundary, scope, why, evid
 
 ## Review Pack
 
-`global_owner_scout_review_pack_v5` exact top-level fields:
+`global_owner_scout_review_pack_v6` exact top-level fields (Project result remains v5):
 
 ```text
 contract_version, mode, status, display_locale, skill_version, project_result,
-owner_parity, review_cards, limitations, review_pack_hash
+owner_parity, review_cards, selection_preview, limitations, review_pack_hash
 ```
 
 Owner parity fields are `status, canonical_source_ref, canonical_source_hash, local_target_ref, local_target_hash, snapshot_id`.
@@ -167,12 +171,35 @@ integration_preview, expected_behavior_change, allowed_actions
 ```
 
 Integration fields are `global_relation, research, owner_comparison, before_after, globalization_risk, repeat_status, supersedes`.
+Actual integration relation owns the recommendation: exact existing coverage is ignore, a challenged or unclear global projection
+is edit, and a supported project/Skill route keeps that scope. The frozen project's initial classification cannot override it.
+`add` has no superseded rules, `replace` exactly one, and `consolidate` at least two. Compare overlapping candidate obligations
+before preview, preserving their distinct triggers and exceptions; a shared topic alone is not a reason to merge.
+If Owner comparison or candidate merging changes a projection, return to deep-review Phases 5–6 and produce a new content-bound
+Project/Review revision. Keep every source obligation's disposition and the original frozen artifacts; do not edit frozen cards
+in place or repeat an unchanged source census.
+
+Run `python -B scripts/scout.py prepare-review` with the draft Review Pack on stdin. This reads the active installed Core artifact
+identity from the existing registry without writes, verifies the artifact bytes, and calls its read-only `preview-bundle` entry.
+With no selection flags, preview the full proposed set. To preview a deliberate subset, repeat
+`--select-card <card-id>` for its exact members; retain all Project/Review Cards and all single-item projections. The Core receipt's
+`bundle_sha256` binds the full proposed catalog, while `combined.card_ids` binds the exact selected subset and its after hash.
+It preserves Project Cards and semantic integration, populating only action qualification, tokens and `selection_preview` before
+hashing the final pack. Drafts may set `selection_preview=null`; they cannot be rendered as confirmable final packs.
+The selection preview is null when no global mutation is proposed; otherwise it has exactly
+`core_artifact_sha256, result, error_code`. `result` is the exact `rule_bundle_preview_v1` receipt or null with an error.
+Every individual confirmation requires its ready item. A combined confirmation requires the ready combined projection;
+individual success never manufactures a combined success. A card used only in a valid combination exposes its bound combination
+identity without offering an invalid standalone confirmation. Unavailable Core or stale Owner never qualifies confirmation.
+All supported cards remain visible when combination/capacity is blocked; explain that the set needs revision and retain edit,
+project/Skill routing and ignore. Other user-selected combinations are previewed before final approval, without rerunning project
+discovery or silently truncating candidates. Deployment still validates the exact current approval and replans under locks.
 For a confirmable card, `selection_token` is the 32-hex operation identity derived from card ID, project claim, proposal,
 sorted `supersedes`, instruction target, and the current canonical source hash. It is `null` otherwise. `edit` and
 `ignore` are always available. `confirm` exists only for matched-parity, `global_agents`, `add/replace/consolidate` cards. Project
 Owner and Skill routes recommend `keep_project` and `make_skill`. Drift removes confirmation but never a card.
 
-Renderer order: warnings; surface-specific decision index; every card's 30-second view; complete evidence and Rule Projection;
+Renderer order: warnings; surface-specific decision index; each card's decision summary with its exact Rule Projection; evidence;
 technical appendix; validation receipt; and only for Scheduled, one final Inbox wrapper. Invoke `python -B scripts/scout.py
 render-review --surface interactive|scheduled` from the Skill root with the validated Pack on stdin. Interactive uses `本次需要判断`,
 has zero wrapper, and contains no Scheduled/Inbox/14-run copy. Scheduled uses `今日需要判断` and exactly one wrapper. The receipt
@@ -181,6 +208,8 @@ total visible action count, atomic bundle action count, and wrapper count. `pyth
 lost or cross-card-moved actions, duplicate or
 non-final wrappers, raw JSON, trailing notes, and truncation. The verifier proves renderer/artifact bytes only; it does not prove the
 actual task final. Renderer failure may not be repaired by hand-written Markdown. `output_budget_exceeded` is a whole-run failure.
+Within a card, show the exact When/Do/Skip body once and reference that named field when another field repeats it exactly.
+Keep distinct qualifications, evidence and before/after facts; semantic similarity does not authorize compression.
 
 ## Interactive Delivery
 
@@ -211,11 +240,15 @@ terminal opened/success result. An exact `queued` host result returns the conten
 confirmation disabled; its controller result is `surface_pending`, never Production qualification. `pending`, missing, failed, or
 unobservable results use the path-free blocked receipt with confirmation disabled. A
 separate controller reads the actual task final and runs `python -B scripts/scout.py verify-final --artifact-root <host-output-root>`.
+The artifact states that its confirmation commands depend on the current task's delivery state and exact selection preview.
+Queued copy says in Chinese that opening is still queued and the file's confirmation commands are not executable yet.
+The compact final carries only `delivery_manifest_sha256`, `surface_observation` and `confirmation_eligible` beside the artifact
+link and user-facing state. The controller reconstructs the remaining manifest fields from the artifact and its verified footer.
 Both `surface_pending` and `surface_observed` prove that the final receipt, artifact path, manifest hash, file bytes, Review Pack/body
 hashes, cards and actions conserve; only `surface_observed` proves the user surface and qualifies the host. Until the five-scenario
 entry matrix passes, the
 interactive product state is `production_unproven / interactive_host_blocked`.
-The controller normalizes line endings and may remove exactly one host-added terminal blank line; every other trailing or semantic
+The controller normalizes line endings and accepts zero, one, or two terminal newlines; every other trailing or semantic
 edit fails closed.
 The controller also binds the canary's actual installed Skill identity before execution. Repository-local source presence is not
 runtime adoption. A task that resolves another Scout version or returns the legacy inline renderer envelope is ineligible rather

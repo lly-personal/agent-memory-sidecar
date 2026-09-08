@@ -26,27 +26,19 @@ DELIVERY_SURFACE = "task_artifact"
 DELIVERY_STATUS = "prepared"
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 ARTIFACT_NAME_RE = re.compile(r"^global-owner-scout-review-pack-(?P<prefix>[0-9a-f]{16})\.md$")
+OPENED_COPY = "完整建议已打开，现有规则未改变。仅可确认文件中已通过预演的准确选择；写入前仍会核对当前规则。"
+QUEUED_COPY = "完整建议已准备，打开请求仍在排队。可先审阅；文件中的确认命令暂不可执行，现有规则未改变。"
 FINAL_RECEIPT_PREFIX = (
     r"^# Global Owner Scout · 完整审阅包\n\n"
-    r"\[打开完整 Review Pack\]\(<(?P<path>[^>\r\n]+)>\)\n\n"
-    r"交付回执：`contract=global_owner_scout_delivery_v1`；"
-    r"`status=prepared`；`delivery_surface=task_artifact`；"
-    rf"`delivery_manifest_sha256=(?P<manifest>{HASH_RE.pattern[1:-1]})`；"
-    rf"`artifact_sha256=(?P<artifact>{HASH_RE.pattern[1:-1]})`；"
-    r"`artifact_bytes=(?P<bytes>\d+)`；"
-    rf"`review_pack_hash=(?P<pack>{HASH_RE.pattern[1:-1]})`；"
-    rf"`visible_body_sha256=(?P<body>{HASH_RE.pattern[1:-1]})`；"
-    r"`project_cards=(?P<project>\d+)`；`visible_cards=(?P<visible>\d+)`；"
-    r"`visible_action_counts=(?P<action_counts>none|\d+(?:,\d+)*)`；"
-    r"`visible_actions=(?P<actions>\d+)`；"
-    r"`bundle_action_count=(?P<bundle>[01])`；`wrapper_count=(?P<wrapper>[01])`；"
+    r"\[打开完整审阅包\]\(<(?P<path>[^>\r\n]+)>\)\n\n"
 )
+FINAL_RECEIPT_BINDING = rf"\n\n交付回执：`delivery_manifest_sha256=(?P<manifest>{HASH_RE.pattern[1:-1]})`；"
 FINAL_OPENED_RECEIPT_RE = re.compile(
-    FINAL_RECEIPT_PREFIX +
+    FINAL_RECEIPT_PREFIX + re.escape(OPENED_COPY) + FINAL_RECEIPT_BINDING +
     r"`surface_observation=open_succeeded`；`confirmation_eligible=true`。\n$"
 )
 FINAL_QUEUED_RECEIPT_RE = re.compile(
-    FINAL_RECEIPT_PREFIX +
+    FINAL_RECEIPT_PREFIX + re.escape(QUEUED_COPY) + FINAL_RECEIPT_BINDING +
     r"`surface_observation=open_queued`；`confirmation_eligible=false`。\n$"
 )
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
@@ -317,6 +309,24 @@ def validate_delivery_manifest(value: Any) -> dict[str, Any]:
     return value
 
 
+def artifact_manifest(data: bytes, artifact_name: str) -> dict[str, Any]:
+    visible = verify_visible_output(data.decode("utf-8"), surface="interactive")
+    manifest: dict[str, Any] = {
+        "contract_version": DELIVERY_CONTRACT,
+        "status": DELIVERY_STATUS,
+        "delivery_surface": DELIVERY_SURFACE,
+        "artifact_name": artifact_name,
+        "artifact_sha256": sha256_bytes(data),
+        "artifact_bytes": len(data),
+        **{field: visible[field] for field in (
+            "review_pack_hash", "visible_body_sha256", "project_cards", "visible_cards",
+            "visible_action_counts", "visible_actions", "bundle_action_count", "wrapper_count",
+        )},
+    }
+    manifest["delivery_manifest_sha256"] = delivery_manifest_sha256(manifest)
+    return validate_delivery_manifest(manifest)
+
+
 def prepare_delivery(pack: dict[str, Any], *, artifact_dir: Path, protected_roots: Iterable[Path]) -> tuple[dict[str, Any], Path]:
     output_root = validate_output_root(artifact_dir, protected_roots)
     rendered = render_review_pack(pack, surface="interactive")
@@ -328,26 +338,7 @@ def prepare_delivery(pack: dict[str, Any], *, artifact_dir: Path, protected_root
     require_artifact_read_only(artifact_path)
     readback = safe_artifact_bytes(artifact_path)
     require(readback == rendered_bytes, "artifact changed after deterministic creation")
-    verified_readback = verify_visible_output(readback.decode("utf-8"), surface="interactive")
-    require(verified_readback == visible, "artifact verification changed after readback")
-    manifest: dict[str, Any] = {
-        "contract_version": DELIVERY_CONTRACT,
-        "status": DELIVERY_STATUS,
-        "delivery_surface": DELIVERY_SURFACE,
-        "artifact_name": artifact_name,
-        "artifact_sha256": sha256_bytes(readback),
-        "artifact_bytes": len(readback),
-        "review_pack_hash": visible["review_pack_hash"],
-        "visible_body_sha256": visible["visible_body_sha256"],
-        "project_cards": visible["project_cards"],
-        "visible_cards": visible["visible_cards"],
-        "visible_action_counts": visible["visible_action_counts"],
-        "visible_actions": visible["visible_actions"],
-        "bundle_action_count": visible["bundle_action_count"],
-        "wrapper_count": visible["wrapper_count"],
-    }
-    manifest["delivery_manifest_sha256"] = delivery_manifest_sha256(manifest)
-    return validate_delivery_manifest(manifest), artifact_path
+    return artifact_manifest(readback, artifact_name), artifact_path
 
 
 def markdown_path(path: Path) -> str:
@@ -386,19 +377,11 @@ def validate_manifest_artifact(manifest: dict[str, Any], *, artifact_path: Path,
 def render_opened_receipt(manifest: dict[str, Any], *, artifact_path: Path, artifact_root: Path) -> str:
     manifest = validate_delivery_manifest(manifest)
     artifact_path = validate_manifest_artifact(manifest, artifact_path=artifact_path, artifact_root=artifact_root)
-    action_counts = ",".join(str(item) for item in manifest["visible_action_counts"]) or "none"
     return (
         "# Global Owner Scout · 完整审阅包\n\n"
-        f"[打开完整 Review Pack](<{markdown_path(artifact_path)}>)\n\n"
-        f"交付回执：`contract={DELIVERY_CONTRACT}`；`status={manifest['status']}`；"
-        f"`delivery_surface={manifest['delivery_surface']}`；"
+        f"[打开完整审阅包](<{markdown_path(artifact_path)}>)\n\n"
+        f"{OPENED_COPY}\n\n交付回执："
         f"`delivery_manifest_sha256={manifest['delivery_manifest_sha256']}`；"
-        f"`artifact_sha256={manifest['artifact_sha256']}`；`artifact_bytes={manifest['artifact_bytes']}`；"
-        f"`review_pack_hash={manifest['review_pack_hash']}`；"
-        f"`visible_body_sha256={manifest['visible_body_sha256']}`；"
-        f"`project_cards={manifest['project_cards']}`；`visible_cards={manifest['visible_cards']}`；"
-        f"`visible_action_counts={action_counts}`；`visible_actions={manifest['visible_actions']}`；"
-        f"`bundle_action_count={manifest['bundle_action_count']}`；`wrapper_count={manifest['wrapper_count']}`；"
         "`surface_observation=open_succeeded`；`confirmation_eligible=true`。\n"
     )
 
@@ -406,19 +389,11 @@ def render_opened_receipt(manifest: dict[str, Any], *, artifact_path: Path, arti
 def render_queued_receipt(manifest: dict[str, Any], *, artifact_path: Path, artifact_root: Path) -> str:
     manifest = validate_delivery_manifest(manifest)
     artifact_path = validate_manifest_artifact(manifest, artifact_path=artifact_path, artifact_root=artifact_root)
-    action_counts = ",".join(str(item) for item in manifest["visible_action_counts"]) or "none"
     return (
         "# Global Owner Scout · 完整审阅包\n\n"
-        f"[打开完整 Review Pack](<{markdown_path(artifact_path)}>)\n\n"
-        f"交付回执：`contract={DELIVERY_CONTRACT}`；`status={manifest['status']}`；"
-        f"`delivery_surface={manifest['delivery_surface']}`；"
+        f"[打开完整审阅包](<{markdown_path(artifact_path)}>)\n\n"
+        f"{QUEUED_COPY}\n\n交付回执："
         f"`delivery_manifest_sha256={manifest['delivery_manifest_sha256']}`；"
-        f"`artifact_sha256={manifest['artifact_sha256']}`；`artifact_bytes={manifest['artifact_bytes']}`；"
-        f"`review_pack_hash={manifest['review_pack_hash']}`；"
-        f"`visible_body_sha256={manifest['visible_body_sha256']}`；"
-        f"`project_cards={manifest['project_cards']}`；`visible_cards={manifest['visible_cards']}`；"
-        f"`visible_action_counts={action_counts}`；`visible_actions={manifest['visible_actions']}`；"
-        f"`bundle_action_count={manifest['bundle_action_count']}`；`wrapper_count={manifest['wrapper_count']}`；"
         "`surface_observation=open_queued`；`confirmation_eligible=false`。\n"
     )
 
@@ -436,6 +411,8 @@ def render_blocked_receipt(manifest: dict[str, Any]) -> str:
 
 def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
     text = value.replace("\r\n", "\n").replace("\r", "\n")
+    if not text.endswith("\n"):
+        text += "\n"
     if text.endswith("\n\n") and not text.endswith("\n\n\n"):
         text = text[:-1]
     match = FINAL_OPENED_RECEIPT_RE.fullmatch(text)
@@ -458,39 +435,8 @@ def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
     require(parent == root, "actual task final artifact must be a direct child of artifact-root")
     require_artifact_read_only(artifact_path)
     data = safe_artifact_bytes(artifact_path)
-    action_counts = [] if match.group("action_counts") == "none" else [int(item) for item in match.group("action_counts").split(",")]
-    manifest: dict[str, Any] = {
-        "contract_version": DELIVERY_CONTRACT,
-        "status": DELIVERY_STATUS,
-        "delivery_surface": DELIVERY_SURFACE,
-        "artifact_name": artifact_path.name,
-        "artifact_sha256": match.group("artifact"),
-        "artifact_bytes": int(match.group("bytes")),
-        "review_pack_hash": match.group("pack"),
-        "visible_body_sha256": match.group("body"),
-        "project_cards": int(match.group("project")),
-        "visible_cards": int(match.group("visible")),
-        "visible_action_counts": action_counts,
-        "visible_actions": int(match.group("actions")),
-        "bundle_action_count": int(match.group("bundle")),
-        "wrapper_count": int(match.group("wrapper")),
-        "delivery_manifest_sha256": match.group("manifest"),
-    }
-    validate_delivery_manifest(manifest)
-    require(len(data) == manifest["artifact_bytes"], "actual task artifact byte count mismatch")
-    require(sha256_bytes(data) == manifest["artifact_sha256"], "actual task artifact SHA-256 mismatch")
-    visible = verify_visible_output(data.decode("utf-8"), surface="interactive")
-    for field in (
-        "review_pack_hash",
-        "visible_body_sha256",
-        "project_cards",
-        "visible_cards",
-        "visible_action_counts",
-        "visible_actions",
-        "bundle_action_count",
-        "wrapper_count",
-    ):
-        require(visible[field] == manifest[field], f"actual task artifact {field} does not match Delivery receipt")
+    manifest = artifact_manifest(data, artifact_path.name)
+    require(manifest["delivery_manifest_sha256"] == match.group("manifest"), "actual task artifact does not match Delivery receipt")
     return {
         "status": surface_status,
         "delivery_manifest_sha256": manifest["delivery_manifest_sha256"],
@@ -527,6 +473,7 @@ def run_self_test() -> None:
             assert pending["confirmation_eligible"] is False
             host_enveloped = verify_final_receipt(queued_receipt + "\n", artifact_root=artifact_dir)
             assert host_enveloped == pending
+            assert verify_final_receipt(queued_receipt.removesuffix("\n"), artifact_root=artifact_dir) == pending
             assert "confirmation_eligible=false" in render_blocked_receipt(manifest)
             tests += 1
 

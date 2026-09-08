@@ -374,116 +374,7 @@ class InstructionRepository:
             if path is not None
             else self.read_target(target=target, identity=identity)
         )
-        _assert_writable(snapshot)
-        original_by_id = {rule.rule_id: rule for rule in snapshot.rules}
-        original_positions = {
-            rule.rule_id: index for index, rule in enumerate(snapshot.rules)
-        }
-        original_ids = set(original_by_id)
-        used_supersedes: set[str] = set()
-        new_rule_ids: set[str] = set()
-        prepared: list[
-            tuple[RuleBundleItem, ConfirmedRule, tuple[str, ...]]
-        ] = []
-        for item in items:
-            rule = ConfirmedRule.from_proposal(item.proposal)
-            supersedes = normalize_supersedes(item.supersedes)
-            if rule.rule_id in new_rule_ids:
-                raise CoreError(
-                    "invalid_rule_bundle",
-                    "rule bundle produces duplicate confirmed rules",
-                    rule_id=rule.rule_id,
-                )
-            overlap = sorted(used_supersedes.intersection(supersedes))
-            if overlap:
-                raise CoreError(
-                    "invalid_rule_bundle",
-                    "rule bundle items cannot supersede the same existing rule",
-                    overlapping_rule_ids=overlap,
-                )
-            missing_from_before = sorted(
-                rule_id for rule_id in supersedes if rule_id not in original_ids
-            )
-            if missing_from_before:
-                raise CoreError(
-                    "rule_revision_stale",
-                    "rule bundle supersedes do not exist in the fresh target snapshot",
-                    missing_rule_ids=missing_from_before,
-                )
-            if not supersedes and rule.rule_id in original_ids:
-                raise CoreError(
-                    "rule_bundle_not_applicable",
-                    "every selected rule must still produce a change",
-                    rule_id=rule.rule_id,
-                )
-            if supersedes == (rule.rule_id,):
-                raise CoreError(
-                    "rule_bundle_not_applicable",
-                    "every selected rule must still produce a change",
-                    rule_id=rule.rule_id,
-                )
-            prepared.append((item, rule, supersedes))
-            new_rule_ids.add(rule.rule_id)
-            used_supersedes.update(supersedes)
-        surviving_ids = original_ids - used_supersedes
-        duplicate_survivors = sorted(new_rule_ids.intersection(surviving_ids))
-        if duplicate_survivors:
-            raise CoreError(
-                "instruction_edit_duplicate",
-                "rule bundle would duplicate an unaffected confirmed rule",
-                rule_ids=duplicate_survivors,
-            )
-
-        positioned: list[tuple[int, int, str, ConfirmedRule]] = [
-            (index, 0, rule.rule_id, rule)
-            for index, rule in enumerate(snapshot.rules)
-            if rule.rule_id in surviving_ids
-        ]
-        mutations: list[PlannedRuleMutation] = []
-        affected: list[ConfirmedRule] = []
-        for item, rule, supersedes in prepared:
-            if supersedes:
-                position = min(original_positions[value] for value in supersedes)
-                action = "consolidated" if len(supersedes) > 1 else "replaced"
-                kind = 1
-            else:
-                position = len(snapshot.rules)
-                action = "deployed"
-                kind = 2
-            positioned.append((position, kind, rule.rule_id, rule))
-            mutations.append(
-                PlannedRuleMutation(
-                    card_id=item.card_id,
-                    action=action,
-                    rule=rule,
-                )
-            )
-            affected.append(rule)
-        current = tuple(
-            value[3]
-            for value in sorted(
-                positioned,
-                key=lambda value: (value[0], value[1], value[2]),
-            )
-        )
-        if len({rule.rule_id for rule in current}) != len(current):
-            raise CoreError(
-                "invalid_rule_bundle",
-                "rule bundle produces duplicate confirmed rules",
-            )
-        if current == snapshot.rules:
-            raise CoreError(
-                "rule_bundle_not_applicable",
-                "selected rule set does not change the target",
-            )
-        plan = plan_replace(
-            snapshot=snapshot,
-            rules=current,
-            rule=affected[0],
-            action="bundle_deployed",
-            affected_rules=tuple(affected),
-        )
-        return plan, tuple(mutations)
+        return plan_deploy_bundle(snapshot=snapshot, items=items)
 
     def plan_revoke(
         self,
@@ -541,6 +432,125 @@ class InstructionRepository:
                 _acquire_file_lock(handle)
                 stack.callback(_release_file_lock, handle)
             yield
+
+
+def plan_deploy_bundle(
+    *, snapshot: DocumentSnapshot, items: tuple[RuleBundleItem, ...]
+) -> tuple[FilePlan, tuple[PlannedRuleMutation, ...]]:
+    """Plan the exact bundle against observed bytes without mutation or recovery."""
+    if not items or any(item.proposal.instruction_target != snapshot.target for item in items):
+        raise CoreError("invalid_rule_bundle", "bundle items must match the observed target")
+    items = tuple(sorted(items, key=lambda item: item.card_id))
+    _assert_writable(snapshot)
+    original_by_id = {rule.rule_id: rule for rule in snapshot.rules}
+    original_positions = {
+        rule.rule_id: index for index, rule in enumerate(snapshot.rules)
+    }
+    original_ids = set(original_by_id)
+    used_supersedes: set[str] = set()
+    new_rule_ids: set[str] = set()
+    prepared: list[
+        tuple[RuleBundleItem, ConfirmedRule, tuple[str, ...]]
+    ] = []
+    for item in items:
+        rule = ConfirmedRule.from_proposal(item.proposal)
+        supersedes = normalize_supersedes(item.supersedes)
+        if rule.rule_id in new_rule_ids:
+            raise CoreError(
+                "invalid_rule_bundle",
+                "rule bundle produces duplicate confirmed rules",
+                rule_id=rule.rule_id,
+            )
+        overlap = sorted(used_supersedes.intersection(supersedes))
+        if overlap:
+            raise CoreError(
+                "invalid_rule_bundle",
+                "rule bundle items cannot supersede the same existing rule",
+                overlapping_rule_ids=overlap,
+            )
+        missing_from_before = sorted(
+            rule_id for rule_id in supersedes if rule_id not in original_ids
+        )
+        if missing_from_before:
+            raise CoreError(
+                "rule_revision_stale",
+                "rule bundle supersedes do not exist in the fresh target snapshot",
+                missing_rule_ids=missing_from_before,
+            )
+        if not supersedes and rule.rule_id in original_ids:
+            raise CoreError(
+                "rule_bundle_not_applicable",
+                "every selected rule must still produce a change",
+                rule_id=rule.rule_id,
+            )
+        if supersedes == (rule.rule_id,):
+            raise CoreError(
+                "rule_bundle_not_applicable",
+                "every selected rule must still produce a change",
+                rule_id=rule.rule_id,
+            )
+        prepared.append((item, rule, supersedes))
+        new_rule_ids.add(rule.rule_id)
+        used_supersedes.update(supersedes)
+    surviving_ids = original_ids - used_supersedes
+    duplicate_survivors = sorted(new_rule_ids.intersection(surviving_ids))
+    if duplicate_survivors:
+        raise CoreError(
+            "instruction_edit_duplicate",
+            "rule bundle would duplicate an unaffected confirmed rule",
+            rule_ids=duplicate_survivors,
+        )
+
+    positioned: list[tuple[int, int, str, ConfirmedRule]] = [
+        (index, 0, rule.rule_id, rule)
+        for index, rule in enumerate(snapshot.rules)
+        if rule.rule_id in surviving_ids
+    ]
+    mutations: list[PlannedRuleMutation] = []
+    affected: list[ConfirmedRule] = []
+    for item, rule, supersedes in prepared:
+        if supersedes:
+            position = min(original_positions[value] for value in supersedes)
+            action = "consolidated" if len(supersedes) > 1 else "replaced"
+            kind = 1
+        else:
+            position = len(snapshot.rules)
+            action = "deployed"
+            kind = 2
+        positioned.append((position, kind, rule.rule_id, rule))
+        mutations.append(
+            PlannedRuleMutation(
+                card_id=item.card_id,
+                action=action,
+                rule=rule,
+            )
+        )
+        affected.append(rule)
+    current = tuple(
+        value[3]
+        for value in sorted(
+            positioned,
+            key=lambda value: (value[0], value[1], value[2]),
+        )
+    )
+    if len({rule.rule_id for rule in current}) != len(current):
+        raise CoreError(
+            "invalid_rule_bundle",
+            "rule bundle produces duplicate confirmed rules",
+        )
+    if current == snapshot.rules:
+        raise CoreError(
+            "rule_bundle_not_applicable",
+            "selected rule set does not change the target",
+        )
+    plan = plan_replace(
+        snapshot=snapshot,
+        rules=current,
+        rule=affected[0],
+        action="bundle_deployed",
+        affected_rules=tuple(affected),
+    )
+    return plan, tuple(mutations)
 
 
 def read_document(

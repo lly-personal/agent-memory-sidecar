@@ -72,6 +72,17 @@
 - bundle revision hash 绑定 canonical bundle hash、instruction target、完整 target before hash 与完整 target after hash。
 - 单卡确认使用大小为一的 bundle；任一项 no-op、stale、冲突、超容量或写入失败，整包零修改且不消费 approval。
 
+确认前使用 `rule preview-bundle --target-file <observed-owner> --from-json -` 对准确 `rule_revision_bundle_v2` 做零写入预演。
+Core 复用正式 bundle planner，校验整个 target before hash，并返回 `rule_bundle_preview_v1`：
+`target_before_sha256, bundle_sha256, before_bytes, budget_bytes, items, combined`。每个 item 包含
+`card_id, status, projected_bytes, target_after_sha256, error_code`；combined 使用同一结果字段及排序的 `card_ids`。
+`status=ready` 才表示该准确集合通过；`blocked` 保留准确错误，未知 projected/after 为 null。一次调用计算单卡与整个选集，
+不创建 Store、proposal、批准、锁、journal 或目标文件。预演只证明当前字节下的结构、容量与差量；语义关系仍由复盘判断，
+真实部署仍在授权及锁内重新规划。Runtime zipapp 的 `preview-bundle` 入口提供相同只读能力，供 Scout 从实际安装 identity 调用。
+两种 Core 预演入口和 `scout.py prepare-review` 都允许重复传入 `--select-card <id>` 核查明确子集。未传则预演全部拟议项。
+子集必须是唯一已知成员；仍保留完整候选与单项投影。`bundle_sha256` 绑定完整输入，`combined.card_ids` 与 after hash
+绑定准确所选组合；不能为了预演子集删除其他卡片或重跑项目发现。
+
 Agent 在创建 proposal 前把候选分类为：
 
 | 关系 | 行为 |
@@ -259,7 +270,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。可靠自动发现边界仍是一次 Codex 刷新或下一任务，但 source/host 物化必须在当前部署任务完成。
 
-`agent-memory-workstation-bootstrap` Skill 2.2.1 提供两个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.2.2 提供两个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
@@ -355,7 +366,7 @@ root 逐级检查两个产品同名 `.agents/skills`，非 Git 项目只检查 p
 `status` 只允许 `ready`、`reload_required`、`consumer_scope_drift`、`consumer_scope_bounded`、
 `distribution_reconcile_blocked`、`source_sync_blocked` 或 `host_materialization_blocked`。中文 renderer 固定先显示期望发行、
 Plugin 分发、源同步、主机物化、消费者范围、消费者采用，再显示未证明事项与唯一下一步。apply 固定不越过模型采用层，
-返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.2.1 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
+返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.2.2 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
 读回仍 exact、Desktop 项目枚举完整且项目级同名 Skill 全部 exact，才允许 `ready`。任何本机结果都保留真实第二台设备、
 Scheduled、连续性与产品收益未证明边界。
 
@@ -464,8 +475,11 @@ v5 保留主机身份与顶层字段，增加严格来源与发现关联；不�
 一条复合规范中各个独立行为义务、触发条件、用户代价与合法例外都必须在投影后保留；同主题观察不能代替完整语义覆盖。
 抽象后还须反查合法成功路径：若不同前置条件已满足同一目标，拟议动作是否仍然必要？不能把项目采用的某个手段、
 次数或顺序变成所有任务的硬门；缩窄 When、保留具体 Skip，或将手段分流为项目/Skill 方法，再冻结语义。
-材料丰富、横跨当前规范与累积决策的复盘，冻结前由独立上下文复核原文义务与草稿投影。复核者只接收原始来源、
-索引/缺口和草稿，不接收 Global Owner 措辞或预期候选答案；使用已有内部子代理能力，不新建用户任务或长期实体。
+复合条款不能整体继承“项目专属”路由；先分离项目实现和各项可迁移行为。例外须确实适用于对应动作；
+某项日志、清理或恢复例外不能自动解除相邻动作的责任。不同前提下仍必需的动作不填写装饰性例外。
+材料丰富、横跨当前规范与累积决策的复盘，冻结前由独立上下文先从原文建立义务清单，再复核草稿投影。复核者首先只接收
+原始来源及索引/缺口，冻结独立清单后才接收草稿；不接收 Global Owner 措辞或预期候选答案，避免已有草稿主导发现分母。
+使用已有内部子代理能力，不新建用户任务或长期实体。独立清单是本轮临时核查证据，不是第二规则 Owner。
 逐项修正有据缺口后重验关联、隐私与语义 hash；无法取得独立复核时记录覆盖限制，不把同一上下文自评称为独立验收。
 反查同时检查“已有观察但只覆盖部分义务”的来源，不能只检查完全没有观察的条款。项目已存在完整规则只证明局部覆盖；
 仍有跨项目行为价值时，保留通用投影进入实际 Global Owner 比较，不得在项目阶段以已有沉淀提前排除。
@@ -481,7 +495,7 @@ Scheduled 使用既有最终 Inbox wrapper 与可见文本校验，不增加文�
 是否截断，以及 `complete/bounded/degraded`。达到宿主任务索引上限、未读到窗口边界或无法继续分页时只能使用
 `bounded/degraded`，不得声称完成完整 session 复盘。
 
-Skill 5.8.0 的所有入口固定使用已验证的原生任务索引上限 `50` 作为首次且唯一的索引请求，不得先请求更大
+Skill 5.9.0 的所有入口固定使用已验证的原生任务索引上限 `50` 作为首次且唯一的索引请求，不得先请求更大
 页面探测上限。调用使用最长 60 秒的初始 yield；返回 `cell_id` 时必须对同一 cell 最多连续 wait 两次、每次最长
 60 秒。cell 未终态前禁止发起第二次索引调用，`Script running` 不得解释为 unavailable、timeout 或 degraded。
 
@@ -519,6 +533,9 @@ Scheduled Scout 或沿用跨路径 Host Enrollment。
 9. `normalized_evidence_hash` 与覆盖 `human_context` 及上述全部项目语义字段的 `project_claim_hash`。
 
 Project Card 是目标工程线程的语义结论。Human Context 与 Rule Projection 都必须在 global owner 比较前形成。
+跨项目可复用不等于整套步骤必须常驻：独立判断必要的跨任务决策义务，再与当前完整 Global Owner 的已有规则和
+非 managed 原则比较；具体执行方法保留适用任务、输入、逐动作例外和实际入口。尚未提供或验证的入口明确为方法
+交付缺口，不以“已路由”冒充能力闭合，也不为通过容量而移走必须执行的独立行为。
 后续 integration preview、Markdown renderer 和按需中央审阅必须验证并保留 `project_claim_hash`，不得翻译、补写
 或修改 Human Context、证据等级、痛点、反证、抽象、owner 建议或七字段。证据引用只保留可在
 对应项目中重建的逻辑定位，不得输出私有绝对路径、原始对话、token、密钥、完整命令或内部诊断正文。
@@ -540,7 +557,7 @@ Project Card 是目标工程线程的语义结论。Human Context 与 Rule Proje
 `count, project_refs, basis, coverage_note`。E2 的 count 通常为 1；E3 至少为 2。refs 必须是隐私安全的 opaque
 identity，`basis` 与 `coverage_note` 必须说明独立证据与覆盖边界，不得再使用固定分母。
 
-### Project Review Pack：`global_owner_scout_review_pack_v5`
+### Project Review Pack：`global_owner_scout_review_pack_v6`
 
 Project Scout 固定全部 Project Card 后，读取同一时刻的 canonical global `AGENTS.md` source 与活动宿主的本机
 global `AGENTS.md` target，生成独立 `integration_preview`。每项 preview 只包含原卡 hash、global relation、一手调研、owner 对比、精确
@@ -555,18 +572,25 @@ before/after/unchanged、风险、重复状态和动作资格；它不得回写 
 `AGENTS.md` 只属于项目证据，绝不能替代本机 global target。snapshot identity 覆盖端点标识、状态和双方内容
 hash，避免“hash 合法但比较对象错误”。
 
-Review Pack 顶层包含 `display_locale=zh-CN`，原样包含完整 `project_result`，并追加 owner parity、全部 review cards、限制和
+Review Pack 顶层包含 `display_locale=zh-CN`，原样包含完整 `project_result`，并追加 owner parity、全部 review cards、`selection_preview`、限制和
 `review_pack_hash`。每个 review card 按原始顺序引用一个不可改写的 `project_claim_hash`，附带对应 integration
 preview、`recommended_action`、中文 `recommended_action_reason`、未来行为变化以及 `allowed_actions`。内部 E2/E3
 Project Card 数必须等于 Review Pack 卡数。每个可确认卡还必须包含由当前 canonical source hash 派生的
-`selection_token`；不可确认卡该字段为 `null`。
+`selection_token`；仅组合可确认的卡保留组合标识但不显示单项确认，其余卡该字段为 `null`。
+
+`scout.py prepare-review` 从只读 runtime installation 绑定取得并验证实际 Core artifact，通过其 `preview-bundle` 对当前
+本机 Owner 字节执行单项及完整组合预演。`selection_preview` 记录 artifact hash 与 Core 回执或明确错误；纯归属/已覆盖
+结果为 `null`。Global relation 决定动作，不能沿用冻结 Project classification 推断全局增量。只有通过准确组合预演才
+显示对应组合确认；失败时完整保留候选，先整理合并、替换或归属，再对新选择预演。预演不消耗批准，也不写 Owner/Store。
 
 活动 Skill 的所有 Python 操作只能从 `scripts` 目录执行 `python -B scripts/scout.py <operation>`；dispatcher 复用
 validator、Owner resolver、renderer、visible verifier 与 delivery 实现。确定性 renderer 只接受通过 validator 的
 Review Pack，使用 `scout.py render-review --surface interactive|scheduled` 并通过 stdin 输入完整对象；禁止动态
 import、直接猜选相邻 helper 或 renderer 失败后的模型手工重写。它按固定顺序生成 Markdown：中文结果状态、未执行规则变更的说明与覆盖/确认限制、
 交互 surface 的`本次需要判断 N 项`或 Scheduled surface 的`今日需要判断 N 项`中文索引、全部完整决策卡、E1 与 Session/模型覆盖技术附录、简短校验回执。每张卡先显示
-项目事件、用户成本、建议范围、具体 before/after、最大反例和全部可选动作构成的决策摘要，再显示完整核对依据。
+项目事件、用户成本、建议范围、一份准确 When/Do/Skip、具体 before/after 和全部可选动作，再显示核对依据。
+同卡完全相同的文本用具名引用代替重复正文，独有例外、证据、前后变化与未证明事项保持可查；不做近义压缩或删除候选。
+interactive 文件明确动作受当前任务交付状态约束；排队或失败时文件内确认命令暂不可执行。此限制不把文件准备冒充用户已看到。
 用户可直接复制对应动作，无需先读技术材料或理解选择标识；确认仍绑定原有精确内容与令牌，不新增模糊批准入口。
 协议状态、证据等级、Owner 关系及模型信息进入核对依据或技术附录；零候选只声明已核查范围没有合格增量。表格
 最多四列，before/after 使用两列表格；不得依赖 HTML 折叠、自定义 App UI 或图片。宿主文件预览只承载相同
@@ -604,8 +628,9 @@ opened 与 queued receipt 生成必须同时接收 artifact path 与原 host-out
 containment、普通只读文件、字节/hash 和 visible-output 守恒。随后 Agent 必须使用当前任务宿主的文件打开工具展示
 该 artifact；这是 Scout 最后一个工具调用。只有明确 terminal opened/success 才进入成功分支；明确 `queued` 返回
 同一 artifact 链接和 `surface_pending / confirmation_eligible=false` compact receipt，供用户发现与外部控制器验证，
-但不计 Production。`pending`、缺失、失败或不可观察结果进入阻断分支。工具成功后 final 只返回 artifact 链接和
-compact Delivery receipt；工具失败或缺少该表面时返回
+但不计 Production。`pending`、缺失、失败或不可观察结果进入阻断分支。final 只返回 artifact 链接、确定性中文状态和
+包含 manifest hash、surface observation、确认资格的 compact receipt；其余机器字段从绑定 artifact 重新计算。
+排队文案明确确认尚未就绪；工具失败或缺少该表面时返回
 `interactive_host_blocked`，不得显示部分卡片、确认命令或成功回执。`prepared` 与 open 成功仍只证明当前运行的
 交付准备/表面调用；production 资格必须由外部 controller 回读实际 task final 与 artifact 后验证。
 
@@ -644,9 +669,10 @@ output_budget_exceeded -> output_budget_exceeded / project_review / unchanged|un
 
 宿主 open 发生在 manifest 形成后，只能走 manifest-bound blocked/queued/opened receipt，不属于 Terminal reason。
 
-`edit` 与 `ignore` 始终可用。parity matched 且项目建议为 `global_agents` 的 `add/replace/consolidate` 卡才允许
-`confirm`；`project_owner/route_to_owner` 推荐 `keep_project`，`skill` 推荐 `make_skill`，`already_covered` 或
-`no_persistence` 推荐 `ignore`，上述卡均不提供直接确认。parity 漂移或不可用时移除所有 `confirm`。用户要改变
+`edit` 与 `ignore` 始终可用。parity matched、去向为 `global_agents`、实际 `global_relation` 为
+`add/replace/consolidate` 且对应 Core 预演通过时才允许 `confirm`；项目初始 classification 不决定 Global 差量。
+实际 Global 关系 `already_covered_exact` 或去向 `no_persistence` 推荐 `ignore`，`project_owner/route_to_owner` 推荐 `keep_project`，
+`skill` 推荐 `make_skill`，上述卡均不提供直接确认。parity 漂移或不可用时移除所有 `confirm`。用户要改变
 Owner 去向时必须先通过 `edit` 生成刷新卡。用户在同一 Scout 任务中可以精确选择一张或多张同 scope/target
 的可确认卡；renderer 把动作显示为 `确认 <card_id>@<selection_token>`，并明确可用 `、` 一次连接多个完整
 `card_id@selection_token` 对。任何确认都必须对选中集合执行一次最新 owner/parity 读取和联合关系重算。按需 `central_review` 可以
@@ -688,7 +714,7 @@ Agent 进入原子规则包链的起点：Agent 必须重新读取最新 global 
 - 活跃原工作区的并发变化只记录为当前隔离快照之外的限制；稳定隔离快照中的卡不得因此整体失效。
 - 2026-08-11 的三个真实 v5.1 Scheduled 运行及最小 automation-source probe 证明本主机原生任务索引未取得终态。
   每个 Host Enrollment 保持 `0/14`，自动化保持 `PAUSED`；普通 worktree 前向测试不再拥有恢复权。只有新的真实
-  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 Skill 5.8.0 项目 canary；
+  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 Skill 5.9.0 项目 canary；
   在 14 次有效运行期间必须显式请求
   `gpt-5.6-sol` 与 `medium` reasoning，并记录请求值、
   宿主可见的实际值和 telemetry 可用性。只有 request 不能证明实际模型；不可观测时诚实标记 `request_only`，
