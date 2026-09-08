@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.3.15 | 0.3.15 | 1.5.4 | 2.2.3 | 5.9.1 | v6 | 3.11–3.13 |
 | v0.3.14 | 0.3.14 | 1.5.4 | 2.2.2 | 5.9.0 | v6 | 3.11–3.13 |
 | v0.3.13 | 0.3.13 | 1.5.4 | 2.2.2 | 5.9.0 | v6 | 3.11–3.13 |
 | v0.3.12 | 0.3.12 | 1.5.3 | 2.2.1 | 5.8.0 | v5 | 3.11–3.13 |
@@ -26,6 +27,8 @@ materializes the matching Scout version. The existing frozen Skill 4 compatibili
 The v0.3.13 and v0.3.14 lanes keep Project v5 and Delivery v1. Review Pack v6 requires the exact installed Core selection preview;
 v5 packs must be re-prepared against fresh Owner bytes before offering confirmation. Scout 5.9 needs Core preview support.
 Core 0.3.14 fixes UTF-8 input for Chinese previews on Windows when Python UTF-8 mode is disabled.
+Core 0.3.15 and Scout 5.9.1 clarify engineering and user-acceptance boundaries without changing rule or delivery contracts;
+Bootstrap 2.2.3 installs the matching Scout.
 Missing or older runtime support preserves cards and removes unavailable confirmation actions. A compatibility row alone does not
 prove publication, host deployment, independent discovery recall, or user acceptance.
 Scout 5.6 keeps Review Pack v4 and adds the separate `global_owner_scout_delivery_v1` task-surface contract.

@@ -14,6 +14,7 @@
 - Treat configured readiness, installed artifacts, public publication, model adoption, continuity, and product effect as separate evidence.
 - Never commit runtime Stores, Hook configuration, credentials, private Owner contents, absolute personal paths, task/thread/event IDs,
   or generated cache files.
-- For session-facing changes, perform a real Codex Desktop new-task check when available. Hook or `additionalContext` evidence alone
-  proves transport, not model adoption.
+- For session-facing changes, validate affected behavior in an isolated environment. A real Codex Desktop new-task check requires a
+  user-requested run and stays within that run's scope; engineering validation never authorizes changes to the user's Global Owner.
+  Report later user experience and adoption as unverified until observed, without blocking technical delivery on them.
 - Verify with `PYTHONPATH=src python -m unittest discover`, `python scripts/check_doc_links.py`, and `git diff --check`.

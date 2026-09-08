@@ -336,6 +336,8 @@ Never expose event refs, tokens, internal commands, raw JSON, or diagnostic labe
 
 ## Admission
 
+Mechanism development and its design corrections belong to project authority. Approval to improve or test the mechanism, or agreement with a candidate's value, does not authorize a formal Owner update. During engineering validation, exercise writes and revocation against isolated Owner, Store and test-event fixtures. If the user defers real use or acceptance, stop at technical delivery and do not reuse an earlier candidate confirmation to continue deployment. A test result neither grants production permission nor proves user acceptance.
+
 Before creating a proposal, inspect the actual rules with `agent-memory rule list`; when the target is already known, use `--target global_agents|project_agents` so an unrelated target cannot block the Fresh read. Compare the candidate only with the current instruction chain and project-authority documents already required for the task. Do not scan the whole project.
 
 Classify the candidate once:

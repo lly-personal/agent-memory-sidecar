@@ -7,7 +7,7 @@ description: Run an explicitly requested, evidence-first, project-read-only 30-d
 
 ## Contract
 
-- Skill version: `5.9.0`
+- Skill version: `5.9.1`
 - Project result: `global_owner_scout_project_v5`
 - User review: `global_owner_scout_review_pack_v6`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -105,6 +105,10 @@ An external controller task—not the Scout itself—must read the actual final 
 --artifact-root <host-output-root>` before any production claim. `surface_pending` proves artifact discoverability and integrity only;
 only `surface_observed` can count. Until the five-scenario entry matrix passes, report
 `interactive_project_scout=production_unproven / interactive_host_blocked`.
+These qualification checks do not authorize creating acceptance tasks or updating a real Owner. During mechanism development,
+validate affected branches in isolation; leave real experience and adoption to later user-initiated use or an explicitly requested
+acceptance run. Do not require that later acceptance to complete technical delivery or treat approval of engineering work as a
+Scout invocation or a rule confirmation.
 Before creating a canary, the controller must bind the formal entry's actually installed Scout Skill version and content identity.
 A worktree containing newer Skill source does not make that source the runtime consumer. The matrix covers Local clean automatic
 projection, Local dirty automatic projection, already-worktree execution, explicit thread-page terminal degradation, and missing

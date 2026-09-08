@@ -2,7 +2,7 @@
 
 ## Common rules
 
-- Skill `5.9.0`; Project result `global_owner_scout_project_v5`; Review Pack
+- Skill `5.9.1`; Project result `global_owner_scout_project_v5`; Review Pack
   `global_owner_scout_review_pack_v6`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.

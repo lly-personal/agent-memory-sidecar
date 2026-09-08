@@ -29,8 +29,8 @@ flowchart LR
 
 | 组件 | 唯一职责 | 输入 | 输出 | 不负责 |
 | --- | --- | --- | --- | --- |
-| 用户 | 长期行为变化与规则集修订授权 | 完整提案、范围和精确 before/after | 明确确认、修改、忽略或撤销 | 文件、数据库或诊断 |
-| Agent | 发现、概括、owner、适用性与规则关系判断 | 当前任务证据、实际 rules、当前已读取 authority、可选 Memories | `already_covered`、`add`、`replace`、`consolidate`、`route_to_owner`、无候选或普通任务结果 | 自行授权、自动删除、部署声明 |
+| 用户 | 正式使用的主动触发、长期行为变化授权与真实体验验收 | 完整提案、范围和精确 before/after | 明确确认、修改、忽略、撤销或延后真实验收 | 文件、数据库或诊断 |
+| Agent | 发现、概括、owner、规则关系判断、隔离技术验证与已授权执行 | 当前任务证据、实际 rules、当前已读取 authority、可选 Memories | 有据候选、机制验证结果或已授权操作的准确回执 | 自行授权、以验收替代正式使用、代替用户判断体验 |
 | Skill | 会话流程、owner 前置检查、用户语言和终态呈现 | Agent 判断、当前 approval ref、实际 target 摘要 | 零或一次单规则或原子规则包 CLI 操作，以及机制参与后的一个最终回执或确认卡片 | 行为所有权、全项目扫描、后台循环 |
 | Runtime Ledger | 有界 prompt event、session、proposal token | Hook event | hash/ref 与当前 scope | prompt 语义、规则正文 |
 | Authorization Ledger | 一次性 approval 消费 | 当前 event、operation、规则集修订 hash | consumed 或明确拒绝 | 规则历史、行为状态 |
@@ -160,7 +160,7 @@ Review Pack 结构通过校验后仍未完成链路；renderer 与 visible-outpu
 继续创建并回读同任务 artifact、通过宿主工具打开，然后由外部 controller 读取实际 final/artifact 才完成呈现。
 宿主 open 是 Scout 的最后一个工具调用；之后只允许 compact Delivery receipt，不得再调用独立 memory 审计或追加尾注。
 
-Bootstrap 2.2.2 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 2.2.3 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得
@@ -378,8 +378,9 @@ HEAD、annotated local tag、remote main/tag、版本 Changelog、immutable poli
 
 ## 发布边界
 
-稳定 Core 与 Ambient 实验分别判定。Core 发布只依赖显式部署、采用、撤销、scope、迁移和运行时证据；
-Ambient discovery 未证明只能影响实验结论。
+稳定 Core 与 Ambient 实验分别判定。Core 技术交付以本次变更相关的契约、隔离部署/撤销、scope、迁移和运行时
+验证为依据；真实用户采用与体验按 [L1 证据边界](axioms.md#证据阶梯) 独立报告，不成为每次技术交付的前置条件。
+Ambient discovery 未证明只能影响实验结论。验收任务或控制器只观察获准运行，不拥有正式 Owner 的变更授权。
 
 公开发布再增加独立证据：`public_export_blocked -> public_artifact_verified -> public_install_verified ->
 public_published`。私有 `main`、源测试或本机 setup 不能跨级证明公开安装或发布。
