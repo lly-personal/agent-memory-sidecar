@@ -171,6 +171,9 @@ Actual integration relation owns the recommendation: exact existing coverage is 
 is edit, and a supported project/Skill route keeps that scope. The frozen project's initial classification cannot override it.
 `add` has no superseded rules, `replace` exactly one, and `consolidate` at least two. Compare overlapping candidate obligations
 before preview, preserving their distinct triggers and exceptions; a shared topic alone is not a reason to merge.
+If Owner comparison or candidate merging changes a projection, return to deep-review Phases 5–6 and produce a new content-bound
+Project/Review revision. Keep every source obligation's disposition and the original frozen artifacts; do not edit frozen cards
+in place or repeat an unchanged source census.
 
 Run `python -B scripts/scout.py prepare-review` with the draft Review Pack on stdin. This reads the active installed Core artifact
 identity from the existing registry without writes, verifies the artifact bytes, and calls its read-only `preview-bundle` entry.
@@ -192,7 +195,7 @@ sorted `supersedes`, instruction target, and the current canonical source hash. 
 `ignore` are always available. `confirm` exists only for matched-parity, `global_agents`, `add/replace/consolidate` cards. Project
 Owner and Skill routes recommend `keep_project` and `make_skill`. Drift removes confirmation but never a card.
 
-Renderer order: warnings; surface-specific decision index; every card's 30-second view; complete evidence and Rule Projection;
+Renderer order: warnings; surface-specific decision index; each card's decision summary with its exact Rule Projection; evidence;
 technical appendix; validation receipt; and only for Scheduled, one final Inbox wrapper. Invoke `python -B scripts/scout.py
 render-review --surface interactive|scheduled` from the Skill root with the validated Pack on stdin. Interactive uses `本次需要判断`,
 has zero wrapper, and contains no Scheduled/Inbox/14-run copy. Scheduled uses `今日需要判断` and exactly one wrapper. The receipt
@@ -201,6 +204,8 @@ total visible action count, atomic bundle action count, and wrapper count. `pyth
 lost or cross-card-moved actions, duplicate or
 non-final wrappers, raw JSON, trailing notes, and truncation. The verifier proves renderer/artifact bytes only; it does not prove the
 actual task final. Renderer failure may not be repaired by hand-written Markdown. `output_budget_exceeded` is a whole-run failure.
+Within a card, show the exact When/Do/Skip body once and reference that named field when another field repeats it exactly.
+Keep distinct qualifications, evidence and before/after facts; semantic similarity does not authorize compression.
 
 ## Interactive Delivery
 
@@ -231,11 +236,15 @@ terminal opened/success result. An exact `queued` host result returns the conten
 confirmation disabled; its controller result is `surface_pending`, never Production qualification. `pending`, missing, failed, or
 unobservable results use the path-free blocked receipt with confirmation disabled. A
 separate controller reads the actual task final and runs `python -B scripts/scout.py verify-final --artifact-root <host-output-root>`.
+The artifact states that its confirmation commands depend on the current task's delivery state and exact selection preview.
+Queued copy says in Chinese that opening is still queued and the file's confirmation commands are not executable yet.
+The compact final carries only `delivery_manifest_sha256`, `surface_observation` and `confirmation_eligible` beside the artifact
+link and user-facing state. The controller reconstructs the remaining manifest fields from the artifact and its verified footer.
 Both `surface_pending` and `surface_observed` prove that the final receipt, artifact path, manifest hash, file bytes, Review Pack/body
 hashes, cards and actions conserve; only `surface_observed` proves the user surface and qualifies the host. Until the five-scenario
 entry matrix passes, the
 interactive product state is `production_unproven / interactive_host_blocked`.
-The controller normalizes line endings and may remove exactly one host-added terminal blank line; every other trailing or semantic
+The controller normalizes line endings and accepts zero, one, or two terminal newlines; every other trailing or semantic
 edit fails closed.
 The controller also binds the canary's actual installed Skill identity before execution. Repository-local source presence is not
 runtime adoption. A task that resolves another Scout version or returns the legacy inline renderer envelope is ineligible rather

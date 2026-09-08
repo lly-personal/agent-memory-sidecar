@@ -11,6 +11,10 @@ their own component versions in `COMPATIBILITY.md`.
 - Core adds zero-write `rule preview-bundle` and the matching immutable-runtime operation, sharing the actual deployment planner.
 - Independent discovery reviewers freeze an original-source obligation inventory before seeing a draft, then compare omissions.
   This order supports evaluation; it does not itself prove semantic recall or user acceptance.
+- Corrective review separates compound source actions and their exceptions, and preserves source obligations when a new revision
+  consolidates candidates or narrows them against the actual Owner.
+- Cards display the exact rule near the decision summary and replace identical repeated text with named references. Compact delivery
+  receipts reconstruct integrity fields from the bound artifact; queued delivery clearly disables the file's confirmation commands.
 - Final receipt verification tolerates only the host's zero, one, or two terminal newlines while preserving all other content checks.
 - Candidate components: Core 0.3.13, Plugin 1.5.4, Bootstrap 2.2.2, Scout 5.9.0, Review Pack v6; Project v5 and Delivery v1 remain.
 

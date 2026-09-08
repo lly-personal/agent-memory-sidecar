@@ -1,4 +1,4 @@
-# Deep Review Protocol 5.8
+# Deep Review Protocol 5.9
 
 ## Evidence posture
 
@@ -108,8 +108,10 @@ different preconditions: if the intended result is already proved, is the
 prescribed action still necessary? Separate the accepted outcome from the
 project's chosen means, count or sequence. Narrow `When`, preserve a concrete
 `Skip`, or route the method to Project/Skill; do not turn one local procedure
-into a universal gate. Apply this check to the completed projection, not just
-the source excerpt, before freezing it.
+into a universal gate. Apply this check to each completed action: a logging
+exception cannot excuse a cleanup or committed-result obligation. A compound
+source with project-specific technology still needs a separate disposition for
+its portable behavior; do not inherit one route for every action in that clause.
 
 For a source-rich review spanning active Owners and accumulated decisions,
 reserve a fresh internal review context before freezing; do not wait for a user
@@ -176,7 +178,10 @@ official/first-party research only to support or challenge existing candidates. 
 privacy, and project read-only fingerprints. Prepare the draft Review Pack through `scripts/scout.py prepare-review` before validating
 or rendering it. This binds single and combined confirmation actions to the actual installed Core planner; absence or failure of that
 receipt cannot be replaced with manually calculated capacity. Preserve candidates and revise exact consolidation/replacement/routing
-when needed, then repeat planning before confirmation. Validate Project and Review Pack objects through `scripts/scout.py`. Every Python helper uses `python -B`; never use
+when needed, then repeat planning before confirmation. If that requires different Rule Projections or merged source observations,
+return to Phases 5–6 and create a new content-bound revision with every source obligation accounted for. Preserve the original
+facts, evidence and frozen artifacts; do not overwrite them or repeat an unchanged task census. Integration does not silently edit
+an existing frozen card. Validate Project and Review Pack objects through `scripts/scout.py`. Every Python helper uses `python -B`; never use
 a dynamic import or an inline import that can create `__pycache__`.
 
 If the resolver returns `unavailable`, remove confirmation and report the limitation. Never search upward, inspect the project-root

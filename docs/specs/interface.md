@@ -475,6 +475,8 @@ v5 保留主机身份与顶层字段，增加严格来源与发现关联；不�
 一条复合规范中各个独立行为义务、触发条件、用户代价与合法例外都必须在投影后保留；同主题观察不能代替完整语义覆盖。
 抽象后还须反查合法成功路径：若不同前置条件已满足同一目标，拟议动作是否仍然必要？不能把项目采用的某个手段、
 次数或顺序变成所有任务的硬门；缩窄 When、保留具体 Skip，或将手段分流为项目/Skill 方法，再冻结语义。
+复合条款不能整体继承“项目专属”路由；先分离项目实现和各项可迁移行为。例外须确实适用于对应动作；
+某项日志、清理或恢复例外不能自动解除相邻动作的责任。不同前提下仍必需的动作不填写装饰性例外。
 材料丰富、横跨当前规范与累积决策的复盘，冻结前由独立上下文先从原文建立义务清单，再复核草稿投影。复核者首先只接收
 原始来源及索引/缺口，冻结独立清单后才接收草稿；不接收 Global Owner 措辞或预期候选答案，避免已有草稿主导发现分母。
 使用已有内部子代理能力，不新建用户任务或长期实体。独立清单是本轮临时核查证据，不是第二规则 Owner。
@@ -583,7 +585,9 @@ validator、Owner resolver、renderer、visible verifier 与 delivery 实现。�
 Review Pack，使用 `scout.py render-review --surface interactive|scheduled` 并通过 stdin 输入完整对象；禁止动态
 import、直接猜选相邻 helper 或 renderer 失败后的模型手工重写。它按固定顺序生成 Markdown：中文结果状态、未执行规则变更的说明与覆盖/确认限制、
 交互 surface 的`本次需要判断 N 项`或 Scheduled surface 的`今日需要判断 N 项`中文索引、全部完整决策卡、E1 与 Session/模型覆盖技术附录、简短校验回执。每张卡先显示
-项目事件、用户成本、建议范围、具体 before/after、最大反例和全部可选动作构成的决策摘要，再显示完整核对依据。
+项目事件、用户成本、建议范围、一份准确 When/Do/Skip、具体 before/after 和全部可选动作，再显示核对依据。
+同卡完全相同的文本用具名引用代替重复正文，独有例外、证据、前后变化与未证明事项保持可查；不做近义压缩或删除候选。
+interactive 文件明确动作受当前任务交付状态约束；排队或失败时文件内确认命令暂不可执行。此限制不把文件准备冒充用户已看到。
 用户可直接复制对应动作，无需先读技术材料或理解选择标识；确认仍绑定原有精确内容与令牌，不新增模糊批准入口。
 协议状态、证据等级、Owner 关系及模型信息进入核对依据或技术附录；零候选只声明已核查范围没有合格增量。表格
 最多四列，before/after 使用两列表格；不得依赖 HTML 折叠、自定义 App UI 或图片。宿主文件预览只承载相同
@@ -621,8 +625,9 @@ opened 与 queued receipt 生成必须同时接收 artifact path 与原 host-out
 containment、普通只读文件、字节/hash 和 visible-output 守恒。随后 Agent 必须使用当前任务宿主的文件打开工具展示
 该 artifact；这是 Scout 最后一个工具调用。只有明确 terminal opened/success 才进入成功分支；明确 `queued` 返回
 同一 artifact 链接和 `surface_pending / confirmation_eligible=false` compact receipt，供用户发现与外部控制器验证，
-但不计 Production。`pending`、缺失、失败或不可观察结果进入阻断分支。工具成功后 final 只返回 artifact 链接和
-compact Delivery receipt；工具失败或缺少该表面时返回
+但不计 Production。`pending`、缺失、失败或不可观察结果进入阻断分支。final 只返回 artifact 链接、确定性中文状态和
+包含 manifest hash、surface observation、确认资格的 compact receipt；其余机器字段从绑定 artifact 重新计算。
+排队文案明确确认尚未就绪；工具失败或缺少该表面时返回
 `interactive_host_blocked`，不得显示部分卡片、确认命令或成功回执。`prepared` 与 open 成功仍只证明当前运行的
 交付准备/表面调用；production 资格必须由外部 controller 回读实际 task final 与 artifact 后验证。
 
@@ -661,9 +666,10 @@ output_budget_exceeded -> output_budget_exceeded / project_review / unchanged|un
 
 宿主 open 发生在 manifest 形成后，只能走 manifest-bound blocked/queued/opened receipt，不属于 Terminal reason。
 
-`edit` 与 `ignore` 始终可用。parity matched 且项目建议为 `global_agents` 的 `add/replace/consolidate` 卡才允许
-`confirm`；`project_owner/route_to_owner` 推荐 `keep_project`，`skill` 推荐 `make_skill`，`already_covered` 或
-`no_persistence` 推荐 `ignore`，上述卡均不提供直接确认。parity 漂移或不可用时移除所有 `confirm`。用户要改变
+`edit` 与 `ignore` 始终可用。parity matched、去向为 `global_agents`、实际 `global_relation` 为
+`add/replace/consolidate` 且对应 Core 预演通过时才允许 `confirm`；项目初始 classification 不决定 Global 差量。
+实际 Global 关系 `already_covered_exact` 或去向 `no_persistence` 推荐 `ignore`，`project_owner/route_to_owner` 推荐 `keep_project`，
+`skill` 推荐 `make_skill`，上述卡均不提供直接确认。parity 漂移或不可用时移除所有 `confirm`。用户要改变
 Owner 去向时必须先通过 `edit` 生成刷新卡。用户在同一 Scout 任务中可以精确选择一张或多张同 scope/target
 的可确认卡；renderer 把动作显示为 `确认 <card_id>@<selection_token>`，并明确可用 `、` 一次连接多个完整
 `card_id@selection_token` 对。任何确认都必须对选中集合执行一次最新 owner/parity 读取和联合关系重算。按需 `central_review` 可以

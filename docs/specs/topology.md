@@ -137,10 +137,10 @@ flowchart LR
 | Rule Projection | 删除项目路径、命令、局部阈值和业务标识，形成精确 owner-ready `When / Do / Skip` | 充当用户确认界面、保存项目故事 |
 | Integration preview | 在 Project Card 固定后读取最新 global owner，追加研究、语义关系、before/after；复用 Core 只读规则预演后确定单卡和组合动作资格 | 改写 Project Card、持久授权、按项目初始分类覆盖实际 Global 关系、提供未通过预演的确认命令 |
 | Deterministic Owner resolver | 从 Core Installation Registry 解析 canonical source，以活动 Codex home 的 global target 计算逻辑端点与 hash | 搜索项目根 Owner、猜测路径、输出物理路径或回退到项目 `AGENTS.md` |
-| Project Review Pack | 将全部 E2/E3 卡渲染为中文分层 Markdown：状态、决策索引、含范围与选择动作的决策摘要、完整依据与技术附录 | 翻译或补写项目语义、原始 JSON 用户界面、跨任务传输、行为 owner |
+| Project Review Pack | 将全部 E2/E3 卡渲染为中文分层 Markdown：状态、决策索引、准确规则与选择、核对依据；完全重复文本引用一次已显示原文 | 近义压缩、补写项目语义、原始 JSON 用户界面、跨任务传输、行为 owner |
 | Deterministic renderer | 从 scripts 目录读取已验证 Review Pack；interactive 输出零 wrapper，scheduled 输出唯一末尾 wrapper | 动态导入、失败后手工重写、修复项目语义 |
 | Visible-output verifier | 按 surface 重新验证 renderer/artifact 字节的正文 hash、卡片、动作、wrapper 数量和无尾注 | 声称已经观察实际用户 final、生成卡片、替代 renderer |
-| Delivery v1 | 绑定 artifact 名称、完整文件 hash/bytes、Review Pack/body hash、卡片与动作守恒 | 保存绝对路径、正文、任务 ID、授权或长期状态 |
+| Delivery v1 | 绑定 artifact 名称、完整文件 hash/bytes、Review Pack/body hash、卡片与动作守恒；final 只显示中文状态与最小绑定，其他字段从 artifact 重算 | 保存绝对路径、正文、任务 ID、授权或长期状态 |
 | Terminal v1 | 在没有 Delivery manifest 时绑定 phase、reason、项目状态与不可确认终态 | 生成部分卡片、替代 Review Pack、声称安装或用户表面成功 |
 | Task artifact | 在宿主为当前任务显式提供且位于项目外的 generated-output root 保存不可变完整 Review Pack；该 root 可位于宿主管理的 app storage | 项目文件、系统临时文件、任意猜测的 `$CODEX_HOME` 路径、Store、跨任务文件桥 |
 | Host surface / external controller | 在当前任务打开 artifact，并从另一个交互控制任务回读实际 final 与 artifact | 用内部 tool output、文件存在或模型自述冒充用户表面证明 |
