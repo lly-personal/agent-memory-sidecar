@@ -72,7 +72,7 @@ def preview_bundle(*, bundle: RuleBundle, target_file: Path,
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    for stream in (sys.stdout, sys.stderr):
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
         if callable(getattr(stream, "reconfigure", None)):
             stream.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="Preview an exact rule bundle without writing state.")
