@@ -70,7 +70,7 @@ class RulePreviewTests(unittest.TestCase):
         runtime.write_bytes(artifact.data)
         before = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
         expected = preview_bundle(bundle=bundle, target_file=self.target)
-        env = {**os.environ, "PYTHONPATH": str(ROOT / "src"), "PYTHONDONTWRITEBYTECODE": "1", "CODEX_HOME": str(self.root / "absent-home")}
+        env = {**os.environ, "PYTHONPATH": str(ROOT / "src"), "PYTHONDONTWRITEBYTECODE": "1", "PYTHONIOENCODING": "ascii", "CODEX_HOME": str(self.root / "absent-home")}
         commands = [
             [sys.executable, "-B", "-X", "utf8=0", "-m", "agent_memory_sidecar", "rule", "preview-bundle", "--from-json", "-"],
             [sys.executable, "-I", "-B", "-X", "utf8=0", str(runtime), "preview-bundle"],
@@ -78,7 +78,7 @@ class RulePreviewTests(unittest.TestCase):
         for command in commands:
             result = subprocess.run(command + ["--target-file", str(self.target)], input=json.dumps(bundle.to_dict(), ensure_ascii=False),
                 capture_output=True, text=True, encoding="utf-8", env=env, cwd=self.root)
-            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
             observed = json.loads(result.stdout)
             self.assertEqual(observed.get("data", observed), expected)
             selected = subprocess.run(command + ["--target-file", str(self.target), "--select-card", "card-00"],
