@@ -198,10 +198,19 @@ automatically deleted.
 
 ### AC-8 — Evidence boundary
 
-Automated tests prove only contracts, deterministic state and configured
-runtime. Core completion additionally requires real Desktop deploy/adopt/revoke,
-global two-project, primary-folder, compact and Memories-off scenarios. Ambient
-single-card/control remains experimental and cannot block stable Core.
+Automated tests prove contracts, deterministic state and configured runtime in
+isolated Owner, Store and event fixtures. Passing the checks relevant to a change
+completes its technical validation; it does not prove real user acceptance.
+Engineering approval does not authorize changes to the user's Global Owner.
+
+Real Desktop deploy/adopt/revoke, global two-project, primary-folder, compact and
+Memories-off scenarios establish only their observed acceptance scope. Observe
+them during user-initiated use or an explicitly requested acceptance run, within
+its authorized effects. Formal Owner updates require the user's confirmation of
+the exact change and scope. If the user defers real acceptance, stop at technical
+delivery; do not manufacture adoption evidence or require these scenarios for
+every change. Ambient single-card/control remains experimental and cannot block
+stable Core.
 
 ## Test mapping
 

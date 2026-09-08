@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.3.15 (2026-09-08)
+
+- Scout and the execution Skill now distinguish approval to develop the mechanism from approval to update the user's Global Owner.
+- Technical validation uses isolated Owner and Store fixtures, while real experience and adoption remain for later user-initiated
+  use or explicitly requested acceptance runs.
+- Core 0.3.15 ships with Scout 5.9.1 and Bootstrap 2.2.3; rule confirmation and atomic write protections are unchanged.
+
 ## 0.3.14 (2026-09-08)
 
 - The CLI and immutable Core preview read their JSON input as UTF-8. Chinese Scout rule bundles now preserve their exact content and

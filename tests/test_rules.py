@@ -872,6 +872,60 @@ class RuleServiceTests(unittest.TestCase):
                 "approval_content_mismatch",
             )
 
+    def test_global_bundle_engineering_approval_cannot_authorize_a_write(self) -> None:
+        source_root = self.root / "global-source"
+        source_file = source_root / "global" / "AGENTS.md"
+        source_file.parent.mkdir(parents=True)
+        before = b"# Isolated global owner\n"
+        source_file.write_bytes(before)
+        target = self.codex / "AGENTS.md"
+        target.write_bytes(before)
+        digest = hashlib.sha256(before).hexdigest()
+        with self._database() as db:
+            with db.transaction():
+                InstallationRegistry(db).bind_global(
+                    source_root=source_root,
+                    source_commit="a" * 40,
+                    source_file_sha256=digest,
+                    target_file_sha256=digest,
+                )
+            service = self._service(db)
+            bundle = _bundle(
+                service,
+                _proposal(
+                    action="An isolated review candidate.",
+                    scope="global",
+                    target="global_agents",
+                ),
+            )
+            preview = preview_bundle(bundle=bundle, target_file=target)
+            self.assertEqual(preview["combined"]["status"], "ready")
+            approval = self._prompt(db, "确认，按方案完成机制开发和隔离验证。")
+            with self.assertRaises(CoreError) as raised:
+                service.deploy_bundle(bundle=bundle, approval_ref=approval)
+            self.assertEqual(raised.exception.code, "approval_content_mismatch")
+            self.assertEqual(source_file.read_bytes(), before)
+            self.assertEqual(target.read_bytes(), before)
+            self.assertEqual(
+                db.conn.execute("SELECT COUNT(*) FROM approval_consumptions").fetchone()[0],
+                0,
+            )
+            # Exercise the real write path only inside this temporary fixture.
+            result = service.deploy_bundle(
+                bundle=bundle,
+                approval_ref=self._prompt(db, bundle.confirmation_text),
+            )
+            self.assertTrue(result.publication_required)
+            self.assertEqual(source_file.read_bytes(), target.read_bytes())
+            self.assertEqual(
+                hashlib.sha256(target.read_bytes()).hexdigest(),
+                preview["combined"]["target_after_sha256"],
+            )
+            self.assertEqual(
+                db.conn.execute("SELECT COUNT(*) FROM approval_consumptions").fetchone()[0],
+                1,
+            )
+
     def test_rule_bundle_target_before_is_fresh_and_unconsumed_on_drift(self) -> None:
         target = self.project / "AGENTS.md"
         target.write_bytes(b"# Project owner\n")
