@@ -7,7 +7,7 @@
 
 ## Purpose
 
-`global_owner_scout_delivery_v1` binds a validated `global_owner_scout_review_pack_v5` to one immutable Markdown artifact in the
+`global_owner_scout_delivery_v1` binds a validated `global_owner_scout_review_pack_v6` to one immutable Markdown artifact in the
 current task's host-generated output root. It closes the boundary between deterministic renderer bytes and the actual task surface.
 It is an output contract, not a Store record, proposal, approval, Inbox, cross-task bridge, or behavior owner.
 
@@ -75,7 +75,7 @@ verification. `status=surface_pending` proves an intact, discoverable artifact b
 `status=surface_observed` proves this task's delivery surface. Internal validation, `prepared`, file existence, queued host-open, or
 host-open invocation alone does not prove Production.
 
-The controller normalizes CRLF/CR to LF and may remove exactly one additional terminal blank line observed in the Desktop final
+The controller normalizes CRLF/CR to LF and accepts zero, one, or two terminal LF characters observed in the Desktop final
 envelope. It rejects three or more terminal newlines, spaces, tail notes, field changes, missing fields, or any other receipt rewrite.
 
 `interactive_project_scout` remains `production_unproven / interactive_host_blocked` until the five-scenario entry matrix passes:

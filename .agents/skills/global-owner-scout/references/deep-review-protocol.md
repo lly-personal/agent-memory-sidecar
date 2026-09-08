@@ -68,6 +68,14 @@ including its exception and linked acceptance or failure. Keep unread sections
 explicit; do not substitute an arbitrary prefix, recent entries or a keyword
 search for the current Owner's knowledge inventory.
 
+For an unqualified whole-project depth claim, read the complete active behavior
+axioms in bounded, non-truncated sections before selecting downstream examples.
+Give each normative clause an obligation/disposition or an exact coverage gap;
+headings alone do not cover compound clauses. The independent source pass uses
+the same full-axioms floor. Downstream implementation and history remain
+relevance-bounded. If that floor cannot be completed, retain useful candidates
+but report bounded discovery and keep the whole-project depth claim open.
+
 ## Phase 3: contrastive causal review
 
 For each high-signal event answer:
@@ -106,9 +114,11 @@ the source excerpt, before freezing it.
 For a source-rich review spanning active Owners and accumulated decisions,
 reserve a fresh internal review context before freezing; do not wait for a user
 to identify an omission. Use an internal
-subagent when available, not another user-facing task. Give it only original
-sources, the source index/read gaps, and draft observations/projections, never
-Global Owner wording or expected candidate answers. It must audit independent
+subagent when available, not another user-facing task. First give it only original
+sources and the source index/read gaps, never drafts, Global Owner wording or
+expected candidate answers. Freeze its own source-obligation inventory before
+providing draft observations/projections for comparison. This prevents the draft
+from defining the denominator of the independent check. It must audit independent
 source obligations and accepted/reversed paths, including partially represented
 ones, and challenge each projected obligation rather than attach one decorative
 counterexample to an entire compound card. Correct evidence-backed defects and
@@ -163,7 +173,10 @@ Run `python -B scripts/scout.py resolve-owner-parity`. With matched parity, read
 against the returned hash; the equal canonical hash proves identical canonical content without revealing its physical path. With
 drift or unavailable parity, mark Owner comparison incomplete and remove confirmation. Compare semantics when proved, and use
 official/first-party research only to support or challenge existing candidates. Add one integration preview per frozen card. Recheck count/order conservation,
-privacy, and project read-only fingerprints. Validate Project and Review Pack objects through `scripts/scout.py`. Every Python helper uses `python -B`; never use
+privacy, and project read-only fingerprints. Prepare the draft Review Pack through `scripts/scout.py prepare-review` before validating
+or rendering it. This binds single and combined confirmation actions to the actual installed Core planner; absence or failure of that
+receipt cannot be replaced with manually calculated capacity. Preserve candidates and revise exact consolidation/replacement/routing
+when needed, then repeat planning before confirmation. Validate Project and Review Pack objects through `scripts/scout.py`. Every Python helper uses `python -B`; never use
 a dynamic import or an inline import that can create `__pycache__`.
 
 If the resolver returns `unavailable`, remove confirmation and report the limitation. Never search upward, inspect the project-root

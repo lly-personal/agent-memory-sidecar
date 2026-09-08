@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate Global Owner Scout v5.8 project results and Review Packs."""
+"""Validate Global Owner Scout v5.9 project results and Review Packs."""
 
 from __future__ import annotations
 
@@ -15,9 +15,9 @@ from typing import Any, Callable, Iterable
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.8.0"
+SKILL_VERSION = "5.9.0"
 PROJECT_CONTRACT = "global_owner_scout_project_v5"
-REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v5"
+REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v6"
 DISPLAY_LOCALE = "zh-CN"
 PILOT_MODEL = "gpt-5.6-sol"
 PILOT_REASONING = "medium"
@@ -88,6 +88,7 @@ RAW_MARKERS = ("<codex_delegation>", "<response-annotations>", "BEGIN PRIVATE KE
 HAN_RE = re.compile(r"[\u3400-\u9fff]")
 LONG_SENTENCE_SPLIT_RE = re.compile(r"(?:[。！？!?]\s*|\.\s+|\n+)")
 LANGUAGE_EXEMPT_PATH_PARTS = (
+    ".selection_preview.",
     ".rule_payload.",
     ".before_after.before",
     ".before_after.after",
@@ -856,6 +857,10 @@ def validate_integration_preview(value: Any, path: str) -> None:
     supersedes = [require_string(item, f"{path}.supersedes[{index}]") for index, item in enumerate(require_list(obj["supersedes"], f"{path}.supersedes"))]
     require(supersedes == sorted(set(supersedes)), f"{path}.supersedes must be sorted and unique")
     require(all(re.fullmatch(r"rule_[0-9a-f]{12}", item) is not None for item in supersedes), f"{path}.supersedes contains an invalid rule ID")
+    relation = obj["global_relation"]
+    require(relation != "add" or not supersedes, f"{path} add cannot supersede rules")
+    require(relation != "replace" or len(supersedes) == 1, f"{path} replace requires one superseded rule")
+    require(relation != "consolidate" or len(supersedes) >= 2, f"{path} consolidate requires multiple superseded rules")
 
 
 def selection_token(
@@ -884,28 +889,98 @@ def selection_token(
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:32]
 
 
-def expected_action_policy(card: dict[str, Any], parity_status: str) -> tuple[str, list[str]]:
-    globally_confirmable = (
-        parity_status == "matched"
-        and card["owner_recommendation"] == "global_agents"
-        and card["classification"] in {"add", "replace", "consolidate"}
-    )
-    if globally_confirmable:
-        return "confirm", copy.deepcopy(ALL_ACTIONS)
-    if card["classification"] == "already_covered" or card["owner_recommendation"] == "no_persistence":
+def global_mutation_candidate(card: dict[str, Any], relation: str, parity_status: str) -> bool:
+    return (parity_status == "matched" and card["owner_recommendation"] == "global_agents"
+            and relation in {"add", "replace", "consolidate"})
+
+
+def review_bundle(pack: dict[str, Any]) -> dict[str, Any] | None:
+    items = []
+    for card, review in zip(pack["project_result"]["project_cards"], pack["review_cards"]):
+        preview = review["integration_preview"]
+        if not global_mutation_candidate(card, preview["global_relation"], pack["owner_parity"]["status"]):
+            continue
+        items.append({
+            "card_id": card["card_id"], "project_claim_hash": card["project_claim_hash"],
+            "proposal": card["rule_payload"], "supersedes": preview["supersedes"],
+            "selection_token": selection_token(card_id=card["card_id"], project_claim_hash=card["project_claim_hash"],
+                proposal=card["rule_payload"], supersedes=preview["supersedes"],
+                target_before_sha256=pack["owner_parity"]["canonical_source_hash"]),
+        })
+    return ({"contract_version": "rule_revision_bundle_v2",
+             "target_before_sha256": pack["owner_parity"]["canonical_source_hash"],
+             "items": sorted(items, key=lambda item: item["card_id"])} if items else None)
+
+
+def validate_selection_preview(pack: dict[str, Any], *, required: bool) -> dict[str, Any] | None:
+    preview = pack["selection_preview"]
+    bundle = review_bundle(pack)
+    if bundle is None:
+        require(preview is None, "selection preview must be null without proposed global mutations")
+        return None
+    if preview is None and not required:
+        return None
+    require(isinstance(preview, dict), "global candidates require a Core selection preview before rendering")
+    require_exact_keys(preview, {"core_artifact_sha256", "result", "error_code"}, "$.selection_preview")
+    digest = preview["core_artifact_sha256"]
+    require(digest is None or isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest), "Core artifact identity invalid")
+    result = preview["result"]
+    if result is None:
+        require_string(preview["error_code"], "selection preview error_code")
+        return None
+    require(digest is not None and preview["error_code"] is None, "Core receipt needs its actual artifact identity")
+    require_object(result, "selection preview result")
+    require_exact_keys(result, {"contract_version", "target_before_sha256", "bundle_sha256", "before_bytes", "budget_bytes", "items", "combined"}, "selection preview result")
+    require(result["contract_version"] == "rule_bundle_preview_v1", "Core preview contract invalid")
+    require(result["target_before_sha256"] == bundle["target_before_sha256"], "Core preview before hash mismatch")
+    require(result["bundle_sha256"] == canonical_hash(bundle), "Core preview bundle hash mismatch")
+    require(type(result["before_bytes"]) is int and result["before_bytes"] >= 0, "Core preview before bytes invalid")
+    require(type(result["budget_bytes"]) is int and result["budget_bytes"] > 0, "Core preview budget invalid")
+    expected_ids = [item["card_id"] for item in bundle["items"]]
+    items = require_list(result["items"], "Core preview items")
+    require(len(items) == len(expected_ids), "Core preview item count mismatch")
+    for item in items:
+        require_object(item, "Core preview item")
+    require([item.get("card_id") for item in items if isinstance(item, dict)] == expected_ids, "Core preview must conserve exact card IDs")
+    combined = require_object(result["combined"], "Core preview combined")
+    combined_ids = require_list(combined.get("card_ids"), "Core combined card IDs", nonempty=True)
+    require(all(isinstance(card_id, str) for card_id in combined_ids), "Core combined card ID invalid")
+    require(combined_ids == sorted(set(combined_ids)) and set(combined_ids).issubset(expected_ids), "Core combined selection mismatch")
+    for item in [*items, combined]:
+        keys = {"card_ids"} if item is combined else {"card_id"}
+        require_exact_keys(item, keys | {"status", "projected_bytes", "target_after_sha256", "error_code"}, "Core projection")
+        size = item["projected_bytes"]
+        require(size is None or type(size) is int and size >= 0, "Core projected bytes invalid")
+        if item["status"] == "ready":
+            require(size is not None and size <= result["budget_bytes"] and item["error_code"] is None, "ready Core projection exceeds budget or has an error")
+            require(isinstance(item["target_after_sha256"], str) and re.fullmatch(r"[0-9a-f]{64}", item["target_after_sha256"]), "ready Core projection needs exact after hash")
+        else:
+            require(item["status"] == "blocked" and item["target_after_sha256"] is None, "blocked Core projection invalid")
+            require_string(item["error_code"], "Core projection error")
+    return result
+
+
+def expected_action_policy(card: dict[str, Any], parity_status: str, relation: str | None = None,
+                           projection_ready: bool = True) -> tuple[str, list[str]]:
+    relation = relation or ("already_covered_exact" if card["classification"] == "already_covered" else card["classification"])
+    if global_mutation_candidate(card, relation, parity_status):
+        return ("confirm", copy.deepcopy(ALL_ACTIONS)) if projection_ready else ("edit", copy.deepcopy(READ_ONLY_ACTIONS))
+    if relation == "already_covered_exact" or card["owner_recommendation"] == "no_persistence":
         return "ignore", copy.deepcopy(READ_ONLY_ACTIONS)
+    if relation in {"globalization_challenged", "needs_project_clarification"}:
+        return "edit", copy.deepcopy(READ_ONLY_ACTIONS)
     if card["owner_recommendation"] == "skill":
         return "make_skill", copy.deepcopy(READ_ONLY_ACTIONS)
-    if card["classification"] == "route_to_owner" or card["owner_recommendation"] in {"project_owner"}:
+    if card["classification"] == "route_to_owner" or card["owner_recommendation"] == "project_owner":
         return "keep_project", copy.deepcopy(READ_ONLY_ACTIONS)
     return "edit", copy.deepcopy(READ_ONLY_ACTIONS)
 
 
-def validate_review_pack(value: Any) -> dict[str, Any]:
+def validate_review_pack(value: Any, *, require_preview: bool = True) -> dict[str, Any]:
     obj = require_object(value, "$")
     require_exact_keys(
         obj,
-        {"contract_version", "mode", "status", "display_locale", "skill_version", "project_result", "owner_parity", "review_cards", "limitations", "review_pack_hash"},
+        {"contract_version", "mode", "status", "display_locale", "skill_version", "project_result", "owner_parity", "review_cards", "selection_preview", "limitations", "review_pack_hash"},
         "$",
     )
     require(obj["contract_version"] == REVIEW_PACK_CONTRACT, "$.contract_version invalid")
@@ -918,6 +993,12 @@ def validate_review_pack(value: Any) -> dict[str, Any]:
     cards = require_list(obj["review_cards"], "$.review_cards")
     project_cards = project["project_cards"]
     require(len(cards) == len(project_cards), "$.review_cards must conserve every Project Card")
+    for index, raw in enumerate(cards):
+        validate_integration_preview(require_object(raw, "review card").get("integration_preview"), f"$.review_cards[{index}].integration_preview")
+    result = validate_selection_preview(obj, required=require_preview)
+    individual = {item["card_id"]: item for item in result["items"]} if result else {}
+    combined_ready = bool(result and result["combined"]["status"] == "ready")
+    combined_ids = set(result["combined"]["card_ids"]) if combined_ready else set()
     for index, raw in enumerate(cards):
         path = f"$.review_cards[{index}]"
         item = require_object(raw, path)
@@ -935,7 +1016,11 @@ def validate_review_pack(value: Any) -> dict[str, Any]:
             path,
         )
         require(item["project_claim_hash"] == project_cards[index]["project_claim_hash"], f"{path} Project Card order or identity changed")
-        recommended, expected_actions = expected_action_policy(project_cards[index], parity["status"])
+        card = project_cards[index]
+        relation = item["integration_preview"]["global_relation"]
+        ready = (individual.get(card["card_id"], {}).get("status") == "ready"
+                 if require_preview or obj["selection_preview"] is not None else True)
+        recommended, expected_actions = expected_action_policy(card, parity["status"], relation, ready)
         require(item["recommended_action"] == recommended, f"{path}.recommended_action violates owner routing")
         validate_zh_cn_text(item["recommended_action_reason"], f"{path}.recommended_action_reason", max_chars=240)
         validate_integration_preview(item["integration_preview"], f"{path}.integration_preview")
@@ -945,7 +1030,7 @@ def validate_review_pack(value: Any) -> dict[str, Any]:
             f"{path}.allowed_actions must exactly match owner and parity policy",
         )
         require(item["recommended_action"] in item["allowed_actions"], f"{path}.recommended_action must be allowed")
-        if "confirm" in expected_actions:
+        if "confirm" in expected_actions or card["card_id"] in combined_ids:
             token = require_string(item["selection_token"], f"{path}.selection_token")
             expected_token = selection_token(
                 card_id=project_cards[index]["card_id"],
@@ -1244,7 +1329,7 @@ def valid_review_pack(project: dict[str, Any] | None = None, *, parity_status: s
                 "recommended_action": recommended,
                 "recommended_action_reason": reasons[recommended],
                 "integration_preview": {
-                    "global_relation": "add",
+                    "global_relation": ("already_covered_exact" if card["classification"] == "already_covered" else card["classification"] if card["classification"] in {"add", "replace", "consolidate"} else "route_supported"),
                     "research": {
                         "status": "official_supported",
                         "sources": [{"title": "Official scheduled tasks guidance", "url": "https://learn.chatgpt.com/docs/automations.md", "support": "官方资料要求在启用定时任务前验证结果是否便于审阅。"}],
@@ -1282,9 +1367,19 @@ def valid_review_pack(project: dict[str, Any] | None = None, *, parity_status: s
         "project_result": project,
         "owner_parity": parity,
         "review_cards": review_cards,
+        "selection_preview": None,
         "limitations": copy.deepcopy(project["limitations"]),
         "review_pack_hash": "",
     }
+    bundle = review_bundle(pack)
+    if bundle:
+        projection = lambda: {"status": "ready", "projected_bytes": 250, "target_after_sha256": "d" * 64, "error_code": None}
+        pack["selection_preview"] = {"core_artifact_sha256": "c" * 64, "error_code": None, "result": {
+            "contract_version": "rule_bundle_preview_v1", "target_before_sha256": bundle["target_before_sha256"],
+            "bundle_sha256": canonical_hash(bundle), "before_bytes": 0, "budget_bytes": 8192,
+            "items": [{"card_id": item["card_id"], **projection()} for item in bundle["items"]],
+            "combined": {"card_ids": [item["card_id"] for item in bundle["items"]], **projection()},
+        }}
     pack["review_pack_hash"] = review_pack_hash(pack)
     return pack
 

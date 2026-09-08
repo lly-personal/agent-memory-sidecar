@@ -14,6 +14,7 @@ from .file_security import logical_absolute
 from .identity import resolve_identity
 from .proposal import RuleBundle, RuleProposal
 from .rule_service import RuleService
+from .rule_preview import preview_bundle
 from .runtime_selftest import run as run_runtime_self_test
 
 
@@ -135,6 +136,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("global_agents", "project_agents"),
     )
     _bind(rule_list, "rule.list", cmd_rule_list)
+    rule_preview = rule_commands.add_parser("preview-bundle", help="Preview exact rule selections without writing state.")
+    rule_preview.add_argument("--from-json", required=True)
+    rule_preview.add_argument("--target-file", type=Path, required=True)
+    rule_preview.add_argument("--select-card", action="append")
+    _bind(rule_preview, "rule.preview_bundle", cmd_rule_preview_bundle)
     rule_deploy = rule_commands.add_parser(
         "deploy", help="Deploy one approved rule."
     )
@@ -279,6 +285,15 @@ def cmd_rule_deploy_bundle(args: argparse.Namespace) -> _OperationResult:
         )
     return _OperationResult(
         data=result.to_dict(),
+        scope=bundle.scope,
+        target=bundle.instruction_target,
+    )
+
+
+def cmd_rule_preview_bundle(args: argparse.Namespace) -> _OperationResult:
+    bundle = _bundle(args.from_json)
+    return _OperationResult(
+        data=preview_bundle(bundle=bundle, target_file=args.target_file, selected_card_ids=args.select_card),
         scope=bundle.scope,
         target=bundle.instruction_target,
     )
@@ -437,7 +452,9 @@ def _bundle(value: str) -> RuleBundle:
 
 def _json_payload(value: str) -> dict[str, Any]:
     stripped = str(value).lstrip()
-    if stripped.startswith("{"):
+    if value == "-":
+        raw = sys.stdin.read()
+    elif stripped.startswith("{"):
         raw = value
     else:
         path = Path(value).expanduser()

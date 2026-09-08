@@ -111,7 +111,7 @@ def verify_visible_output(value: str, *, surface: str) -> dict[str, Any]:
         for card_id in bundle_ids:
             require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}@[0-9a-f]{32}", card_id) is not None, "bundle action contains an invalid card selection")
             require(
-                f"- `确认 {card_id}` — " in body,
+                f"- `确认 {card_id}` — " in body or f"- **组合确认标识**：`{card_id}`；" in body,
                 "bundle action references a card without a confirm action",
             )
     return {

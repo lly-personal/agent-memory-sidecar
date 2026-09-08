@@ -88,10 +88,15 @@ def confirmable_card_selections(
     pack: dict[str, Any],
     cards_by_hash: dict[str, dict[str, Any]],
 ) -> list[str]:
+    preview = pack["selection_preview"]
+    result = preview["result"] if preview else None
+    if not result or result["combined"]["status"] != "ready":
+        return []
+    selected_ids = set(result["combined"]["card_ids"])
     return [
         f"{cards_by_hash[review['project_claim_hash']]['card_id']}@{review['selection_token']}"
         for review in pack["review_cards"]
-        if "confirm" in review["allowed_actions"]
+        if cards_by_hash[review["project_claim_hash"]]["card_id"] in selected_ids
     ]
 
 
@@ -109,6 +114,7 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
     research = preview["research"]
     before_after = preview["before_after"]
     recommended = review["recommended_action"]
+    combination_only = bool(review["selection_token"] and "confirm" not in review["allowed_actions"])
     recommended_command = action_command(recommended, card["card_id"], review["selection_token"])
     lines = [
         f"## 决策卡 {ordinal}：{human['decision_title']}",
@@ -116,7 +122,7 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
         f"**建议范围**：{SCOPE_LABELS[card['owner_recommendation']]}。",
         "",
         "> [!IMPORTANT]",
-        f"> **推荐动作：`{recommended_command}`**  ",
+        "> **确认范围：仅上方完整组合**  " if combination_only else f"> **推荐动作：`{recommended_command}`**  ",
         f"> {review['recommended_action_reason']}",
         "",
         "### 决策摘要",
@@ -143,8 +149,10 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
         "",
     ]
     for action in review["allowed_actions"]:
-        suffix = "（推荐）" if action == recommended else ""
+        suffix = "（推荐）" if action == recommended and not combination_only else ""
         lines.append(f"- `{action_command(action, card['card_id'], review['selection_token'])}` — {ACTION_LABELS[action]}{suffix}")
+    if review["selection_token"] and "confirm" not in review["allowed_actions"]:
+        lines.append(f"- **组合确认标识**：`{card['card_id']}@{review['selection_token']}`；仅上方完整组合通过预演，此项不能单独确认。")
     lines.extend([
         "",
         "### 完整核对依据",
@@ -297,9 +305,10 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         for index, review in enumerate(pack["review_cards"], start=1):
             card = cards_by_hash[review["project_claim_hash"]]
             support = card["project_support"]
+            recommendation = "仅组合可确认" if review["selection_token"] and "confirm" not in review["allowed_actions"] else ACTION_LABELS[review["recommended_action"]]
             lines.append(
                 f"| {index} | {table_cell(card['human_context']['decision_title'])} | "
-                f"{ACTION_LABELS[review['recommended_action']]} | {card['evidence_level']} · {support['count']} 个项目 |"
+                f"{recommendation} | {card['evidence_level']} · {support['count']} 个项目 |"
             )
         confirmable = confirmable_card_selections(pack, cards_by_hash)
         if len(confirmable) > 1:
@@ -310,9 +319,18 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
                     "",
                     "选中的建议会基于最新生效规则一起核查并提交：全部成功，或整包零写入。若建议关系发生实质变化，会先刷新预览，等待你重新判断。",
                     "",
-                    f"- **一次确认命令**：`确认 {'、'.join(confirmable)}` — 确认全部当前可确认建议。只确认部分时，可使用对应卡片的完整确认行。",
+                    f"- **一次确认命令**：`确认 {'、'.join(confirmable)}` — 确认这组已通过预演的准确建议。单项可使用卡片上提供的确认行；其他组合需先预演。",
                 ]
             )
+        preview = pack["selection_preview"]
+        if preview and not confirmable:
+            result = preview["result"]
+            if result and result["combined"]["error_code"] == "instruction_capacity_exceeded":
+                combined = result["combined"]
+                message = f"所选组合合并后需要 {combined['projected_bytes']} 字节，超过当前 {result['budget_bytes']} 字节预算。"
+            else:
+                message = "当前组合尚未通过规则预演。"
+            lines.extend(["", "**组合需先整理**：" + message + "候选和原始依据完整保留；先明确合并、替换或归属方案，再对准确选择预演。本次没有规则生效。"])
         for index, review in enumerate(pack["review_cards"], start=1):
             lines.extend(["", *render_card(cards_by_hash[review["project_claim_hash"]], review, index)])
 
@@ -462,7 +480,7 @@ def run_self_test() -> None:
     assert "bundle_action_count=1" in twenty_four
     tests += 1
 
-    print(json.dumps({"status": "ok", "tests": tests, "renderer": "global_owner_scout_review_pack_v5"}, separators=(",", ":")))
+    print(json.dumps({"status": "ok", "tests": tests, "renderer": "global_owner_scout_review_pack_v6"}, separators=(",", ":")))
 
 
 def load_stdin_json() -> Any:

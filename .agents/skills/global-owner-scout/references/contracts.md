@@ -1,9 +1,9 @@
-# Global Owner Scout 5.8 contracts
+# Global Owner Scout 5.9 contracts
 
 ## Common rules
 
-- Skill `5.8.0`; Project result `global_owner_scout_project_v5`; Review Pack
-  `global_owner_scout_review_pack_v5`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
+- Skill `5.9.0`; Project result `global_owner_scout_project_v5`; Review Pack
+  `global_owner_scout_review_pack_v6`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
 - `project_claim_hash` covers every Project Card field except itself. `review_pack_hash` covers the pack except itself.
@@ -144,11 +144,11 @@ not. `rule_payload` is exactly `trigger, action, skip_boundary, scope, why, evid
 
 ## Review Pack
 
-`global_owner_scout_review_pack_v5` exact top-level fields:
+`global_owner_scout_review_pack_v6` exact top-level fields (Project result remains v5):
 
 ```text
 contract_version, mode, status, display_locale, skill_version, project_result,
-owner_parity, review_cards, limitations, review_pack_hash
+owner_parity, review_cards, selection_preview, limitations, review_pack_hash
 ```
 
 Owner parity fields are `status, canonical_source_ref, canonical_source_hash, local_target_ref, local_target_hash, snapshot_id`.
@@ -167,6 +167,26 @@ integration_preview, expected_behavior_change, allowed_actions
 ```
 
 Integration fields are `global_relation, research, owner_comparison, before_after, globalization_risk, repeat_status, supersedes`.
+Actual integration relation owns the recommendation: exact existing coverage is ignore, a challenged or unclear global projection
+is edit, and a supported project/Skill route keeps that scope. The frozen project's initial classification cannot override it.
+`add` has no superseded rules, `replace` exactly one, and `consolidate` at least two. Compare overlapping candidate obligations
+before preview, preserving their distinct triggers and exceptions; a shared topic alone is not a reason to merge.
+
+Run `python -B scripts/scout.py prepare-review` with the draft Review Pack on stdin. This reads the active installed Core artifact
+identity from the existing registry without writes, verifies the artifact bytes, and calls its read-only `preview-bundle` entry.
+With no selection flags, preview the full proposed set. To preview a deliberate subset, repeat
+`--select-card <card-id>` for its exact members; retain all Project/Review Cards and all single-item projections. The Core receipt's
+`bundle_sha256` binds the full proposed catalog, while `combined.card_ids` binds the exact selected subset and its after hash.
+It preserves Project Cards and semantic integration, populating only action qualification, tokens and `selection_preview` before
+hashing the final pack. Drafts may set `selection_preview=null`; they cannot be rendered as confirmable final packs.
+The selection preview is null when no global mutation is proposed; otherwise it has exactly
+`core_artifact_sha256, result, error_code`. `result` is the exact `rule_bundle_preview_v1` receipt or null with an error.
+Every individual confirmation requires its ready item. A combined confirmation requires the ready combined projection;
+individual success never manufactures a combined success. A card used only in a valid combination exposes its bound combination
+identity without offering an invalid standalone confirmation. Unavailable Core or stale Owner never qualifies confirmation.
+All supported cards remain visible when combination/capacity is blocked; explain that the set needs revision and retain edit,
+project/Skill routing and ignore. Other user-selected combinations are previewed before final approval, without rerunning project
+discovery or silently truncating candidates. Deployment still validates the exact current approval and replans under locks.
 For a confirmable card, `selection_token` is the 32-hex operation identity derived from card ID, project claim, proposal,
 sorted `supersedes`, instruction target, and the current canonical source hash. It is `null` otherwise. `edit` and
 `ignore` are always available. `confirm` exists only for matched-parity, `global_agents`, `add/replace/consolidate` cards. Project

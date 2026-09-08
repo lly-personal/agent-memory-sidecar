@@ -3,6 +3,17 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.3.13 (Unreleased)
+
+- Scout preserves source candidates while deriving confirmation from the actual Global Owner comparison and installed Core planner.
+  Single selections and the complete proposed set receive separate byte-exact previews; an infeasible aggregate no longer offers
+  confirmation. Valid combinations that require consolidation remain available without claiming each member works independently.
+- Core adds zero-write `rule preview-bundle` and the matching immutable-runtime operation, sharing the actual deployment planner.
+- Independent discovery reviewers freeze an original-source obligation inventory before seeing a draft, then compare omissions.
+  This order supports evaluation; it does not itself prove semantic recall or user acceptance.
+- Final receipt verification tolerates only the host's zero, one, or two terminal newlines while preserving all other content checks.
+- Candidate components: Core 0.3.13, Plugin 1.5.4, Bootstrap 2.2.2, Scout 5.9.0, Review Pack v6; Project v5 and Delivery v1 remain.
+
 ## 0.3.12 (2026-09-07)
 
 ### Fixed

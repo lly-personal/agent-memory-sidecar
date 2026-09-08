@@ -91,7 +91,7 @@ flowchart LR
     GO["Canonical source 与本机 global target"] --> OR
     OR --> IP["Integration preview"]
     RPJ --> IP
-    HC --> RP["Validated review_pack_v5"]
+    HC --> RP["Validated review_pack_v6"]
     IP --> RP
     RP --> DR["Deterministic renderer：interactive surface + 精确多选动作"]
     DR --> VO["Visible-output verifier：交付前字节守恒"]
@@ -135,7 +135,7 @@ flowchart LR
 | Project Card | 以 `project_claim_hash` 同时固定中文 Human Context、项目事实、因果、证据、抽象、Rule Projection 与本地 owner 判断 | global owner 写入、中央结论 |
 | Human Context | 使用简体中文和脱敏项目业务语境解释真实事件、成本、建议、行为变化与最大风险 | 抽象规则写入、翻译后补、私有细节泄漏 |
 | Rule Projection | 删除项目路径、命令、局部阈值和业务标识，形成精确 owner-ready `When / Do / Skip` | 充当用户确认界面、保存项目故事 |
-| Integration preview | 在 Project Card 固定后读取最新 global owner，追加研究、语义关系、before/after 和动作资格 | 改写 Project Card、持久授权 |
+| Integration preview | 在 Project Card 固定后读取最新 global owner，追加研究、语义关系、before/after；复用 Core 只读规则预演后确定单卡和组合动作资格 | 改写 Project Card、持久授权、按项目初始分类覆盖实际 Global 关系、提供未通过预演的确认命令 |
 | Deterministic Owner resolver | 从 Core Installation Registry 解析 canonical source，以活动 Codex home 的 global target 计算逻辑端点与 hash | 搜索项目根 Owner、猜测路径、输出物理路径或回退到项目 `AGENTS.md` |
 | Project Review Pack | 将全部 E2/E3 卡渲染为中文分层 Markdown：状态、决策索引、含范围与选择动作的决策摘要、完整依据与技术附录 | 翻译或补写项目语义、原始 JSON 用户界面、跨任务传输、行为 owner |
 | Deterministic renderer | 从 scripts 目录读取已验证 Review Pack；interactive 输出零 wrapper，scheduled 输出唯一末尾 wrapper | 动态导入、失败后手工重写、修复项目语义 |
@@ -160,7 +160,7 @@ Review Pack 结构通过校验后仍未完成链路；renderer 与 visible-outpu
 继续创建并回读同任务 artifact、通过宿主工具打开，然后由外部 controller 读取实际 final/artifact 才完成呈现。
 宿主 open 是 Scout 的最后一个工具调用；之后只允许 compact Delivery receipt，不得再调用独立 memory 审计或追加尾注。
 
-Bootstrap 2.2.1 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 2.2.2 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得

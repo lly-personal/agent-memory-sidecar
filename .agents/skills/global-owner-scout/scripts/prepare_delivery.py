@@ -436,6 +436,8 @@ def render_blocked_receipt(manifest: dict[str, Any]) -> str:
 
 def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
     text = value.replace("\r\n", "\n").replace("\r", "\n")
+    if not text.endswith("\n"):
+        text += "\n"
     if text.endswith("\n\n") and not text.endswith("\n\n\n"):
         text = text[:-1]
     match = FINAL_OPENED_RECEIPT_RE.fullmatch(text)
@@ -527,6 +529,7 @@ def run_self_test() -> None:
             assert pending["confirmation_eligible"] is False
             host_enveloped = verify_final_receipt(queued_receipt + "\n", artifact_root=artifact_dir)
             assert host_enveloped == pending
+            assert verify_final_receipt(queued_receipt.removesuffix("\n"), artifact_root=artifact_dir) == pending
             assert "confirmation_eligible=false" in render_blocked_receipt(manifest)
             tests += 1
 
