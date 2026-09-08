@@ -3,7 +3,7 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
-## 0.3.13 (Unreleased)
+## 0.3.13 (2026-09-08)
 
 - Scout preserves source candidates while deriving confirmation from the actual Global Owner comparison and installed Core planner.
   Single selections and the complete proposed set receive separate byte-exact previews; an infeasible aggregate no longer offers
@@ -18,7 +18,7 @@ their own component versions in `COMPATIBILITY.md`.
 - Cards display the exact rule near the decision summary and replace identical repeated text with named references. Compact delivery
   receipts reconstruct integrity fields from the bound artifact; queued delivery clearly disables the file's confirmation commands.
 - Final receipt verification tolerates only the host's zero, one, or two terminal newlines while preserving all other content checks.
-- Candidate components: Core 0.3.13, Plugin 1.5.4, Bootstrap 2.2.2, Scout 5.9.0, Review Pack v6; Project v5 and Delivery v1 remain.
+- Components: Core 0.3.13, Plugin 1.5.4, Bootstrap 2.2.2, Scout 5.9.0, Review Pack v6; Project v5 and Delivery v1 remain.
 
 ## 0.3.12 (2026-09-07)
 
