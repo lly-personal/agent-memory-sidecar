@@ -37,6 +37,11 @@ the decisions are [ADR 0057](docs/decisions/0057-agent-memory-core-v1.zh.md),
   owner. Public Core mode does not search for or invent an Owner.
 - Optional background: native Memories may be disabled without changing
   mandatory rule behavior.
+- Optional engineering methods: the Plugin includes
+  [Engineering Contract Review](plugins/agent-memory-sidecar/skills/engineering-contract-review/SKILL.md)
+  for relevant design, verification and recovery tasks. This repository owns its
+  source; it follows the Plugin version and update path, with no Core or Global
+  Owner mutation. See the [method handoff SOP](docs/specs/interface.md#按需方法的维护与交接).
 
 A proposal has exactly seven fields:
 

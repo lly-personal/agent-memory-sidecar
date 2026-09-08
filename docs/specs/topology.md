@@ -113,7 +113,7 @@ flowchart LR
 | 组件 | 唯一职责 | 不负责 |
 | --- | --- | --- |
 | Repo Bootstrap Anchor | 识别统一部署意图，验证 Release 并从安全展开的 portable 在同任务调用正式 Bootstrap | 复制 Bootstrap/Scout、保存主机状态、项目枚举、Owner |
-| Agent Memory Plugin | 私有 repo marketplace 或公开 portable release 分发冷启动 Anchor | 完整实现、行为 Owner、Host Profile、自动项目启用 |
+| Agent Memory Plugin | 通过现有 marketplace/portable 分发冷启动 Anchor 与可选 Engineering Contract Review 方法；Plugin 版本和内容身份拥有方法的更新来源 | Core 实现、行为 Owner、Host Profile、自动项目启用 |
 | Public Release Resolver | 解析 latest stable 或指定版本，验证 immutable Release、tag/commit、asset digest、checksums、manifest 与 portable，并把普通文件安全展开到新目录 | 回退 `main`、跟随 archive alias、把 Marketplace 当 source authority、后台自动升级 |
 | Managed capability sources | 在 `$CODEX_HOME` 保存 Sidecar 与 canonical Owner 的 clean、可重建安装快照 | 活跃项目工作区、任务历史、候选或第二 Owner |
 | Workstation Bootstrap Skill | 同步受管源并物化 Core/global binding/Bootstrap/Scout/Doctor；只有用户明确要求 Scheduled 实验时才生成 Enrollment Pack 和调和 Host Profile | 把内容同步冒充主机激活、清理活跃工程、自动选择新项目、修改 Owner |
@@ -160,7 +160,7 @@ Review Pack 结构通过校验后仍未完成链路；renderer 与 visible-outpu
 继续创建并回读同任务 artifact、通过宿主工具打开，然后由外部 controller 读取实际 final/artifact 才完成呈现。
 宿主 open 是 Scout 的最后一个工具调用；之后只允许 compact Delivery receipt，不得再调用独立 memory 审计或追加尾注。
 
-Bootstrap 2.2.3 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 2.2.4 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得

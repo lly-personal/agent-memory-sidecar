@@ -208,6 +208,12 @@ class CliAndPackageTests(unittest.TestCase):
                 self.assertEqual(target["remaining_bytes"], 8192)
 
     def test_rule_deploy_bundle_cli_applies_one_atomic_operation(self) -> None:
+        self._assert_cli_bundle_confirmation(markdown_escaped=False)
+
+    def test_rule_deploy_bundle_cli_accepts_markdown_escaped_selection(self) -> None:
+        self._assert_cli_bundle_confirmation(markdown_escaped=True)
+
+    def _assert_cli_bundle_confirmation(self, *, markdown_escaped: bool) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             store = root / "memory.sqlite"
@@ -272,7 +278,8 @@ class CliAndPackageTests(unittest.TestCase):
                 event = RuntimeLedger(db).capture_prompt(
                     identity=identity,
                     source_session="session",
-                    prompt=parsed_bundle.confirmation_text,
+                    prompt=(parsed_bundle.confirmation_text.replace("@", "\\@")
+                            if markdown_escaped else parsed_bundle.confirmation_text),
                     metadata={},
                 )
             output = io.StringIO()
@@ -697,6 +704,8 @@ class CliAndPackageTests(unittest.TestCase):
         self.assertIn("agent-memory rule deploy-bundle", skill)
         self.assertIn("agent-memory rule list --target", skill)
         self.assertIn("The bundle succeeds completely or changes no Owner bytes", skill)
+        self.assertIn("every `@` escaped once as Markdown `\\@`", skill)
+        self.assertIn("Preserve the original user event", skill)
         self.assertIn("agent-memory proposal confirm", skill)
         self.assertIn("already_covered", skill)
         self.assertIn("consolidate", skill)

@@ -1,21 +1,21 @@
 {
   "name": "agent-memory-sidecar",
-  "version": "1.5.4",
-  "description": "Cold-start anchor for portable Agent Memory workstation capability.",
+  "version": "1.6.0",
+  "description": "Portable Agent Memory bootstrap and optional engineering contract review methods.",
   "author": {
     "name": "IIyaqoo",
     "url": "https://github.com/IIyaqoo"
   },
   "repository": "https://github.com/lly-personal/agent-memory-sidecar",
   "skills": "./skills/",
-  "keywords": ["agent-memory", "codex", "owner", "bootstrap"],
+  "keywords": ["agent-memory", "codex", "owner", "bootstrap", "engineering"],
   "interface": {
     "displayName": "Agent Memory",
-    "shortDescription": "从远端恢复本机 Agent Memory 能力",
-    "longDescription": "从不可变 Sidecar 发行物冷启动本机 Agent Memory，并可选绑定用户自有的私有 Global Owner。",
+    "shortDescription": "部署 Agent Memory，按需使用工程契约方法",
+    "longDescription": "从不可变发行物部署本机 Agent Memory，并提供按需使用的 Engineering Contract Review；Global Owner 绑定与规则更新遵循各自授权。",
     "developerName": "IIyaqoo",
     "category": "Productivity",
-    "capabilities": ["Workstation bootstrap", "Interactive project review"],
+    "capabilities": ["Workstation bootstrap", "Interactive project review", "Engineering contract review"],
     "defaultPrompt": [
       "同步并部署本机 Agent Memory"
     ],

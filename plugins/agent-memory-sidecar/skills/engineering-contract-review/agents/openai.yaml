@@ -1,0 +1,4 @@
+interface:
+  display_name: "Engineering Contract Review"
+  short_description: "Agent Memory 配套方法：按需检查设计、验证与恢复边界"
+  default_prompt: "使用 $engineering-contract-review，按当前工程事实检查相关契约，给出必要改动、合法例外和准确验证范围。"

@@ -22,8 +22,8 @@ from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
 
 
-BOOTSTRAP_VERSION = "2.2.3"
-SCOUT_VERSION = "5.9.1"
+BOOTSTRAP_VERSION = "2.2.4"
+SCOUT_VERSION = "5.9.2"
 PACK_VERSION = "agent_memory_workstation_deployment_pack_v3"
 DESKTOP_PROJECT_INVENTORY_VERSION = "agent_memory_desktop_project_inventory_v1"
 WORKSTATION_RECONCILE_PLAN_VERSION = "agent_memory_workstation_reconcile_plan_v2"
@@ -2625,7 +2625,7 @@ def render_pack(value: Any) -> str:
     pack = validate_pack(value)
     status = {
         "ready": "本机托管能力、新任务入口与 Desktop 项目消费者范围已对齐",
-        "reload_required": "能力已对齐到磁盘，需一次 Desktop 刷新后在新任务验收",
+        "reload_required": "本机安装与读回已完成；下次使用前刷新 Desktop，真实采用尚未验证",
         "consumer_scope_drift": "托管能力已对齐，但 Desktop 可见项目存在不同版本或内容的同名 Skill",
         "consumer_scope_bounded": "托管能力已对齐，但 Desktop 项目消费者范围尚未完整观察",
         "distribution_reconcile_blocked": "Plugin 或 Marketplace 尚未精确对齐",
@@ -2666,10 +2666,10 @@ def render_pack(value: Any) -> str:
         lines.extend(["", "## 尚未证明", ""])
         lines.extend(f"> {item}" for item in pack["limitations"])
     next_step = {
-        "reload_required": "下一步：刷新一次 Codex Desktop，并在新任务中再次发送“同步并部署本机 Agent Memory”完成采用验收。",
+        "reload_required": "本次安装交付到此完成。下次使用前刷新一次 Codex Desktop；只有你主动要求检查消费者时才进行只读验收，无需现在新建任务或重复部署。",
         "ready": "下一步：可在目标工程的新任务中发送 `$global-owner-scout 复盘当前项目`。",
         "consumer_scope_drift": "下一步：先判断上表项目级同名 Skill 是待发布开发版本还是陈旧副本；更新或移除该项目来源后重新验收。调和器不会自动修改 checkout。",
-        "consumer_scope_bounded": "下一步：恢复完整 Desktop 项目枚举与只读访问后，在新任务重新执行同一句部署入口。",
+        "consumer_scope_bounded": "下一步：恢复完整 Desktop 项目枚举与只读访问后，继续你已请求的只读消费者检查；无需重复部署。",
         "distribution_reconcile_blocked": "下一步：处理上表显示的 Plugin/Marketplace 唯一阻断后，再发送“同步并部署本机 Agent Memory”。",
         "source_sync_blocked": "下一步：恢复期望来源的只读访问或消除来源歧义后，再发送“同步并部署本机 Agent Memory”。",
         "host_materialization_blocked": "下一步：保留当前失败现场并重试同一句部署入口；不得手工跳过 Core、Doctor 或 Skill 步骤。",

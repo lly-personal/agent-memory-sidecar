@@ -106,18 +106,19 @@ class AuthorizationLedger:
     def validate_prompt_content(
         self, *, approval: Approval, expected_prompt: str
     ) -> None:
-        expected_sha256 = hashlib.sha256(
-            expected_prompt.encode("utf-8")
-        ).hexdigest()
-        if (
-            approval.event.prompt_sha256 != expected_sha256
-            or approval.event.prompt_bytes
-            != len(expected_prompt.encode("utf-8"))
-        ):
-            raise CoreError(
-                "approval_content_mismatch",
-                "current approval prompt does not exactly confirm the selected rule bundle",
-            )
+        # Markdown may escape every separator while preserving the exact selection.
+        # Derive both complete forms; never normalize or retain the user's prompt.
+        for text in (expected_prompt, expected_prompt.replace("@", "\\@")):
+            encoded = text.encode("utf-8")
+            if (
+                approval.event.prompt_sha256 == hashlib.sha256(encoded).hexdigest()
+                and approval.event.prompt_bytes == len(encoded)
+            ):
+                return
+        raise CoreError(
+            "approval_content_mismatch",
+            "current approval prompt does not exactly confirm the selected rule bundle",
+        )
 
     def transaction_committed(self, transaction_id: str) -> bool:
         row = self.db.conn.execute(

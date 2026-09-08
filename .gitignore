@@ -4,6 +4,7 @@
 
 tmp/
 scratch/
+/.sandbox/
 .agent-memory/
 .agent-memory-sync/
 .codex-worktrees/

@@ -66,7 +66,12 @@ An explicit Review Pack selection binds `rule_revision_bundle_v2`: one or more
 unique cards for the same scope/target, each card/project claim, seven-field
 proposal, selected superseded set and deterministic selection token, plus the
 complete pre-mutation and post-mutation document SHA-256. The current prompt
-must exactly equal the canonical confirmation text for the selected set. The
+must match the complete canonical confirmation text for the selected set, or
+that exact text with every `@` separator escaped once as Markdown `\@`. Compare
+the stored raw prompt hash and byte count against these two derived forms; do
+not retain prompt text, strip extra prose, interpret broad agreement, or accept
+mixed/double escaping. Both forms bind the same bundle and consume the original
+event once. The
 bundle is an unordered set: every permutation produces the same after bytes,
 revision hash, receipts or error. It consumes one approval as one operation.
 Any invalid, prompt-mismatched, no-op, stale, overlapping, over-capacity or

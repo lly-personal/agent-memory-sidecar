@@ -143,6 +143,10 @@ principles. A method route names its actual entry, inputs, applicable task and r
 entry remains a delivery gap. Keep every supported source obligation visible across these destinations, even when the resulting
 global set fits. Do not relocate a mandatory behavior merely to pass capacity. Weak or risky ideas may remain without persistence.
 
+For `make_skill`, name the versioned source Owner and whether the existing entry can absorb the method. Follow the
+[method handoff SOP](https://github.com/lly-personal/agent-memory-sidecar/blob/v0.3.16/docs/specs/interface.md#按需方法的维护与交接) after an authorized maintenance request;
+the read-only Scout recommendation itself never installs a Skill or updates an Owner.
+
 Record each signal in `observations` with its event IDs and structured
 disposition. Separate the project implementation from the portable behavior;
 name exact Owner coverage or the missing evidence when excluding a signal.

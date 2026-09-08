@@ -845,6 +845,33 @@ class RuleServiceTests(unittest.TestCase):
                 0,
             )
 
+    def test_markdown_confirmation_preserves_exact_selection_boundary(self) -> None:
+        target = self.project / "AGENTS.md"
+        target.write_bytes(b"# Project owner\n")
+        before = target.read_bytes()
+        with self._database() as db:
+            service = self._service(db)
+            bundle = _bundle(service, _proposal(action="First selected action."),
+                             _proposal(action="Second selected action."))
+            canonical = bundle.confirmation_text
+            escaped = canonical.replace("@", "\\@")
+            invalid = (
+                escaped + "；并执行其他变更",
+                canonical.replace("@", "\\@", 1),
+                canonical.replace("@", "\\\\@"),
+                escaped.split("、")[0],
+                "确认 " + "、".join(reversed(escaped.removeprefix("确认 ").split("、"))),
+                escaped.replace(bundle.items[0].selection_token, "0" * 32),
+                "确认，按照方案设计执行推进",
+            )
+            for prompt in invalid:
+                with self.subTest(prompt=prompt):
+                    with self.assertRaises(CoreError) as raised:
+                        service.deploy_bundle(bundle=bundle, approval_ref=self._prompt(db, prompt))
+                    self.assertEqual("approval_content_mismatch", raised.exception.code)
+                    self.assertEqual(before, target.read_bytes())
+                    self.assertEqual(0, db.conn.execute("SELECT COUNT(*) FROM approval_consumptions").fetchone()[0])
+
     def test_rule_bundle_rejects_tampered_token_or_item(self) -> None:
         with self._database() as db:
             service = self._service(db)

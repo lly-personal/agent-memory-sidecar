@@ -128,7 +128,8 @@ integration preview，并把完整中文审阅包直接呈现给用户；用户�
 8. **人工精确选择、所见即所签**：复盘输出始终是草案。用户可以一次选择同一 Review Pack、scope 和 target 的
    一张或多张可确认卡；每张卡以 `card_id@selection_token` 绑定项目 claim、proposal、superseded 集合、target 与
    Fresh before。Agent 必须读取一次最新 owner、联合重算关系与聚合 before/after，并执行零或一次原子规则包修订；
-   Core 必须证明当前回复逐字等于选中集合的 canonical 确认文本。单卡是大小为一的规则包；不得循环复用 approval、
+   Core 必须证明当前回复完整绑定选中集合，只允许 canonical 确认文本或接口规范限定的 Markdown 分隔符转义表示。
+   单卡是大小为一的规则包；不得循环复用 approval、
    沿用旧快照、按输入顺序解释集合或留下部分成功。
 9. **资源策略随入口分层**：交互入口不要求用户填写资源配置，也不为自动隔离 executor 注入 model/thinking override；
    使用该 executor 的宿主解析值，并验证可观测实际值与该任务请求值一致。暂停的 Scheduled 14 次实验仍固定

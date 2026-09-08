@@ -3,6 +3,18 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.3.16 (2026-09-08)
+
+- The Plugin now owns the optional Engineering Contract Review Skill source, references and update path. Its methods are loaded
+  only for relevant tasks; maintenance follows the existing Skill handoff and Plugin distribution workflow.
+- Method consolidation removes assumptions about a pre-existing Global rule set and makes ordinary task execution independent
+  of other installed review Skills. This is not a claim of cross-project benefit or natural model adoption.
+- Exact Review Pack selections accept literal `@` or uniformly Markdown-escaped `\@` separators. Extra prose, mismatched selections,
+  mixed/double escaping and changed content remain rejected; authorization is still scoped, current and consumed once.
+- Installation delivery ends after verified materialization. Anchor, Bootstrap, SOP and the rendered receipt leave consumer
+  verification to a later user-initiated request instead of requiring another task or repeated deployment.
+- Components: Core 0.3.16, Plugin 1.6.0, Bootstrap 2.2.4 and Scout 5.9.2; existing wire contracts remain unchanged.
+
 ## 0.3.15 (2026-09-08)
 
 - Scout and the execution Skill now distinguish approval to develop the mechanism from approval to update the user's Global Owner.
