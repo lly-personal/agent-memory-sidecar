@@ -325,7 +325,7 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         preview = pack["selection_preview"]
         if preview and not confirmable:
             result = preview["result"]
-            if result and result["combined"]["error_code"] == "instruction_capacity_exceeded":
+            if result and result["combined"]["error_code"] == "instruction_capacity_exceeded" and result["combined"]["projected_bytes"] is not None:
                 combined = result["combined"]
                 message = f"所选组合合并后需要 {combined['projected_bytes']} 字节，超过当前 {result['budget_bytes']} 字节预算。"
             else:
