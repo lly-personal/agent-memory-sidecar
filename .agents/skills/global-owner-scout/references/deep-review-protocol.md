@@ -136,8 +136,12 @@ Create two projections from the same evidence:
 - Rule Projection: remove project names, paths, commands, product labels, local thresholds, identifiers, raw dialogue, and private
   diagnostics; retain precise `When / Do / Skip` behavior.
 
-Route project architecture to Project Owner, repeatable methods to Skill, cross-project behavior to global candidates, and weak or
-risky ideas to no persistence.
+Route project architecture to Project Owner, repeatable methods to Skill, and only necessary cross-task behavior increments to
+global candidates. Cross-project usefulness alone does not make a whole procedure an always-on instruction. Separate the short
+decision obligation from its execution method and compare the obligation with the complete current Owner, including unmanaged
+principles. A method route names its actual entry, inputs, applicable task and retained action/exception; an absent or unverified
+entry remains a delivery gap. Keep every supported source obligation visible across these destinations, even when the resulting
+global set fits. Do not relocate a mandatory behavior merely to pass capacity. Weak or risky ideas may remain without persistence.
 
 Record each signal in `observations` with its event IDs and structured
 disposition. Separate the project implementation from the portable behavior;

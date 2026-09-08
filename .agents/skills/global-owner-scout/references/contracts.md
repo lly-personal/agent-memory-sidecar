@@ -130,6 +130,10 @@ owner_rationale, anti_examples, privacy_check, unproven, rule_payload
 one. E2 normally has one project; E3 requires at least two independently evidenced project refs. It never implies a fixed total.
 Classifications are `already_covered`, `add`, `replace`, `consolidate`, `route_to_owner`; owner recommendations are
 `project_owner`, `skill`, `global_agents`, `no_persistence`.
+Cross-project reuse is not sufficient for `global_agents`: compare the necessary cross-task decision with the complete current
+Owner and keep task-specific procedures in their actual method entry. Method routing preserves the source action and exception,
+names the applicable task and inputs, and distinguishes a tested entry from a draft or missing capability. Capacity never proves
+semantic coverage or authorizes relocating a mandatory behavior.
 
 `human_context` exact fields:
 

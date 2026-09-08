@@ -533,6 +533,9 @@ Scheduled Scout 或沿用跨路径 Host Enrollment。
 9. `normalized_evidence_hash` 与覆盖 `human_context` 及上述全部项目语义字段的 `project_claim_hash`。
 
 Project Card 是目标工程线程的语义结论。Human Context 与 Rule Projection 都必须在 global owner 比较前形成。
+跨项目可复用不等于整套步骤必须常驻：独立判断必要的跨任务决策义务，再与当前完整 Global Owner 的已有规则和
+非 managed 原则比较；具体执行方法保留适用任务、输入、逐动作例外和实际入口。尚未提供或验证的入口明确为方法
+交付缺口，不以“已路由”冒充能力闭合，也不为通过容量而移走必须执行的独立行为。
 后续 integration preview、Markdown renderer 和按需中央审阅必须验证并保留 `project_claim_hash`，不得翻译、补写
 或修改 Human Context、证据等级、痛点、反证、抽象、owner 建议或七字段。证据引用只保留可在
 对应项目中重建的逻辑定位，不得输出私有绝对路径、原始对话、token、密钥、完整命令或内部诊断正文。

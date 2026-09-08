@@ -13,6 +13,8 @@ their own component versions in `COMPATIBILITY.md`.
   This order supports evaluation; it does not itself prove semantic recall or user acceptance.
 - Corrective review separates compound source actions and their exceptions, and preserves source obligations when a new revision
   consolidates candidates or narrows them against the actual Owner.
+  Reusable procedures receive an explicit method entry and applicability check; cross-project reuse alone does not qualify them
+  as always-on rules, and an unverified method route remains an open delivery gap.
 - Cards display the exact rule near the decision summary and replace identical repeated text with named references. Compact delivery
   receipts reconstruct integrity fields from the bound artifact; queued delivery clearly disables the file's confirmation commands.
 - Final receipt verification tolerates only the host's zero, one, or two terminal newlines while preserving all other content checks.
