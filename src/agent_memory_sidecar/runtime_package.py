@@ -95,6 +95,9 @@ def build_runtime_artifact(
                 "if sys.argv[1:2] == ['preview-bundle']:\n"
                 "    from agent_memory_sidecar.rule_preview import main\n"
                 "    raise SystemExit(main(sys.argv[2:]))\n"
+                "if sys.argv[1:2] == ['preview']:\n"
+                "    from agent_memory_sidecar.rule_preview import main\n"
+                "    raise SystemExit(main(sys.argv[2:], single=True))\n"
                 "raise SystemExit(0)\n"
             ).encode("utf-8"),
         )

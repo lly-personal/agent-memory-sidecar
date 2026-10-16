@@ -351,6 +351,19 @@ Classify the candidate once:
 
 If the relation is uncertain, show a clarification draft only. Never create a token for `no_candidate`, `already_covered`, or `route_to_owner`, and never delete or consolidate rules without explicit authorization. Because invoking the Skill makes the mechanism user-visible, every classification must use its matching terminal outcome; do not silently exit after `rule list`.
 
+## Capacity preflight and formal Owner delivery
+
+Owner placement follows the content's authority, not spare bytes. An independent must-apply behavior belongs in `AGENTS.md`; project facts, specifications and detailed procedures belong in their existing formal Owner or Skill. Capacity alone never justifies moving mandatory behavior to optional memory or appending it outside the managed block.
+
+1. Resolve the actual target from `rule list` and the current binding. For global changes, verify canonical/local parity and preview the effective host `AGENTS.md` target so override checks use the same context as deployment. The canonical source checkout is the publication Owner, not the host override context; an arbitrary `--target-file` is not proof of binding or authorization.
+2. Before creating or confirming a proposal or performing an explicit deploy, run `agent-memory rule preview --target-file <observed-owner> --from-json '<same-json>' [--supersedes <rule-id>]...`. For a selected bundle, use `agent-memory rule preview-bundle --target-file <observed-owner> --from-json '<same-bundle-json>'` with the exact selection. Both entries are read-only: no Store, token, approval consumption or file mutation.
+3. Read both `capacity.rules` and `capacity.managed_block`; a blocked result is not deployable. Rule bytes use normalized UTF-8 LF; block bytes use the target's physical LF/CRLF, including markers, headings and separators. The 1,024/8,192-byte budgets are revisitable engineering limits, not host document limits or proven optimal values.
+4. For consolidation or routing, map every old obligation, trigger and exception to its exact retained rule or Owner section. Preserve independently applicable requirements and all exceptions; shorter wording and a passing byte count do not prove semantic equivalence. Do not split rules, drop boundaries or force an unrelated Owner just to fit. If the necessary set still exceeds budget, report it undeployed and propose an explicit budget/design review.
+5. `route_to_owner` is only a placement decision. Complete authorized ordinary project edits in the formal Owner and read back its exact path/section. For mandatory behavior, also deploy or verify an applicable, unshadowed `AGENTS.md` trigger that requires reading that Owner before acting. A link without a mandatory trigger is insufficient. Reuse existing authorization within its scope; ask only if the new content, superseded set, Owner scope or operation materially exceeds it. Owner routing does not create a second memory-governance service.
+6. After authorized deployment, read back the actual instruction target and routed Owner, checking the obligation map, untouched rules and outside bytes. Report routing proposed, Owner content landed, mandatory entry deployed, and later adoption separately. For facts or specifications without mandatory behavior, Owner read-back completes content delivery without claiming a deployed rule. Preview is not deployment, publication, model adoption or continuity; the mutating command replans under its existing authorization and lock checks.
+
+Never substitute optional Memories, a local note, a summary, or a saved draft for formal deployment, including after a capacity failure. If the Owner body landed but its mandatory entry failed, retain that evidence and report the entry as undeployed; do not claim unchanged content or completed behavior delivery. Do not change live Owners or installations during mechanism engineering validation.
+
 ## Proposal
 
 Build exactly these seven fields: `trigger`, `action`, `skip_boundary`, `scope`, `why`, `evidence`, `instruction_target`.
@@ -384,7 +397,7 @@ When the user confirms one or more cards from the current Global Owner Scout Rev
 
 1. Accept only the exact `card_id@selection_token` pairs from the same Review Pack, scope, and instruction target. The current user reply must be the canonical `确认 <card_id>@<token>[、...]` command or that complete command with every `@` escaped once as Markdown `\\@`. Preserve the original user event; do not rewrite the prompt or mix confirmation with edit, routing, or ignore actions.
 2. Reread that target with `agent-memory rule list --target <instruction-target>`, verify canonical/local parity when global, and jointly recompute every selected card against the same Owner snapshot and against the other selected cards.
-3. If any relation, rule text, superseded set, or Owner target changes materially, execute no mutation. Show one refreshed aggregate before/after and ask once for confirmation of that changed bundle.
+3. Run the exact bundle preflight above. If blocked, execute no mutation and report its precise failure. If any relation, rule text, superseded set, or Owner target changes materially, execute no mutation. Show one refreshed aggregate before/after and ask once for confirmation of that changed bundle.
 4. Otherwise execute exactly one standalone command: `agent-memory rule deploy-bundle --approval-ref user_prompt:<event-id> --from-json '<rule_revision_bundle_v2-json>'`. Include each card/project claim, proposal, sorted supersedes and selection token plus the complete target before hash; Core recomputes all bindings.
 5. Never loop over `rule deploy`, derive child approvals, or leave a partially deployed selected set. The bundle succeeds completely or changes no Owner bytes.
 6. After success, unselected Project Cards keep their immutable project evidence; only their integration previews are stale. Rebase them when later selected. Do not rerun project discovery unless project evidence itself changed.
@@ -398,7 +411,7 @@ When the user confirms one or more cards from the current Global Owner Scout Rev
 - View: `agent-memory rule list`
 - Revoke: `agent-memory rule revoke <rule-id> --approval-ref user_prompt:<event-id>`
 
-An unambiguous explicit remember utterance is the one authorization; do not ask twice. Echo the final `When / Do / Skip / scope`, deploy directly, and use the deployed terminal outcome only after the actual target is parsed and unshadowed. A proposal confirmation follows the same success outcome. For global results, complete the ordinary private-Git commit/push workflow when `publication_required=true`; local effect and cross-device publication are separate evidence.
+An unambiguous explicit remember utterance is the one authorization; do not ask twice. Echo the final `When / Do / Skip / scope`, preflight and deploy within that authorization, and use the deployed terminal outcome only after the actual target is parsed and unshadowed. A proposal confirmation follows the same success outcome. For global results, complete the ordinary private-Git commit/push workflow when `publication_required=true`; local effect and cross-device publication are separate evidence.
 
 On failure, preserve the completed task result and state only `未保存`, `未部署`, or `未证明` as supported. Exception: `instruction_cleanup_required` with `operation_committed=true` means the mutation and approval consumption completed. Read actual targets with `rule list`, report their actual state plus pending transaction cleanup, and never retry the consumed approval or claim unchanged/undeployed. A current task may retain already-loaded instructions after revoke; verify a new task before claiming continuity.
 
@@ -408,7 +421,9 @@ The terminal artifact is the last user-facing Agent Memory block in the final re
 
 - Explicit audit with no candidate: `记忆检查：已完成｜结论：没有合格的可复用规则｜动作：未创建建议｜长期状态：未变更`
 - Covered by actual authority: `记忆检查：已完成｜结论：当前规则已经覆盖｜动作：未创建建议｜长期状态：未变更`
-- Routed to a formal owner: `记忆检查：已完成｜结论：内容应归入{正式 owner}｜动作：未创建长期规则｜长期状态：未变更`
+- Routing proposed but not implemented: `记忆检查：已完成｜结论：内容应归入{正式 owner}｜动作：未创建长期规则｜长期状态：未变更`
+- Owner content landed, mandatory entry still missing or failed: `记忆检查：交付未完成｜结论：正文已落地但必需入口未部署｜动作：已写入{正式 owner}｜长期状态：行为未部署`
+- Owner content landed with no mandatory behavior required: `记忆检查：已完成｜结论：正式正文已落地｜动作：已写入{正式 owner}｜长期状态：未新增行为规则`
 - Proposal created: use the confirmation card above, including its `待确认` receipt as the last line.
 - Explicit deploy or proposal confirmation succeeded: after the rule echo, `记忆检查：已完成｜结论：规则已部署｜动作：已写入{范围}规则｜长期状态：生效中`
 - Atomic Scout bundle succeeded: after echoing every selected `When / Do / Skip / scope`, `记忆检查：已完成｜结论：已原子部署{数量}条规则｜动作：选中规则已整包写入{范围}｜长期状态：生效中`
@@ -418,5 +433,5 @@ The terminal artifact is the last user-facing Agent Memory block in the final re
 - Committed mutation with incomplete cleanup: `记忆检查：清理待完成｜结论：规则操作已提交｜动作：待事务清理｜长期状态：{实际 target 读回状态，无法读回则未证明}`. This takes precedence over the generic failure receipt.
 - Adoption is not yet observed: `记忆检查：已完成｜结论：规则已部署但后续采用尚未观察｜动作：未证明行为采用｜长期状态：生效中`
 
-For discard, edit, consolidate, and revoke, use the same four-part shape with the operation actually completed and the actual parsed target state. A no-op receipt proves only that the Agent surfaced a classification; it does not prove persistence, adoption, continuity, or product effect.
+For routed mandatory behavior, use the deployed or adoption-unobserved outcome only after both Owner content and the mandatory entry are verified. For discard, edit, consolidate, and revoke, use the same four-part shape with the operation actually completed and the actual parsed target state. A no-op receipt proves only that the Agent surfaced a classification; it does not prove persistence, adoption, continuity, or product effect.
 """

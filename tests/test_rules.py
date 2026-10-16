@@ -32,8 +32,9 @@ from agent_memory_sidecar.proposal import (
     review_selection_token,
 )
 from agent_memory_sidecar.rule_service import RuleService
-from agent_memory_sidecar.rule_preview import preview_bundle
+from agent_memory_sidecar.rule_preview import preview_bundle, preview_rule
 from agent_memory_sidecar.runtime_ledger import RuntimeLedger
+from agent_memory_sidecar.skill import build_skill_files
 
 
 class RuleServiceTests(unittest.TestCase):
@@ -109,6 +110,80 @@ class RuleServiceTests(unittest.TestCase):
             capacities["global_agents"]["managed_block_bytes"],
             0,
         )
+
+    def test_owner_routing_consolidation_preserves_obligations_and_matches_preflight(self) -> None:
+        obligations = [
+            RuleProposal.from_payload({**_proposal().to_dict(),
+                "trigger": "When presenting module configuration comparisons.",
+                "action": "Preserve complete module and data names; distinguish current, suggested and pending values.",
+                "skip_boundary": "Skip comparisons without a proposed change; do not abbreviate identifiers."}),
+            RuleProposal.from_payload({**_proposal().to_dict(),
+                "trigger": "When reviewing Owner decisions.",
+                "action": "Explain real differences and keep unknown decisions explicitly pending.",
+                "skip_boundary": "Do not infer approval from a default; skip tasks without an Owner decision."}),
+        ]
+        old = [ConfirmedRule.from_proposal(item) for item in obligations]
+        untouched = ConfirmedRule.from_proposal(_proposal(action="Preserve unrelated approved behavior."))
+        target = self.project / "AGENTS.md"
+        outside = b"# Independent user guidance\r\n\r\n"
+        target.write_bytes(outside + managed_block_bytes((old[0], untouched, old[1]), newline="\r\n"))
+        owner = self.project / "docs/specs/interface.md"
+        owner.parent.mkdir(parents=True)
+        # Ordinary authorized project work retains each exact obligation, trigger and exception.
+        owner_body = ("# Interface\n\n## Module review\n\n" +
+                      "\n\n".join(render_rule(rule, newline="\n") for rule in old) + "\n").encode()
+        owner.write_bytes(owner_body)
+        routing = RuleProposal.from_payload({**_proposal().to_dict(),
+            "trigger": "When presenting module configuration comparisons or reviewing Owner decisions.",
+            "action": "Read and apply docs/specs/interface.md#module-review before presenting the review.",
+            "skip_boundary": "Apply each obligation only under its recorded trigger and exception; skip other work."})
+        supersedes = [rule.rule_id for rule in old]
+        with self._database() as db:
+            service = self._service(db)
+            before = service.repository.read_target(target="project_agents", identity=self.identity)
+            receipt = preview_rule(proposal=routing, target_file=target, supersedes=supersedes)
+            self.assertEqual(receipt["status"], "ready")
+            self.assertEqual(receipt["supersedes"], sorted(supersedes))
+            self.assertEqual(target.read_bytes(), before.data)
+            self.assertEqual(db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0], 0)
+            result = service.deploy(proposal=routing, supersedes=supersedes,
+                                    approval_ref=self._prompt(db, "Consolidate the exact routed obligations."))
+            self.assertEqual(result.action, "consolidated")
+            self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), receipt["target_after_sha256"])
+            self.assertEqual(result.plans[0].to_dict()["after_sha256"], "sha256:" + receipt["target_after_sha256"])
+            after = service.repository.read_target(target="project_agents", identity=self.identity)
+            route = ConfirmedRule.from_proposal(routing)
+            self.assertEqual(after.rules, (route, untouched))
+            self.assertEqual(after.outside, before.outside)
+            self.assertIn(render_rule(untouched, newline="\r\n").encode(), target.read_bytes())
+            self.assertEqual(owner.read_bytes(), owner_body)
+            for rule in old:
+                self.assertIn(render_rule(rule, newline="\n").encode(), owner.read_bytes())
+            service.revoke(rule_id=route.rule_id, approval_ref=self._prompt(db, "Revoke the routing entry."))
+            revoked = service.repository.read_target(target="project_agents", identity=self.identity)
+            self.assertEqual(revoked.rules, (untouched,))
+            self.assertEqual(revoked.outside, before.outside)
+            self.assertEqual(owner.read_bytes(), owner_body)
+
+    def test_both_capacity_failures_match_preview_without_consuming_approval(self) -> None:
+        rules = tuple(ConfirmedRule.from_proposal(_proposal(action=f"{index} " + "x" * 850)) for index in range(7))
+        target = self.project / "AGENTS.md"
+        before = managed_block_bytes(rules, newline="\r\n")
+        target.write_bytes(before)
+        proposed = _proposal(action="保留全部条件与例外😀" * 100)
+        preview = preview_rule(proposal=proposed, target_file=target)
+        self.assertEqual(preview["status"], "blocked")
+        with self._database() as db:
+            service = self._service(db)
+            approval = self._prompt(db, "Remember the exact agreed behavior.")
+            with self.assertRaises(CoreError) as caught:
+                service.deploy(proposal=proposed, approval_ref=approval)
+            self.assertEqual(caught.exception.code, "instruction_capacity_exceeded")
+            self.assertEqual(caught.exception.details["capacity"], preview["capacity"])
+            self.assertTrue(preview["capacity"]["managed_block"]["exceeded"])
+            self.assertTrue(any(item["exceeded"] for item in preview["capacity"]["rules"]))
+            self.assertEqual(db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0], 0)
+            self.assertEqual(target.read_bytes(), before)
 
     def test_target_scoped_list_is_not_blocked_by_unrelated_invalid_target(self) -> None:
         (self.codex / "AGENTS.md").write_bytes(b"# Global owner\n")
@@ -615,6 +690,44 @@ class RuleServiceTests(unittest.TestCase):
                 )
             self.assertEqual(expired.exception.code, "proposal_invalid")
             self.assertFalse((self.project / "AGENTS.md").exists())
+
+    def test_global_preflight_uses_host_override_context_after_parity(self) -> None:
+        source_root = self.root / "global-source"
+        source_file = source_root / "global/AGENTS.md"
+        source_file.parent.mkdir(parents=True)
+        source_file.write_bytes(b"# Global\n")
+        (source_file.parent / "AGENTS.override.md").write_bytes(b"# Source checkout only\n")
+        target = self.codex / "AGENTS.md"
+        target.write_bytes(source_file.read_bytes())
+        digest = hashlib.sha256(source_file.read_bytes()).hexdigest()
+        proposed = _proposal(scope="global", target="global_agents")
+        with self._database() as db:
+            with db.transaction():
+                InstallationRegistry(db).bind_global(source_root=source_root, source_commit="a" * 40,
+                    source_file_sha256=digest, target_file_sha256=digest)
+            service = self._service(db)
+            observed = service.repository.read_target(target="global_agents", identity=self.identity)
+            self.assertFalse(observed.shadowed)
+            preview = preview_rule(proposal=proposed, target_file=observed.path)
+            self.assertEqual(preview["status"], "ready")
+            self.assertEqual(target.read_bytes(), source_file.read_bytes())
+            approval = self._prompt(db, "Remember this exact global behavior.")
+            (self.codex / "AGENTS.override.md").write_bytes(b"# Effective host override\n")
+            blocked = preview_rule(proposal=proposed, target_file=observed.path)
+            self.assertEqual(blocked["error_code"], "instruction_target_shadowed")
+            with self.assertRaises(CoreError) as raised:
+                service.deploy(proposal=proposed, approval_ref=approval)
+            self.assertEqual(raised.exception.code, blocked["error_code"])
+            self.assertEqual(db.conn.execute("SELECT count(*) FROM approval_consumptions").fetchone()[0], 0)
+            (self.codex / "AGENTS.override.md").unlink()
+            result = service.deploy(proposal=proposed, approval_ref=approval)
+            self.assertEqual(result.action, "deployed")
+            self.assertEqual(target.read_bytes(), source_file.read_bytes())
+            self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), preview["target_after_sha256"])
+        # The generated consumer instructions must select the same host context proved above.
+        skill = build_skill_files()["SKILL.md"]
+        self.assertIn("preview the effective host `AGENTS.md` target", skill)
+        self.assertNotIn("preview the canonical Owner", skill)
 
     def test_global_deploy_updates_source_and_target_or_restores_both(self) -> None:
         source_root = self.root / "global-source"

@@ -14,7 +14,7 @@ from .file_security import logical_absolute
 from .identity import resolve_identity
 from .proposal import RuleBundle, RuleProposal
 from .rule_service import RuleService
-from .rule_preview import preview_bundle
+from .rule_preview import preview_bundle, preview_rule
 from .runtime_selftest import run as run_runtime_self_test
 
 
@@ -136,6 +136,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("global_agents", "project_agents"),
     )
     _bind(rule_list, "rule.list", cmd_rule_list)
+    rule_single_preview = rule_commands.add_parser("preview", help="Preview one rule and the complete managed block without writing state.")
+    rule_single_preview.add_argument("--from-json", required=True)
+    rule_single_preview.add_argument("--target-file", type=Path, required=True)
+    rule_single_preview.add_argument("--supersedes", action="append")
+    _bind(rule_single_preview, "rule.preview", cmd_rule_preview)
     rule_preview = rule_commands.add_parser("preview-bundle", help="Preview exact rule selections without writing state.")
     rule_preview.add_argument("--from-json", required=True)
     rule_preview.add_argument("--target-file", type=Path, required=True)
@@ -287,6 +292,15 @@ def cmd_rule_deploy_bundle(args: argparse.Namespace) -> _OperationResult:
         data=result.to_dict(),
         scope=bundle.scope,
         target=bundle.instruction_target,
+    )
+
+
+def cmd_rule_preview(args: argparse.Namespace) -> _OperationResult:
+    proposal = _proposal(args.from_json)
+    return _OperationResult(
+        data=preview_rule(proposal=proposal, target_file=args.target_file, supersedes=args.supersedes),
+        scope=proposal.scope,
+        target=proposal.instruction_target,
     )
 
 

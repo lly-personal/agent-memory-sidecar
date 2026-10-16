@@ -702,6 +702,10 @@ class CliAndPackageTests(unittest.TestCase):
         skill = build_skill_files()["SKILL.md"]
         self.assertIn("agent-memory rule deploy", skill)
         self.assertIn("agent-memory rule deploy-bundle", skill)
+        self.assertIn("agent-memory rule preview --target-file", skill)
+        self.assertIn("agent-memory rule preview-bundle --target-file", skill)
+        self.assertIn("capacity.rules", skill)
+        self.assertIn("capacity.managed_block", skill)
         self.assertIn("agent-memory rule list --target", skill)
         self.assertIn("The bundle succeeds completely or changes no Owner bytes", skill)
         self.assertIn("every `@` escaped once as Markdown `\\@`", skill)
@@ -751,6 +755,10 @@ class CliAndPackageTests(unittest.TestCase):
             skill.index("**记忆建议**"),
         )
         self.assertIn("do not ask twice", skill)
+        self.assertIn("Never substitute optional Memories", skill)
+        self.assertIn("map every old obligation, trigger and exception", skill)
+        self.assertIn("正文已落地但必需入口未部署", skill)
+        self.assertIn("A link without a mandatory trigger is insufficient", skill)
         self.assertNotIn(
             "For explicit remember, say it is already covered; otherwise remain silent",
             skill,

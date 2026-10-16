@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.4.0 | 0.4.0 | 1.6.0 | 2.2.5 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.3.16 | 0.3.16 | 1.6.0 | 2.2.4 | 5.9.2 | v6 | 3.11–3.13 |
 | v0.3.15 | 0.3.15 | 1.5.4 | 2.2.3 | 5.9.1 | v6 | 3.11–3.13 |
 | v0.3.14 | 0.3.14 | 1.5.4 | 2.2.2 | 5.9.0 | v6 | 3.11–3.13 |
@@ -33,6 +34,10 @@ Bootstrap 2.2.3 installs the matching Scout.
 Core 0.3.16 also accepts the exact full selection with uniformly Markdown-escaped `@` separators; rule/bundle wire formats and
 scope, freshness, capacity and atomicity checks are unchanged. Plugin 1.6.0 owns the optional Engineering Contract Review methods.
 Bootstrap 2.2.4 ends installation delivery before optional user-initiated consumer verification; Scout 5.9.2 documents method handoff.
+Core 0.4.0 adds scalar `rule_preview_v1` and emits `rule_bundle_preview_v2` with per-rule and full-block capacity measurements.
+Scout 5.10.0 accepts both preview v1 and v2 and distinguishes their reported failure layers; older Scouts cannot consume v2.
+Bootstrap 2.2.5 installs the matching components together. Rule revision bundles remain v2, Review Pack remains v6, and existing
+approval, scope, atomicity, 1 KiB rule and 8 KiB block budgets remain unchanged. Plugin 1.6.0 content is unchanged.
 Missing or older runtime support preserves cards and removes unavailable confirmation actions. A compatibility row alone does not
 prove publication, host deployment, independent discovery recall, or user acceptance.
 Scout 5.6 keeps Review Pack v4 and adds the separate `global_owner_scout_delivery_v1` task-surface contract.

@@ -81,18 +81,30 @@ failed item leaves every target byte unchanged and does not consume approval.
 
 Before presenting confirmation, `rule preview-bundle --target-file <observed-owner> --from-json -` consumes the exact
 `rule_revision_bundle_v2` through stdin and runs the same bundle planner as deployment without Store, approval, locks, journals or
-file writes. The target bytes must match the bundle's before hash. `rule_bundle_preview_v1` contains
+file writes. The target bytes must match the bundle's before hash. `rule_bundle_preview_v2` contains
 `target_before_sha256, bundle_sha256, before_bytes, budget_bytes, items, combined`; each item has
-`card_id, status, projected_bytes, target_after_sha256, error_code`, and combined has the corresponding sorted `card_ids`.
+`card_id, status, projected_bytes, target_after_sha256, error_code, capacity`, and combined has the corresponding sorted `card_ids`.
 Ready results bind the exact after bytes; blocked results retain the planner error, with unavailable projections represented by null.
 Individual feasibility never implies combined feasibility. The installed immutable runtime exposes the same read-only
 `preview-bundle` command. Actual deployment still rechecks authorization and replans under its existing locks.
-Both preview entrypoints accept repeated `--select-card <id>` arguments for a deliberate combined subset. Without them the full
+Both bundle preview entrypoints accept repeated `--select-card <id>` arguments for a deliberate combined subset. Without them the full
 proposed catalog is selected. IDs must be unique known members. `bundle_sha256` binds the complete input catalog, individual
 projections preserve every member, and `combined.card_ids` plus its after hash identify the exact selected combination.
 
+Scalar `rule preview --target-file <observed-owner> --from-json - [--supersedes <id>]...` accepts the deployment's seven fields
+and uses the same scalar planner without writes. The immutable runtime exposes `preview` with the same stdin and target/selection.
+Its `rule_preview_v1` binds `instruction_target, target_before_sha256, proposal_sha256, supersedes, before_bytes, budget_bytes`
+and the projection fields `status, projected_bytes, target_after_sha256, error_code, capacity`.
+Capacity contains exactly `rules` (`rule_id, actual_bytes, budget_bytes, exceeded`) and `managed_block`
+(`before_bytes, projected_bytes, budget_bytes, exceeded`). It measures the entire proposed rule set even when both budgets fail.
+Structural/target failures have null capacity; blocked results never have an after hash. Capacity errors retain
+`instruction_capacity_exceeded` with `capacity_kind` and the same capacity report. New Scout consumers accept legacy v1 receipts
+and v2, but validate both measurements before qualifying v2 as ready. Preflight cannot establish authorization, global parity,
+write permissions, deployment, semantic equivalence or later adoption.
+
 Persistent rules contain only derived `rule_id` and `When / Do / Skip`. One
-rendered rule is at most 1 KiB and one complete managed block is at most 8 KiB.
+rendered rule is at most 1 KiB in UTF-8 with normalized LF, and one complete managed block is at most 8 KiB using its target's
+physical LF/CRLF, including markers, headings and separators. These are revisitable editing budgets, not measured optima.
 The 8 KiB limit is a Sidecar edit budget for the managed block, not a Codex
 document limit. Full document bytes are reported but never authorize edits
 outside the managed block.
@@ -101,6 +113,10 @@ One superseded ID replaces one rule. Multiple unique IDs consolidate rules in
 one file transaction: every ID must exist in the selected target, the new rule
 occupies the earliest replaced position, and all unaffected rule ordering and
 outside bytes remain unchanged.
+
+Owner routing must conserve each obligation, trigger and exception. Authorized ordinary project edits deliver detailed content
+to its formal Owner; mandatory behavior also needs an applicable, unshadowed `AGENTS.md` reading entry. Routing proposed, Owner
+content delivered, entry deployed and behavior adopted are distinct evidence. Optional memory notes cannot replace deployment.
 
 The repository preserves every byte outside the managed block. Invalid encoding,
 duplicate blocks, override shadowing, drift, capacity failure, symbolic links,
