@@ -2,7 +2,7 @@
 
 ## Common rules
 
-- Skill `5.9.2`; Project result `global_owner_scout_project_v5`; Review Pack
+- Skill `5.10.0`; Project result `global_owner_scout_project_v5`; Review Pack
   `global_owner_scout_review_pack_v6`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
@@ -187,13 +187,21 @@ With no selection flags, preview the full proposed set. To preview a deliberate 
 It preserves Project Cards and semantic integration, populating only action qualification, tokens and `selection_preview` before
 hashing the final pack. Drafts may set `selection_preview=null`; they cannot be rendered as confirmable final packs.
 The selection preview is null when no global mutation is proposed; otherwise it has exactly
-`core_artifact_sha256, result, error_code`. `result` is the exact `rule_bundle_preview_v1` receipt or null with an error.
+`core_artifact_sha256, result, error_code`. `result` is the exact `rule_bundle_preview_v2` receipt or null with an error;
+legacy v1 receipts remain readable. V2 preserves the top-level fields and adds `capacity` to every item and combined projection.
+It contains `rules` (`rule_id, actual_bytes, budget_bytes, exceeded`) and `managed_block`
+(`before_bytes, projected_bytes, budget_bytes, exceeded`), or is null for a structural/target failure. Rules count normalized
+UTF-8 LF bytes; the block counts its physical target newlines. Ready requires both budgets to pass; a capacity failure must retain
+both measurements even when both exceed budget. Validators reject missing or inconsistent measurements and false ready states.
+Ship a v2-producing Core with a Scout that accepts v2; do not treat an old v1 receipt as proof of detailed per-rule measurements.
 Every individual confirmation requires its ready item. A combined confirmation requires the ready combined projection;
 individual success never manufactures a combined success. A card used only in a valid combination exposes its bound combination
 identity without offering an invalid standalone confirmation. Unavailable Core or stale Owner never qualifies confirmation.
 All supported cards remain visible when combination/capacity is blocked; explain that the set needs revision and retain edit,
 project/Skill routing and ignore. Other user-selected combinations are previewed before final approval, without rerunning project
 discovery or silently truncating candidates. Deployment still validates the exact current approval and replans under locks.
+Routing is a recommendation until authorized formal Owner content and any mandatory `AGENTS.md` reading trigger are read back.
+Preserve each obligation, condition and exception at its correct authority; optional memory saves never substitute for deployment.
 For a confirmable card, `selection_token` is the 32-hex operation identity derived from card ID, project claim, proposal,
 sorted `supersedes`, instruction target, and the current canonical source hash. It is `null` otherwise. `edit` and
 `ignore` are always available. `confirm` exists only for matched-parity, `global_agents`, `add/replace/consolidate` cards. Project

@@ -29,6 +29,7 @@
   proposal token 绑定下节定义的规则集修订 hash。
 - 持久 instruction 只写 `When / Do / Skip` 和派生 `rule_id`。
 - 单条渲染后上限 1 KiB；含 marker、heading 和换行的完整 managed block 每 target 上限 8 KiB。
+- 单条按 UTF-8、规范化 LF 计量，整块按目标实际换行计量；这两个数是可复审的编辑预算，不是模型容量标准。
 - 8 KiB 只约束 managed block；完整 `AGENTS.md` 字节数只报告，不作为 Sidecar 修改块外正文的理由。
 - `why`、`evidence`、原始 prompt 和回复不进入长期 Store。
 
@@ -75,15 +76,28 @@
 - 单卡确认使用大小为一的 bundle；任一项 no-op、stale、冲突、超容量或写入失败，整包零修改且不消费 approval。
 
 确认前使用 `rule preview-bundle --target-file <observed-owner> --from-json -` 对准确 `rule_revision_bundle_v2` 做零写入预演。
-Core 复用正式 bundle planner，校验整个 target before hash，并返回 `rule_bundle_preview_v1`：
+Core 复用正式 bundle planner，校验整个 target before hash，并返回 `rule_bundle_preview_v2`：
 `target_before_sha256, bundle_sha256, before_bytes, budget_bytes, items, combined`。每个 item 包含
-`card_id, status, projected_bytes, target_after_sha256, error_code`；combined 使用同一结果字段及排序的 `card_ids`。
+`card_id, status, projected_bytes, target_after_sha256, error_code, capacity`；combined 使用同一结果字段及排序的 `card_ids`。
 `status=ready` 才表示该准确集合通过；`blocked` 保留准确错误，未知 projected/after 为 null。一次调用计算单卡与整个选集，
 不创建 Store、proposal、批准、锁、journal 或目标文件。预演只证明当前字节下的结构、容量与差量；语义关系仍由复盘判断，
 真实部署仍在授权及锁内重新规划。Runtime zipapp 的 `preview-bundle` 入口提供相同只读能力，供 Scout 从实际安装 identity 调用。
-两种 Core 预演入口和 `scout.py prepare-review` 都允许重复传入 `--select-card <id>` 核查明确子集。未传则预演全部拟议项。
+CLI 与 runtime 的 bundle 预演入口和 `scout.py prepare-review` 都允许重复传入 `--select-card <id>` 核查明确子集。未传则预演全部拟议项。
 子集必须是唯一已知成员；仍保留完整候选与单项投影。`bundle_sha256` 绑定完整输入，`combined.card_ids` 与 after hash
 绑定准确所选组合；不能为了预演子集删除其他卡片或重跑项目发现。
+
+普通单规则使用 `rule preview --target-file <observed-owner> --from-json - [--supersedes <id>]...`，
+输入与 deploy 相同的七字段，返回 `rule_preview_v1`：`instruction_target, target_before_sha256,
+proposal_sha256, supersedes, before_bytes, budget_bytes, status, projected_bytes, target_after_sha256, error_code, capacity`。
+Runtime zipapp 的 `preview` 从 stdin 接受同样输入。它与 bundle 预演一样完全只读，不需要 Store 或批准。
+
+bundle v2 保留 v1 顶层字段，每个单项和 combined 增加 `capacity`。
+新 Scout 兼容旧 v1；v2 需要同步支持它的消费者。`capacity=null` 表示结构或目标阻断，未取得可用容量测量；
+否则它精确包含 `rules` 和 `managed_block`。每条 rule 包含 `rule_id, actual_bytes, budget_bytes, exceeded`；
+managed_block 包含 `before_bytes, projected_bytes, budget_bytes, exceeded`。一次测量保留所有规则与两类超限；
+capacity 错误仍使用 `instruction_capacity_exceeded`，详情增加同一 `capacity` 和 `capacity_kind`。
+`ready` 必须两类预算都通过；blocked 不得返回 after hash。完整文档不受这些预算限制。
+只读预演不证明全局双目标 parity 或写权限；部署仍按当前事件和实际目标重算，不接受 preview 作为批准。
 
 Agent 在创建 proposal 前把候选分类为：
 
@@ -97,10 +111,16 @@ Agent 在创建 proposal 前把候选分类为：
 
 该分类是 Agent 的本轮语义判断，不写 Store，不创造用户状态。无法可靠判断关系时只展示澄清草案。
 
+正式 Owner 路由先列原义务、触发与例外到准确文档/章节的去向，再按已获授权完成普通项目编辑与读回。
+必须执行的独立行为不得仅为通过容量而移出 `AGENTS.md`；方法正文可以分层，但其读取入口必须实际存在。
+未实施路由保持未部署；正文已落地、入口已部署及后续采用分别陈述。不得将可选记忆保存作为部署失败的替代。
+
 ## 公开 CLI
 
 ```text
 agent-memory rule list [--target global_agents|project_agents]
+agent-memory rule preview --target-file <observed-owner> --from-json <json-or-path> [--supersedes <rule_id>]...
+agent-memory rule preview-bundle --target-file <observed-owner> --from-json <bundle-json-or-path> [--select-card <card_id>]...
 agent-memory rule deploy --from-json <json-or-path> --approval-ref <ref> [--supersedes <rule_id>]...
 agent-memory rule deploy-bundle --from-json <bundle-json-or-path> --approval-ref <ref>
 agent-memory rule revoke <rule_id> --approval-ref <ref>
@@ -272,7 +292,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。可靠自动发现边界仍是一次 Codex 刷新或下一任务，但 source/host 物化必须在当前部署任务完成。
 
-`agent-memory-workstation-bootstrap` Skill 2.2.4 提供两个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.2.5 提供两个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
@@ -368,7 +388,7 @@ root 逐级检查两个产品同名 `.agents/skills`，非 Git 项目只检查 p
 `status` 只允许 `ready`、`reload_required`、`consumer_scope_drift`、`consumer_scope_bounded`、
 `distribution_reconcile_blocked`、`source_sync_blocked` 或 `host_materialization_blocked`。中文 renderer 固定先显示期望发行、
 Plugin 分发、源同步、主机物化、消费者范围、消费者采用，再显示未证明事项与唯一下一步。apply 固定不越过模型采用层，
-返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.2.4 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
+返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.2.5 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
 读回仍 exact、Desktop 项目枚举完整且项目级同名 Skill 全部 exact，才允许 `ready`。任何本机结果都保留真实第二台设备、
 Scheduled、连续性与产品收益未证明边界。
 
@@ -507,7 +527,7 @@ Scheduled 使用既有最终 Inbox wrapper 与可见文本校验，不增加文�
 是否截断，以及 `complete/bounded/degraded`。达到宿主任务索引上限、未读到窗口边界或无法继续分页时只能使用
 `bounded/degraded`，不得声称完成完整 session 复盘。
 
-Skill 5.9.2 的所有入口固定使用已验证的原生任务索引上限 `50` 作为首次且唯一的索引请求，不得先请求更大
+Skill 5.10.0 的所有入口固定使用已验证的原生任务索引上限 `50` 作为首次且唯一的索引请求，不得先请求更大
 页面探测上限。调用使用最长 60 秒的初始 yield；返回 `cell_id` 时必须对同一 cell 最多连续 wait 两次、每次最长
 60 秒。cell 未终态前禁止发起第二次索引调用，`Script running` 不得解释为 unavailable、timeout 或 degraded。
 
@@ -745,7 +765,7 @@ Store、常驻规则或独立更新器。正常工程任务按需选择方法，
 - 活跃原工作区的并发变化只记录为当前隔离快照之外的限制；稳定隔离快照中的卡不得因此整体失效。
 - 2026-08-11 的三个真实 v5.1 Scheduled 运行及最小 automation-source probe 证明本主机原生任务索引未取得终态。
   每个 Host Enrollment 保持 `0/14`，自动化保持 `PAUSED`；普通 worktree 前向测试不再拥有恢复权。只有新的真实
-  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 Skill 5.9.2 项目 canary；
+  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 Skill 5.10.0 项目 canary；
   在 14 次有效运行期间必须显式请求
   `gpt-5.6-sol` 与 `medium` reasoning，并记录请求值、
   宿主可见的实际值和 telemetry 可用性。只有 request 不能证明实际模型；不可观测时诚实标记 `request_only`，

@@ -3,6 +3,19 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.4.0 (2026-10-16)
+
+- Scalar `rule preview` and the immutable runtime's `preview` now preflight exact proposals and replacements without writes.
+- Scalar and bundle planning report every rule and the complete managed block together, including simultaneous overflows. Bundle
+  preview v2 adds capacity measurements; Scout accepts v1/v2 and rejects inconsistent v2 readiness.
+- Scout now distinguishes rule and block capacity failures, so a rule that exceeds 1 KiB is no longer described as exceeding 8 KiB.
+- The generated execution Skill completes authorized formal Owner routing with obligation/exception preservation and read-back,
+  distinguishes content delivery from mandatory entry deployment and later adoption, and forbids optional-memory fallback.
+- Global preflight checks the effective host target after canonical/local parity, matching deployment's override context.
+- The 1 KiB rule and 8 KiB managed-block limits remain revisitable editing budgets; this change does not claim an optimal size,
+  a host document limit, or observed model adoption. The v2-producing Core and compatible Scout must ship together.
+- Components: Core 0.4.0, Plugin 1.6.0, Bootstrap 2.2.5 and Scout 5.10.0; upgrade Core and Scout together for bundle preview v2.
+
 ## 0.3.16 (2026-09-08)
 
 - The Plugin now owns the optional Engineering Contract Review Skill source, references and update path. Its methods are loaded

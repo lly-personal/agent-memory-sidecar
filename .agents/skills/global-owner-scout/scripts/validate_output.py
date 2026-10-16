@@ -15,7 +15,7 @@ from typing import Any, Callable, Iterable
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.9.2"
+SKILL_VERSION = "5.10.0"
 PROJECT_CONTRACT = "global_owner_scout_project_v5"
 REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v6"
 DISPLAY_LOCALE = "zh-CN"
@@ -912,6 +912,36 @@ def review_bundle(pack: dict[str, Any]) -> dict[str, Any] | None:
              "items": sorted(items, key=lambda item: item["card_id"])} if items else None)
 
 
+def validate_capacity_projection(item: dict[str, Any], result: dict[str, Any]) -> None:
+    capacity = item["capacity"]
+    if capacity is None:
+        require(item["status"] == "blocked" and item["error_code"] != "instruction_capacity_exceeded",
+                "ready or capacity-blocked Core projection needs capacity measurements")
+        return
+    require_object(capacity, "Core capacity")
+    require_exact_keys(capacity, {"rules", "managed_block"}, "Core capacity")
+    rules = require_list(capacity["rules"], "Core rule capacity", nonempty=True)
+    rule_ids = []
+    for rule in rules:
+        require_object(rule, "Core rule capacity")
+        require_exact_keys(rule, {"rule_id", "actual_bytes", "budget_bytes", "exceeded"}, "Core rule capacity")
+        require(isinstance(rule["rule_id"], str) and re.fullmatch(r"rule_[0-9a-f]{12}", rule["rule_id"]), "Core capacity rule ID invalid")
+        require(type(rule["actual_bytes"]) is int and rule["actual_bytes"] > 0, "Core rule bytes invalid")
+        require(type(rule["budget_bytes"]) is int and rule["budget_bytes"] > 0, "Core rule budget invalid")
+        require(type(rule["exceeded"]) is bool and rule["exceeded"] == (rule["actual_bytes"] > rule["budget_bytes"]), "Core rule capacity flag inconsistent")
+        rule_ids.append(rule["rule_id"])
+    require(len(rule_ids) == len(set(rule_ids)), "Core capacity contains duplicate rule IDs")
+    block = require_object(capacity["managed_block"], "Core block capacity")
+    require_exact_keys(block, {"before_bytes", "projected_bytes", "budget_bytes", "exceeded"}, "Core block capacity")
+    for key, expected in (("before_bytes", result["before_bytes"]), ("projected_bytes", item["projected_bytes"]), ("budget_bytes", result["budget_bytes"])):
+        require(type(block[key]) is int and block[key] == expected, "Core block capacity disagrees with projection")
+    require(type(block["exceeded"]) is bool and block["exceeded"] == (block["projected_bytes"] > block["budget_bytes"]), "Core block capacity flag inconsistent")
+    exceeded = block["exceeded"] or any(rule["exceeded"] for rule in rules)
+    require((item["status"] == "ready" and not exceeded) or
+            (item["status"] == "blocked" and item["error_code"] == "instruction_capacity_exceeded" and exceeded),
+            "Core projection status disagrees with capacity")
+
+
 def validate_selection_preview(pack: dict[str, Any], *, required: bool) -> dict[str, Any] | None:
     preview = pack["selection_preview"]
     bundle = review_bundle(pack)
@@ -931,7 +961,7 @@ def validate_selection_preview(pack: dict[str, Any], *, required: bool) -> dict[
     require(digest is not None and preview["error_code"] is None, "Core receipt needs its actual artifact identity")
     require_object(result, "selection preview result")
     require_exact_keys(result, {"contract_version", "target_before_sha256", "bundle_sha256", "before_bytes", "budget_bytes", "items", "combined"}, "selection preview result")
-    require(result["contract_version"] == "rule_bundle_preview_v1", "Core preview contract invalid")
+    require(result["contract_version"] in {"rule_bundle_preview_v1", "rule_bundle_preview_v2"}, "Core preview contract invalid")
     require(result["target_before_sha256"] == bundle["target_before_sha256"], "Core preview before hash mismatch")
     require(result["bundle_sha256"] == canonical_hash(bundle), "Core preview bundle hash mismatch")
     require(type(result["before_bytes"]) is int and result["before_bytes"] >= 0, "Core preview before bytes invalid")
@@ -948,6 +978,8 @@ def validate_selection_preview(pack: dict[str, Any], *, required: bool) -> dict[
     require(combined_ids == sorted(set(combined_ids)) and set(combined_ids).issubset(expected_ids), "Core combined selection mismatch")
     for item in [*items, combined]:
         keys = {"card_ids"} if item is combined else {"card_id"}
+        if result["contract_version"] == "rule_bundle_preview_v2":
+            keys.add("capacity")
         require_exact_keys(item, keys | {"status", "projected_bytes", "target_after_sha256", "error_code"}, "Core projection")
         size = item["projected_bytes"]
         require(size is None or type(size) is int and size >= 0, "Core projected bytes invalid")
@@ -957,6 +989,8 @@ def validate_selection_preview(pack: dict[str, Any], *, required: bool) -> dict[
         else:
             require(item["status"] == "blocked" and item["target_after_sha256"] is None, "blocked Core projection invalid")
             require_string(item["error_code"], "Core projection error")
+        if result["contract_version"] == "rule_bundle_preview_v2":
+            validate_capacity_projection(item, result)
     return result
 
 

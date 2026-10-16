@@ -160,7 +160,7 @@ Review Pack 结构通过校验后仍未完成链路；renderer 与 visible-outpu
 继续创建并回读同任务 artifact、通过宿主工具打开，然后由外部 controller 读取实际 final/artifact 才完成呈现。
 宿主 open 是 Scout 的最后一个工具调用；之后只允许 compact Delivery receipt，不得再调用独立 memory 审计或追加尾注。
 
-Bootstrap 2.2.4 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 2.2.5 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得
@@ -219,11 +219,17 @@ runtime_skill_identity_mismatch`；它不会消耗五条入口矩阵样本，也
 -> 分类 already_covered / add / replace / consolidate / route_to_owner
 -> already_covered 与 route_to_owner 不创建 proposal token，但在本轮已进入 Agent Memory 时返回可见终态
 -> replace 或 consolidate 展示精确 before/after
+-> 普通单规则用 rule preview、规则包用 preview-bundle 同时核对单条和整块容量
 -> 只有需要 managed-block mutation 时进入授权与发布
 ```
 
 不得为了 admission 自动扫描整个项目、建立后台治理循环或把模型分类持久化。分类只决定本轮是否提出修订；
 实际行为状态仍只来自 `AGENTS.md`。
+
+正式 Owner 路由复用普通项目编辑，不增文件写入服务：Agent 逐项映射原义务与例外，核对具体正文和
+`AGENTS.md` 的触发/读取入口，按现有授权完成并读回。归属判断本身不证明正文或入口已经交付；容量失败
+不得回退可选记忆。单规则和 bundle 的只读预演复用正式规划器，零 Store、零批准、零文件写入，
+部署仍在原授权与锁内重算。当前字节预演不证明 global parity 或模型采用。
 
 ### 会话终态
 

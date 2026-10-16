@@ -69,12 +69,24 @@ receipt，确认关闭。生产验收控制任务从实际 Scout final 读取 ar
 `prepare_delivery.py --verify-final --artifact-root <host-output-root>` 验证；内部 renderer/verifier 输出或文件存在不
 能替代 `surface_observed`。`surface_pending` 只证明完整内容可发现且字节守恒，不计 Production。
 
-每条渲染后不超过 1 KiB；每个完整 managed block 不超过 8 KiB。超限整次拒绝且不消费授权，错误详情返回
-`before_bytes`、`projected_bytes` 与 `budget_bytes`。`rule list` 的 `targets` 返回 managed、budget、
-remaining、完整文档字节和规则数；8 KiB 不约束块外正文。
+普通单规则先执行 `rule preview --target-file <observed-owner> --from-json <json-or-path> [--supersedes <id>]...`；
+规则包执行 `rule preview-bundle --target-file <observed-owner> --from-json <bundle-json-or-path>`。
+预演不创建 Store 或文件、不消费批准；全局先核对当前 binding 的双目标 parity，再预演 `rule list` 读回的宿主实际目标。
+canonical 源目录旁的 override 不代表宿主覆盖上下文；预演本身不证明双目标 parity。
+返回的 `capacity.rules` 一次报告全部拟议规则的实际字节、预算与超限标志，`capacity.managed_block` 报告整块 before、
+projected、budget 与超限标志。两种同时超限也保留完整测量；结构或目标阻断时 capacity 为 null，blocked 无 after hash。
+
+单条以 UTF-8 规范化 LF 渲染，不超过 1,024 字节；完整 managed block 以目标实际 LF／CRLF 渲染，不超过 8,192 字节。
+这两个值是可复审的工程预算，复审条件见 [ADR 0081](decisions/0081-capacity-preflight-and-owner-delivery.zh.md)。
+超限整次拒绝且不消费授权；错误包含 `capacity_kind` 与同一完整 `capacity`。`rule list` 的 `targets` 返回 managed、
+budget、remaining、完整文档字节和规则数；8 KiB 不约束块外正文。
 
 一个 `--supersedes` 表示替换；重复参数表示归并。所有 ID 必须唯一、存在于同一 target。新规则进入最早
 被替换位置，其余规则顺序和块外字节保持不变。
+
+容量失败先核对独立义务、触发条件与例外，再决定归并或正式 Owner 路由；不得用缩句、拆条或可选记忆笔记代替部署。
+按已有授权完成正文编辑与准确路径/章节读回；必需行为还要有实际部署且未被遮蔽的 `AGENTS.md` 触发读取入口。
+正文已落地但入口失败时，报告“正文已落地、行为未部署”。预演、文件部署、发布和后续采用分别取证。
 
 ## Core Store
 

@@ -39,7 +39,9 @@ class ConfirmedRule:
     rule_id: str
 
     @classmethod
-    def from_proposal(cls, proposal: RuleProposal) -> "ConfirmedRule":
+    def from_proposal(
+        cls, proposal: RuleProposal, *, validate_capacity: bool = True
+    ) -> "ConfirmedRule":
         target: InstructionTarget = proposal.instruction_target
         rule_id = rule_id_for(
             target=target,
@@ -54,11 +56,14 @@ class ConfirmedRule:
             skip_boundary=proposal.skip_boundary,
             rule_id=rule_id,
         )
-        if len(render_rule(value, newline="\n").encode("utf-8")) > MAX_RENDERED_RULE_BYTES:
+        actual_bytes = len(render_rule(value, newline="\n").encode("utf-8"))
+        if validate_capacity and actual_bytes > MAX_RENDERED_RULE_BYTES:
             raise CoreError(
                 "instruction_capacity_exceeded",
                 "confirmed rule exceeds the 1 KiB instruction budget",
                 rule_id=rule_id,
+                capacity_kind="rule",
+                actual_bytes=actual_bytes,
                 budget_bytes=MAX_RENDERED_RULE_BYTES,
             )
         return value
@@ -161,6 +166,14 @@ class FilePlan:
     action: str
     outside_unchanged: bool
     affected_rules: tuple[ConfirmedRule, ...] = ()
+
+    def capacity_dict(self) -> dict[str, object]:
+        newline = _newline_for_data(self.before)
+        return measure_capacity(
+            self.after_rules,
+            before_bytes=len(managed_block_bytes(self.before_rules, newline=newline)),
+            newline=newline,
+        )
 
     def to_dict(self) -> dict[str, object]:
         before_managed = len(
@@ -334,20 +347,13 @@ class InstructionRepository:
         supersedes: str | Sequence[str] | None = None,
         path: Path | None = None,
     ) -> FilePlan:
-        rule = ConfirmedRule.from_proposal(proposal)
-        target = rule.target
+        target = proposal.instruction_target
         snapshot = (
             read_document(path=path, target=target, shadowed=False)
             if path is not None
             else self.read_target(target=target, identity=identity)
         )
-        _assert_writable(snapshot)
-        updated, action = _deploy_rules(
-            snapshot.rules,
-            rule=rule,
-            supersedes=normalize_supersedes(supersedes),
-        )
-        return plan_replace(snapshot=snapshot, rules=updated, rule=rule, action=action)
+        return plan_deploy(snapshot=snapshot, proposal=proposal, supersedes=supersedes)
 
     def plan_deploy_bundle(
         self,
@@ -434,6 +440,22 @@ class InstructionRepository:
             yield
 
 
+def plan_deploy(
+    *, snapshot: DocumentSnapshot, proposal: RuleProposal,
+    supersedes: str | Sequence[str] | None = None,
+) -> FilePlan:
+    """Plan one deployment against observed bytes, including both capacity budgets."""
+    if proposal.instruction_target != snapshot.target:
+        raise CoreError("instruction_rule_target_mismatch", "rule must match the observed target")
+    _assert_writable(snapshot)
+    # Defer rejection until the complete proposed set can be measured in plan_replace.
+    rule = ConfirmedRule.from_proposal(proposal, validate_capacity=False)
+    updated, action = _deploy_rules(
+        snapshot.rules, rule=rule, supersedes=normalize_supersedes(supersedes),
+    )
+    return plan_replace(snapshot=snapshot, rules=updated, rule=rule, action=action)
+
+
 def plan_deploy_bundle(
     *, snapshot: DocumentSnapshot, items: tuple[RuleBundleItem, ...]
 ) -> tuple[FilePlan, tuple[PlannedRuleMutation, ...]]:
@@ -453,7 +475,7 @@ def plan_deploy_bundle(
         tuple[RuleBundleItem, ConfirmedRule, tuple[str, ...]]
     ] = []
     for item in items:
-        rule = ConfirmedRule.from_proposal(item.proposal)
+        rule = ConfirmedRule.from_proposal(item.proposal, validate_capacity=False)
         supersedes = normalize_supersedes(item.supersedes)
         if rule.rule_id in new_rule_ids:
             raise CoreError(
@@ -651,18 +673,22 @@ def replace_managed_region(
 ) -> bytes:
     parsed = _parse_document(data, target=target, path=path)
     block = managed_block_bytes(rules, newline=parsed.newline)
-    if len(block) > MAX_MANAGED_BLOCK_BYTES:
-        before_bytes = len(
-            managed_block_bytes(parsed.rules, newline=parsed.newline)
-        )
+    before_bytes = len(managed_block_bytes(parsed.rules, newline=parsed.newline))
+    capacity = measure_capacity(rules, before_bytes=before_bytes, newline=parsed.newline)
+    oversized = [item for item in capacity["rules"] if item["exceeded"]]
+    if oversized or capacity["managed_block"]["exceeded"]:
+        first = oversized[0] if oversized else None
         raise CoreError(
             "instruction_capacity_exceeded",
-            "managed instruction block exceeds the 8 KiB target budget",
-            budget_bytes=MAX_MANAGED_BLOCK_BYTES,
-            actual_bytes=len(block),
+            "proposed instructions exceed the rule or managed block budget",
+            capacity_kind="rule" if first else "managed_block",
+            budget_bytes=first["budget_bytes"] if first else MAX_MANAGED_BLOCK_BYTES,
+            actual_bytes=first["actual_bytes"] if first else len(block),
             before_bytes=before_bytes,
             projected_bytes=len(block),
             path=str(path),
+            capacity=capacity,
+            **({"rule_id": first["rule_id"]} if first else {}),
         )
     if parsed.marker_start is None:
         if not rules:
@@ -673,6 +699,31 @@ def replace_managed_region(
     if not rules:
         return data[: parsed.region_start] + data[parsed.region_end :]
     return data[: parsed.marker_start] + block + data[parsed.region_end :]
+
+
+def measure_capacity(
+    rules: tuple[ConfirmedRule, ...], *, before_bytes: int, newline: str
+) -> dict[str, object]:
+    """Count rules as normalized UTF-8 LF; count the block as it will be written."""
+    measurements = []
+    for rule in rules:
+        actual_bytes = len(render_rule(rule, newline="\n").encode("utf-8"))
+        measurements.append({
+            "rule_id": rule.rule_id,
+            "actual_bytes": actual_bytes,
+            "budget_bytes": MAX_RENDERED_RULE_BYTES,
+            "exceeded": actual_bytes > MAX_RENDERED_RULE_BYTES,
+        })
+    projected_bytes = len(managed_block_bytes(rules, newline=newline))
+    return {
+        "rules": measurements,
+        "managed_block": {
+            "before_bytes": before_bytes,
+            "projected_bytes": projected_bytes,
+            "budget_bytes": MAX_MANAGED_BLOCK_BYTES,
+            "exceeded": projected_bytes > MAX_MANAGED_BLOCK_BYTES,
+        },
+    }
 
 
 def managed_block_bytes(

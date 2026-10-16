@@ -343,9 +343,23 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         preview = pack["selection_preview"]
         if preview and not confirmable:
             result = preview["result"]
-            if result and result["combined"]["error_code"] == "instruction_capacity_exceeded" and result["combined"]["projected_bytes"] is not None:
+            if result and result["combined"]["error_code"] == "instruction_capacity_exceeded":
                 combined = result["combined"]
-                message = f"所选组合合并后需要 {combined['projected_bytes']} 字节，超过当前 {result['budget_bytes']} 字节预算。"
+                capacity = combined.get("capacity")
+                if capacity is not None:
+                    exceeded_rules = [rule for rule in capacity["rules"] if rule["exceeded"]]
+                    parts = []
+                    if exceeded_rules:
+                        largest = max(exceeded_rules, key=lambda rule: rule["actual_bytes"])
+                        parts.append(f"{len(exceeded_rules)} 条规则超过单条预算（最大 {largest['actual_bytes']} 字节，预算 {largest['budget_bytes']} 字节）。")
+                    block = capacity["managed_block"]
+                    parts.append(f"整块预计使用 {block['projected_bytes']} 字节，" +
+                                 (f"超过整块预算 {block['budget_bytes']} 字节。" if block["exceeded"] else f"整块预算为 {block['budget_bytes']} 字节。"))
+                    message = "".join(parts)
+                elif combined["projected_bytes"] is not None and combined["projected_bytes"] > result["budget_bytes"]:
+                    message = f"整块预计使用 {combined['projected_bytes']} 字节，超过整块预算 {result['budget_bytes']} 字节。"
+                else:
+                    message = "规则容量超限；旧版回执未提供完整容量明细。"
             else:
                 message = "当前组合尚未通过规则预演。"
             lines.extend(["", "**组合需先整理**：" + message + "候选和原始依据完整保留；先明确合并、替换或归属方案，再对准确选择预演。本次没有规则生效。"])
