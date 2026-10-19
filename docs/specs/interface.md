@@ -272,6 +272,18 @@ Global Owner Scout 的交互或 Scheduled 输出都是只读 `review draft`，�
 Review Pack 只存在于当前任务结果；interactive 可以写入当前任务宿主显式提供、位于项目外的不可变
 generated-output artifact，但不得写入 Store、文件 Inbox、项目文件或 `AGENTS.md`。
 
+### 多宿主全局规范同步
+
+同一自然语言入口 `同步并部署本机 Agent Memory` 的规范同步意图走
+[global-instruction-sync-v1](../../specs/global-instruction-sync-v1.md)，不是 Pi 的完整 Core/Scout 安装。
+Anchor 先验证 immutable Release，再从 verified portable 的 Core wheel 调用 `instructions sync`：预览返回
+`plan_hash`，apply 重算准确计划后才执行。参数与 token 由 Agent 处理，不要求用户重复输入路径。
+`--source`、`--codex-home`、`--pi-agent-dir` 只用于首次明确绑定或已有实际上下文；后续使用本机绑定。
+新设备首次私有源选择与 Git 认证不可省略，也不能写入公开发行物。
+
+状态包含 `planned`、`reload_required`；后者仅表示本机文件与绑定回读成功，其他设备和采用始终单列未验证。
+同一设备显式授权发布并同步时复用此链，不新增复制脚本。完整 Codex 能力安装仍遵循下一节的独立契约。
+
 ### Workstation Bootstrap 与 Host Enrollment
 
 Repo/plugin 分发的冷启动 Anchor 固定识别：

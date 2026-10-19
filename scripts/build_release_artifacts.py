@@ -713,6 +713,7 @@ def build(
                 root / "plugins" / "agent-memory-sidecar",
                 root / "docs" / "specs",
                 root / "specs" / "agent-memory-core-v1.md",
+                root / "specs" / "global-instruction-sync-v1.md",
                 root / "specs" / "public-distribution-v1.md",
                 root / "specs" / "public-authority-cutover-v1.md",
                 root / "COMPATIBILITY.md",

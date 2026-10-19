@@ -80,7 +80,7 @@ class CliAndPackageTests(unittest.TestCase):
 
     def test_public_help_only_advertises_new_surface(self) -> None:
         help_text = cli.build_parser().format_help()
-        self.assertIn("{rule,setup,doctor}", help_text)
+        self.assertIn("{rule,setup,doctor,instructions}", help_text)
         self.assertNotIn("remember", help_text)
         self.assertNotIn("forget", help_text)
         self.assertNotIn("status", help_text)

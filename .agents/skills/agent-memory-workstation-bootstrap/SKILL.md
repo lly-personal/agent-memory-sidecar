@@ -25,6 +25,15 @@ This Skill separates five facts that must never be collapsed:
 A normal deployment request always enters `inspect`. It must not create, update, pause, resume, or delete Scheduled tasks and must
 not change the Host Profile. Only an explicit request to retest or configure Scheduled capability enters `apply_enrollment`.
 
+## Global-standard synchronization (Codex or Pi)
+
+For `同步并部署本机 Agent Memory` requests whose purpose is updating global standards, use the Bootstrap Anchor's instruction
+lane: resolve the immutable Release first, then invoke `scripts/sync_instructions.py` from that verified portable bundle.
+This lane synchronizes all enrolled local Codex/Pi targets and does not install Codex Hooks, run Scout, or request project inventory.
+Do not route a Pi instruction request through `workstation-reconcile`, and do not use this installed script instead of the
+Resolver-verified bundle. Report instruction deployment separately from full capability readiness. Full Codex installation and
+migration continue through `inspect` below.
+
 ## Mode: `inspect`
 
 1. Establish the cold-start source without assuming a pre-existing Sidecar checkout:

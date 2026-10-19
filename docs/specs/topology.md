@@ -309,6 +309,18 @@ proposal body、before 文档和规则正文始终留在实际 instruction targe
 任一写入或数据库提交失败都恢复两份原始文件。CLI 成功只证明本机 target 生效且 source 已更新；
 `publication_required=true` 必须由 Agent 完成 Git 发布后才能消除。
 
+## 全局规范的多宿主按需分发
+
+规则发布与完整文档分发是两条边界不同的链路。`instructions sync` 从 canonical Git 的已发布 main 固定提交，
+经隔离 clone 读取完整字节，不 pull 或覆盖活跃工程。一次本机操作向已接入 Codex/Pi 物化，并逐宿主回读。
+宿主目标与源发现信息保存在本机同步 metadata；每个宿主的既有格式 Installation Registry 保存该目标最后部署的 hash，
+不复制行为内容、运行事件或授权。Codex 继续使用其现有 Store，Pi 只使用相同 registry schema，不安装 Codex runtime。
+同步后的受管源 snapshot 由现有 Bootstrap 显式识别并校验后承接，不能把外部路径相似当作 Owner 身份证据。
+
+统一入口先完成原有 Release Resolver；指令分发调用 verified portable 内 Core wheel，完整 Codex 能力安装仍走
+Workstation Reconcile。Pi 原生 package manifest 仅暴露同一 Bootstrap Anchor，不引入第二实现。
+详见[同步契约](../../specs/global-instruction-sync-v1.md)。本机部署与另一设备、刷新加载、行为采用分开验收。
+
 ## Scope 与 Desktop
 
 - `project` 映射 `project_agents`，target 是授权 prompt 所属 primary folder 根目录的 `AGENTS.md`；是否为 Git 仓库不改变 owner。

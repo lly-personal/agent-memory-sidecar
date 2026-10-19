@@ -1,0 +1,9 @@
+{
+  "name": "agent-memory-sidecar",
+  "private": true,
+  "description": "Pi discovery surface for the versioned Agent Memory bootstrap anchor.",
+  "keywords": ["pi-package"],
+  "pi": {
+    "skills": ["./plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor"]
+  }
+}

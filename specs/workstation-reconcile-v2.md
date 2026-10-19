@@ -58,6 +58,12 @@ When managed source identity is already exact, the same dry-run invokes the exac
 reads installed Bootstrap and Scout versions/hashes. Only live Core runtime identity, expected Owner parity state, Doctor, and both
 Skills can produce a no-op host result. Historical cutover receipts are transaction records, not current-state observations.
 
+An Owner enrolled through [global instruction sync](global-instruction-sync-v1.md) may reside in its verified workstation
+snapshot outside the legacy Codex source slot. Preservation must read the existing Core binding, exact sync metadata, enrolled
+Codex directory, source remote identity and clean commit. The current/desired source comparison and materialization use that same
+bound root; an obsolete legacy source slot cannot replace it. Missing or mismatched metadata remains blocked. This compatibility
+path neither installs Pi Hooks nor qualifies another host.
+
 ## Plan and authorization
 
 `agent_memory_workstation_reconcile_plan_v2` has exact fields:
