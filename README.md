@@ -138,7 +138,7 @@ not use normal sync to replace it. The unified deployment flow reviews and appli
 existing private Owner remains a separate optional backend unless explicitly
 detached.
 
-## Global instructions across Codex and Pi (next release)
+## Global instructions across Codex and Pi
 
 The same `同步并部署本机 Agent Memory` intent has an instruction-distribution lane: resolve the verified Release, preview
 and apply its Core `instructions sync` operation, then report each enrolled local host separately. A single published canonical
@@ -146,8 +146,8 @@ and apply its Core `instructions sync` operation, then report each enrolled loca
 or claim Scout support or model adoption. See [the synchronization contract](specs/global-instruction-sync-v1.md).
 
 The root Pi package manifest exposes the existing Bootstrap Anchor through Pi's native Git-package discovery. Use an immutable
-release ref containing this capability when available; current source tests are not evidence that a published release or a user's
-installation contains it. A new device needs one source selection and existing Git credentials; subsequent synchronization uses
+release ref `v0.5.0` or later; verify the installed release before claiming this capability is available. A new device needs one
+source selection and existing Git credentials; subsequent synchronization uses
 saved local bindings. Current-session instructions and another device are not updated by a local file readback.
 
 Developer verification (isolated fixtures only):

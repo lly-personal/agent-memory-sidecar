@@ -304,7 +304,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。可靠自动发现边界仍是一次 Codex 刷新或下一任务，但 source/host 物化必须在当前部署任务完成。
 
-`agent-memory-workstation-bootstrap` Skill 2.2.5 提供两个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.3.0 提供两个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
@@ -400,7 +400,7 @@ root 逐级检查两个产品同名 `.agents/skills`，非 Git 项目只检查 p
 `status` 只允许 `ready`、`reload_required`、`consumer_scope_drift`、`consumer_scope_bounded`、
 `distribution_reconcile_blocked`、`source_sync_blocked` 或 `host_materialization_blocked`。中文 renderer 固定先显示期望发行、
 Plugin 分发、源同步、主机物化、消费者范围、消费者采用，再显示未证明事项与唯一下一步。apply 固定不越过模型采用层，
-返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.2.5 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
+返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.3.0 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
 读回仍 exact、Desktop 项目枚举完整且项目级同名 Skill 全部 exact，才允许 `ready`。任何本机结果都保留真实第二台设备、
 Scheduled、连续性与产品收益未证明边界。
 

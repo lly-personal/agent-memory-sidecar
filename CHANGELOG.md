@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.0 (2026-10-19)
+
+- Synchronize the published global instruction document to enrolled Codex and Pi hosts with one preview/apply operation and reuse saved bindings on later runs.
+- Local edits, overrides and stale previews block overwrites; a failed multi-host update restores affected files and bindings.
+- Pi can discover the same release-bound Bootstrap Anchor through its native Git-package entry, and Codex workstation updates preserve the synchronized Owner snapshot.
+- Components: Core 0.5.0, Plugin 1.7.0, Bootstrap 2.3.0 and Scout 5.10.0; refresh Codex or start a new Pi session after deployment, with behavior adoption verified separately.
+
 ## 0.4.0 (2026-10-16)
 
 - Scalar `rule preview` and the immutable runtime's `preview` now preflight exact proposals and replacements without writes.

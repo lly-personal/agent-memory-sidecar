@@ -7,7 +7,7 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `2.2.5`
+- Skill version: `2.3.0`
 - Modes: `inspect`, `verify_consumer`, `apply_enrollment`
 - Deployment pack: `agent_memory_workstation_deployment_pack_v3`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
@@ -54,7 +54,7 @@ migration continue through `inspect` below.
      root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
 3. Run exact-hash `workstation-reconcile --apply`. Marketplace/Plugin mutation participates in the source-cutover rollback
    transaction. The transaction then runs Core setup, binds the explicit or preserved canonical Owner, verifies Doctor, installs
-   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.2.5`, Scout `5.10.0`,
+   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.3.0`, Scout `5.10.0`,
    and every desired identity. The result is `reload_required`; it proves host materialization, not model adoption or project-level
    same-name Skill parity.
 4. Finish installation delivery here. State that one Codex Desktop refresh is needed before later use; do not create a new task,
@@ -70,7 +70,7 @@ distinct from a real second-device result.
 
 ## Mode: `verify_consumer`
 
-Enter only when the user asks to verify consumers, from a refreshed new task that actually loaded Bootstrap 2.2.5. Use the Codex
+Enter only when the user asks to verify consumers, from a refreshed new task that actually loaded Bootstrap 2.3.0. Use the Codex
 Desktop project API in this task to obtain the complete visible project inventory. Write only the exact temporary
 `agent_memory_desktop_project_inventory_v1` input required by the reconciler inside a fresh mode-0700 directory, then run
 `workstation-reconcile --verify-consumer --desktop-project-inventory <inventory>` against the same Resolver output. This mode is read-only: it requires an exact no-op plan,

@@ -160,7 +160,7 @@ Review Pack 结构通过校验后仍未完成链路；renderer 与 visible-outpu
 继续创建并回读同任务 artifact、通过宿主工具打开，然后由外部 controller 读取实际 final/artifact 才完成呈现。
 宿主 open 是 Scout 的最后一个工具调用；之后只允许 compact Delivery receipt，不得再调用独立 memory 审计或追加尾注。
 
-Bootstrap 2.2.5 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 2.3.0 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得
