@@ -1,6 +1,6 @@
 ---
 name: agent-memory-bootstrap-anchor
-description: Restore Agent Memory workstation capability from a verified immutable public release and an optional private Global Owner when the user says “同步并部署本机 Agent Memory”. Use only for cold start or migration; do not use for ordinary project work.
+description: Synchronize global instructions across local Codex and Pi, or restore Agent Memory workstation capability, from a verified immutable release when the user says “同步并部署本机 Agent Memory”. Use for explicit synchronization, cold start or migration; not ordinary project work.
 ---
 
 # Agent Memory Bootstrap Anchor
@@ -8,6 +8,33 @@ description: Restore Agent Memory workstation capability from a verified immutab
 This is a cold-start distribution anchor, not the Bootstrap implementation and not a behavior Owner.
 
 When the user says `同步并部署本机 Agent Memory`:
+
+Choose the requested operation, not the current host alone. Global-standard synchronization on either Codex or Pi uses the
+instruction lane below; full Codex capability installation/migration uses the existing workstation lane. An established Owner
+with a request to synchronize standards defaults to the instruction lane. Do not install Codex Hooks or Scout to satisfy a Pi
+instruction request. Both lanes first complete step 1's immutable Release resolution.
+
+## Instruction lane: Codex and Pi
+
+After step 1, run `python -B <portable_root>/.agents/skills/agent-memory-workstation-bootstrap/scripts/sync_instructions.py
+--portable-root <portable_root>` to preview the verified wheel's `instructions sync` operation. Do not use an ambient installed
+Core or bypass missing release support with source-checkout scripts. The implementation resolves saved target/source bindings;
+for first enrollment, pass `--codex-home` / `--pi-agent-dir` only from observed host configuration, and `--source` from the existing
+canonical Owner binding or an explicitly selected private source checkout. Never guess a repository or overwrite an ambiguous
+home. First-time source selection is a one-time user choice, not a recurring path-entry requirement.
+
+The preview covers all enrolled local hosts. If successful, repeat with `--apply --plan-hash <returned-plan-hash>`; the user's
+synchronization request authorizes this exact published-version deployment. Do not run per-host copy commands. Drift, override,
+identity changes or unpublished edits stop without a force option. Explain the affected host and preserve its content. First-time
+nonempty divergence requires showing the exact local/published difference and one explicit replacement confirmation; only then
+pass `--adopt-existing HOST=SHA256` for those reviewed bytes into a fresh preview and apply. Never use it for already-bound drift.
+On success,
+report in Chinese the source commit, each host's updated/unchanged result, and required Pi reload/new session or Codex refresh/new
+task. Do not expose internal tokens or require the user to run the commands. Other devices and behavior adoption remain unverified.
+End this instruction-only operation here; do not fall through into full capability installation. After an authorized ordinary Git
+publication with explicit local-sync scope, use this same lane, never a second synchronization implementation.
+
+## Workstation lane: full Codex capability
 
 1. Run `python -B scripts/resolve_release.py --output <new-path-under-a-temporary-parent>`. Use `--version <vX.Y.Z>` only when
    the user selected an explicit version. The resolver must return `agent_memory_release_resolution_v1 / verified`; it validates

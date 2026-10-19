@@ -78,7 +78,7 @@ SDDL 文本表现形式代替权限语义。
 
 - 稳定核心：显式授权、作用域校验、规则部署、查看、编辑和撤销。
 - 实验能力：Ambient discovery 与单卡建议；不阻塞稳定核心发布。
-- 可选分发：私有 Git 传播完整 global `AGENTS.md`；本机 target 才决定本机行为。
+- 可选分发：私有 Git 传播完整 global `AGENTS.md`；本机 target 才决定本机行为。按需同步可覆盖 Windows/macOS 的 Codex 与 Pi；同一源、同一提交、完整字节物化，各宿主分别保留本机 binding。该能力不安装 Pi Hook、不迁移 Scout、不证明新会话采用。详见[全局规范同步契约](../../specs/global-instruction-sync-v1.md)。
 - 公开分发：只从白名单导出 Core 与版本化 Plugin/Skill；私有 Owner 是可选后端，不随源码或发行物公开。
 - 公开演进：首发验收前私有工程仓库是唯一研发权威；明确切换后公开 `main` 接管全部公开研发与发行，私有工程仓库
   冻结归档。公开候选期不得解释为双 owner 或长期镜像。

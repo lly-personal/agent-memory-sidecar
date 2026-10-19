@@ -12,6 +12,7 @@ from .database import CoreDatabase
 from .errors import CoreError
 from .file_security import logical_absolute
 from .identity import resolve_identity
+from .instruction_sync import synchronize
 from .proposal import RuleBundle, RuleProposal
 from .rule_service import RuleService
 from .rule_preview import preview_bundle, preview_rule
@@ -24,9 +25,9 @@ RESULT_CONTRACT = "agent_memory_result_v1"
 class ResultParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:
         if message.startswith(
-            "argument {rule,setup,doctor}: invalid choice:"
+            "argument {rule,setup,doctor,instructions}: invalid choice:"
         ):
-            message = "unknown command; expected rule, setup, or doctor"
+            message = "unknown command; expected rule, setup, doctor, or instructions"
         raise CoreError("invalid_request", message)
 
 
@@ -120,8 +121,21 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(
         dest="command",
         required=True,
-        metavar="{rule,setup,doctor}",
+        metavar="{rule,setup,doctor,instructions}",
     )
+
+    instructions = commands.add_parser("instructions", help="Synchronize published global instructions to Codex and Pi.")
+    instruction_commands = instructions.add_subparsers(dest="instruction_command", required=True)
+    sync = instruction_commands.add_parser("sync", help="Preview or apply whole-document workstation synchronization.")
+    sync.add_argument("--source", type=Path)
+    sync.add_argument("--codex-home", type=Path)
+    sync.add_argument("--pi-agent-dir", type=Path)
+    sync.add_argument("--state-dir", type=Path)
+    sync.add_argument("--apply", action="store_true")
+    sync.add_argument("--plan-hash")
+    sync.add_argument("--adopt-existing", action="append", metavar="HOST=SHA256",
+                      help="First enrollment only: bind an explicitly reviewed existing document hash.")
+    _bind(sync, "instructions.sync", cmd_instruction_sync)
 
     rule = commands.add_parser("rule", help="List, deploy, or revoke rules.")
     rule_commands = rule.add_subparsers(
@@ -237,7 +251,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands._choices_actions[:] = [  # type: ignore[attr-defined]
         item
         for item in commands._choices_actions  # type: ignore[attr-defined]
-        if getattr(item, "dest", None) in {"rule", "setup", "doctor"}
+        if getattr(item, "dest", None) in {"rule", "setup", "doctor", "instructions"}
     ]
     return parser
 
@@ -387,6 +401,12 @@ def cmd_proposal_discard(args: argparse.Namespace) -> _OperationResult:
             identity=identity,
         ).discard_proposal(approval_ref=args.approval_ref)
     return _OperationResult(data=data)
+
+
+def cmd_instruction_sync(args: argparse.Namespace) -> dict[str, Any]:
+    return synchronize(source=args.source, codex_home=args.codex_home, pi_agent_dir=args.pi_agent_dir,
+                       state_dir=args.state_dir, apply=args.apply, plan_hash=args.plan_hash,
+                       adopt_existing=args.adopt_existing)
 
 
 def cmd_setup(args: argparse.Namespace) -> _OperationResult:

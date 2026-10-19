@@ -56,6 +56,7 @@ class ContractTests(unittest.TestCase):
                 "public-authority-cutover-v1.md",
                 "source-authority-cutover-v2.md",
                 "workstation-reconcile-v2.md",
+                "global-instruction-sync-v1.md",
                 "global-owner-scout-delivery-v1.md",
                 "release-promotion-v1.md",
             }:

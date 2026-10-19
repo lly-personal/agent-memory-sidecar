@@ -272,6 +272,18 @@ Global Owner Scout 的交互或 Scheduled 输出都是只读 `review draft`，�
 Review Pack 只存在于当前任务结果；interactive 可以写入当前任务宿主显式提供、位于项目外的不可变
 generated-output artifact，但不得写入 Store、文件 Inbox、项目文件或 `AGENTS.md`。
 
+### 多宿主全局规范同步
+
+同一自然语言入口 `同步并部署本机 Agent Memory` 的规范同步意图走
+[global-instruction-sync-v1](../../specs/global-instruction-sync-v1.md)，不是 Pi 的完整 Core/Scout 安装。
+Anchor 先验证 immutable Release，再从 verified portable 的 Core wheel 调用 `instructions sync`：预览返回
+`plan_hash`，apply 重算准确计划后才执行。参数与 token 由 Agent 处理，不要求用户重复输入路径。
+`--source`、`--codex-home`、`--pi-agent-dir` 只用于首次明确绑定或已有实际上下文；后续使用本机绑定。
+新设备首次私有源选择与 Git 认证不可省略，也不能写入公开发行物。
+
+状态包含 `planned`、`reload_required`；后者仅表示本机文件与绑定回读成功，其他设备和采用始终单列未验证。
+同一设备显式授权发布并同步时复用此链，不新增复制脚本。完整 Codex 能力安装仍遵循下一节的独立契约。
+
 ### Workstation Bootstrap 与 Host Enrollment
 
 Repo/plugin 分发的冷启动 Anchor 固定识别：
@@ -292,7 +304,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。可靠自动发现边界仍是一次 Codex 刷新或下一任务，但 source/host 物化必须在当前部署任务完成。
 
-`agent-memory-workstation-bootstrap` Skill 2.2.5 提供两个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.3.0 提供两个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
@@ -388,7 +400,7 @@ root 逐级检查两个产品同名 `.agents/skills`，非 Git 项目只检查 p
 `status` 只允许 `ready`、`reload_required`、`consumer_scope_drift`、`consumer_scope_bounded`、
 `distribution_reconcile_blocked`、`source_sync_blocked` 或 `host_materialization_blocked`。中文 renderer 固定先显示期望发行、
 Plugin 分发、源同步、主机物化、消费者范围、消费者采用，再显示未证明事项与唯一下一步。apply 固定不越过模型采用层，
-返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.2.5 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
+返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.3.0 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
 读回仍 exact、Desktop 项目枚举完整且项目级同名 Skill 全部 exact，才允许 `ready`。任何本机结果都保留真实第二台设备、
 Scheduled、连续性与产品收益未证明边界。
 

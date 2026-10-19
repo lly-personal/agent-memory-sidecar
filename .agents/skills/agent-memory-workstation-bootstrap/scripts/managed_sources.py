@@ -22,7 +22,7 @@ from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
 
 
-BOOTSTRAP_VERSION = "2.2.5"
+BOOTSTRAP_VERSION = "2.3.0"
 SCOUT_VERSION = "5.10.0"
 PACK_VERSION = "agent_memory_workstation_deployment_pack_v3"
 DESKTOP_PROJECT_INVENTORY_VERSION = "agent_memory_desktop_project_inventory_v1"
@@ -602,6 +602,15 @@ def _existing_global_binding(codex_home: Path) -> dict[str, str] | None:
         raise BootstrapError("source_cutover_owner_state_ambiguous") from exc
 
 
+def _current_owner_root(codex_home: Path) -> Path:
+    binding = _existing_global_binding(codex_home)
+    if binding is not None:
+        bound = Path(binding["source_root"])
+        if len(bound.parents) >= 3 and bound.parent.parent.name == "sources":
+            return bound
+    return _managed_source_root(codex_home, create=False) / "canonical_owner"
+
+
 def _preserved_owner_identity(
     codex_home: Path,
     current_owner: dict[str, str] | None,
@@ -609,10 +618,34 @@ def _preserved_owner_identity(
     binding = _existing_global_binding(codex_home)
     if current_owner is None and binding is None:
         return None
-    require(
-        current_owner is not None and binding is not None,
-        "source_cutover_owner_state_ambiguous",
-    )
+    require(binding is not None, "source_cutover_owner_state_ambiguous")
+    # A multi-host instruction sync owns a verified source snapshot outside the
+    # legacy Codex source slot. Import its identity, never its runtime state.
+    bound = Path(binding["source_root"])
+    if len(bound.parents) >= 3 and bound.parent.parent.name == "sources":
+        metadata = bound.parents[2] / "instruction-sync.json"
+        if metadata.is_file():
+            value = metadata.lstat()
+            require(stat.S_ISREG(value.st_mode) and not stat.S_ISLNK(value.st_mode)
+                    and not _is_reparse(value) and value.st_nlink == 1,
+                    "source_cutover_owner_state_ambiguous")
+            saved = _load_json_file(metadata, "source_cutover_owner_state_ambiguous")
+            require(saved.get("contract_version") == "global_instruction_sync_v1"
+                    and saved.get("source_root") == str(bound)
+                    and os.path.normcase(str(Path(saved.get("targets", {}).get("codex", "")).resolve()))
+                    == os.path.normcase(str(codex_home.resolve())),
+                    "source_cutover_owner_state_ambiguous")
+            raw_remote = run_git(["remote", "get-url", "origin"], cwd=bound).strip()
+            require(saved.get("source_identity") == bound.parent.name
+                    == hashlib.sha256(raw_remote.encode("utf-8")).hexdigest(),
+                    "source_cutover_owner_state_ambiguous")
+            observed = inspect_existing_checkout(bound)
+            require(observed["commit"] == binding["source_commit"] == bound.name,
+                    "source_cutover_owner_state_ambiguous")
+            require(current_owner is None or current_owner["remote_sha256"] == observed["remote_sha256"],
+                    "source_cutover_owner_state_ambiguous")
+            return {**observed, "ref": "preserved"}
+    require(current_owner is not None, "source_cutover_owner_state_ambiguous")
     owner_root = _managed_source_root(codex_home, create=False) / "canonical_owner"
     try:
         bound_root = Path(binding["source_root"]).expanduser().resolve()
@@ -656,7 +689,8 @@ def _source_cutover_state(codex_home: Path, specs: tuple[SourceSpec, ...]) -> di
     desired: dict[str, Any] = {}
     changes: list[str] = []
     for name in ("sidecar", "canonical_owner"):
-        target = root / name
+        target = (_current_owner_root(codex_home)
+                  if name == "canonical_owner" and name not in by_name else root / name)
         try:
             current[name] = inspect_existing_checkout(target) if target.exists() else None
         except BootstrapError as exc:
@@ -1063,7 +1097,8 @@ def apply_source_cutover(
         for name in ("sidecar", "canonical_owner"):
             if name in prepared:
                 continue
-            target = root / name
+            target = (_current_owner_root(codex_home)
+                      if name == "canonical_owner" and name not in by_name else root / name)
             current = inspect_existing_checkout(target) if target.exists() else None
             require(current == plan["current"][name], "source_cutover_plan_stale")
 
@@ -1811,12 +1846,12 @@ def materialize_host(
     sidecar = root / "sidecar"
     canonical_owner = root / "canonical_owner" if "canonical_owner" in by_name else None
     if preserve_existing_owner:
-        current_owner = inspect_existing_checkout(root / "canonical_owner")
+        current_owner = inspect_existing_checkout(_current_owner_root(codex_home))
         require(
             _preserved_owner_identity(codex_home, current_owner) is not None,
             "source_cutover_owner_state_ambiguous",
         )
-        canonical_owner = root / "canonical_owner"
+        canonical_owner = _current_owner_root(codex_home)
     enrollment = sidecar / ".agents" / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "enrollment.py"
     require(enrollment.is_file(), "managed_bootstrap_missing")
     skill_root = _installed_skill_root(codex_home, create=True)
