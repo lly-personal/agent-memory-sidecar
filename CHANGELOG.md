@@ -3,6 +3,12 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## Unreleased
+
+- Add explicit, commit-bound non-secret Codex configuration field discovery, exact approved application, readback and latest-delta restoration.
+- Preserve unmanaged TOML and later unrelated edits; stop on stale plans, unsupported syntax, unsafe paths and interrupted transactions.
+- Keep file match, externally reported effective values and real consumer behavior separate; no host configuration is automatically enrolled or deployed.
+
 ## 0.5.0 (2026-10-19)
 
 - Synchronize the published global instruction document to enrolled Codex and Pi hosts with one preview/apply operation and reuse saved bindings on later runs.

@@ -63,6 +63,13 @@ target and is not shadowed by `AGENTS.override.md`.
 
 ## CLI
 
+For explicitly enrolled non-secret Codex configuration fields, see the separate
+[configuration reconciliation contract](specs/codex-config-sync-v1.md). `config preview`
+is read-only; `config apply` and `config restore` require approval of an exact fresh plan.
+Policy belongs to the selected commit in `codex-instructions`. File readback does not
+prove effective session values or consumer behavior. This optional CLI does not install
+or automatically alter the host configuration.
+
 ```powershell
 python -m agent_memory_sidecar rule list
 python -m agent_memory_sidecar rule list --target global_agents

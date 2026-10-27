@@ -52,6 +52,7 @@ ACTIVE_DOCUMENTS = (
     ROOT / "specs" / "workstation-reconcile-v2.md",
     ROOT / "specs" / "global-owner-scout-delivery-v1.md",
     ROOT / "specs" / "release-promotion-v1.md",
+    ROOT / "specs" / "codex-config-sync-v1.md",
 )
 LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 

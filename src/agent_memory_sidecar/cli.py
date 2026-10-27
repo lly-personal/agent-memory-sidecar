@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
+from . import config_sync
 from .codex_integration import doctor, setup, store_path
 from .core_cutover import apply_core_cutover, preview_core_cutover
 from .database import CoreDatabase
@@ -25,9 +26,9 @@ RESULT_CONTRACT = "agent_memory_result_v1"
 class ResultParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:
         if message.startswith(
-            "argument {rule,setup,doctor,instructions}: invalid choice:"
+            "argument {rule,setup,doctor,instructions,config}: invalid choice:"
         ):
-            message = "unknown command; expected rule, setup, doctor, or instructions"
+            message = "unknown command; expected rule, setup, doctor, instructions, or config"
         raise CoreError("invalid_request", message)
 
 
@@ -121,7 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(
         dest="command",
         required=True,
-        metavar="{rule,setup,doctor,instructions}",
+        metavar="{rule,setup,doctor,instructions,config}",
     )
 
     instructions = commands.add_parser("instructions", help="Synchronize published global instructions to Codex and Pi.")
@@ -136,6 +137,26 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument("--adopt-existing", action="append", metavar="HOST=SHA256",
                       help="First enrollment only: bind an explicitly reviewed existing document hash.")
     _bind(sync, "instructions.sync", cmd_instruction_sync)
+
+    config = commands.add_parser("config", help="Explicit non-secret Codex field discovery and approved reconciliation.")
+    config_commands = config.add_subparsers(dest="config_command", required=True)
+    for action in ("preview", "apply", "verify", "reconcile", "restore-preview", "restore"):
+        command = config_commands.add_parser(action)
+        command.add_argument("--target-file", type=Path, required=True,
+                             help="Explicit existing config.toml; no implicit host discovery.")
+        if action in {"preview", "apply", "verify"}:
+            command.add_argument("--source", type=Path, required=True)
+            command.add_argument("--source-commit", required=True)
+            command.add_argument("--policy-file", required=True)
+            command.add_argument("--platform", required=True)
+            command.add_argument("--codex-version", required=True)
+        if action in {"apply", "restore"}:
+            command.add_argument("--plan-hash", required=True)
+            command.add_argument("--approval-ref", required=True,
+                                 help="Reference to explicit user approval of this exact plan; not an approval generator.")
+        if action == "verify":
+            command.add_argument("--observation-file", type=Path)
+        _bind(command, "config." + action, cmd_config)
 
     rule = commands.add_parser("rule", help="List, deploy, or revoke rules.")
     rule_commands = rule.add_subparsers(
@@ -407,6 +428,39 @@ def cmd_instruction_sync(args: argparse.Namespace) -> dict[str, Any]:
     return synchronize(source=args.source, codex_home=args.codex_home, pi_agent_dir=args.pi_agent_dir,
                        state_dir=args.state_dir, apply=args.apply, plan_hash=args.plan_hash,
                        adopt_existing=args.adopt_existing)
+
+
+def cmd_config(args: argparse.Namespace) -> dict[str, Any]:
+    action = args.config_command
+    kwargs: dict[str, Any] = {"target": args.target_file}
+    if action in {"preview", "apply", "verify"}:
+        kwargs.update(bundle=config_sync.load_policy(source=args.source, commit=args.source_commit,
+                                                     policy_file=args.policy_file),
+                      platform=args.platform, codex_version=args.codex_version)
+    if action in {"apply", "restore"}:
+        kwargs.update(plan_hash=args.plan_hash, approval_ref=args.approval_ref)
+    if action == "verify" and args.observation_file:
+        _, data = config_sync._read_regular_bytes(args.observation_file)
+        try:
+            kwargs["observation"] = json.loads(data)
+        except (ValueError, UnicodeError) as exc:
+            raise CoreError("config_observation_invalid", "Observation must be non-secret UTF-8 JSON") from exc
+    function = {"preview": config_sync.preview, "apply": config_sync.apply,
+                "verify": config_sync.verify, "reconcile": config_sync.reconcile,
+                "restore-preview": config_sync.preview_restore, "restore": config_sync.restore}[action]
+    try:
+        return function(**kwargs)
+    except OSError as exc:
+        raise CoreError("config_transaction_interrupted" if action in {"apply", "restore"} else "config_read_failed",
+                        "Configuration operation interrupted; reconcile before any mutation retry",
+                        mutation_outcome="unknown" if action in {"apply", "restore"} else "not_attempted",
+                        reconciliation_required=action in {"apply", "restore"}) from exc
+    except CoreError as exc:
+        if action in {"apply", "restore"} and exc.code in {
+            "instruction_write_failed", "config_readback_failed", "config_recovery_required"
+        }:
+            exc.details.update(reconciliation_required=True)
+        raise
 
 
 def cmd_setup(args: argparse.Namespace) -> _OperationResult:

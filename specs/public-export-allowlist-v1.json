@@ -28,6 +28,7 @@
     "specs/source-authority-cutover-v2.md",
     "specs/workstation-reconcile-v2.md",
     "specs/global-instruction-sync-v1.md",
+    "specs/codex-config-sync-v1.md",
     "specs/release-promotion-v1.md",
     "specs/public-export-allowlist-v1.json",
     "docs/README.md",

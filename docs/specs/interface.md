@@ -803,6 +803,17 @@ Skill 源码不等于该任务采用它；若任务解析旧版本、没有 Deli
 `ineligible / runtime_skill_identity_mismatch`，不计通过、失败或五条入口矩阵分母。先由 commit-bound
 Bootstrap/Release 完成安装与新任务发现，再重跑前台可见验收。
 
+## Codex configuration field transport
+
+Codex non-secret configuration field transport is a separate optional CLI described by
+[Codex configuration reconciliation v1](../../specs/codex-config-sync-v1.md).
+`config preview/verify/reconcile/restore-preview` are read-only. `config apply/restore`
+require explicit approval evidence and a fresh exact plan hash; they never consume Core
+rule approvals or replace whole configuration documents. The source owner is
+`codex-instructions`; file readback, effective values, actual consumer verification and
+later experience remain distinct. No configuration is enrolled by installation or by
+ordinary instruction synchronization.
+
 ## Core cutover
 
 ```text
