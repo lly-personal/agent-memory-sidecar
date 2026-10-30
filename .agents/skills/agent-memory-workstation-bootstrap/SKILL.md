@@ -79,7 +79,8 @@ and physically checks product same-name Skills from each local primary folder th
 folder for non-Git projects). Preserve enumerated projects without a local path as bounded entries. Delete the temporary directory
 after the command. A historical cutover receipt is never accepted as current host evidence. Project-level drift returns
 `consumer_scope_drift`; incomplete inventory or unsafe/unreadable scope returns `consumer_scope_bounded`. Neither state authorizes
-patching, pulling, deleting, or overwriting a project checkout.
+patching, pulling, deleting, or overwriting a project checkout. Report entry conditions separately from actual Scout execution;
+this check does not run Scout or prove its acceptance.
 
 ## Mode: `apply_enrollment`
 

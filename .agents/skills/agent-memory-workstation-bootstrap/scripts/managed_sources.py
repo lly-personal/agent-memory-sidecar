@@ -2659,7 +2659,7 @@ def _markdown_table_text(value: str) -> str:
 def render_pack(value: Any) -> str:
     pack = validate_pack(value)
     status = {
-        "ready": "本机托管能力、新任务入口与 Desktop 项目消费者范围已对齐",
+        "ready": "本机托管能力和 Desktop 项目消费者范围已对齐",
         "reload_required": "本机安装与读回已完成；下次使用前刷新 Desktop，真实采用尚未验证",
         "consumer_scope_drift": "托管能力已对齐，但 Desktop 可见项目存在不同版本或内容的同名 Skill",
         "consumer_scope_bounded": "托管能力已对齐，但 Desktop 项目消费者范围尚未完整观察",
@@ -2685,7 +2685,8 @@ def render_pack(value: Any) -> str:
         f"| 能力源同步 | Sidecar `{sources['sidecar']['status']}` / Global Owner `{sources['canonical_owner']['status']}` | 只更新本机受管缓存，不清理活跃工程 |",
         f"| 主机物化 | Core `{material['core']['status']}` / Doctor `{material['doctor']}` / Scout `{material['scout_skill']['status']}` | Bootstrap {material['bootstrap_skill']['version']}；Scout {material['scout_skill']['version']} |",
         f"| 项目消费者范围 | `{scope['status']}` | Desktop 项目 {scope['desktop_project_count']}；已读 {scope['scanned_project_count']}；同名 Skill {scope['matching_skill_count']} |",
-        f"| 消费者采用 | Desktop 刷新 `{activation['desktop_reload']}` / 交互入口 `{activation['interactive_entry']}` | Scheduled `{activation['scheduled']}`，项目集合仍由当前主机和用户决定 |",
+        f"| 消费者采用 | Desktop 刷新 `{activation['desktop_reload']}` / 入口检查 `{activation['interactive_entry']}` | `verified` 仅表示安装与项目范围检查通过；Scheduled `{activation['scheduled']}` |",
+        "| Scout 实际运行 | 本次未运行 | 本次未验证 Scout 运行验收，不判断其他运行的验收结果 |",
     ]
     if scope["projects"]:
         lines.extend(["", "## Desktop 可见项目级同名 Skill", "", "| 项目 | Skill | 版本 | 关系 |", "|---|---|---|---|"])

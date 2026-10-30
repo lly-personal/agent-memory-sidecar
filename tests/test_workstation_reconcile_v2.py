@@ -5,6 +5,7 @@ import contextlib
 import hashlib
 import io
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -268,6 +269,16 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         }
         ready = self.reconcile.build_deployment_pack(**common, consumer_scope=exact_scope)
         self.assertEqual("ready", ready["status"])
+        rendered_ready = self.reconcile.render_pack(ready)
+        self.assertIn("入口检查 `verified`", rendered_ready)
+        self.assertIn("仅表示安装与项目范围检查通过", rendered_ready)
+        self.assertIn("Scout 实际运行 | 本次未运行", rendered_ready)
+        self.assertIn("不判断其他运行的验收结果", rendered_ready)
+        result = subprocess.run(
+            [sys.executable, "-B", str(MANAGED_SOURCES), "render-pack"],
+            input=json.dumps(ready), capture_output=True, text=True, check=True,
+        )
+        self.assertEqual(rendered_ready, result.stdout)
 
         drifted_scope = {
             **exact_scope,
@@ -287,6 +298,8 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         rendered = self.reconcile.render_pack(drifted)
         self.assertIn("&lt;Project&gt;\\|Name", rendered)
         self.assertNotIn("<Project>", rendered)
+        self.assertIn("入口检查 `ambiguous`", rendered)
+        self.assertIn("Scout 实际运行 | 本次未运行", rendered)
 
         bounded_scope = {
             **exact_scope,

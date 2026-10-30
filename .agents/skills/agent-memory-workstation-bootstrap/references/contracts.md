@@ -92,6 +92,9 @@ An apply result uses `agent_memory_workstation_reconcile_receipt_v3` with exact
   `available_next_task`; only read-only `--verify-consumer` from a newly loaded Bootstrap task with complete exact consumer scope
   may return `verified` and `ready`. Drift returns `ambiguous`; bounded coverage returns `unproven`. Managed-layer blocked status
   returns `blocked`, does not request a reload, and cannot route the user to Project Scout.
+- In v3, `interactive_entry=verified` means the installation and project scope checks passed, assuming the caller satisfies the
+  new-task Bootstrap precondition; it does not attest an actual Scout invocation or its acceptance. Keep the machine contract
+  compatible. The renderer separately reports the entry check and that Scout was not run by this check, without asserting other runs.
 - `limitations` must explicitly retain the real-second-device proof boundary when only a same-host clean-profile test exists.
 - `pack_hash` is SHA-256 of canonical UTF-8 JSON excluding `pack_hash`.
 

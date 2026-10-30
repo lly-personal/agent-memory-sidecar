@@ -407,6 +407,9 @@ Scheduled、连续性与产品收益未证明边界。
 安装交付在 `reload_required` 结束；它提示下次使用前刷新 Desktop，不要求用户立即创建新任务或重复部署。
 只有用户后续主动要求检查消费者时才进入只读 `verify_consumer`。该检查证明所声明的加载与安装范围，真实理解、
 自然采用和收益独立保留；用户延后验收不阻塞技术交付。所有 Anchor、Bootstrap、SOP 与 renderer 使用这一分工。
+v3 的 `consumer_activation.interactive_entry=verified` 只表示安装与项目范围检查通过，并以调用方满足新任务已加载
+Bootstrap 为前提；它不证明 Scout 被实际调用或运行验收通过。保持 v3 字段和值兼容；中文回执分别显示入口检查和 Scout 实际运行状态，
+明确本次检查未运行 Scout，不能据此判断其他运行的验收结果。
 
 `global_owner_scout_enrollment_pack_v1` 顶层精确包含：
 
