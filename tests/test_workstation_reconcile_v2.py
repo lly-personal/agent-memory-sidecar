@@ -46,7 +46,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "core_version": "0.3.10",
             "plugin_version": "1.5.1",
             "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.3.2",
+            "bootstrap_version": "2.3.3",
             "bootstrap_sha256": "c" * 64,
             "scout_version": "5.11.0",
             "scout_sha256": "d" * 64,
@@ -95,7 +95,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "unavailable",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.3.2", "content_sha256": "c" * 64,
+                "status": "unchanged", "version": "2.3.3", "content_sha256": "c" * 64,
             },
             "scout_skill": {
                 "status": "unchanged", "version": "5.11.0", "content_sha256": "d" * 64,
@@ -154,7 +154,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             skill = project / ".agents" / "skills" / "agent-memory-workstation-bootstrap"
             skill.mkdir(parents=True)
             skill_file = skill / "SKILL.md"
-            skill_file.write_text("# Bootstrap\n\n- Skill version: `2.3.2`\n", encoding="utf-8")
+            skill_file.write_text("# Bootstrap\n\n- Skill version: `2.3.3`\n", encoding="utf-8")
             desired = self.desired_bundle()
             desired["bootstrap_sha256"] = self.reconcile.physical_tree_hash(skill)
 
@@ -163,12 +163,12 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             )
             self.assertEqual("exact", exact["status"])
 
-            skill_file.write_text("# Bootstrap\n\n- Skill version: `2.3.2`\n\nChanged.\n", encoding="utf-8")
+            skill_file.write_text("# Bootstrap\n\n- Skill version: `2.3.3`\n\nChanged.\n", encoding="utf-8")
             drifted = self.reconcile.observe_consumer_scope(
                 self.desktop_inventory(("Project", project)), desired=desired,
             )
             self.assertEqual("drifted", drifted["status"])
-            self.assertEqual("2.3.2", drifted["projects"][0]["skills"][0]["version"])
+            self.assertEqual("2.3.3", drifted["projects"][0]["skills"][0]["version"])
 
     def test_consumer_scope_fails_bounded_on_project_skill_parent_alias(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -236,7 +236,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             skill = project / ".agents" / "skills" / "agent-memory-workstation-bootstrap"
             skill.mkdir(parents=True)
             (skill / "SKILL.md").write_text(
-                "# Bootstrap\n\n- Skill version: `2.3.2`\n", encoding="utf-8",
+                "# Bootstrap\n\n- Skill version: `2.3.3`\n", encoding="utf-8",
             )
             for index in range(self.reconcile.CONSUMER_SKILL_MAX_ENTRIES):
                 (skill / f"extra-{index:03d}.txt").write_text("x", encoding="utf-8")
@@ -275,6 +275,8 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         self.assertIn("仅表示安装与项目范围检查通过", rendered_ready)
         self.assertIn("Scout 实际运行 | 本次未运行", rendered_ready)
         self.assertIn("不判断其他运行的验收结果", rendered_ready)
+        self.assertIn("模型自动加载、自然采用和实际体验仍未证明", rendered_ready)
+        self.assertNotIn("新任务中发送", rendered_ready)
         result = subprocess.run(
             [sys.executable, "-B", str(MANAGED_SOURCES), "render-pack"],
             input=json.dumps(ready), capture_output=True, encoding="utf-8",
@@ -316,6 +318,44 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         self.assertIn("无需重复部署", rendered)
         self.assertNotIn("同一句部署入口", rendered)
         self.assertEqual("unproven", bounded["consumer_activation"]["interactive_entry"])
+
+    def test_requested_consumer_check_reads_scope_without_session_gate_or_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = root / "project"
+            project.mkdir()
+            protected = project / "AGENTS.md"
+            protected.write_text("Keep the project rules.\n", encoding="utf-8")
+            inventory = root / "inventory.json"
+            inventory.write_text(json.dumps(self.desktop_inventory(("Example", project))), encoding="utf-8")
+            context = {
+                "desired": self.desired_bundle(), "observed": self.exact_distribution(),
+                "source_sha256": "e" * 64, "source_plan": self.source_plan(),
+                "observed_host": self.exact_host(),
+            }
+            # The host observer is the boundary substitute; scope observation, CLI dispatch,
+            # rendering and project I/O are real. No session-loading assertion is supplied.
+            with mock.patch.object(self.reconcile, "_workstation_reconcile_context", return_value=({"status": "noop"}, context)):
+                output = io.StringIO()
+                argv = [
+                    str(MANAGED_SOURCES), "workstation-reconcile", "--verify-consumer", "--codex-home", str(root / "codex"),
+                    "--source-manifest", str(root / "source.json"),
+                    "--release-manifest", str(root / "release.json"),
+                    "--desktop-project-inventory", str(inventory),
+                ]
+                with contextlib.redirect_stdout(output), mock.patch.object(sys, "argv", argv):
+                    code = self.reconcile.main()
+            self.assertEqual(0, code)
+            pack = json.loads(output.getvalue())
+            self.assertEqual("ready", pack["status"])
+            self.assertEqual(1, pack["consumer_scope"]["scanned_project_count"])
+            self.assertIn("模型自动加载、自然采用和实际体验仍未证明", self.reconcile.render_pack(pack))
+            self.assertEqual("Keep the project rules.\n", protected.read_text(encoding="utf-8"))
+            self.assertFalse((root / "codex").exists())
+
+            with mock.patch.object(self.reconcile, "_workstation_reconcile_context", return_value=({"status": "ready"}, context)):
+                with self.assertRaisesRegex(self.reconcile.BootstrapError, "consumer_verification_requires_exact_host"):
+                    self.reconcile.verify_workstation_consumer(root / "codex", root / "source.json", root / "release.json", inventory)
 
     def test_real_regression_detects_stale_marketplace_and_plugin(self) -> None:
         observed = self.exact_distribution()
@@ -448,7 +488,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.3.2",
+                "version": "2.3.3",
                 "content_sha256": "c" * 64,
             },
             "scout_skill": {
@@ -479,11 +519,11 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         self.reconcile.validate_pack(pack)
         rendered = self.reconcile.render_pack(pack)
         self.assertIn("本次安装交付到此完成", rendered)
-        self.assertIn("主动要求检查消费者", rendered)
+        self.assertIn("同一主机、同一聊天完成只读消费者检查", rendered)
         self.assertNotIn("再次发送", rendered)
         self.assertNotIn("完成采用验收", rendered)
 
-    def test_unverified_consumer_always_requires_one_refresh(self) -> None:
+    def test_installation_pack_preserves_unverified_consumer_state(self) -> None:
         materialization = {
             "core": {
                 "status": "verified", "version": "0.3.10", "source_commit": "a" * 40,
@@ -492,7 +532,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "verified",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.3.2", "content_sha256": "c" * 64,
+                "status": "unchanged", "version": "2.3.3", "content_sha256": "c" * 64,
             },
             "scout_skill": {
                 "status": "unchanged", "version": "5.11.0", "content_sha256": "d" * 64,
@@ -560,7 +600,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             plugin_manifest.parent.mkdir()
             plugin_manifest.write_text(json.dumps({"version": "1.5.1"}), encoding="utf-8")
             (bootstrap / "SKILL.md").write_text(
-                "# Bootstrap\n\n- Skill version: `2.3.2`\n", encoding="utf-8",
+                "# Bootstrap\n\n- Skill version: `2.3.3`\n", encoding="utf-8",
             )
             (scout / "SKILL.md").write_text(
                 "# Scout\n\n- Skill version: `5.11.0`\n", encoding="utf-8",
@@ -589,7 +629,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 },
                 "versions": {
                     "core": "0.3.10", "plugin": "1.5.1",
-                    "bootstrap": "2.3.2", "scout": "5.11.0",
+                    "bootstrap": "2.3.3", "scout": "5.11.0",
                 },
                 "artifacts": [],
                 "verification": {},
@@ -622,7 +662,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
 
             self.assertEqual("v0.3.10", desired["release_ref"])
             self.assertEqual("1.5.1", desired["plugin_version"])
-            self.assertEqual("2.3.2", desired["bootstrap_version"])
+            self.assertEqual("2.3.3", desired["bootstrap_version"])
             self.assertEqual("a" * 40, sidecar.expected_commit)
             self.assertRegex(source_hash, r"^[0-9a-f]{64}$")
             self.assertRegex(desired["plugin_sha256"], r"^[0-9a-f]{64}$")
@@ -756,7 +796,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             codex_home = root / "codex-home"
             self.reconcile.sync_sources(codex_home, spec)
             for name, version in (
-                ("agent-memory-workstation-bootstrap", "2.3.2"),
+                ("agent-memory-workstation-bootstrap", "2.3.3"),
                 ("global-owner-scout", "5.11.0"),
             ):
                 skill = codex_home / "skills" / name
@@ -787,7 +827,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             self.assertEqual("verified", observed["core"]["status"])
             self.assertEqual(commit, observed["core"]["source_commit"])
             self.assertEqual("verified", observed["doctor"])
-            self.assertEqual("2.3.2", observed["bootstrap_skill"]["version"])
+            self.assertEqual("2.3.3", observed["bootstrap_skill"]["version"])
             self.assertRegex(observed["scout_skill"]["content_sha256"], r"^[0-9a-f]{64}$")
 
     def test_distribution_participant_rolls_back_with_source_transaction(self) -> None:

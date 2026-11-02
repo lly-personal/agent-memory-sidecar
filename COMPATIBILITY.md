@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.5.6 | 0.5.6 | 1.7.6 | 2.3.3 | 5.11.0 | v6 | 3.11–3.13 |
 | v0.5.5 | 0.5.5 | 1.7.5 | 2.3.2 | 5.11.0 | v6 | 3.11–3.13 |
 | v0.5.4 | 0.5.4 | 1.7.4 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.5.3 | 0.5.3 | 1.7.3 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
@@ -82,3 +83,7 @@ context snapshot; regenerate new Project results instead of filling old payloads
 Delivery v1 files and queued receipts can still be verified without migration. Covered cards retain evidence with no required
 action. Queued readback is not UI proof or approval; later exact human selections use the existing Fresh Core bundle flow.
 Bootstrap 2.3.2 and Plugin 1.7.5 carry the new bundle; real adoption and platform UI behavior remain separately observed.
+
+Bootstrap 2.3.3 and Plugin 1.7.6 allow requested consumer checks in the original task, including deployment-and-verification.
+Deployment Pack v3 stays wire-compatible: ready/verified cover installation and project scope only; legacy reload markers are
+not session-loading observations. Automatic loading, natural adoption and other-host experience remain unverified by this check.

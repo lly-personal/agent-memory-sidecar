@@ -54,11 +54,13 @@ publication with explicit local-sync scope, use this same lane, never a second s
    - an explicitly disabled Plugin, Owner ambiguity, unreadable state, dirty tracked source, unresolved ref, or stale plan stops.
 3. `workstation-reconcile --apply` owns Plugin/Marketplace compensation, source synchronization, Core/global Owner materialization,
    Doctor, atomic Bootstrap/Scout installation, and exact readback. Return its Chinese Deployment Pack v3. A successful mutation
-   ends at `reload_required`. State that one Codex Desktop refresh is needed before later use; installation delivery is complete.
-   Do not create an acceptance task or request an immediate repeat deployment.
-4. Only when the user later requests consumer verification in a refreshed new task, resolve the same current Release and rerun dry-run. When the plan is exact `noop`, run
-   `workstation-reconcile --verify-consumer` instead of apply. Only that read-only new-task check may return `ready`; user experience,
-   natural adoption and benefit remain separate evidence and may be deferred.
+   ends at `reload_required`, which completes installation but does not prove session loading or adoption. Do not create an
+   acceptance task or ask for a repeated request; suggest refresh only for missing discovery or an explicit host requirement.
+4. When the user requests consumer verification, including in the deployment request or the same chat, continue with the verified
+   Bootstrap's `verify_consumer` mode on the target host. Reuse this task's verified Resolver output; resolve again only if it is no
+   longer available or the release identity changed. An exact `noop` allows `workstation-reconcile --verify-consumer` instead of apply. This read-only
+   check can return `ready` for installation and project scope only; automatic loading, Scout execution, natural adoption and
+   benefit remain separate evidence. A new chat or refresh is not a prerequisite for these independent checks.
 
 Compatibility: published Anchor 1.x calls `source-cutover` after resolving a Release. Bootstrap 2.0 recognizes only that complete
 Resolver directory shape and routes the legacy command and renderer through this same Workstation Reconcile v2 plan/transaction.

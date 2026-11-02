@@ -73,7 +73,8 @@ the latest stable immutable GitHub Release or an explicit version and verifies t
 `release_resolution_blocked`; it never falls back to `main`, a private repository, or an unverified local checkout. The resolver
 manually materializes only validated regular-file entries under a new `portable_root`, rejecting absolute/traversal paths,
 case-collisions, symlink/device metadata, encryption, and expansion beyond its bound. Anchor executes the formal Bootstrap from that
-verified root in the same deployment task; a later Codex refresh/new task is only the automatic Skill discovery boundary. The
+verified root in the same deployment task, including requested read-only consumer checks. Automatic Skill discovery and natural
+adoption remain separate observations; refresh is only a recovery step for missing discovery or an explicit host requirement. The
 resolver contract begins with `v0.3.1`; earlier public releases remain historical artifacts and are not valid inputs for this cold-start path.
 For GitHub API metadata only, the Resolver may use an explicit `GITHUB_TOKEN`/`GH_TOKEN` or existing non-interactive `gh`
 authentication before falling back to the anonymous public quota. It never persists or renders that token; rate limiting and invalid

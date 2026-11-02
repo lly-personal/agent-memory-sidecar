@@ -3,6 +3,12 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.6 (2026-11-02)
+
+- Continue requested consumer checks in the original chat after deployment, without requiring another refresh, chat, or repeated request.
+- Keep automatic loading, natural adoption, and actual experience explicitly unverified even when installation and project-scope checks pass; remote-host checks cannot use another machine's evidence.
+- Components: Core 0.5.6, Plugin 1.7.6, Bootstrap 2.3.3 and Scout 5.11.0; deployment identities, read-only checks and mutation guards are unchanged.
+
 ## 0.5.5 (2026-11-02)
 
 - Complete read-only Scout reviews in the invoking task; remove mandatory child-chat/worktree projection and bind helper checks to the explicit consumer project.

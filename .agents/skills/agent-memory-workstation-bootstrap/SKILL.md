@@ -7,20 +7,21 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `2.3.2`
+- Skill version: `2.3.3`
 - Modes: `inspect`, `verify_consumer`, `apply_enrollment`
 - Deployment pack: `agent_memory_workstation_deployment_pack_v3`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
 - Host profile: `global_owner_scout_host_profile_v1`
 - Read [references/contracts.md](references/contracts.md) completely before either mode.
 
-This Skill separates five facts that must never be collapsed:
+This Skill separates six facts that must never be collapsed:
 
 1. **desired bundle identity**: one verified Release binds Core, Plugin, Bootstrap, Scout, source commit, and content hashes;
 2. **observed distribution**: Codex JSON state and physical readback identify the actual Marketplace and Plugin version/ref/hash/enabled state;
 3. **source synchronization**: this host has clean managed snapshots of the Sidecar and canonical Global Owner sources;
 4. **host materialization**: Core, global binding, Bootstrap, Scout, and Doctor are installed and verified on this host;
-5. **consumer adoption**: a refreshed new task actually loaded the installed Bootstrap before the interactive entry is called ready.
+5. **consumer scope**: current target-host Desktop projects have no conflicting product Skills; this is a read-only check;
+6. **consumer adoption**: automatic loading, natural use, and actual experience require separate observations; scope checks cannot prove them.
 
 A normal deployment request always enters `inspect`. It must not create, update, pause, resume, or delete Scheduled tasks and must
 not change the Host Profile. Only an explicit request to retest or configure Scheduled capability enters `apply_enrollment`.
@@ -54,24 +55,29 @@ migration continue through `inspect` below.
      root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
 3. Run exact-hash `workstation-reconcile --apply`. Marketplace/Plugin mutation participates in the source-cutover rollback
    transaction. The transaction then runs Core setup, binds the explicit or preserved canonical Owner, verifies Doctor, installs
-   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.3.2`, Scout `5.11.0`,
+   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.3.3`, Scout `5.11.0`,
    and every desired identity. The result is `reload_required`; it proves host materialization, not model adoption or project-level
    same-name Skill parity.
-4. Finish installation delivery here. State that one Codex Desktop refresh is needed before later use; do not create a new task,
-   request an immediate acceptance run, or ask the user to repeat deployment. Consumer verification is a separate, user-initiated
-   read-only request. Do not enumerate project activity or Scheduled tasks for ordinary installation; enrollment remains optional.
+4. If the user also requested verification, continue through `verify_consumer` in this same task after exact readback; that request
+   already authorizes the read-only check. Otherwise finish installation here. Do not request a new chat, repeated instruction, or
+   acceptance run. Skill changes support native automatic discovery; suggest refresh only for observed missing discovery or an
+   explicit host requirement. Do not enumerate project activity or Scheduled tasks for ordinary installation.
 5. Build and validate one `agent_memory_workstation_deployment_pack_v3` from the reconciler's exact readback, render it with
    `python -B scripts/managed_sources.py render-pack`, and return the Chinese Markdown. Separately render an Enrollment Pack only
    when project discovery is useful to the user's request. Do not make enrollment a prerequisite for interactive Scout use.
 
 The final deployment result reports `desired release / Plugin distribution / source synchronization / host materialization /
-consumer adoption` separately. A same-machine clean-profile simulation may prove deterministic cold start, but it must remain
+consumer scope / consumer adoption` separately. A same-machine clean-profile simulation may prove deterministic cold start, but it must remain
 distinct from a real second-device result.
 
 ## Mode: `verify_consumer`
 
-Enter only when the user asks to verify consumers, from a refreshed new task that actually loaded Bootstrap 2.3.2. Use the Codex
-Desktop project API in this task to obtain the complete visible project inventory. Write only the exact temporary
+Enter when the user asks to verify consumers, including deployment-and-verification in one request or a follow-up in the original
+chat. Read the verified portable Bootstrap and run its existing commands; automatic session loading is not a prerequisite for this
+explicit read-only execution and is not thereby proven. Bind the target host from the request and native task context. Use that
+host's Codex Desktop project API to obtain its complete visible inventory; another host's local inventory cannot substitute. If the
+target host cannot be reached or enumerated, preserve that boundary and complete independent checks without asking the user to test.
+Write only the exact temporary
 `agent_memory_desktop_project_inventory_v1` input required by the reconciler inside a fresh mode-0700 directory, then run
 `workstation-reconcile --verify-consumer --desktop-project-inventory <inventory>` against the same Resolver output. This mode is read-only: it requires an exact no-op plan,
 re-observes current managed sources, Core runtime, Owner parity, Doctor, installed Bootstrap/Scout bytes, distribution identities,
@@ -80,7 +86,8 @@ folder for non-Git projects). Preserve enumerated projects without a local path 
 after the command. A historical cutover receipt is never accepted as current host evidence. Project-level drift returns
 `consumer_scope_drift`; incomplete inventory or unsafe/unreadable scope returns `consumer_scope_bounded`. Neither state authorizes
 patching, pulling, deleting, or overwriting a project checkout. Report entry conditions separately from actual Scout execution;
-this check does not run Scout or prove its acceptance.
+this check does not run Scout or prove its acceptance, automatic loading, or natural adoption. Do not create a chat or ask the user
+to repeat the request to fill those evidence gaps.
 
 ## Mode: `apply_enrollment`
 

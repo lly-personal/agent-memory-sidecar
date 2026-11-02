@@ -5,7 +5,7 @@
 engineering-authority epochs, first-release cutover gate, and steady-state public development boundary.
 `source-authority-cutover-v2.md` owns the lower-level transaction for explicit migration between managed Sidecar identities.
 `workstation-reconcile-v2.md` owns the single user-facing operation that reconciles verified Release identity, Marketplace/Plugin,
-managed sources, host materialization, and new-task consumer verification.
+managed sources, host materialization, and same-task read-only consumer scope verification.
 `global-owner-scout-delivery-v1.md` owns task-scoped Review Pack artifacts, compact receipts, and actual task-surface qualification.
 `release-promotion-v1.md` owns the deterministic inspect/apply transition from a verified draft to an attested immutable Release.
 `global-instruction-sync-v1.md` owns on-demand whole-document distribution to enrolled Codex/Pi hosts; it does not install Pi Core or Scout.

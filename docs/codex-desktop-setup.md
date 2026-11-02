@@ -10,7 +10,7 @@
 Codex Desktop users register the tagged public Marketplace and install the plugin:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.5.4
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.5.6
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -20,8 +20,9 @@ selected version), verifies asset digests, checksums, tag/commit and manifests,
 safely materializes its portable bundle, and runs the commit-bound Bootstrap in
 the same task. Fresh/same-source deployment completes directly. A legacy
 Sidecar or Marketplace source identity replacement displays one path-free plan and asks for one
-confirmation before a fresh-hash atomic apply. The following task is needed
-only for reliable automatic discovery and consumer verification of newly installed Plugin/Skills.
+confirmation before a fresh-hash atomic apply. If verification was requested, continue the target-host read-only consumer check
+in this task. Native Skill discovery supports automatic updates; refresh only for missing discovery or an explicit host requirement.
+The check cannot prove automatic loading or natural adoption.
 A checkout or Marketplace alone does not authorize source materialization or prove model adoption.
 
 The installed Agent Memory Skill includes its own Core command entry under `scripts/agent-memory.py`.
@@ -32,7 +33,7 @@ remain with the verified Bootstrap; the daily entry does not expose setup or mig
 Core-only consumers install the Release wheel and run:
 
 ```powershell
-python -m pip install .\agent_memory_sidecar-0.5.4-py3-none-any.whl
+python -m pip install .\agent_memory_sidecar-0.5.6-py3-none-any.whl
 agent-memory setup
 agent-memory setup --apply
 agent-memory doctor
@@ -67,7 +68,7 @@ when Core's bound source root and commit match it exactly.
 If an existing host has a clean managed Sidecar with a different repository
 identity, normal `sync-sources` intentionally fails closed. The unified flow reads actual Codex JSON and physical component
 identities, renders only safe desired/observed changes, then passes the exact fresh `plan_hash` to apply after one confirmation.
-Apply returns `reload_required`; a refreshed task runs read-only `--verify-consumer` before reporting `ready`.
+Apply returns `reload_required`; requested read-only `--verify-consumer` continues in the same task and reports `ready` only for exact installation and project scope. Automatic loading, natural adoption and actual experience remain separate observations.
 Existing global Owner removal is not implicit and requires a separate decision.
 
 ## Contributor path
