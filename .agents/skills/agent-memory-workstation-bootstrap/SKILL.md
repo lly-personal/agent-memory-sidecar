@@ -54,7 +54,7 @@ migration continue through `inspect` below.
      root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
 3. Run exact-hash `workstation-reconcile --apply`. Marketplace/Plugin mutation participates in the source-cutover rollback
    transaction. The transaction then runs Core setup, binds the explicit or preserved canonical Owner, verifies Doctor, installs
-   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.3.1`, Scout `5.10.0`,
+   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.3.1`, Scout `5.10.1`,
    and every desired identity. The result is `reload_required`; it proves host materialization, not model adoption or project-level
    same-name Skill parity.
 4. Finish installation delivery here. State that one Codex Desktop refresh is needed before later use; do not create a new task,

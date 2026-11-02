@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.5 (Unreleased)
+
+- Scout 5.10.1 accepts an explicit project root for preflight so installed helper working directories cannot replace the actual consumer context.
+- Clarify task output grants, require exact decision fields in independent review, and keep request-only host open acknowledgements separate from observed presentation.
+- Windows consumer verification passed on v0.5.4. The corrected Scout draft is reviewable, but first-invocation routing and terminal host-open observation remain unqualified; these source fixes are not a new workstation deployment.
+- Components: Core 0.5.5, Plugin 1.7.4, Bootstrap 2.3.1 and Scout 5.10.1; v0.5.4 remains immutable and no new release has been published.
+
 ## 0.5.4 (2026-11-02)
 
 - Use the installed Skill description as the single runtime admission owner; remove narrower duplicate trigger lists from Ambient and the Skill body.

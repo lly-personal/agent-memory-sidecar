@@ -475,7 +475,8 @@ $global-owner-scout 复盘当前项目
 ```
 
 Skill 禁止隐式触发。入口必须先于任务索引、线程分页、Owner 比较和项目深挖完成一次前置 preflight：Fresh
-解析当前 Desktop 项目绑定，并通过 `python -B scripts/scout.py inspect-context` 取得无路径
+解析当前 Desktop 项目绑定，并通过已解析的 dispatcher 执行
+`python -B <resolved-skill-root>/scripts/scout.py inspect-context --project-root <bound-project-root>` 取得无路径
 `global_owner_scout_preflight_v1` Git/只读快照。已在独立 worktree 时原地继续；该正式调用授权恰好一个只读 executor；位于
 Local 时必须使用宿主原生项目任务创建能力，把当前 working-tree state 与同一正式调用作为初始 prompt 一次性投影，
 并在隔离任务继续，用户不重复输入。不得创建空子任务、不得用
@@ -483,6 +484,10 @@ shell 手工创建 worktree、猜测路径或先执行部分复盘再检查上�
 入口在 preflight 阶段通过 `global_owner_scout_terminal_v1` 失败关闭。
 投影成功时，前门任务只返回宿主原生 created-task surface，把用户直接链接到唯一 executor；该状态只证明
 `routed`，不得声称复盘、Review Pack、安装采用或用户验收已经完成。完整 Review Pack 或 Terminal 只在 executor 任务产生。
+
+`--project-root` 由当前 Desktop 绑定提供绝对路径，与 helper 的工作目录分离；安装目录不能成为项目身份。
+旧调用省略该参数时仍使用 cwd，正式入口和最终只读复核必须显式传入。输出 schema 不变且不暴露路径。
+宿主输出目录先从当前任务注入的文件系统上下文核对；空的 artifact 列表或缺字段的 request metadata 不能推翻已有明确授权。
 
 `global_owner_scout_preflight_v1` 精确包含：
 
@@ -563,7 +568,7 @@ Scheduled 使用既有最终 Inbox wrapper 与可见文本校验，不增加文�
 是否截断，以及 `complete/bounded/degraded`。达到宿主任务索引上限、未读到窗口边界或无法继续分页时只能使用
 `bounded/degraded`，不得声称完成完整 session 复盘。
 
-Skill 5.10.0 的所有入口固定使用已验证的原生任务索引上限 `50` 作为首次且唯一的索引请求，不得先请求更大
+Skill 5.10.1 的所有入口固定使用已验证的原生任务索引上限 `50` 作为首次且唯一的索引请求，不得先请求更大
 页面探测上限。调用使用最长 60 秒的初始 yield；返回 `cell_id` 时必须对同一 cell 最多连续 wait 两次、每次最长
 60 秒。cell 未终态前禁止发起第二次索引调用，`Script running` 不得解释为 unavailable、timeout 或 degraded。
 
@@ -801,7 +806,7 @@ Store、常驻规则或独立更新器。正常工程任务按需选择方法，
 - 活跃原工作区的并发变化只记录为当前隔离快照之外的限制；稳定隔离快照中的卡不得因此整体失效。
 - 2026-08-11 的三个真实 v5.1 Scheduled 运行及最小 automation-source probe 证明本主机原生任务索引未取得终态。
   每个 Host Enrollment 保持 `0/14`，自动化保持 `PAUSED`；普通 worktree 前向测试不再拥有恢复权。只有新的真实
-  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 Skill 5.10.0 项目 canary；
+  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 Skill 5.10.1 项目 canary；
   在 14 次有效运行期间必须显式请求
   `gpt-5.6-sol` 与 `medium` reasoning，并记录请求值、
   宿主可见的实际值和 telemetry 可用性。只有 request 不能证明实际模型；不可观测时诚实标记 `request_only`，

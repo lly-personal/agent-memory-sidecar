@@ -121,7 +121,8 @@ def main() -> int:
     configure_utf8_stdio()
     parser = argparse.ArgumentParser(description="Run one active Global Owner Scout helper operation.")
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("inspect-context")
+    context = commands.add_parser("inspect-context")
+    context.add_argument("--project-root", type=Path)
     output = commands.add_parser("inspect-output")
     output.add_argument("--artifact-dir", type=Path, required=True)
     output.add_argument("--protected-root", action="append", type=Path, required=True)
@@ -148,7 +149,7 @@ def main() -> int:
 
     try:
         if args.command == "inspect-context":
-            print(json.dumps(inspect_git_context(Path.cwd()), separators=(",", ":")))
+            print(json.dumps(inspect_git_context(args.project_root or Path.cwd()), separators=(",", ":")))
         elif args.command == "inspect-output":
             validate_output_root(args.artifact_dir, args.protected_root)
             print(json.dumps({"status": "ok", "output_root_contained": True, "writes_performed": False}))

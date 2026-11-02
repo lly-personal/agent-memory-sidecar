@@ -98,7 +98,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.10.0",
+                "version": "5.10.1",
                 "content_sha256": "c" * 64,
             },
         }
@@ -848,7 +848,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             "release_ref": "v0.3.10", "source_commit": "a" * 40,
             "core_version": "0.3.10", "plugin_version": "1.5.1", "plugin_sha256": "b" * 64,
             "bootstrap_version": "2.3.1", "bootstrap_sha256": "c" * 64,
-            "scout_version": "5.10.0", "scout_sha256": "d" * 64,
+            "scout_version": "5.10.1", "scout_sha256": "d" * 64,
         }
         source_sha = "e" * 64
         pack = self.managed_sources.build_deployment_pack(
@@ -866,7 +866,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 "core": {"status": "verified", "version": "0.3.10", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
                 "global_binding": "unavailable", "doctor": "verified",
                 "bootstrap_skill": {"status": "unchanged", "version": "2.3.1", "content_sha256": "c" * 64},
-                "scout_skill": {"status": "unchanged", "version": "5.10.0", "content_sha256": "d" * 64},
+                "scout_skill": {"status": "unchanged", "version": "5.10.1", "content_sha256": "d" * 64},
             },
             requires_reload=True,
             consumer_verified=False,
@@ -1029,7 +1029,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_v5_prompt_has_no_fixed_binding(self) -> None:
         prompt = (
             "Use $global-owner-scout in project_scout mode for the current bound project; rolling 72 hours; "
-            "Skill 5.10.0; global_owner_scout_project_v5; global_owner_scout_review_pack_v6; "
+            "Skill 5.10.1; global_owner_scout_project_v5; global_owner_scout_review_pack_v6; "
             "gpt-5.6-sol; medium; read-only."
         )
         self.bootstrap.validate_prompt(prompt)
@@ -1286,6 +1286,19 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             snapshot = json.loads(result.stdout)
             self.assertEqual("linked_worktree", snapshot["execution_context"])
             self.assertNotIn(str(root), result.stdout)
+
+            # Installed helpers run outside the consumer repository. The bound
+            # project, including its dirty state, must not come from helper cwd.
+            explicit = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context", "--project-root", str(worktree)],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            )
+            self.assertEqual(snapshot, json.loads(explicit.stdout))
+            self.assertNotIn(str(root), explicit.stdout)
 
     def test_preflight_failure_is_path_free(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1665,7 +1678,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             target = Path(temporary) / "global-owner-scout"
             source = ROOT / ".agents" / "skills" / "global-owner-scout"
             installed = self.bootstrap.install_skill(source, target)
-            self.assertEqual("5.10.0", installed["version"])
+            self.assertEqual("5.10.1", installed["version"])
             helper = target / "scripts" / "prepare_delivery.py"
             dispatcher = target / "scripts" / "scout.py"
             self.assertTrue(helper.is_file())
@@ -1679,6 +1692,17 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 check=True,
             )
             self.assertIn("render-terminal", dispatcher_result.stdout)
+            context_result = subprocess.run(
+                [sys.executable, "-B", str(dispatcher), "inspect-context", "--project-root", str(ROOT)],
+                cwd=dispatcher.parent,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            )
+            self.assertTrue(json.loads(context_result.stdout)["git_repository"])
+            self.assertNotIn(str(ROOT), context_result.stdout)
+            self.assertNotIn(str(target), context_result.stdout)
             result = subprocess.run(
                 [sys.executable, "-B", str(helper), "--self-test"],
                 cwd=helper.parent,

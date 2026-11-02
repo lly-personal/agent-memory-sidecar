@@ -2,7 +2,7 @@
 
 ## Common rules
 
-- Skill `5.10.0`; Project result `global_owner_scout_project_v5`; Review Pack
+- Skill `5.10.1`; Project result `global_owner_scout_project_v5`; Review Pack
   `global_owner_scout_review_pack_v6`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
@@ -15,7 +15,9 @@
 `global_owner_scout_preflight_v1` has exact fields
 `contract_version, git_repository, execution_context, head, status_sha256, staged_diff_sha256, unstaged_diff_sha256,
 untracked_files_sha256, context_snapshot_sha256`. It emits no path. `execution_context` is `local` or `linked_worktree`; the snapshot
-hash covers every other field. Invoke it only through `python -B scripts/scout.py inspect-context` before any deep read.
+hash covers every other field. Before any deep read, invoke the resolved dispatcher with
+`inspect-context --project-root <bound-project-root>`. The caller supplies the current Desktop project's absolute root;
+the helper's working directory is not that authority. Omitted `--project-root` retains cwd behavior for older callers only.
 
 ## Project result
 

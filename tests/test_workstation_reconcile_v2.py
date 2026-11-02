@@ -48,7 +48,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "plugin_sha256": "b" * 64,
             "bootstrap_version": "2.3.1",
             "bootstrap_sha256": "c" * 64,
-            "scout_version": "5.10.0",
+            "scout_version": "5.10.1",
             "scout_sha256": "d" * 64,
         }
 
@@ -98,7 +98,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 "status": "unchanged", "version": "2.3.1", "content_sha256": "c" * 64,
             },
             "scout_skill": {
-                "status": "unchanged", "version": "5.10.0", "content_sha256": "d" * 64,
+                "status": "unchanged", "version": "5.10.1", "content_sha256": "d" * 64,
             },
         }
 
@@ -453,7 +453,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.10.0",
+                "version": "5.10.1",
                 "content_sha256": "d" * 64,
             },
         }
@@ -495,7 +495,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 "status": "unchanged", "version": "2.3.1", "content_sha256": "c" * 64,
             },
             "scout_skill": {
-                "status": "unchanged", "version": "5.10.0", "content_sha256": "d" * 64,
+                "status": "unchanged", "version": "5.10.1", "content_sha256": "d" * 64,
             },
         }
         source_sync = {
@@ -563,7 +563,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 "# Bootstrap\n\n- Skill version: `2.3.1`\n", encoding="utf-8",
             )
             (scout / "SKILL.md").write_text(
-                "# Scout\n\n- Skill version: `5.10.0`\n", encoding="utf-8",
+                "# Scout\n\n- Skill version: `5.10.1`\n", encoding="utf-8",
             )
             source_manifest = {
                 "contract_version": "agent_memory_source_manifest_v1",
@@ -589,7 +589,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 },
                 "versions": {
                     "core": "0.3.10", "plugin": "1.5.1",
-                    "bootstrap": "2.3.1", "scout": "5.10.0",
+                    "bootstrap": "2.3.1", "scout": "5.10.1",
                 },
                 "artifacts": [],
                 "verification": {},
@@ -757,7 +757,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             self.reconcile.sync_sources(codex_home, spec)
             for name, version in (
                 ("agent-memory-workstation-bootstrap", "2.3.1"),
-                ("global-owner-scout", "5.10.0"),
+                ("global-owner-scout", "5.10.1"),
             ):
                 skill = codex_home / "skills" / name
                 skill.mkdir(parents=True)

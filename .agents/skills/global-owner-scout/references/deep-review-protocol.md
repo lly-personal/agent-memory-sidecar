@@ -9,7 +9,8 @@ and unproven claim separate.
 ## Phase 0: project front door and isolation
 
 Before any task index, thread page, Owner comparison, or project deep read, Fresh-resolve the current Desktop project binding and
-installed Skill identity, then run `python -B scripts/scout.py inspect-context` for the path-free Git/baseline snapshot. If already
+installed Skill identity, then run the resolved installed dispatcher with `inspect-context --project-root <bound-project-root>`
+for the path-free Git/baseline snapshot. Supply the actual task's absolute project root independently of helper working directory. If already
 in an isolated worktree, continue. This formal invocation authorizes exactly one read-only executor. If in Local, use the host-native
 project-task creation operation with the current project, current working-tree state, and this exact invocation as the initial prompt;
 do not create an empty child or ask
@@ -20,7 +21,9 @@ and stop before Phase 1.
 For interactive `manual_30d`, also check the host-declared current-task output root
 and file-preview capability before task census. Use `scripts/scout.py
 inspect-output --artifact-dir <host-output-root> --protected-root <project-root>`;
-it checks containment without writing. Missing capability returns Terminal v1
+it checks containment without writing. Read the task's injected filesystem context before declaring an output grant absent;
+an empty artifact list or missing request-metadata field does not negate an explicit current-task output root there.
+Missing capability returns Terminal v1
 before deep work. Recheck these conditions during delivery; preflight does not
 prove later writability or visibility. Scheduled checks its final Inbox wrapper
 surface instead; it has no file artifact root or file-preview prerequisite.
@@ -125,6 +128,9 @@ source obligations and accepted/reversed paths, including partially represented
 ones, and challenge each projected obligation rather than attach one decorative
 counterexample to an entire compound card. Correct evidence-backed defects and
 recheck associations, privacy and semantic hashes before the final freeze.
+After the source inventory is frozen, give the reviewer the exact Human Context and Rule Projection fields, not only draft summaries
+or an inaccessible tool-output reference. Check each card's event, cost, before/after and strongest counterpoint against its sources;
+generic filler and circular references cannot replace those decision fields. Structural validation does not perform this semantic check.
 Preserve earlier failed evaluation records; a correction is not retroactive
 blind discovery. If independent context is unavailable, record that coverage
 limitation instead of claiming a self-review is independent qualification.

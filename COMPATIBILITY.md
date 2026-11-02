@@ -1,7 +1,11 @@
 # Component Compatibility
 
+The unreleased v0.5.5 source uses Scout 5.10.1 with optional `inspect-context --project-root`; existing cwd callers remain compatible.
+This is not a published or installed version. The immutable v0.5.4 release below continues to contain Scout 5.10.0.
+
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.5.5 | 0.5.5 | 1.7.4 | 2.3.1 | 5.10.1 | v6 | 3.11–3.13 |
 | v0.5.4 | 0.5.4 | 1.7.4 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.5.3 | 0.5.3 | 1.7.3 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.5.2 | 0.5.2 | 1.7.2 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |

@@ -7,7 +7,7 @@ description: Run an explicitly requested, evidence-first, project-read-only 30-d
 
 ## Contract
 
-- Skill version: `5.10.0`
+- Skill version: `5.10.1`
 - Project result: `global_owner_scout_project_v5`
 - User review: `global_owner_scout_review_pack_v6`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -29,7 +29,8 @@ project name, path, project ID, candidate hint, or the deep-review procedure.
 ## Mode: `project_scout`
 
 0. Before any task index, thread page, Owner comparison, or project deep read, Fresh-resolve the current Desktop project binding,
-   then run `python -B scripts/scout.py inspect-context` for the Git context and project read-only baseline. If already in an isolated
+   then run `python -B <resolved-skill-root>/scripts/scout.py inspect-context --project-root <bound-project-root>` for the Git context
+   and project read-only baseline. Resolve both absolute paths from the current task; helper working directory is not project identity. If already in an isolated
    worktree, continue in place. The formal invocation authorizes exactly one read-only isolated executor task. If in Local, use the
    host-native project-task creation operation (`create_thread` when exposed) once with the current bound project, a worktree based
    on the current working tree, and this exact invocation as its initial prompt; omit model/thinking overrides and let that task
@@ -38,13 +39,18 @@ project name, path, project ID, candidate hint, or the deep-review procedure.
    surface for that executor; this proves routing, not review completion, and the Review Pack/Terminal remains in the executor task.
    If binding, Git eligibility, or host projection is unavailable, stop at preflight and
    render `global_owner_scout_terminal_v1` through `python -B scripts/scout.py render-terminal`.
+   This workflow does not override a host requirement for an explicit human request to create a chat. If the formal invocation is
+   insufficient under that requirement, report the entry compatibility gap; a later manually authorized projection does not prove the one-invocation path.
 1. In the isolated executor, derive the current project label, host project reference, primary folder, Git eligibility, and content identity from the bound
    Desktop task. Record only privacy-safe opaque identity fields in the result.
 2. Capture HEAD, status, staged/unstaged fingerprints and external-write baseline. Resolve canonical/local global Owner hashes only
    through `python -B scripts/scout.py resolve-owner-parity`; never search for or guess a canonical path.
 3. For interactive `manual_30d` delivery, confirm the host-declared current-task output root and file-preview capability before deep work. Run
    `python -B scripts/scout.py inspect-output --artifact-dir <host-output-root> --protected-root <project-root>` without writes;
-   on failure render Terminal v1 with `output_preflight_unavailable` in phase `preflight`. Recheck at delivery. Scheduled uses its
+   Inspect the current task's injected environment context, including its filesystem workspace roots, before declaring the output root absent.
+   A separately granted current-task output directory there remains eligible even when an artifact listing is empty or request metadata omits it;
+   do not infer an output grant from an arbitrary writable directory. On failure render Terminal v1 with `output_preflight_unavailable`
+   in phase `preflight`. Recheck at delivery. Scheduled uses its
    existing final Inbox wrapper and visible-text verifier; it does not require a file artifact root or preview capability.
    Execute all seven deep-review phases, including the six-category source inventory and structured signal dispositions in
    contracts.md. Active project Owners and accepted knowledge are not limited by the recent Session window. Never treat
@@ -77,7 +83,9 @@ project name, path, project ID, candidate hint, or the deep-review procedure.
    If comparison or merging changes a projection, create a new Project/Review revision through Phases 5–6, preserving every source
    obligation and the original frozen artifacts. Do not overwrite frozen semantics or repeat an unchanged source census.
 6. Re-capture read-only proof. Any project mutation, privacy leak, integrity failure, or unauthorized external write fails closed.
-7. From the Skill `scripts` directory, execute every Python helper with bytecode writes disabled (`python -B`). For the formal user
+7. Execute every Python helper with bytecode writes disabled (`python -B`). Relative `scripts/scout.py` commands run from the resolved
+   Skill root, or use its absolute dispatcher path. Every `inspect-context`, including the final read-only recheck, supplies the bound
+   project root explicitly; never inspect the installed Skill directory as the project. For the formal user
    entry, resolve an explicit host-generated output root from the current task context and require it to be outside the reviewed
    project. If none exists, render Terminal v1 with `interactive_host_blocked / output_root_unavailable`; do not guess a temp,
    project, or arbitrary Codex-home path. A host may
@@ -105,6 +113,8 @@ An external controller task—not the Scout itself—must read the actual final 
 --artifact-root <host-output-root>` before any production claim. `surface_pending` proves artifact discoverability and integrity only;
 only `surface_observed` can count. Until the five-scenario entry matrix passes, report
 `interactive_project_scout=production_unproven / interactive_host_blocked`.
+Some host versions acknowledge every open request as `queued`, including foreground requests. Treat that as an observation gap;
+do not ask the user to switch windows or repeat an unchanged open solely to obtain a success receipt, and never rewrite queued as opened.
 These qualification checks do not authorize creating acceptance tasks or updating a real Owner. During mechanism development,
 validate affected branches in isolation; leave real experience and adoption to later user-initiated use or an explicitly requested
 acceptance run. Do not require that later acceptance to complete technical delivery or treat approval of engineering work as a
