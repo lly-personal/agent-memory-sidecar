@@ -137,3 +137,20 @@ v0.5.4 从继续修复到交付收尾约 31.8 分钟，没有新增人工测试�
 - Codex/Pi 的全局规范同步沿用 [完整文档同步契约](../../specs/global-instruction-sync-v1.md) 与
   [兼容性边界](../../COMPATIBILITY.md)。Pi 指令同步不等于 Codex Hook/Scout 支持或实际采用，不复制跨端运行事件
   与凭证。文档收口不改变 v0.5.4 的发行身份，也不触发重复部署。
+
+## Windows 消费者验收与接手（2026-11-02）
+
+Windows 主机从经校验的 v0.5.4 发行包完成安装与读回：Plugin 1.7.4 已启用，Core 0.5.4、全局绑定及 Doctor
+检查通过。刷新后的新任务完成 Desktop 可见项目检查，覆盖 6 个项目；当时本地工程仍停在 v0.5.0，工程内
+Bootstrap 2.3.0 与已安装的 2.3.1 不同，因此消费者结果为 `consumer_scope_drift`，入口不能判为通过。
+同一检查发现的工程内 Scout 5.10.0 与已安装内容一致。发行资产的摘要与内容已核对；该 Windows 检查未单独验证签名。
+
+随后将干净的本地工程快进至公开主线 `ac4a8d43cb6f`。针对先前差异直接复核时，工程内和已安装的 Bootstrap
+均为 2.3.1，内容哈希均为 `cd44d5697ac2daccca5f274c8a79041dd97bb3522373e1fde6ccca0d6aeebc22`。
+这解释并消除了已发现的文件差异，但不是快进后的完整消费者检查，也不证明新任务已选择该入口；后续应在符合
+Bootstrap 条件的新任务中重跑只读消费者验收，不用旧的 drift 回执代替新结果。
+
+独立 Scout 调用在 Local 的执行前检查返回 `interactive_entry_blocked / worktree_projection_unavailable`：
+该会话未获得宿主允许的隔离任务投影，因此没有开展深度复盘，也没有产生 Review Pack 或确认项。这个终态证明
+的是当次入口受阻，不能推断 Scout 内部复盘成功或失败。后续仅在宿主支持并获授权的隔离入口下验证真实运行，
+保留输出和用户体验各自的证据；本次没有改变项目 Owner 或 Scheduled 配置。
