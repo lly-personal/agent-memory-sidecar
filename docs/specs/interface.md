@@ -323,16 +323,17 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 私有开发通道可使用显式 development manifest，但不得成为公开兜底。Resolver 把 portable 手工安全展开到解析目录，
 拒绝绝对路径、`..`、symlink、reparse 语义、非 regular file 与重复条目。Anchor 从该已验证副本在同一任务执行正式
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
-Skill 冒充已加载。可靠自动发现边界仍是一次 Codex 刷新或下一任务，但 source/host 物化必须在当前部署任务完成。
+Skill 冒充已加载。原生 Skill 支持自动发现；未显示或宿主明确要求时才提示刷新。source/host 物化与已请求的只读检查在当前任务完成，不能推导自动加载。
 
-`agent-memory-workstation-bootstrap` Skill 2.3.2 提供两个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.3.3 提供三个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
   显示一份人类可读计划并等待一次确认，再消费 fresh hash 原子 apply。显式禁用 Plugin 保持不变并阻断。随后验证 Core、
-  global binding、Doctor 与 versioned Skills；Skill 安装通过后从下一任务保证交互 Scout 可用，无需 Host Enrollment。项目发现和
+  global binding、Doctor 与 versioned Skills；Skill 安装通过不证明自动加载；交互 Scout 无需 Host Enrollment。项目发现和
   `global_owner_scout_enrollment_pack_v1` 继续作为信息面；Scheduled 阻断时不得要求
   用户处理新的 enrollment 建议，也不得改变 Scheduled Task 或 Host Profile。
+- `verify_consumer`：用户要求验收时，在同一任务检查目标主机的完整项目范围；只读执行不证明模型自动加载或自然采用。
 - `apply_enrollment`：只在用户明确要求复测或配置 Scheduled 实验时，消费当前 Enrollment Pack 的明确选择并原子调和
   `$CODEX_HOME/global-owner-scout/host-profile.json` 与对应 Scheduled Task。
 
@@ -421,16 +422,16 @@ root 逐级检查两个产品同名 `.agents/skills`，非 Git 项目只检查 p
 `status` 只允许 `ready`、`reload_required`、`consumer_scope_drift`、`consumer_scope_bounded`、
 `distribution_reconcile_blocked`、`source_sync_blocked` 或 `host_materialization_blocked`。中文 renderer 固定先显示期望发行、
 Plugin 分发、源同步、主机物化、消费者范围、消费者采用，再显示未证明事项与唯一下一步。apply 固定不越过模型采用层，
-返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.3.2 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
-读回仍 exact、Desktop 项目枚举完整且项目级同名 Skill 全部 exact，才允许 `ready`。任何本机结果都保留真实第二台设备、
+返回 `reload_required`；同一任务可执行已请求的只读 `--verify-consumer`，所有目标主机读回仍 exact、该主机 Desktop
+项目枚举完整且项目级同名 Skill 全部 exact，才允许技术检查的 `ready`。不依赖新聊天或自动加载证明。任何本机结果都保留真实第二台设备、
 Scheduled、连续性与产品收益未证明边界。
 
-安装交付在 `reload_required` 结束；它提示下次使用前刷新 Desktop，不要求用户立即创建新任务或重复部署。
-只有用户后续主动要求检查消费者时才进入只读 `verify_consumer`。该检查证明所声明的加载与安装范围，真实理解、
-自然采用和收益独立保留；用户延后验收不阻塞技术交付。所有 Anchor、Bootstrap、SOP 与 renderer 使用这一分工。
-v3 的 `consumer_activation.interactive_entry=verified` 只表示安装与项目范围检查通过，并以调用方满足新任务已加载
-Bootstrap 为前提；它不证明 Scout 被实际调用或运行验收通过。保持 v3 字段和值兼容；中文回执分别显示入口检查和 Scout 实际运行状态，
-明确本次检查未运行 Scout，不能据此判断其他运行的验收结果。
+安装与验收同在一次请求时，安装读回后直接继续既有 `verify_consumer`；只要求安装时到此结束。沿用当前任务已验证的
+Resolver 输出，不重复下载安装包，不要求用户新建聊天、重复请求或执行测试。目标是远端时，必须使用该远端执行器和
+项目清单；本机证据不能替代，访问缺失只保留对应未验范围。
+v3 的 `consumer_activation.interactive_entry=verified` 与 `ready` 只表示安装与项目范围检查通过。兼容保留的
+`reload_required`、`available_next_task`、`desktop_reload` 表示安装/检查阶段，不是会话加载观测或必须刷新的证明。
+renderer 仅展示已证层，并始终保留自动加载、自然采用与体验未证；明确检查未运行 Scout，不判断其他运行结果。
 
 `global_owner_scout_enrollment_pack_v1` 顶层精确包含：
 

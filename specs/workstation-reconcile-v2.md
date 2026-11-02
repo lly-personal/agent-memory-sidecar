@@ -14,10 +14,10 @@ DesiredBundleIdentity
 -> ObservedHostState
 -> exact reconcile plan
 -> transactional execution and readback
--> installation delivery complete (reload required before later use)
+-> installation delivery complete
 
-Later user-initiated consumer check
--> read-only verification from a refreshed task
+User-requested consumer check (including in the deployment request)
+-> read-only target-host verification in the same task
 ```
 
 No earlier fact can substitute for a later one. In particular, a verified Release, clean managed source, installed Skill, passing
@@ -118,10 +118,11 @@ source_sync, host_materialization, consumer_scope, consumer_activation, limitati
 
 Statuses are `ready`, `reload_required`, `consumer_scope_drift`, `consumer_scope_bounded`,
 `distribution_reconcile_blocked`, `source_sync_blocked`, or `host_materialization_blocked`. `ready` requires exact distribution,
-exact managed Sidecar commit, verified runtime/Doctor, exact installed Bootstrap and Scout hashes, a new task that loaded the
-installed Bootstrap, and an exact `consumer_scope` from a complete current Desktop project inventory. An apply task therefore ends
-at `reload_required`; after one Desktop refresh, `--verify-consumer` in the newly loaded Bootstrap task may produce `ready` only
-when the project scope is also exact.
+exact managed Sidecar commit, verified runtime/Doctor, exact installed Bootstrap and Scout hashes, and an exact `consumer_scope`
+from a complete current target-host Desktop project inventory. Apply returns `reload_required`; when verification is already
+requested, continue with `--verify-consumer` in the same task. Refresh or a new chat is not a prerequisite. `ready` proves only
+installation and project scope; every Pack retains unobserved automatic loading, natural adoption, experience, and other-host
+continuity. Legacy activation values remain wire-compatible check-state markers, not observations of session loading.
 Any blocked Pack sets the interactive entry to `blocked` and does not ask for Desktop refresh or Project Scout; it routes only to
 the first invalid layer.
 
@@ -145,7 +146,7 @@ and a repeated version/hash read; overflow or concurrent change is bounded rathe
 ## Acceptance criteria
 
 - Fresh host: install Marketplace, Plugin, managed source, Core, Skills, and Doctor; return `reload_required`.
-- Exact live host: plan is `noop`; read-only new-task verification re-observes it and may return `ready`.
+- Exact live host: plan is `noop`; read-only same-task verification re-observes it and may return `ready`.
 - Exact host with a stale project-level same-name Skill: return `consumer_scope_drift`, identify the project/Skill without paths,
   and do not modify the checkout.
 - Incomplete Desktop inventory or unreadable project/Skill tree: return `consumer_scope_bounded`; never infer `ready`.

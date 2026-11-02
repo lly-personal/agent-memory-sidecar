@@ -39,7 +39,7 @@
     确定性 inspect/apply 与终态回读。
 19. [`workstation-reconcile-v2.md`](../specs/workstation-reconcile-v2.md)、
     [`ADR 0078`](decisions/0078-workstation-reconcile-v2-observed-state.zh.md) 与
-    [`工作站调和 SOP`](sops/workstation-reconcile.zh.md)：统一期望身份、真实分发读回、补偿事务与新任务采用门。
+    [`工作站调和 SOP`](sops/workstation-reconcile.zh.md)：统一期望身份、真实分发读回、补偿事务与同任务消费者范围检查。
 20. [`ADR 0081`](decisions/0081-capacity-preflight-and-owner-delivery.zh.md)：单条与整块完整容量预演、正式 Owner 路由交付及预算复审。
 
 Global Owner Scout 的确认交接还必须读取 [`ADR 0070`](decisions/0070-atomic-review-pack-rule-bundles.zh.md)：用户可以

@@ -13,6 +13,10 @@ ref、Plugin version/hash/enabled 的情况下构造 `ready`。因此真实主�
 
 ## 决策
 
+2026-11-02 修订：下列第 5 项的新任务门槛与结果中的固定刷新要求已由
+[Windows 原聊天验收修订](0082-installed-memory-command-entry.zh.md#windows-部署后原聊天验收的断点2026-11-02)取代。
+已请求的只读检查在同任务继续；`ready` 仅证明安装与项目范围，不证明加载或采用。其余身份与事务边界不变。
+
 1. 引入唯一 `DesiredBundleIdentity`，由已验证 Release manifest、source manifest 与 portable 内容共同生成；Core、Plugin、
    Bootstrap、Scout、source ref/commit 和组件 hash 不再分别猜测。
 2. `ObservedHostState` 必须通过 Codex JSON CLI、clean tracked Marketplace checkout、tracked manifest、可选 legacy install

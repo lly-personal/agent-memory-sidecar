@@ -155,7 +155,7 @@ integration preview，并把完整中文审阅包直接呈现给用户；用户�
     Scheduled 状态，也不能以文字宣称已暂停。自动化的创建、暂停、恢复与删除由 Bootstrap / 当前交互任务的宿主
     激活控制面执行，并以工具调用后的实际状态复读为准。
 18. **可移植内容不冒充主机能力**：仓库 Owner、已提交 Skill、冷启动 Anchor 与插件目录只证明远端可取得的内容；
-    只有当前主机完成能力源同步、Core/global binding/Skill 物化、Doctor 与新任务加载后，才能声明交互入口已安装。
+    只有当前主机完成能力源同步、Core/global binding/Skill 物化、Doctor 后，才能声明交互入口已安装；模型自动加载与自然采用另行观察。
     当前主机 canary 不得外推为另一台机器已经具备相同能力。
 19. **冷启动第一跳必须自包含**：任何明确加入跨设备连续性的工程必须携带极小 repo Anchor 或等价官方分发入口，
     使用户只需表达“同步并部署本机 Agent Memory”；不得要求用户记住 Sidecar checkout、canonical Owner 路径、
@@ -171,8 +171,8 @@ integration preview，并把完整中文审阅包直接呈现给用户；用户�
     随即冻结归档。发布证据不得自动冒充权威切换，切换后不得继续私有导出或双向同步。
 23. **可发现入口不等于安装权威**：公开 checkout、Marketplace 与 Release 页面只帮助定位能力；Anchor 必须验证
     stable immutable Release、tag/commit、资产 digest、checksums 与 manifest 后，才可把准确来源交给安装器。解析失败
-    不得回退浮动 branch、私有工程源或人工猜测资产。安装后的 Skill 自动发现仍以一次 Codex 刷新或新任务为平台
-    边界，但主机 source sync、Core/Owner/Skill 物化与 Doctor 不得被推迟到第二个任务。
+    不得回退浮动 branch、私有工程源或人工猜测资产。安装后的 Skill 支持原生自动发现；未显示或宿主明确要求时才提示刷新，不将新聊天设为只读检查的
+    前置条件，但主机 source sync、Core/Owner/Skill 物化与 Doctor 不得被推迟到第二个任务。
 24. **换源是显式例外而非同步特权**：普通 source sync 永远拒绝 identity 变化；存量主机换到公开 Sidecar 必须先
     生成无写入计划，再由用户一次确认后以 fresh `plan_hash` 原子执行并失败恢复。公开 manifest 的
     `canonical_owner=null` 只表示发行物不携带 Owner：已有 Owner checkout 与 Core binding identity 完全一致时必须保持

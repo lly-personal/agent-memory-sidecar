@@ -97,15 +97,16 @@ For normal Codex Desktop use, register the immutable repository Marketplace,
 install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.5.4
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.5.6
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
 After Codex refreshes the installed Plugin, start one task and send `同步并部署本机 Agent Memory`. The Anchor resolves and
 verifies the immutable public Release, safely materializes its portable bundle, and runs the formal Bootstrap in that same task.
 Fresh and same-source hosts complete directly; an existing Sidecar identity replacement shows one short plan and consumes one
-confirmation. Host source sync, Core/Owner/Skill materialization, and Doctor finish before the result is returned. One later Codex
-refresh or new task is needed only for automatic discovery of the newly installed Skills.
+confirmation. Host source sync, Core/Owner/Skill materialization, and Doctor finish before the result is returned. Codex supports automatic Skill discovery;
+refresh only if the capability is missing or the host explicitly requires it. Requested read-only consumer checks continue in the
+same task without proving automatic loading.
 Marketplace registration and a repository checkout are discovery surfaces;
 they are not source authority and do not by themselves prove host deployment.
 

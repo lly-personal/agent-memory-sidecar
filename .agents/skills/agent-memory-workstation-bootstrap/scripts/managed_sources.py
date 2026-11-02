@@ -22,7 +22,7 @@ from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
 
 
-BOOTSTRAP_VERSION = "2.3.2"
+BOOTSTRAP_VERSION = "2.3.3"
 SCOUT_VERSION = "5.11.0"
 PACK_VERSION = "agent_memory_workstation_deployment_pack_v3"
 DESKTOP_PROJECT_INVENTORY_VERSION = "agent_memory_desktop_project_inventory_v1"
@@ -2541,9 +2541,10 @@ def build_deployment_pack(
         interactive_entry = "unproven"
     else:
         interactive_entry = "verified"
-    limitations = ["真实第二台设备的首次部署与项目续接仍需独立验收。"]
-    if not consumer_verified and not blocked:
-        limitations.insert(0, "当前任务未证明新版本已被模型加载；需在一次 Desktop 刷新后的新任务中验收。")
+    limitations = [
+        "安装与范围读回不观察宿主会话加载；模型自动加载、自然采用和实际体验仍未证明。",
+        "本次结果只适用于执行检查的主机；其他设备与跨任务连续性仍未证明。",
+    ]
     limitations = [*scope["limitations"], *limitations]
     pack = {
         "contract_version": PACK_VERSION,
@@ -2660,7 +2661,7 @@ def render_pack(value: Any) -> str:
     pack = validate_pack(value)
     status = {
         "ready": "本机托管能力和 Desktop 项目消费者范围已对齐",
-        "reload_required": "本机安装与读回已完成；下次使用前刷新 Desktop，真实采用尚未验证",
+        "reload_required": "本机安装与读回已完成；消费者范围及真实采用尚未验证",
         "consumer_scope_drift": "托管能力已对齐，但 Desktop 可见项目存在不同版本或内容的同名 Skill",
         "consumer_scope_bounded": "托管能力已对齐，但 Desktop 项目消费者范围尚未完整观察",
         "distribution_reconcile_blocked": "Plugin 或 Marketplace 尚未精确对齐",
@@ -2685,7 +2686,7 @@ def render_pack(value: Any) -> str:
         f"| 能力源同步 | Sidecar `{sources['sidecar']['status']}` / Global Owner `{sources['canonical_owner']['status']}` | 只更新本机受管缓存，不清理活跃工程 |",
         f"| 主机物化 | Core `{material['core']['status']}` / Doctor `{material['doctor']}` / Scout `{material['scout_skill']['status']}` | Doctor 包含安装后的命令入口；Bootstrap {material['bootstrap_skill']['version']}；Scout {material['scout_skill']['version']} |",
         f"| 项目消费者范围 | `{scope['status']}` | Desktop 项目 {scope['desktop_project_count']}；已读 {scope['scanned_project_count']}；同名 Skill {scope['matching_skill_count']} |",
-        f"| 消费者入口条件 | Desktop 刷新 `{activation['desktop_reload']}` / 入口检查 `{activation['interactive_entry']}` | `verified` 仅表示安装与项目范围检查通过；Scheduled `{activation['scheduled']}` |",
+        f"| 消费者入口条件 | 入口检查 `{activation['interactive_entry']}` | `verified` 仅表示安装与项目范围检查通过；Scheduled `{activation['scheduled']}` |",
         "| Scout 实际运行 | 本次未运行 | 本次未验证 Scout 运行验收，不判断其他运行的验收结果 |",
     ]
     if scope["projects"]:
@@ -2702,8 +2703,8 @@ def render_pack(value: Any) -> str:
         lines.extend(["", "## 尚未证明", ""])
         lines.extend(f"> {item}" for item in pack["limitations"])
     next_step = {
-        "reload_required": "本次安装交付到此完成。下次使用前刷新一次 Codex Desktop；只有你主动要求检查消费者时才进行只读验收，无需现在新建任务或重复部署。",
-        "ready": "下一步：可在目标工程的新任务中发送 `$global-owner-scout 复盘当前项目`。",
+        "reload_required": "本次安装交付到此完成。若本次已要求验收，Agent 继续在同一主机、同一聊天完成只读消费者检查，无需重复请求。未要求时到此结束；仅在能力未显示或宿主明确要求时提示刷新。",
+        "ready": "已完成所请求的安装与项目范围检查。实际使用继续沿用目标工程的现有入口，无需另建验收聊天。",
         "consumer_scope_drift": "下一步：先判断上表项目级同名 Skill 是待发布开发版本还是陈旧副本；更新或移除该项目来源后重新验收。调和器不会自动修改 checkout。",
         "consumer_scope_bounded": "下一步：恢复完整 Desktop 项目枚举与只读访问后，继续你已请求的只读消费者检查；无需重复部署。",
         "distribution_reconcile_blocked": "下一步：处理上表显示的 Plugin/Marketplace 唯一阻断后，再发送“同步并部署本机 Agent Memory”。",
@@ -2753,7 +2754,7 @@ def render_workstation_reconcile_plan(value: Any) -> str:
         "",
         *[f"- {item}" for item in dict.fromkeys(rendered_changes)],
         f"- 授权：{confirmation}",
-        f"- 平台边界：{'执行后需要一次 Desktop 刷新。' if plan['requires_reload'] else '无需额外刷新。'}",
+        "- 平台发现：仅在能力未显示或宿主明确要求时刷新；已请求的只读检查可在原聊天继续。",
         "",
     ])
 
@@ -2815,7 +2816,7 @@ def self_test() -> None:
         consumer_verified=False,
         generated_at="2026-08-21T12:00:00+08:00",
     )
-    require("真实第二台设备" in render_pack(pack), "deployment renderer lost proof boundary")
+    require("其他设备与跨任务连续性仍未证明" in render_pack(pack), "deployment renderer lost proof boundary")
     marketplace = {
         "name": "agent-memory", "interface": {"displayName": "Agent Memory"},
         "plugins": [{

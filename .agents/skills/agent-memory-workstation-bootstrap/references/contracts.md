@@ -42,9 +42,9 @@ also reconciles Plugin/Marketplace. Standalone source manifests retain strict lo
 The source manifest binds each configured source to a credential-free remote identity, ref, and full commit. Public Core mode sets
 `canonical_owner=null`; on a fresh host this keeps global parity unavailable without blocking project-scope Core, while a legacy host
 may retain an already exact Core-bound Owner. Private Owner authentication uses the host's existing Git credentials. Failure to
-authenticate is `source_sync_blocked`, not a request for project paths and not proof that the capability is installed. A newly
-installed plugin or Skill is guaranteed automatically discoverable only after one Codex refresh or from a new task; host
-materialization finishes in the current deployment task.
+authenticate is `source_sync_blocked`, not a request for project paths and not proof that the capability is installed. Native Skill
+discovery supports automatic updates; missing discovery or an explicit host requirement may need refresh. Explicit execution of
+the verified portable Bootstrap and requested read-only verification can finish in the same task without proving automatic loading.
 
 ## Reconcile Plan and Deployment Pack
 
@@ -74,7 +74,7 @@ An apply result uses `agent_memory_workstation_reconcile_receipt_v3` with exact
 
 - `status`: `ready`, `reload_required`, `consumer_scope_drift`, `consumer_scope_bounded`,
   `distribution_reconcile_blocked`, `source_sync_blocked`, or `host_materialization_blocked`.
-- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.3.2`.
+- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.3.3`.
 - `consumer_scope`: exact fields `status, inventory_status, desktop_project_count, scanned_project_count,
   matching_skill_count, projects, limitations`; status is `not_observed`, `exact`, `drifted`, or `bounded`.
 - Each consumer project has exact `project_ref, display_name, status, skills`; each Skill has exact
@@ -89,13 +89,15 @@ An apply result uses `agent_memory_workstation_reconcile_receipt_v3` with exact
 - `host_materialization.core` contains `status, version, source_commit, artifact_sha256`; each Skill contains
   `status, version, content_sha256`; global binding and Doctor remain separate.
 - `consumer_activation` reports `desktop_reload`, `interactive_entry`, and unchanged Scheduled state. Apply returns
-  `available_next_task`; only read-only `--verify-consumer` from a newly loaded Bootstrap task with complete exact consumer scope
-  may return `verified` and `ready`. Drift returns `ambiguous`; bounded coverage returns `unproven`. Managed-layer blocked status
+  `available_next_task`; read-only `--verify-consumer` with complete exact target-host consumer scope may return `verified` and
+  `ready` in the same task. Drift returns `ambiguous`; bounded coverage returns `unproven`. Managed-layer blocked status
   returns `blocked`, does not request a reload, and cannot route the user to Project Scout.
-- In v3, `interactive_entry=verified` means the installation and project scope checks passed, assuming the caller satisfies the
-  new-task Bootstrap precondition; it does not attest an actual Scout invocation or its acceptance. Keep the machine contract
-  compatible. The renderer separately reports the entry check and that Scout was not run by this check, without asserting other runs.
-- `limitations` must explicitly retain the real-second-device proof boundary when only a same-host clean-profile test exists.
+- In v3, `interactive_entry=verified` and `ready` mean only that installation and project scope checks passed. The legacy
+  `reload_required`, `available_next_task`, and `desktop_reload` values remain compatible installation/check-state markers, not
+  observations of session loading or proof that refresh is necessary. The renderer reports only their supported evidence.
+- `limitations` always retain unobserved automatic loading, natural adoption, actual experience, and other-host continuity. The
+  check does not invoke Scout or judge other runs. An explicit verification request authorizes same-task continuation after apply;
+  without that request installation ends without project enumeration. Do not ask for a new chat or repeated instruction.
 - `pack_hash` is SHA-256 of canonical UTF-8 JSON excluding `pack_hash`.
 
 The renderer produces one Chinese result table ordered as `desired release / Plugin distribution / source synchronization /
@@ -113,7 +115,7 @@ automation_change_count, allowed_actions, limitations, pack_hash
 ```
 
 - `status`: `ready`, `bounded`, or `host_activation_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `2.3.2`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `2.3.3`.
 - `portable_layer` exact fields: `sidecar`, `canonical_owner`, `core_setup`, `doctor`, `scout_skill_version`,
   `scout_skill_hash`. State values are `synced`, `unchanged`, `installed`, `verified`, `failed`, or `unavailable`.
 - `discovery` exact fields: `inventory_status`, `activity_status`, `desktop_project_count`, `accessible_count`,

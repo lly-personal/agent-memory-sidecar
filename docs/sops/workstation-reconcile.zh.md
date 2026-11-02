@@ -27,11 +27,11 @@
 -> exact-hash 原子 apply 与失败补偿
 -> 执行后 exact readback
 -> 返回 reload_required
--> 本次安装交付结束；提示下次使用前刷新 Desktop
+-> 本次安装交付完成
 
-用户后续主动请求检查消费者
--> 已刷新且加载新版的任务只读 consumer verification
--> ready
+用户已要求验收（同次部署请求或原聊天后续请求）
+-> 同一任务继续目标主机的只读 consumer verification
+-> 安装与项目范围检查结果；真实加载、采用和体验另行观察
 ```
 
 ## Agent 执行规则
@@ -47,26 +47,28 @@
    不得自动启用。Marketplace/Plugin 状态不可读时失败关闭。
 5. apply 必须使用 fresh `plan_hash`。Plugin/Marketplace、受管 source、Core/Owner、Bootstrap/Scout、Doctor 与最终读回属于
    同一补偿边界；任一失败都不能返回完成。
-6. apply 成功只返回 `reload_required`，本次安装交付结束。提示下次使用前刷新一次 Desktop；不创建验收任务、
-   不请求用户立即重复部署，也不为普通安装枚举项目活动或 Scheduled。用户可延后真实体验验收。
-7. 用户后续主动要求检查消费者，且当前任务已在刷新后加载新版时，先通过 Codex Desktop project API 取得本轮完整项目清单，再把临时清单交给
+6. apply 成功返回 `reload_required`，证明安装完成。若本次已要求验收，直接继续下一步；只要求安装时结束。
+   不创建验收任务、不要求重复输入或用户测试，不为普通安装枚举项目活动或 Scheduled。仅在能力未显示或宿主明确要求时提示刷新。
+7. 已请求的消费者检查复用当前任务的已验证 Resolver 输出，不以刷新或新聊天为前提。通过目标主机的 Codex Desktop
+   project API 取得本轮完整项目清单，再把临时清单交给
    只读 `--verify-consumer --desktop-project-inventory <inventory>`。只有 dry-run 为 exact `noop`、live
    Core/Doctor/Owner/用户级 Skills 仍 exact，且所有 Desktop 可见项目级同名 Skill 也 exact 时才返回 `ready`。
    项目同名 Skill 差异返回 `consumer_scope_drift`；清单或读取不完整返回 `consumer_scope_bounded`。两者都不自动修改项目。
+   远端检查须由远端执行器和清单支持；只有本机工具时保留远端未验，不能用本机结果替代或要求用户代测。
 8. 已发布的 Anchor 1.x 会调用旧命令名；当且仅当输入是 Resolver 的完整目录形态时，Bootstrap 2.0 自动把该命令路由
    到 v2 计划与事务。用户不需要先迁移 Anchor、重复部署或刷新两次。
 
 ## 用户可见状态矩阵
 
-| 状态 | 已证明 | 未证明 | 用户动作 |
+| 状态 | 已证明 | 未证明 | 后续处理 |
 |---|---|---|---|
 | `distribution_reconcile_blocked` | 已定位 Plugin/Marketplace 缺失、不可读或禁用 | source、主机物化、采用 | 只处理显示的唯一阻断 |
 | `source_sync_blocked` | Release 与 distribution 读回可用 | source/host/采用 | 修复来源访问或 ambiguity 后重试 |
 | `host_materialization_blocked` | distribution 与 source 已验证或已恢复 | 完整 Core/Skill/Doctor、采用 | 根据唯一错误重试，不手工补步骤 |
-| `reload_required` | 当前主机 distribution/source/Core/Skills/Doctor exact；安装交付结束 | 当前任务模型采用、第二设备、连续性 | 下次使用前刷新一次 Desktop；后续可主动请求只读消费者检查 |
-| `consumer_scope_drift` | 托管主机层 exact、新任务已采用 | Desktop 可见项目级同名 Skill 全部对齐 | 按回执处理首个项目级来源；不自动更新 checkout |
-| `consumer_scope_bounded` | 托管主机层 exact、新任务已采用 | 未完整观察的项目消费者范围 | 恢复完整项目枚举/只读访问后重新验收 |
-| `ready` | 当前主机 exact，且新任务已加载该 Release 对应的 Bootstrap，项目消费者范围 exact | 第二设备、Scheduled、连续性、产品收益 | 可在目标工程新任务运行 Project Scout |
+| `reload_required` | 当前主机安装读回 exact | 项目范围、自动加载、自然采用 | 已要求验收则 Agent 同聊天继续；否则安装交付结束 |
+| `consumer_scope_drift` | 托管主机层 exact | 项目同名 Skill 对齐、自动加载与采用 | 定位首个项目级差异；不自动更新 checkout |
+| `consumer_scope_bounded` | 托管主机层 exact | 项目范围、自动加载与采用 | 可访问后继续已请求检查；其余保留未验 |
+| `ready` | 当前主机安装与项目范围 exact | 自动加载、Scout 执行、自然采用、其他设备、Scheduled、连续性与收益 | 所请求技术检查完成；不追加验收聊天 |
 
 任何 blocked 状态都不得同时要求刷新 Desktop 或引导运行 Project Scout；先修复矩阵中第一层失效事实。
 
@@ -85,5 +87,5 @@
 - 完整清单且无项目同名 Skill、完整清单且同名 Skill exact、旧版本/同版本不同 hash、项目不可访问、物理树别名、bounded 清单。
 - Plugin cache 缺失、CLI 状态不可读、显式禁用、执行中失败、最终读回不一致。
 - 任一失败后的 Marketplace/Plugin/source/Skill target 与执行前一致。
-- apply 只到 `reload_required`；刷新后真实新任务才到 `ready`。
+- apply 返回 `reload_required`；已请求的同任务只读检查在 exact 主机和完整 exact 项目范围下才到 `ready`，仍不证明自动加载或采用。
 - 当前主机与真实第二设备证据始终分开。
