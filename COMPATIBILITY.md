@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.5.3 | 0.5.3 | 1.7.3 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.5.2 | 0.5.2 | 1.7.2 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.5.1 | 0.5.1 | 1.7.1 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.5.0 | 0.5.0 | 1.7.0 | 2.3.0 | 5.10.0 | v6 | 3.11–3.13 |
@@ -65,3 +66,7 @@ Plugin 1.7.1 carries the updated release identity; Engineering Contract Review a
 
 Core 0.5.2 scopes runtime self-test evidence and cleanup to its own probe session. Event retention and unrelated runtime activity
 no longer invalidate successful capture. Plugin 1.7.2 carries the release identity; Bootstrap and Scout remain unchanged.
+
+Core 0.5.3 clarifies fresh authority reads, interpreter discovery and no-write failure handling in the generated memory Skill.
+Plugin 1.7.3 carries the release identity. No approval, Store, Bootstrap or Scout contract changes are included; Desktop adoption
+and complete user journeys remain distinct from these source and packaging guarantees.
