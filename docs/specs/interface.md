@@ -325,7 +325,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。原生 Skill 支持自动发现；未显示或宿主明确要求时才提示刷新。source/host 物化与已请求的只读检查在当前任务完成，不能推导自动加载。
 
-`agent-memory-workstation-bootstrap` Skill 2.4.0 提供三个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.4.1 提供三个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时

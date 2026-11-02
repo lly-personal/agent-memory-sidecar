@@ -152,7 +152,7 @@ helper 从任意 cwd 执行时都显式接收当前绑定的 project-root；当�
 `verify-final` 可在后续从原回执恢复 manifest 与原文件，无需重做发现或建立控制任务。queued 保留未观测；准确人类
 选择经文件核验和 Fresh Core 预演进入现有原子授权链，不把旧排队状态改称展示成功。
 
-Bootstrap 2.4.0 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 2.4.1 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得

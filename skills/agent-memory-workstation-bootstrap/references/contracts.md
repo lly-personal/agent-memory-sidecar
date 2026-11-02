@@ -27,7 +27,7 @@ root and commit. One-sided, dirty, or mismatched state fails closed.
 
 `managed_sources.py workstation-reconcile` owns the unified distribution, source, and host transaction: deterministic Codex JSON
 readback, Plugin/Marketplace compensation, Core setup, global binding, Doctor, and per-target atomic Bootstrap/Scout installation.
-It validates Deployment Pack v2 before releasing rollback state. `source-cutover`, `sync-sources`, and `materialize-host` remain lower-level
+It validates the Deployment Pack contract defined below before releasing rollback state. `source-cutover`, `sync-sources`, and `materialize-host` remain lower-level
 strict contracts and do not gain standalone production status. Agent-authored shell sequences are not an alternative contract.
 The atomic source receipt replacement is the transaction commit point; a post-commit snapshot-cleanup failure is visible but must
 not roll back after a recovery copy may already have been discarded.
@@ -70,11 +70,11 @@ source_sync, host_materialization, consumer_scope, consumer_activation, limitati
 ```
 
 An apply result uses `agent_memory_workstation_reconcile_receipt_v3` with exact
-`contract_version, status, plan_hash, deployment_pack`; `deployment_pack` must validate as v3.
+`contract_version, status, plan_hash, deployment_pack`; `deployment_pack` must satisfy the Deployment Pack contract defined above.
 
 - `status`: `ready`, `reload_required`, `consumer_scope_drift`, `consumer_scope_bounded`,
   `distribution_reconcile_blocked`, `source_sync_blocked`, or `host_materialization_blocked`.
-- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.4.0`.
+- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.4.1`.
 - `consumer_scope`: exact fields `status, inventory_status, desktop_project_count, scanned_project_count,
   matching_skill_count, projects, limitations`; status is `not_observed`, `exact`, `drifted`, or `bounded`.
 - Each consumer project has exact `project_ref, display_name, status, skills`; each Skill has exact
@@ -119,7 +119,7 @@ automation_change_count, allowed_actions, limitations, pack_hash
 ```
 
 - `status`: `ready`, `bounded`, or `host_activation_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `2.4.0`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `2.4.1`.
 - `portable_layer` exact fields: `sidecar`, `canonical_owner`, `core_setup`, `doctor`, `scout_skill_version`,
   `scout_skill_hash`. State values are `synced`, `unchanged`, `installed`, `verified`, `failed`, or `unavailable`.
 - `discovery` exact fields: `inventory_status`, `activity_status`, `desktop_project_count`, `accessible_count`,

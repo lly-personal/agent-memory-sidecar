@@ -3,6 +3,11 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.8 (2026-11-02)
+
+- Keep Bootstrap instructions consistent with Deployment Pack v4 by removing stale duplicate version claims; native entry verification and installation behavior are unchanged.
+- Components: Core 0.5.8, Plugin 1.7.8, Bootstrap 2.4.1 and Scout 5.11.1.
+
 ## 0.5.7 (2026-11-02)
 
 - Move Bootstrap and Scout development sources out of automatic project discovery; preserve the existing portable layout for installed Anchor upgrades.
