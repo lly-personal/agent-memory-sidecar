@@ -15,39 +15,39 @@ def run(*, store_path: Path | str) -> dict[str, Any]:
     target = Path(store_path)
     session_id = f"core-v1-self-test-{uuid.uuid4().hex}"
     with CoreDatabase(target) as db:
-        before = db.conn.execute(
-            "SELECT COUNT(*) FROM prompt_events"
-        ).fetchone()[0]
-        execution = execute_runtime_hook(
-            payload={
-                "hook_event_name": "UserPromptSubmit",
-                "session_id": session_id,
-                "cwd": str(target.parent),
-                "prompt": "Agent Memory immutable runtime self-test",
-            },
-            store_path=target,
-            allow_maintenance=True,
-        )
-        after = db.conn.execute(
-            "SELECT COUNT(*) FROM prompt_events"
-        ).fetchone()[0]
-        integrity = db.integrity_check()
-        event_id = execution.audit.event_id
-        if execution.output and after == before + 1 and event_id is not None:
+        try:
+            execution = execute_runtime_hook(
+                payload={
+                    "hook_event_name": "UserPromptSubmit",
+                    "session_id": session_id,
+                    "cwd": str(target.parent),
+                    "prompt": "Agent Memory immutable runtime self-test",
+                },
+                store_path=target,
+                allow_maintenance=True,
+            )
+            captured = db.conn.execute(
+                """SELECT 1 FROM prompt_events e JOIN runtime_sessions s
+                   ON s.source_session = e.source_session AND s.last_prompt_event_id = e.event_id
+                   WHERE e.event_id = ? AND e.source_session = ?""",
+                (execution.audit.event_id, session_id),
+            ).fetchone()
+            integrity = db.integrity_check()
+            if not execution.output or captured is None or integrity != "ok":
+                raise CoreError(
+                    "runtime_artifact_self_test_failed",
+                    "runtime artifact failed prompt capture self-test",
+                )
+        finally:
             with db.transaction():
                 db.conn.execute(
                     "DELETE FROM runtime_sessions WHERE source_session = ?",
                     (session_id,),
                 )
                 db.conn.execute(
-                    "DELETE FROM prompt_events WHERE event_id = ?",
-                    (event_id,),
+                    "DELETE FROM prompt_events WHERE source_session = ?",
+                    (session_id,),
                 )
-    if not execution.output or after != before + 1 or integrity != "ok":
-        raise CoreError(
-            "runtime_artifact_self_test_failed",
-            "runtime artifact failed prompt capture self-test",
-        )
     return {
         "schema": schema_manifest(),
         "hook_output": True,

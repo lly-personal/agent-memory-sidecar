@@ -12,10 +12,11 @@ import tempfile
 import unittest
 import zipfile
 from contextlib import redirect_stdout
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from agent_memory_sidecar import cli, runtime_package
+from agent_memory_sidecar import cli, runtime_package, runtime_selftest
 from agent_memory_sidecar.ambient_capability import (
     MAX_AMBIENT_CAPABILITY_BYTES,
     build_ambient_capability,
@@ -396,8 +397,11 @@ class CliAndPackageTests(unittest.TestCase):
                 store,
                 create=True,
                 now="2026-07-24T00:00:00+00:00",
-            ):
-                pass
+            ) as db:
+                RuntimeLedger(db).capture_prompt(
+                    identity=resolve_identity(root), source_session="expired-test-session",
+                    prompt="Expired fixture", metadata={}, now="2026-07-24T00:00:00+00:00",
+                )
             first = build_runtime_artifact()
             second = build_runtime_artifact()
             self.assertEqual(first.data, second.data)
@@ -434,6 +438,34 @@ class CliAndPackageTests(unittest.TestCase):
             self.assertTrue(
                 str(artifact).endswith(f"{first.sha256[:16]}.pyz")
             )
+
+    def test_runtime_self_test_owns_its_event_despite_other_events_or_failure(self) -> None:
+        for outcome in ("other_event", "empty_output", "raise_after_capture"):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                store = root / "memory.sqlite"
+                with CoreDatabase(store, create=True, now="2026-07-24T00:00:00+00:00"):
+                    pass
+                execute = runtime_selftest.execute_runtime_hook
+
+                def hook(**kwargs):
+                    result = execute(**kwargs)
+                    with CoreDatabase(store) as db:
+                        RuntimeLedger(db).capture_prompt(identity=resolve_identity(root), source_session="unrelated-session",
+                                                         prompt="Unrelated fixture", metadata={})
+                    if outcome == "raise_after_capture":
+                        raise CoreError("injected_failure", "Failure after the probe was captured")
+                    return replace(result, output="") if outcome == "empty_output" else result
+
+                with patch.object(runtime_selftest, "execute_runtime_hook", side_effect=hook):
+                    if outcome == "other_event":
+                        self.assertEqual(1, runtime_selftest.run(store_path=store)["event_delta"])
+                    else:
+                        with self.assertRaises(CoreError):
+                            runtime_selftest.run(store_path=store)
+                with CoreDatabase(store) as db:
+                    self.assertEqual(["unrelated-session"], [r[0] for r in db.conn.execute("SELECT source_session FROM prompt_events")])
+                    self.assertEqual(["unrelated-session"], [r[0] for r in db.conn.execute("SELECT source_session FROM runtime_sessions")])
 
     def test_zipapp_is_independent_of_checkout_line_endings(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
