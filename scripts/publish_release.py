@@ -330,11 +330,11 @@ def apply_plan(
     require(state.get("isDraft") is False, "promotion_publish_readback_draft")
     require(state.get("isImmutable") is True, "promotion_publish_readback_mutable")
     require(bool(state.get("publishedAt")), "promotion_publish_timestamp_missing")
-    local_assets, files = _release_files(asset_dir)
-    _validate_remote_assets(local_assets, state)
-    runner(["gh", "release", "verify", tag, "--repo", repository, "--format", "json"], root)
-    for name, path in sorted(files.items()):
-        runner(["gh", "release", "verify-asset", tag, str(path), "--repo", repository, "--format", "json"], root)
+    _validate_remote_assets(plan["assets"], state)
+    verify_release_assets(
+        root=root, asset_dir=asset_dir, repository=plan["repository"], tag=tag,
+        expected_assets=plan["assets"], runner=runner,
+    )
     return {
         "contract_version": RECEIPT_CONTRACT,
         "status": "public_published",
@@ -344,12 +344,49 @@ def apply_plan(
         "plan_hash": plan["plan_hash"],
         "published_at": state["publishedAt"],
         "release_url": state.get("url"),
-        "asset_count": len(local_assets),
+        "asset_count": len(plan["assets"]),
         "release_attestation_verified": True,
         "asset_attestations_verified": True,
         "is_draft": False,
         "is_immutable": True,
     }
+
+
+def verify_release_assets(
+    *, root: Path, asset_dir: Path, repository: str, tag: str,
+    expected_assets: list[dict[str, Any]], runner: Runner = run,
+) -> None:
+    verified = _json_output(
+        runner, ["gh", "release", "verify", tag, "--repo", repository, "--format", "json"],
+        root, "promotion_verified_statement_invalid",
+    )
+    try:
+        statement = verified["verificationResult"]["statement"]
+        predicate = statement["predicate"]
+        purl = f"pkg:github/{predicate['repository']}@{tag}"
+        require(
+            statement["_type"] == "https://in-toto.io/Statement/v1"
+            and statement["predicateType"] == "https://in-toto.io/attestation/release/v0.2"
+            and predicate["repository"].casefold() == repository.casefold()
+            and predicate["tag"] == tag and predicate["purl"] == purl,
+            "promotion_verified_release_identity_mismatch",
+        )
+        subjects = statement["subject"]
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise PromotionError("promotion_verified_statement_invalid") from exc
+    # Re-read the bytes after the network call; a pre-verification digest is not current evidence.
+    local_assets, _ = _release_files(asset_dir)
+    require(local_assets == expected_assets, "promotion_local_assets_changed")
+    tag_object = runner(["git", "rev-parse", "--verify", tag], root)
+    expected_subjects = [
+        {"uri": purl, "digest": {"sha1": tag_object}},
+        *({"name": item["name"], "digest": {"sha256": item["sha256"]}} for item in local_assets),
+    ]
+    require(
+        isinstance(subjects, list)
+        and sorted(map(canonical, subjects)) == sorted(map(canonical, expected_subjects)),
+        "promotion_attested_asset_set_mismatch",
+    )
 
 
 def main() -> int:

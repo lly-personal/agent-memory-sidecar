@@ -53,7 +53,8 @@ before mutation and fails on drift. A valid apply:
 1. publishes only the named draft through `gh release edit <tag> --draft=false`;
 2. performs a bounded readback until GitHub reports a publication timestamp, non-draft, and immutable;
 3. rechecks the exact remote asset set and digests;
-4. verifies the Release attestation and every local asset against the Release attestation; and
+4. runs native `gh release verify --format json` once, then compares its `verificationResult.statement` with the release identity,
+   annotated tag object and complete local asset set, freshly hashed after verification; and
 5. emits `agent_memory_release_promotion_receipt_v1 / public_published` with the source commit, consumed plan hash, publication
    timestamp, release URL, asset count, and terminal flags.
 
@@ -68,6 +69,9 @@ rebuilt or replaced; corrections use a new semantic version.
   Release blocks the plan.
 - Apply rejects a stale or malformed plan hash.
 - Success requires Release and per-asset attestation verification plus `non-draft + immutable` readback.
+- One verified Release statement proves all included asset subjects. Match exact names and SHA-256 values, rejecting duplicate,
+  missing, extra or changed subjects and malformed or mismatched release identity. Never decode an unverified envelope as proof,
+  reuse a saved verification result, or repeat `verify-asset` for each already-covered subject.
 - CI retains minimum permissions and remains unable to publish; operator credentials and runtime receipts are never committed.
 - A protected remote tag is never updated or deleted; post-tag source repair uses the next semantic version.
 - Local tag-build qualification and CI draft-asset byte qualification remain separately named; neither hash channel upgrades the other.
