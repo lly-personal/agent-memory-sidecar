@@ -4,12 +4,13 @@
 - Owner layer: project_docs
 - Applies when: 查找早期 Agent Memory 调研、验收或回归证据的来源。
 - Avoid when: 判断 Core v1 当前行为或发布状态；读取活动规范、源码和当前测试。
-- Last verified: 2026-07-24
+- Last verified: 2026-11-02
 - Evidence: [Core v1 L1 evidence ladder](../specs/axioms.md)、[Core v1 L3 acceptance](../specs/interface.md)
 
 ## 当前边界
 
-Core v1 尚未创建 tag、Release 或发布证据包。当前 checkout 的自动化结果只能证明其运行时、Store、授权、文件事务、
+Core v1 已有正式不可变发行；准确版本、资产与来源以 [公开 Releases](https://github.com/lly-personal/agent-memory-sidecar/releases)
+和 [兼容矩阵](../../COMPATIBILITY.md) 为准。当前 checkout 的自动化结果只能证明其运行时、Store、授权、文件事务、
 安装和迁移机制；真实 Codex Desktop 新任务才可证明 deploy 后采用与 revoke 后不采用。
 
 Ambient discovery 继续是 experimental。旧 release harness、trace、action ledger、benchmark CLI 或 evidence matrix

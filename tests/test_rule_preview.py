@@ -52,6 +52,7 @@ class RulePreviewTests(unittest.TestCase):
             cls.resolver = importlib.import_module("resolve_owner_parity")
             cls.renderer = importlib.import_module("render_review")
             cls.visible = importlib.import_module("verify_visible_output")
+            cls.delivery = importlib.import_module("prepare_delivery")
         finally:
             sys.path.pop(0)
 
@@ -347,10 +348,12 @@ class RulePreviewTests(unittest.TestCase):
         prepared = self.preparer.prepare_review(draft, codex_home=codex_home)
         self.assertNotIn("confirm", prepared["review_cards"][0]["allowed_actions"])
         self.assertIsNone(prepared["review_cards"][0]["selection_token"])
+        self.assertIsNone(self.visible.verify_visible_output(
+            self.renderer.render_review_pack(prepared, surface="interactive"), surface="interactive")["recovery_bundle"])
         review = draft["review_cards"][0]
         review["integration_preview"]["global_relation"] = "already_covered_exact"
         review["recommended_action"] = "ignore"
-        review["allowed_actions"] = list(self.validator.READ_ONLY_ACTIONS)
+        review["allowed_actions"] = []
         review["selection_token"] = None
         draft["review_pack_hash"] = self.validator.review_pack_hash(draft)
         prepared = self.preparer.prepare_review(draft, codex_home=codex_home)
@@ -380,6 +383,68 @@ class RulePreviewTests(unittest.TestCase):
         self.assertIn("**一次确认命令**", rendered)
         self.assertIn("**组合确认标识**", rendered)
         self.assertEqual(self.visible.verify_visible_output(rendered, surface="interactive")["bundle_action_count"], 1)
+
+    def test_queued_artifact_alone_recovers_exact_bundle_for_fresh_core_preview(self) -> None:
+        old = ConfirmedRule.from_proposal(RuleProposal.from_payload(proposal(100)))
+        self.target.write_bytes(managed_block_bytes((old,), newline="\n"))
+        codex_home = self.install_fixture()
+        draft = self.draft(codex_home, count=2, rule_length=30)
+        revision = draft["review_cards"][1]["integration_preview"]
+        revision.update(global_relation="replace", supersedes=[old.rule_id])
+        bundle = self.validator.review_bundle(draft)
+        for review, item in zip(draft["review_cards"], bundle["items"]):
+            review["selection_token"] = item["selection_token"]
+        draft["review_pack_hash"] = self.validator.review_pack_hash(draft)
+        pack = self.preparer.prepare_review(draft, codex_home=codex_home)
+        expected_bundle_hash = hashlib.sha256(self.delivery.canonical_json(bundle).encode()).hexdigest()
+        expected_preview = pack["selection_preview"]["result"]
+        output = self.root / "task-output"
+        output.mkdir()
+        manifest, artifact = self.delivery.prepare_delivery(pack, artifact_dir=output, protected_roots=[codex_home])
+        receipt = self.delivery.render_queued_receipt(manifest, artifact_path=artifact, artifact_root=output)
+        del pack, draft, bundle, manifest
+        before = {str(p): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        restored = subprocess.run([sys.executable, "-B", str(SCRIPTS / "scout.py"), "verify-final", "--artifact-root", str(output)],
+            input=receipt, capture_output=True, text=True, encoding="utf-8", cwd=self.root)
+        self.assertEqual(restored.returncode, 0, restored.stderr)
+        result = json.loads(restored.stdout)
+        self.assertFalse(result["confirmation_eligible"])
+        self.assertEqual(result["status"], "surface_pending")
+        recovered = result["recovery_bundle"]
+        self.assertEqual(hashlib.sha256(self.delivery.canonical_json(recovered).encode()).hexdigest(), expected_bundle_hash)
+        runtime, _ = self.preparer.installed_core(codex_home)
+        preview = subprocess.run([sys.executable, "-I", "-B", str(runtime), "preview-bundle", "--target-file", str(codex_home / "AGENTS.md")],
+            input=json.dumps(recovered), capture_output=True, text=True, encoding="utf-8", cwd=self.root)
+        self.assertEqual(preview.returncode, 0, preview.stderr)
+        self.assertEqual(json.loads(preview.stdout), expected_preview)
+        self.assertEqual(before, {str(p): p.read_bytes() for p in self.root.rglob("*") if p.is_file()})
+        rendered = artifact.read_text(encoding="utf-8")
+        tampered = self.visible.replace_body_and_hash(rendered, lambda text: text.replace(
+            '"project_claim_hash":"' + recovered["items"][0]["project_claim_hash"], '"project_claim_hash":"' + "0" * 64, 1))
+        with self.assertRaises(self.validator.ContractError):
+            self.visible.verify_visible_output(tampered, surface="interactive")
+        tampered = self.visible.replace_body_and_hash(rendered, lambda text: text.replace("项目里发生了什么", "项目发生了什么", 1))
+        artifact.chmod(0o600)
+        artifact.write_text(tampered, encoding="utf-8")
+        artifact.chmod(0o400)
+        with self.assertRaises(self.validator.ContractError):
+            self.delivery.verify_final_receipt(receipt, artifact_root=output)
+
+    def test_scheduled_and_legacy_report_recovery_preserve_evidence_boundary(self) -> None:
+        pack = self.validator.valid_review_pack(self.validator.valid_project(window_kind="rolling_72h"))
+        rendered = self.renderer.render_review_pack(pack, surface="scheduled")
+        result = self.visible.verify_visible_output(rendered, surface="scheduled")
+        self.assertEqual(result["recovery_bundle"], self.validator.review_bundle(pack))
+        legacy = self.visible.replace_body_and_hash(rendered, lambda body: self.visible.RECOVERY_BLOCK_RE.sub("", body))
+        self.assertIsNone(self.visible.verify_visible_output(legacy, surface="scheduled")["recovery_bundle"])
+        pack = self.validator.valid_review_pack(self.validator.valid_project(card_count=1))
+        rendered = self.renderer.render_review_pack(pack, surface="interactive")
+        legacy = self.visible.replace_body_and_hash(rendered, lambda body: self.visible.RECOVERY_BLOCK_RE.sub("", body))
+        artifact = self.root / f"global-owner-scout-review-pack-{pack['review_pack_hash'][:16]}.md"
+        self.delivery.write_immutable_artifact(artifact, legacy.encode("utf-8"))
+        manifest = self.delivery.artifact_manifest(legacy.encode("utf-8"), artifact.name)
+        receipt = self.delivery.render_queued_receipt(manifest, artifact_path=artifact, artifact_root=self.root)
+        self.assertIsNone(self.delivery.verify_final_receipt(receipt, artifact_root=self.root)["recovery_bundle"])
 
 
 if __name__ == "__main__":

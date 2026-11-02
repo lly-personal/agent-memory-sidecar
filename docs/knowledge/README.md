@@ -2,7 +2,7 @@
 
 - Status: active
 - Owner layer: project_docs
-- Last verified: 2026-07-24
+- Last verified: 2026-11-02
 
 ## Current authority route
 
@@ -36,8 +36,8 @@ immutable zipapp; neither imports the editable checkout at runtime.
 
 ## Historical boundary
 
-All root contracts other than `agent-memory-core-v1.md` and `public-distribution-v1.md` are retained historical
-records and are superseded for the current implementation. They may explain
+Root contracts declare their own current status; the active L1–L3 links identify the owning implementation contracts, including
+release promotion, workstation reconciliation, instruction sync and Scout delivery. Only explicitly superseded contracts are historical. They may explain
 earlier decisions, but cannot restore legacy CLI, generic `MemoryStore`,
 SQLite-active state, release harnesses, clean-store rotation, editable Hooks, or
 Ambient release holds.

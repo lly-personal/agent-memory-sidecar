@@ -13,7 +13,9 @@ from utf8_stdio import configure_utf8_stdio
 
 from validate_output import (
     ContractError,
+    canonical_json,
     project_claim_hash,
+    review_bundle,
     valid_project,
     valid_review_pack,
     validate_review_pack,
@@ -41,6 +43,8 @@ SCOPE_LABELS = {
     "no_persistence": "仅供本次参考",
 }
 SURFACES = {"interactive", "scheduled"}
+RECOVERY_BLOCK_START = "<details>\n<summary>恢复准确选择（不代表授权或当前可写）</summary>\n\n```text\n"
+RECOVERY_BLOCK_END = "\n```\n\n</details>"
 
 
 def visible_body_sha256(body: str) -> str:
@@ -48,11 +52,11 @@ def visible_body_sha256(body: str) -> str:
 
 
 def inbox_wrapper(pack: dict[str, Any]) -> str:
-    count = len(pack["review_cards"])
+    count = sum(bool(card["allowed_actions"]) for card in pack["review_cards"])
     if pack["status"] in {"failed", "output_budget_exceeded"}:
         title = "Owner Scout：运行失败"
         summary = "本次没有可操作卡片，请查看完整失败终态。"
-    elif pack["status"] == "no_material_delta":
+    elif pack["status"] == "no_material_delta" or count == 0:
         title = "Owner Scout：暂无新候选"
         summary = "已核查范围内暂无新建议；未覆盖部分仍未知。"
     else:
@@ -114,6 +118,7 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
     research = preview["research"]
     before_after = preview["before_after"]
     recommended = review["recommended_action"]
+    needs_decision = bool(review["allowed_actions"])
     combination_only = bool(review["selection_token"] and "confirm" not in review["allowed_actions"])
     # Exact repeats refer to their first field; similar text is never merged.
     shown = {rule["trigger"]: "When", rule["action"]: "Do", rule["skip_boundary"]: "Skip"}
@@ -132,7 +137,7 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
         f"**建议范围**：{SCOPE_LABELS[card['owner_recommendation']]}。",
         "",
         "> [!IMPORTANT]",
-        "> **确认范围：仅上方完整组合**  " if combination_only else f"> **推荐动作：{ACTION_LABELS[recommended]}**  ",
+        "> **无需处理：已有覆盖或无需变更**  " if not needs_decision else "> **确认范围：仅上方完整组合**  " if combination_only else f"> **推荐动作：{ACTION_LABELS[recommended]}**  ",
         f"> {review['recommended_action_reason']}",
         "",
         "### 决策摘要",
@@ -147,7 +152,7 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
         f"| 建议结果 | {table_cell(fact('建议结果', human['recommended_outcome']))} |",
         f"| 最大反例 | {table_cell(fact('最大反例', human['strongest_counterpoint']))} |",
         "",
-        "### 接受后的准确规则",
+        "### 接受后的准确规则" if needs_decision else "### 已核对的规则（未新增）",
         "",
         f"- **When**：{rule['trigger']}",
         f"- **Do**：{rule['action']}",
@@ -162,9 +167,9 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
         "| --- | --- |",
         f"| {table_cell(fact('接受前', human['concrete_before']))} | {table_cell(fact('接受后', human['concrete_after']))} |",
         "",
-        "### 你的选择",
+        "### 你的选择" if needs_decision else "### 参考结论",
         "",
-        "复制对应行回复即可；忽略只跳过本次建议，不修改已有规则。",
+        "复制对应行回复即可；忽略只跳过本次建议，不修改已有规则。" if needs_decision else "无需逐项确认或忽略；以下保留来源，供需要时查阅。",
         "",
     ]
     for action in review["allowed_actions"]:
@@ -277,17 +282,20 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         if not proof["host_automation_memory_read"] or not proof["host_automation_memory_updated"]:
             raise ContractError("scheduled surface requires its bounded automation memory wrapper")
     cards_by_hash = {card["project_claim_hash"]: card for card in project["project_cards"]}
+    decisions = [(index, review) for index, review in enumerate(pack["review_cards"], 1) if review["allowed_actions"]]
+    references = [(index, review) for index, review in enumerate(pack["review_cards"], 1) if not review["allowed_actions"]]
+    result_label = "已核查范围无需新增规则" if pack["status"] == "ok" and not decisions else STATUS_LABELS[pack["status"]]
     lines = [
         f"# 项目复盘 · {project['project_key']}",
         "",
-        f"**结果**：{STATUS_LABELS[pack['status']]}。  ",
-        f"**决策卡**：{len(pack['review_cards'])} 张  ",
+        f"**结果**：{result_label}。  ",
+        f"**需决定**：{len(decisions)} 项；**参考记录**：{len(references)} 项。  ",
         "**本次规则变更**：无。建议经明确确认并成功写入后，才会改变相应作用域的后续任务。",
         "",
     ]
     if surface == "interactive" and pack["review_cards"]:
         lines.extend([
-            "> **确认条件**：请以当前任务的交付回执为准。打开仍排队或交付失败时，下面的确认命令暂不可执行；可先审阅或修改建议。交付就绪后，也只可确认通过准确预演的选择。",
+            "> **确认条件**：本文件没有改变规则。审阅后可回复准确选择；Agent 会先恢复本文件的完整性校验，再核对当前规则并预演。打开请求排队不证明你已看到内容，也不代替你的授权；文件或预演校验失败时不写入。",
             "",
         ])
     if pack["status"] == "failed":
@@ -318,9 +326,9 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         lines.extend(["", "## 容量失败", "", "完整卡片无法在一次结果中无损呈现，因此整次运行失败；没有输出部分卡片。"])
     else:
         decision_scope = "本次" if surface == "interactive" else "今日"
-        lines.extend(["", f"## {decision_scope}需要判断 {len(pack['review_cards'])} 项", ""])
+        lines.extend(["", f"## {decision_scope}需要判断 {len(decisions)} 项", ""])
         lines.extend(["| # | 决策 | 推荐动作 | 证据 |", "| --- | --- | --- | --- |"])
-        for index, review in enumerate(pack["review_cards"], start=1):
+        for index, review in decisions:
             card = cards_by_hash[review["project_claim_hash"]]
             support = card["project_support"]
             recommendation = "仅组合可确认" if review["selection_token"] and "confirm" not in review["allowed_actions"] else ACTION_LABELS[review["recommended_action"]]
@@ -328,6 +336,13 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
                 f"| {index} | {table_cell(card['human_context']['decision_title'])} | "
                 f"{recommendation} | {card['evidence_level']} · {support['count']} 个项目 |"
             )
+        if not decisions:
+            lines.append("无需确认或逐项忽略；当前规则保持不变。")
+        if references:
+            lines.extend(["", f"**已有覆盖或无需变更 {len(references)} 项**：无需处理，完整来源保留在下方参考卡。", ""])
+            for index, review in references:
+                card = cards_by_hash[review["project_claim_hash"]]
+                lines.append(f"- 参考卡 {index}：{card['human_context']['decision_title']} — {review['recommended_action_reason']}")
         confirmable = confirmable_card_selections(pack, cards_by_hash)
         if len(confirmable) > 1:
             lines.extend(
@@ -377,7 +392,7 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
             f"**模型请求**：`{model['requested_model']} + {model['requested_reasoning']}`  ",
             f"**实际模型**：`{model['actual_model'] or model['runtime_metadata_status']} + {model['actual_reasoning'] or model['runtime_metadata_status']}`",
             "",
-            f"Session 覆盖：`{coverage['status']}`；发现 {coverage['discovered_task_count']}，窗口内 {coverage['window_task_count']}，选择 {coverage['selected_task_count']}，完整读取 {coverage['fully_read_task_count']}，读取 {coverage['turn_pages_read']} 页/轮；宿主上限 {coverage['task_index_limit']}；截断 `{str(coverage['truncated']).lower()}`。",
+            f"Session 覆盖：`{coverage['status']}`；发现 {coverage['discovered_task_count']}，窗口内 {coverage['window_task_count']}，选择 {coverage['selected_task_count']}，完整读取 {coverage['fully_read_task_count']}，读取 {coverage['turn_pages_read']} 页/轮；索引 {coverage['index_pages_read']} 页，每页至多 {coverage['task_index_limit']} 项；active `{coverage['index_terminals']['active']}`，archived `{coverage['index_terminals']['archived']}`；截断 `{str(coverage['truncated']).lower()}`。",
             "",
             "### 证据来源",
             "",
@@ -409,6 +424,13 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
     else:
         lines.append("- 无。")
 
+    bundle = review_bundle(pack)
+    if bundle:
+        eligible = {review["selection_token"] for review in pack["review_cards"] if review["selection_token"]}
+        bundle["items"] = [item for item in bundle["items"] if item["selection_token"] in eligible]
+        if bundle["items"]:
+            lines.extend(["", RECOVERY_BLOCK_START + canonical_json(bundle).decode("utf-8") + RECOVERY_BLOCK_END])
+
     body = "\n".join(lines).rstrip() + "\n"
     action_counts = [len(review["allowed_actions"]) for review in pack["review_cards"]]
     action_count = sum(action_counts)
@@ -433,6 +455,8 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
 
 
 def run_self_test() -> None:
+    from verify_visible_output import RECOVERY_BLOCK_RE
+
     tests = 0
     for surface, decision_heading, wrapper_count in (
         ("interactive", "本次需要判断 2 项", 0),
@@ -459,7 +483,7 @@ def run_self_test() -> None:
         else:
             assert "Scheduled" not in rendered and "Inbox" not in rendered and "0/14" not in rendered
             assert "今日需要判断" not in rendered and "14 次" not in rendered
-        assert "{\"contract_version\"" not in rendered and "```json" not in rendered
+        assert "{\"contract_version\"" not in RECOVERY_BLOCK_RE.sub("", rendered) and "```json" not in rendered
         tests += 1
 
     degraded = render_review_pack(valid_review_pack(valid_project(status="degraded", coverage="degraded", observed=False)), surface="interactive")

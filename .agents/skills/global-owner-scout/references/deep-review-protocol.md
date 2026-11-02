@@ -1,4 +1,4 @@
-# Deep Review Protocol 5.9
+# Deep Review Protocol 5.11
 
 ## Evidence posture
 
@@ -6,51 +6,44 @@ Session content discovers leads; current project Owners, ADR/specs, Git, tests, 
 summary is not proof. Missing Session access is a coverage limitation, not evidence that no learning exists. Keep fact, inference,
 and unproven claim separate.
 
-## Phase 0: project front door and isolation
+## Phase 0: current-task context
 
-Before any task index, thread page, Owner comparison, or project deep read, Fresh-resolve the current Desktop project binding and
-installed Skill identity, then run `python -B scripts/scout.py inspect-context` for the path-free Git/baseline snapshot. If already
-in an isolated worktree, continue. This formal invocation authorizes exactly one read-only executor. If in Local, use the host-native
-project-task creation operation with the current project, current working-tree state, and this exact invocation as the initial prompt;
-do not create an empty child or ask
-the user to repeat it. Do not use shell-created worktrees, guessed paths, or partial Local execution. If the project is not eligible,
-binding is unavailable, or the host cannot project the task, render Terminal v1 through `python -B scripts/scout.py render-terminal`
-and stop before Phase 1.
-
-For interactive `manual_30d`, also check the host-declared current-task output root
-and file-preview capability before task census. Use `scripts/scout.py
-inspect-output --artifact-dir <host-output-root> --protected-root <project-root>`;
-it checks containment without writing. Missing capability returns Terminal v1
-before deep work. Recheck these conditions during delivery; preflight does not
-prove later writability or visibility. Scheduled checks its final Inbox wrapper
-surface instead; it has no file artifact root or file-preview prerequisite.
+Follow SKILL.md preflight before evidence reads: resolve the current native project, installed Skill, explicit output grant and
+an available Python 3 runtime. Use the absolute dispatcher with `-B` and `inspect-context --project-root <bound-project-root>`;
+helper cwd is never project authority. Keep the full snapshot hash before and after, including untracked contents. Interactive
+reviews use Local or the existing worktree without creating a new task. Scheduled experiments retain their isolated worktree.
+For interactive delivery, read the host-injected environment roots before declaring output unavailable; a path pattern alone never proves a grant.
+`inspect-output` checks the exact granted root without writes. Recheck at delivery. Missing binding/Git/output capability uses
+Terminal v1 before deep work; a changed snapshot invalidates stability without attributing an unproved mutation to Scout.
+Scheduled retains its verified inline/Inbox surface and has no artifact-root or file-preview prerequisite.
 
 ## Phase 1: identity and task census
 
-1. Derive the project from the current Desktop binding. Compute opaque content/host identity; never trust a Prompt-supplied name,
-   path, ID, or allowlist.
-2. Call the native task index once with `limit=50`. Run its enclosing execution cell with a 60-second initial yield. If it returns a
-   `cell_id`, call `wait` on that same cell up to two times, 60 seconds each, until terminal. Do not issue a second index call while
-   the cell is running; `Script running` is not unavailable or timeout evidence.
-3. An unresumed cell, invalid request, or interrupted execution is `failed / execution_protocol_failed`. It may preserve one already
-   proved index terminal enum, but it produces no cards. An explicit terminal index error is
-   `degraded / native_index_terminal_failure`; an explicit host cap is `bounded / native_index_host_cap`.
-4. Associate tasks through native identity, current primary folder, or isolated-worktree origin. Exclude Scheduled, Scout, test, and
-   delegated tasks. For every selected natural task, use native `read_thread` pages with `turnLimit=10` and
-   `maxOutputCharsPerItem=20000` to the evidence-window boundary or EOF. Do not probe larger values. Any yielded execution cell
-   follows the same resume-to-terminal rule. An explicit terminal page error is
-   `degraded / native_thread_pages_terminal_failure`; record truncation and preserve cards independently supported by non-Session
-   formal project evidence.
-5. Count discovered, in-window, selected, fully read tasks and pages; list exclusions and reasons. Use `complete` only with
-   `native_index_completed + native_thread_pages_completed`; use `bounded` only with
-   `native_index_host_cap + native_thread_pages_completed`. The current active-task snapshot is sufficient; record concurrent
-   later changes and never wait for another project task to end.
-6. Never use transcript storage, file bridges, automation memory, or databases as a Session substitute.
+1. Derive identity and freeze the 30-day start/end from the current Desktop binding; never a prompt-supplied path or allowlist.
+2. Use native history with source `codex`, current host, limit 50; enumerate active and archived partitions separately. Follow
+   the returned `nextCursor` with unchanged host/source/archive selection until EOF or a proved window boundary. Stop at a
+   window boundary only when the history's ordering and all relevant entries on the page are older than the frozen start;
+   a pinned/recent list or one old item is not sufficient. Deduplicate task identity across pages before counting. Record
+   `index_pages_read` and `index_terminals.active/archived`; unavailable history remains bounded/degraded, not a complete census.
+3. Resume a yielded cell to its actual terminal result before another call; use bounded waits so the user is not left without
+   progress. An abandoned cell or invalid call is `execution_protocol_failed`; explicit terminal index failure is
+   `native_index_terminal_failure`. Existing partial results are retained without inventing missing pages.
+4. Associate natural tasks by native project identity or proved worktree origin. Exclude dedicated Scout, test, Scheduled and
+   delegated tasks. In a mixed engineering/Scout task, retain natural work turns before the frozen invocation boundary and exclude
+   Scout-generated review/acceptance turns; never drop the whole current task because it also invokes Scout. Page selected tasks to the frozen boundary or EOF using `read_thread`; begin with one turn and bounded
+   output. Read relevant truncated output separately. On an explicit capacity error, retry the same cursor once with a smaller
+   output request; if it still fails, record `native_thread_pages_terminal_failure` and the exact unread scope. Preserve the
+   original failed attempt even if recovery succeeds. Do not change cursor, omit a failed page, or use transcript files.
+5. Count discovered, in-window, selected and fully read tasks. `complete` requires both history partitions to reach
+   `window_boundary/eof` plus every selected task read to boundary/EOF. `bounded` means history remains incomplete but selected
+   reads completed. `degraded` exposes explicit failures. The current active-turn snapshot is sufficient; later concurrent
+   updates are outside the frozen observation, not a reason to wait for the task to finish.
+6. No transcript parser, database, background queue, task polling service or automation memory substitutes for native evidence.
 
 ## Phase 2: project fact reconstruction
 
 Read the project instruction chain, L1/L2/L3 or equivalent Owners, current-status Owner, relevant ADR/specs, windowed Git changes,
-tests, failures, acceptance, and isolated snapshot. Recheck Session leads against these sources. Record each source's availability.
+tests, failures, acceptance, and bound project snapshot. Recheck Session leads against these sources. Record each source's availability.
 
 Build the six-category `evidence_sources` inventory defined in contracts.md.
 Start from current Owners and follow their relevant references in bounded
@@ -144,7 +137,7 @@ entry remains a delivery gap. Keep every supported source obligation visible acr
 global set fits. Do not relocate a mandatory behavior merely to pass capacity. Weak or risky ideas may remain without persistence.
 
 For `make_skill`, name the versioned source Owner and whether the existing entry can absorb the method. Follow the
-[method handoff SOP](https://github.com/lly-personal/agent-memory-sidecar/blob/v0.3.16/docs/specs/interface.md#按需方法的维护与交接) after an authorized maintenance request;
+[method handoff SOP](https://github.com/lly-personal/agent-memory-sidecar/blob/main/docs/specs/interface.md#按需方法的维护与交接) after an authorized maintenance request;
 the read-only Scout recommendation itself never installs a Skill or updates an Owner.
 
 Record each signal in `observations` with its event IDs and structured
@@ -181,8 +174,11 @@ with an empty inventory or claim exhaustive knowledge beyond the declared scope.
 
 Run `python -B scripts/scout.py resolve-owner-parity`. With matched parity, read the active host-local global Owner and verify its bytes
 against the returned hash; the equal canonical hash proves identical canonical content without revealing its physical path. With
-drift or unavailable parity, mark Owner comparison incomplete and remove confirmation. Compare semantics when proved, and use
-official/first-party research only to support or challenge existing candidates. Add one integration preview per frozen card. Recheck count/order conservation,
+drift or unavailable parity, mark Owner comparison incomplete and remove confirmation. Compare semantics when proved. Map each proposed trigger, obligation and exception to the complete Owner, including unmanaged
+principles. A differently worded conjunction of existing clauses is still covered. For `add`, identify the residual obligation
+and one concrete permitted failure that existing clauses would not prevent. If none exists, use `already_covered_exact`;
+uncertainty stays unproven rather than becoming an extra user choice. Do not copy an existing Skill procedure into global rules.
+Use official/first-party research only to support or challenge existing candidates. Add one integration preview per frozen card. Recheck count/order conservation,
 privacy, and project read-only fingerprints. Prepare the draft Review Pack through `scripts/scout.py prepare-review` before validating
 or rendering it. This binds single and combined confirmation actions to the actual installed Core planner; absence or failure of that
 receipt cannot be replaced with manually calculated capacity. Preserve candidates and revise exact consolidation/replacement/routing
@@ -195,28 +191,16 @@ a dynamic import or an inline import that can create `__pycache__`.
 If the resolver returns `unavailable`, remove confirmation and report the limitation. Never search upward, inspect the project-root
 `AGENTS.md` as a substitute, or guess a canonical path from the current checkout.
 
-For the explicit user entry, resolve the current task's explicit host-generated output root. It must exist outside the reviewed
-project; never guess a system temp directory, project `.sandbox`, arbitrary `$CODEX_HOME` path, another task, or a persistent bridge.
-A host-declared task output root may physically live inside host-managed app storage; only that explicit grant is eligible. Invoke
-`python -B scripts/scout.py prepare-delivery --artifact-dir <host-output-root> --protected-root <project-root>` with the Review Pack on stdin. The helper
-renders, verifies, creates, flushes and reads back the complete Markdown, then emits a compact Delivery v1 manifest.
+For delivery, use the single artifact and receipt sequence in SKILL.md and the [Delivery contract](https://github.com/lly-personal/agent-memory-sidecar/blob/main/specs/global-owner-scout-delivery-v1.md).
+The renderer puts actual decisions first and covered/no-change evidence in a reference index. No action is needed for covered
+cards; every source and card still conserves. A queued request is not proof of display. Technical completion and the result link
+stay in this task; no separate controller chat is required to finish the review.
 
-Pre-render `open_succeeded`, `open_queued` and `open_failed` compact receipts through `scripts/scout.py render-receipt` from that
-manifest. Success and queued rendering receive
-the exact artifact path and host-output root and recheck direct-child containment, read-only state, bytes, hashes and visible-output conservation.
-Recheck project/Skill read-only fingerprints,
-then open the artifact with the current-task host file-preview tool as the final tool call. Return the exact success receipt only if
-the host call succeeds. An exact `queued` result returns the content-bound queued receipt and remains `surface_pending` with
-confirmation disabled; any other non-success result returns the blocked receipt. Do not copy the Review Pack into chat. Missing output root, renderer
-failure, artifact mismatch, host-open failure or inability to preserve the compact receipt returns `interactive_host_blocked`,
-`render_integrity_failed`, or `output_budget_exceeded`; never manufacture partial or replacement Markdown. When no valid manifest
-exists, construct `global_owner_scout_terminal_v1` and run `scripts/scout.py render-terminal`; do not call a manifest receipt path.
-
-The interactive artifact open is the final tool call. Do not invoke `agent-memory`, another Skill, another tool, or a post-open audit.
-The task artifact and compact receipt are already the terminal memory-review artifact. Any mandatory higher-level audit stays silent.
-A separate controller task reads the actual final and invokes `python -B scripts/scout.py verify-final --artifact-root
-<host-output-root>`; `surface_pending` proves discoverability/integrity only and only `surface_observed` can qualify the host. The optional paused Scheduled path continues to use
-`scripts/scout.py render-review --surface scheduled` plus `scripts/scout.py verify-visible --surface scheduled` and its final wrapper.
+For recovery, reuse `verify-final` on the actual prior receipt and original granted output root. Reconstruct the manifest from
+that same immutable file; never regenerate the evidence or rewrite the previous artifact. Exact human selections resume through
+the existing installed Agent Memory bundle handoff after artifact verification and Fresh Core preview. Preserve the queued
+observation; it neither grants authorization nor permanently blocks a later independently verified human selection.
+The optional paused Scheduled path retains `render-review --surface scheduled` and `verify-visible --surface scheduled`.
 
 Capture the user-level Skill directory bytecode-cache baseline before helper execution and recheck it afterward. A new or changed
 `__pycache__`, `.pyc`, or `.pyo` is an external side effect and fails the run; do not delete it from inside the Scout to hide the
@@ -224,12 +208,12 @@ failure. The Bootstrap installer, not the Scout, owns cache-free atomic installa
 
 Terminal meanings:
 
-- `interactive_entry_blocked`: preflight could not prove the project binding, Git eligibility, or host-native worktree projection;
-  no deep review ran and confirmation is disabled.
+- `interactive_entry_blocked`: preflight could not prove the project binding, or Git eligibility;
+  no deep review ran and no authorization is inferred.
 - `ok`: at least one card plus complete/bounded coverage.
 - `degraded`: material coverage gap; supported cards remain visible and the run does not count.
 - `no_material_delta`: complete/bounded census and all search lenses produced no E2/E3 delta.
 - `failed`: execution protocol, privacy, integrity, mutation, required-source, render, or read-only failure; no cards.
 - `output_budget_exceeded`: not every card fits; no partial cards.
-- `surface_pending`: the exact artifact and final link are externally verified after a host `queued` result; content is discoverable, but the user surface remains unproved and confirmation is disabled.
+- `surface_pending`: the exact artifact and final link are externally verified after a host `queued` result; content is discoverable, but the user surface remains unproved and no authorization is inferred.
 - `interactive_host_blocked`: no safe task output root, artifact/open failure, or an actual final without a verifiable opened/queued receipt; no partial cards or confirmation.

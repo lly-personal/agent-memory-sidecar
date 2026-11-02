@@ -91,7 +91,6 @@ class ContractTests(unittest.TestCase):
         self.assertIn("interactive_host_blocked", contract)
         self.assertIn("0/1/3/6/7/8/24-card", contract)
         self.assertIn("global_owner_scout_terminal_v1", contract)
-        self.assertIn("five-scenario entry matrix", contract)
 
     def test_public_distribution_contract_is_active_and_fail_closed(self) -> None:
         contract = (ROOT / "specs" / "public-distribution-v1.md").read_text(

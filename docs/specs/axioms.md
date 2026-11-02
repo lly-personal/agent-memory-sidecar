@@ -92,12 +92,11 @@ SDDL 文本表现形式代替权限语义。
 零卡不能由空观察证明候选穷尽。有界复盘只声明已覆盖范围内未发现合格增量，不宣称工程不存在可复用经验。
 确定性校验只证明关联与交付守恒；发现能力以不泄露答案的固定源样本及人工校准判断验收，未来采用另行验证。
 
-Global Owner Scout 是用户显式触发的外部项目复盘 workflow，不是 Core 的默认后台治理能力。正式入口是用户在
-目标 Git 工程的当前项目任务发送 `$global-owner-scout 复盘当前项目`；入口在任何深挖前自动把 Local 调用投影到
-隔离 worktree 执行任务，用户不负责创建 worktree 或重复指令。隔离执行器重建项目事实、提炼候选并
-把完整 Project Review Pack 交付到当前任务的宿主生成文件表面。任何运行都只产生 `review draft`，不得创建
-proposal token、写入七表 Store、修改任何 `AGENTS.md`、发布 Git 或调用外部写操作；唯一例外是写入项目工作树
-之外、由当前任务宿主显式提供的不可变 output artifact。Scheduled 只是暂停的可选宿主扩展，不能阻断交互结果。
+Global Owner Scout 是用户显式触发的只读项目复盘，不是 Core 的后台治理能力。用户在当前绑定 Git 工程发送
+`$global-owner-scout 复盘当前项目` 后，同一任务完成预检、30 天取证、审阅文件和结果链接；默认不创建新聊天或
+worktree，用户已选的 worktree 原地沿用。前后完整项目指纹必须一致，包括未跟踪文件内容；并发变化只能按证据
+归因，不能直接指称 Scout 写入。复盘不创建 proposal token、不修改 Store、Owner、Git 或外部系统，唯一输出写入
+是当前宿主显式授予且位于项目外的不可变 artifact。Scheduled 仍是独立暂停的隔离实验。
 
 该实验的正式激活集合由每台主机动态发现和人工确认，不由共享源携带固定项目名单。Project/global Owner、已提交
 Skill 和工程事实属于 Git 可移植层；Codex `projectId`、绝对路径、Scheduled Task、运行计数与未确认 Review Pack
@@ -122,10 +121,9 @@ integration preview，并把完整中文审阅包直接呈现给用户；用户�
    中央审阅可以校验、关联、质疑和追加注释，但不得修改项目证据等级、痛点、反证、抽象或 owner 建议。
 5. **正式 owner 优先**：项目事实、设计规范和多步骤方法分别路由到项目 owner 或 Skill；只有未来跨项目
    必须执行的行为增量才进入 global managed block 的人工决策范围。
-6. **直接全量可判断**：每个项目全部合格 E2/E3 卡必须由该项目的当前复盘任务直接完整显示；同任务、不可变、
-   宿主可打开的 Review Pack artifact 属于直接显示，跨任务文件桥不属于。先给出中文决策索引和逐卡决策摘要，
-   再展示完整依据，E1 与技术覆盖进入附录。内部 Project Card 数与可见 Markdown 卡数必须守恒，不得通过中央失败、
-   排名、摘要或通知策略隐藏项目卡。
+6. **完整证据与必要决策分开呈现**：全部合格 E2/E3 卡和来源保留在同任务不可变文件中。首层给出结论、
+   需决定的真实行为增量及风险；已覆盖和无需持久化项不计待决、不要求逐项忽略，完整依据留供查阅。
+   不因排序、摘要、容量或外部故障隐藏卡片；语义去重比较全部行为义务与例外，重组已有条款不构成新增规则。
 7. **可见性与写入采用不同失败边界**：Session 索引或分页明确终态失败只能产生醒目的 `degraded` 警告，不得删除
     由 Owner、ADR、Git、测试或验收独立支持的卡；隐私、只读、完整性或 Owner parity 失败必须阻断相应写入动作。
 8. **人工精确选择、所见即所签**：复盘输出始终是草案。用户可以一次选择同一 Review Pack、scope 和 target 的
@@ -134,24 +132,22 @@ integration preview，并把完整中文审阅包直接呈现给用户；用户�
    Core 必须证明当前回复完整绑定选中集合，只允许 canonical 确认文本或接口规范限定的 Markdown 分隔符转义表示。
    单卡是大小为一的规则包；不得循环复用 approval、
    沿用旧快照、按输入顺序解释集合或留下部分成功。
-9. **资源策略随入口分层**：交互入口不要求用户填写资源配置，也不为自动隔离 executor 注入 model/thinking override；
-   使用该 executor 的宿主解析值，并验证可观测实际值与该任务请求值一致。暂停的 Scheduled 14 次实验仍固定
-   `gpt-5.6-sol + medium`，Speed/service tier 继承本机配置。手动运行不计入 Scheduled 14 次实验。
+9. **资源策略随入口分层**：交互入口使用当前任务的宿主设置，不询问或覆盖 model/thinking；可观察时记录实际值。
+   暂停的 Scheduled 实验保留其固定模型与滚动窗口，手动复盘不计入实验次数。
 10. **零背景状态**：不得增加候选 Inbox、transcript parser、长期候选数据库、后台规则 GC 或第二行为 owner。
 11. **证据不可跨级**：定时发现与文件写入不证明自然任务采用。采用和撤销必须由后续无答案泄漏的新任务验证。
-12. **可移植安装与可选激活分离**：Bootstrap 安装并验证 Skill 后，所有满足隔离条件的目标工程即可由用户显式
+12. **可移植安装与可选激活分离**：Bootstrap 安装并验证 Skill 后，所有具备原生绑定与输出授权的 Git 工程即可由用户显式
     触发，无需 Host Enrollment。只有用户明确要求 Scheduled 实验时才进入项目发现与 enrollment；共享 Prompt、
     Manifest 与 Owner 不得写入固定项目名、host `projectId` 或绝对路径。
-13. **安全资格先于推荐**：滚动 30 天自然任务决定 `active`，Git worktree 能力决定 `eligible`；Scout、测试、
-    自动化和委派任务不计入自然活动。交互入口中的 worktree 是宿主自动选择的隔离执行原语，不是用户前置操作；
-    任务来源不可证明时只能 `bounded / 建议试运行`，非 Git 项目不得默认启用。
+13. **安全资格先于推荐**：Scheduled enrollment 以滚动 30 天自然任务判断 `active`，Git worktree 能力判断 `eligible`；
+    专用 Scout、测试、自动化和委派任务不计入自然活动。交互复盘沿用当前 Local 或已选 worktree；混合任务保留自然
+    工作 turns，排除复盘生成内容。来源不可证明时只能 bounded，非 Git 项目不得默认启用。
 14. **原生工具必须取得终态**：任务索引或分页调用返回运行中 cell 时，必须恢复同一 cell 直到明确终态；未恢复、
     非法参数或执行序列中断属于 `execution_protocol_failed`。分页工具明确返回终态错误时使用
     `native_thread_pages_terminal_failure` 降级，并保留其他证据独立支持的卡；两者不得互相伪装。
-15. **可见结果必须逐字守恒**：只有通过校验的 Review Pack 经确定性 renderer 完整生成、写入同任务不可变
-    artifact、按原字节回读，并且宿主实际表面由外部 controller 验证，才算完成呈现。内部 verifier、文件写入或
-    `open` 工具成功不得单独升级为用户可见证明。interactive 聊天只返回 compact Delivery receipt；scheduled
-    继续阻断。renderer 或 artifact 失败后不得由模型手工重写、摘要或部分恢复结果。
+15. **交付内容必须逐字守恒**：确定性 renderer、同任务不可变 artifact、完整字节读回和最终结果链接共同证明技术
+    交付；不独立证明 UI 已展示或用户已理解。实际 final 的外部读回可增加证据，但不要求另建控制任务。
+    交互 final 仅显示 compact receipt，完整证据留在文件；渲染失败不允许手写部分结果。
 16. **Enrollment 不等于生产激活**：用户确认 `enabled` 只授权本机配置该项目，不证明 automation 当前 Active、
     原生任务索引可用或 Scheduled 生产链成立。恢复周期运行前必须由真实 `thread_source=automation` canary 在外部
     验收下取得终态；普通任务、fixture、Doctor 与安装 hash 不能替代。
@@ -181,25 +177,21 @@ integration preview，并把完整中文审阅包直接呈现给用户；用户�
     生成无写入计划，再由用户一次确认后以 fresh `plan_hash` 原子执行并失败恢复。公开 manifest 的
     `canonical_owner=null` 只表示发行物不携带 Owner：已有 Owner checkout 与 Core binding identity 完全一致时必须保持
     该独立后端；二者缺一、dirty 或 identity 不一致时阻断。移除 Owner 需要另一个明确决策。
-25. **任务交付物不是状态或 Owner**：Review Pack artifact 只能位于当前宿主显式提供的 generated-output root，
-    文件名与内容 hash 确定绑定，不能进入被复盘项目、任意猜测的 `$CODEX_HOME` 路径、系统临时目录、Store、Inbox、
-    Manifest、中央服务或另一个任务。宿主可以把显式授予的 output root 物理放在其 app-managed storage 中；该任务级
-    授权而不是路径前缀决定资格。明确 `queued` 只能成为带原 artifact 链接、确认关闭的 `surface_pending`；宿主表面缺失、失败或
-    不可观察时返回 `interactive_host_blocked`，不得选择隐式后备路径，也不得把 pending 升级成已打开。
-26. **项目任务是意图前门，worktree 是内部执行快照**：同一句正式调用必须先完成项目绑定、Git 资格、执行上下文和
-    只读基线 preflight；该正式调用授权恰好一个只读执行任务，Local 由宿主原生、携带初始 prompt 的项目 worktree
-    任务创建自动投影，已隔离则原地继续。无法投影时在任何昂贵读取前
-    失败，不能把手工创建 worktree、复制 prompt 或理解 Git 拓扑重新交给用户。
+25. **任务交付物不是状态或 Owner**：输出目录来自当前任务宿主的明确授权，先读环境 roots 与元数据再预检；
+    不猜测 app-storage 路径，不写项目、临时目录、Store 或跨任务桥。`queued` 保留为 `surface_pending`，既不冒充
+    opened，也不要求用户反复切窗口。后续准确的人类选择可在原 artifact 读回、Fresh Owner 和 Core 预演后恢复已有
+    授权链；它不倒推旧 UI 已展示，不授权未选项。文件丢失、变化或授权不匹配仍拒绝写入。
+26. **当前项目任务负责完整收口**：原生项目绑定与显式 `project-root` 确定证据上下文，不依赖 helper cwd。
+    只读交互复盘不强制新聊天或 worktree；原生 active/archived history 均分页到冻结窗口边界或 EOF，页大小不等于
+    总覆盖上限。正文容量错误可缩小同一请求恢复并保留失败记录；缺口不冒充完整，也不要求用户补交证据。
 27. **失败终态不依赖成功产物**：任何发生在 Delivery manifest 之前的阻断必须通过
     `global_owner_scout_terminal_v1` 确定性渲染；不得手写恢复 Markdown，也不得调用依赖 manifest 的 receipt 路径。
 28. **托管物化不冒充消费者范围**：用户级安装 exact 不能证明 Desktop 可见项目级同名 Skill exact。完整声明必须由
     本轮原生项目清单和只读项目 Skill 检查界定；范围缺失返回 bounded，差异返回 drift，不得自动修改项目 checkout。
 
-该实验按入口独立停止：无法证明项目任务自动隔离投影、交互 worktree 执行器取得任务索引终态、中文 Review Pack 可理解性、同任务 artifact
-直接呈现、实际 final 回读、隔离零变化或隐私过滤时，交互入口保持
-`production_unproven / interactive_host_blocked`；无法证明 automation 执行源时只保持 Scheduled 暂停。Session 原生
-工具返回明确终态错误时可以展示其他正式证据支持的降级结果；调用持续运行但未终态时属于宿主激活阻断，既不
-生成降级卡也不计入 14 次完整有效运行，不得以新增文件队列、数据库或 transcript parser 补洞。
+该实验分层报告：技术实现与安装可独立交付；展示、自然发现、准确选择、后续采用及用户成本只有实际观察后才成立。
+未取得真实体验证据时保留未证，不制造更多测试聊天或要求用户配合。Scheduled 的执行源资格与暂停状态独立维护；
+不新增文件队列、候选数据库或 transcript parser。当前机制与旧入口的区别见 [ADR 0079 修订](../decisions/0079-project-session-front-door-and-scout-terminal-contract.zh.md)。
 
 ## 条件可见终态
 

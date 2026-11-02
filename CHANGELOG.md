@@ -3,6 +3,14 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.5 (2026-11-02)
+
+- Complete read-only Scout reviews in the invoking task; remove mandatory child-chat/worktree projection and bind helper checks to the explicit consumer project.
+- Enumerate native active and archived histories through their cursors, preserving window/EOF coverage and recoverable page failures instead of treating a 50-item page as a total census.
+- Recover queued delivery from its original immutable artifact and actual receipt; preserve unobserved display status and require exact human selection plus Fresh Core checks before any rule change.
+- Put necessary decisions before reference evidence, remove mandatory actions for already-covered items, and add semantic calibration for composed existing rules and partial coverage.
+- Correct current knowledge/release indexes. Components: Core 0.5.5, Plugin 1.7.5, Bootstrap 2.3.2, Scout 5.11.0. Real display, comprehension, natural adoption and cross-device experience are not inferred from these technical checks.
+
 ## 0.5.4 (2026-11-02)
 
 - Use the installed Skill description as the single runtime admission owner; remove narrower duplicate trigger lists from Ambient and the Skill body.

@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.5.5 | 0.5.5 | 1.7.5 | 2.3.2 | 5.11.0 | v6 | 3.11–3.13 |
 | v0.5.4 | 0.5.4 | 1.7.4 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.5.3 | 0.5.3 | 1.7.3 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.5.2 | 0.5.2 | 1.7.2 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
@@ -75,3 +76,9 @@ and complete user journeys remain distinct from these source and packaging guara
 Core 0.5.4 makes the installed Skill description the single runtime admission owner and clarifies proposal replies and existing-rule
 operations. Plugin 1.7.4 carries the release identity. Authorization and storage remain unchanged; isolated Hook-to-CLI and model
 observations do not establish passive discovery or real Desktop confirmation and revocation.
+
+Scout 5.11 completes interactive reviews in the current task. Project v5 now binds both native history partitions and the full
+context snapshot; regenerate new Project results instead of filling old payloads with invented evidence. Existing immutable
+Delivery v1 files and queued receipts can still be verified without migration. Covered cards retain evidence with no required
+action. Queued readback is not UI proof or approval; later exact human selections use the existing Fresh Core bundle flow.
+Bootstrap 2.3.2 and Plugin 1.7.5 carry the new bundle; real adoption and platform UI behavior remain separately observed.

@@ -15,7 +15,7 @@ from typing import Any, Callable, Iterable
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.10.0"
+SKILL_VERSION = "5.11.0"
 PROJECT_CONTRACT = "global_owner_scout_project_v5"
 REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v6"
 DISPLAY_LOCALE = "zh-CN"
@@ -326,6 +326,8 @@ def validate_session_coverage(value: Any, path: str, project_status: str) -> Non
         obj,
         {
             "task_index_limit",
+            "index_pages_read",
+            "index_terminals",
             "discovered_task_count",
             "window_task_count",
             "selected_task_count",
@@ -345,14 +347,19 @@ def validate_session_coverage(value: Any, path: str, project_status: str) -> Non
     selected = require_int(obj["selected_task_count"], f"{path}.selected_task_count")
     read = require_int(obj["fully_read_task_count"], f"{path}.fully_read_task_count")
     require_int(obj["turn_pages_read"], f"{path}.turn_pages_read")
-    require(read <= selected <= window <= discovered <= limit, f"{path} counts are inconsistent")
+    pages = require_int(obj["index_pages_read"], f"{path}.index_pages_read")
+    terminals = require_object(obj["index_terminals"], f"{path}.index_terminals")
+    require_exact_keys(terminals, {"active", "archived"}, f"{path}.index_terminals")
+    require(all(isinstance(item, str) and item in {"window_boundary", "eof", "has_more", "unavailable", "failed"} for item in terminals.values()), f"{path} index terminal invalid")
+    index_complete = all(item in {"window_boundary", "eof"} for item in terminals.values())
+    require(read <= selected <= window <= discovered <= pages * limit, f"{path} counts are inconsistent")
     require(isinstance(obj["truncated"], bool), f"{path}.truncated must be boolean")
     status = obj["status"]
     require(status in COVERAGE_STATUSES, f"{path}.status invalid")
     if status == "complete":
-        require(not obj["truncated"] and read == selected, f"{path} complete coverage is inconsistent")
+        require(index_complete and pages >= 2 and not obj["truncated"] and read == selected, f"{path} complete coverage requires both history partitions and selected tasks")
     if status == "bounded":
-        require(obj["truncated"] and discovered == limit and read == selected, f"{path} bounded coverage must prove the host limit")
+        require(not index_complete and obj["truncated"] and read == selected, f"{path} bounded coverage must expose the unfinished history")
     excluded = require_list(obj["excluded"], f"{path}.excluded")
     for index, raw in enumerate(excluded):
         item_path = f"{path}.excluded[{index}]"
@@ -367,6 +374,13 @@ def validate_session_coverage(value: Any, path: str, project_status: str) -> Non
     require(len(methods) == len(set(methods)), f"{path}.discovery_methods must be unique")
     require(set(methods) <= DISCOVERY_METHODS, f"{path}.discovery_methods contains a non-terminal method")
     method_set = set(methods)
+    if "native_index_completed" in method_set:
+        require(index_complete and pages >= 2, f"{path} completed index needs both history partitions")
+    if "native_index_host_cap" in method_set:
+        require(not index_complete and not any(item in {"failed", "unavailable"} for item in terminals.values()) and obj["truncated"], f"{path} bounded index must expose unread history")
+    if "native_index_terminal_failure" in method_set:
+        require(status == "degraded" and project_status == "degraded", f"{path} index failure requires degraded coverage and project status")
+        require(any(item in {"unavailable", "failed"} for item in terminals.values()), f"{path} index failure needs a failed or unavailable partition")
     protocol_failed = "execution_protocol_failed" in method_set
     thread_pages_failed = "native_thread_pages_terminal_failure" in method_set
     if protocol_failed:
@@ -544,6 +558,8 @@ def validate_read_only_proof(value: Any, path: str, status: str, window_kind: st
     obj = require_object(value, path)
     fields = {
         "snapshot_scope",
+        "before_context_snapshot_hash",
+        "after_context_snapshot_hash",
         "before_head",
         "after_head",
         "before_status_hash",
@@ -560,12 +576,14 @@ def validate_read_only_proof(value: Any, path: str, status: str, window_kind: st
         "concurrent_source_changes",
     }
     require_exact_keys(obj, fields, path)
-    require(obj["snapshot_scope"] == "isolated_worktree", f"{path}.snapshot_scope invalid")
+    scopes = {"isolated_worktree"} if window_kind == "rolling_72h" else {"isolated_worktree", "current_project"}
+    require(obj["snapshot_scope"] in scopes, f"{path}.snapshot_scope invalid")
     validate_git_id(obj["before_head"], f"{path}.before_head")
     validate_git_id(obj["after_head"], f"{path}.after_head")
     for field in fields & {
         "before_status_hash", "after_status_hash", "before_staged_diff_hash", "after_staged_diff_hash",
         "before_unstaged_diff_hash", "after_unstaged_diff_hash",
+        "before_context_snapshot_hash", "after_context_snapshot_hash",
     }:
         validate_hash(obj[field], f"{path}.{field}")
     for field in (
@@ -579,6 +597,7 @@ def validate_read_only_proof(value: Any, path: str, status: str, window_kind: st
         require(isinstance(obj[field], bool), f"{path}.{field} must be boolean")
     unchanged = (
         obj["before_head"] == obj["after_head"]
+        and obj["before_context_snapshot_hash"] == obj["after_context_snapshot_hash"]
         and obj["before_status_hash"] == obj["after_status_hash"]
         and obj["before_staged_diff_hash"] == obj["after_staged_diff_hash"]
         and obj["before_unstaged_diff_hash"] == obj["after_unstaged_diff_hash"]
@@ -1000,7 +1019,7 @@ def expected_action_policy(card: dict[str, Any], parity_status: str, relation: s
     if global_mutation_candidate(card, relation, parity_status):
         return ("confirm", copy.deepcopy(ALL_ACTIONS)) if projection_ready else ("edit", copy.deepcopy(READ_ONLY_ACTIONS))
     if relation == "already_covered_exact" or card["owner_recommendation"] == "no_persistence":
-        return "ignore", copy.deepcopy(READ_ONLY_ACTIONS)
+        return "ignore", []
     if relation in {"globalization_challenged", "needs_project_clarification"}:
         return "edit", copy.deepcopy(READ_ONLY_ACTIONS)
     if card["owner_recommendation"] == "skill":
@@ -1063,7 +1082,7 @@ def validate_review_pack(value: Any, *, require_preview: bool = True) -> dict[st
             require_list(item["allowed_actions"], f"{path}.allowed_actions") == expected_actions,
             f"{path}.allowed_actions must exactly match owner and parity policy",
         )
-        require(item["recommended_action"] in item["allowed_actions"], f"{path}.recommended_action must be allowed")
+        require(item["recommended_action"] in item["allowed_actions"] or (recommended == "ignore" and not expected_actions), f"{path}.recommended_action must be allowed")
         if "confirm" in expected_actions or card["card_id"] in combined_ids:
             token = require_string(item["selection_token"], f"{path}.selection_token")
             expected_token = selection_token(
@@ -1112,6 +1131,8 @@ def valid_model(*, observed: bool = True, window_kind: str = "manual_30d") -> di
 def valid_read_only(*, scheduled: bool = False) -> dict[str, Any]:
     return {
         "snapshot_scope": "isolated_worktree",
+        "before_context_snapshot_hash": sha("context"),
+        "after_context_snapshot_hash": sha("context"),
         "before_head": "a" * 40,
         "after_head": "a" * 40,
         "before_status_hash": sha("status"),
@@ -1235,6 +1256,8 @@ def valid_project(
         "owner_snapshot": {"project_instruction_hash": sha("owner"), "owners_read": ["项目 AGENTS", "项目 L1"]},
         "session_coverage": {
             "task_index_limit": PILOT_TASK_INDEX_LIMIT,
+            "index_pages_read": 2,
+            "index_terminals": {"active": "has_more" if coverage == "bounded" else "failed" if coverage == "degraded" and not thread_pages_terminal_failure else "window_boundary", "archived": "eof"},
             "discovered_task_count": discovered,
             "window_task_count": 3,
             "selected_task_count": selected,
