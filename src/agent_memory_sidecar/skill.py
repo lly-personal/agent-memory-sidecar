@@ -341,7 +341,7 @@ North star: `discover -> authorize -> deploy -> later-task behavior -> revoke`.
 ## Installed command entry
 
 Resolve `<skill-dir>` from the actual loaded path of this SKILL.md and `<python>` from an available
-Python 3.11+ interpreter on this host (normally `python3` on macOS/Linux or `python` on Windows).
+Python 3.11+ interpreter on this host. Use command lookup and check its version first; do not guess a system path.
 Replace both placeholders with observed absolute paths in every command below. Execute from the current
 primary project directory and preserve its active CODEX_HOME. In PowerShell, prefix each quoted interpreter
 command with the call operator `&`; POSIX shells execute the quoted path directly. The installed script includes the Core;
@@ -363,7 +363,7 @@ Never expose event refs, tokens, internal commands, raw JSON, or diagnostic labe
 
 Mechanism development and its design corrections belong to project authority. Approval to improve or test the mechanism, or agreement with a candidate's value, does not authorize a formal Owner update. During engineering validation, exercise writes and revocation against isolated Owner, Store and test-event fixtures. If the user defers real use or acceptance, stop at technical delivery and do not reuse an earlier candidate confirmation to continue deployment. A test result neither grants production permission nor proves user acceptance.
 
-Before creating a proposal, inspect the actual rules with `agent-memory rule list`; when the target is already known, use `--target global_agents|project_agents` so an unrelated target cannot block the Fresh read. Compare the candidate only with the current instruction chain and project-authority documents already required for the task. Do not scan the whole project.
+Before classifying an eligible candidate, including `already_covered`, inspect the actual rules with `agent-memory rule list`; when the target is already known, use `--target global_agents|project_agents` so an unrelated target cannot block the Fresh read. Reread any actual authority used to claim coverage; earlier conversation text or a previous file read does not prove its current contents. Compare only with the current instruction chain and project-authority documents already required for the task. Do not scan the whole project.
 
 Classify the candidate once:
 
@@ -387,7 +387,7 @@ Owner placement follows the content's authority, not spare bytes. An independent
 5. `route_to_owner` is only a placement decision. Complete authorized ordinary project edits in the formal Owner and read back its exact path/section. For mandatory behavior, also deploy or verify an applicable, unshadowed `AGENTS.md` trigger that requires reading that Owner before acting. A link without a mandatory trigger is insufficient. Reuse existing authorization within its scope; ask only if the new content, superseded set, Owner scope or operation materially exceeds it. Owner routing does not create a second memory-governance service.
 6. After authorized deployment, read back the actual instruction target and routed Owner, checking the obligation map, untouched rules and outside bytes. Report routing proposed, Owner content landed, mandatory entry deployed, and later adoption separately. For facts or specifications without mandatory behavior, Owner read-back completes content delivery without claiming a deployed rule. Preview is not deployment, publication, model adoption or continuity; the mutating command replans under its existing authorization and lock checks.
 
-Never substitute optional Memories, a local note, a summary, or a saved draft for formal deployment, including after a capacity failure. If the Owner body landed but its mandatory entry failed, retain that evidence and report the entry as undeployed; do not claim unchanged content or completed behavior delivery. Do not change live Owners or installations during mechanism engineering validation.
+Never substitute optional Memories, a local note, a summary, a saved draft, or a direct AGENTS.md edit for formal behavior-rule deployment. Use the Core commands below for these rules; `route_to_owner` is not a fallback for a missing event or failed command. If the current host event is unavailable, leave rule storage unchanged and report that the actual user entry remains unverified; do not reconstruct an event or approval from logs or Store rows. If any Owner or note was nevertheless changed, report that exact mutation instead of using an unchanged-state receipt. Do not change live Owners or installations during mechanism engineering validation.
 
 ## Proposal
 

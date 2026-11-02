@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.3 (2026-11-02)
+
+- Memory guidance checks the available Python version and reads current rule authority before claiming that a preference is already covered.
+- Missing user events and failed memory commands must not be replaced by direct instruction edits or optional memory notes; receipts must reflect any actual writes.
+- A controlled Desktop run verified one explicit authorization and later-task adoption. Passive confirmation and normal-entry revocation remain unverified; installation is not complete experience acceptance.
+- Components: Core 0.5.3, Plugin 1.7.3, Bootstrap 2.3.1 and Scout 5.10.0; authorization and storage contracts are unchanged.
+
 ## 0.5.2 (2026-11-02)
 
 - Workstation updates no longer fail their runtime self-test when normal event retention removes expired records or another task records an event.

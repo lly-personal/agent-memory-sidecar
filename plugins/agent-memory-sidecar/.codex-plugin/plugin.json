@@ -1,6 +1,6 @@
 {
   "name": "agent-memory-sidecar",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "description": "Portable Agent Memory bootstrap and optional engineering contract review methods.",
   "author": {
     "name": "IIyaqoo",
