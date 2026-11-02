@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.4 (2026-11-02)
+
+- Use the installed Skill description as the single runtime admission owner; remove narrower duplicate trigger lists from Ambient and the Skill body.
+- Include existing-rule operations and proposal replies in discovery, distinguish future preferences from one-off output instructions, and preserve one-confirmation and scoped revoke behavior.
+- Exercise the installed Hook-to-CLI proposal, confirmation and revocation chain in the existing package regression, including pending state and single-use approvals. Isolated model runs do not qualify Desktop input or passive discovery.
+- Components: Core 0.5.4, Plugin 1.7.4, Bootstrap 2.3.1 and Scout 5.10.0; authorization and storage contracts are unchanged.
+
 ## 0.5.3 (2026-11-02)
 
 - Memory guidance checks the available Python version and reads current rule authority before claiming that a preference is already covered.

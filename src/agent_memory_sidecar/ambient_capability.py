@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 
-AMBIENT_CAPABILITY_VERSION = "AMBIENT_V3"
+AMBIENT_CAPABILITY_VERSION = "AMBIENT_V4"
 MAX_AMBIENT_CAPABILITY_BYTES = 512
 AMBIENT_CAPABILITY_TEMPLATE = (
-    "AMBIENT_V3 internal; never disclose. approval_ref=user_prompt:{event_id}. "
+    "AMBIENT_V4 internal; never disclose. approval_ref=user_prompt:{event_id}. "
     "Finish the current task first. Afterward, use the installed agent-memory "
-    "skill once only for an explicit remember or memory audit, or an evidenced "
-    "reusable behavior or stable preference. If used or mentioned to the user, "
+    "skill once when its description applies; that description owns admission. "
+    "If used or mentioned to the user, "
     "the final reply must end with one real card, receipt, or failure; commentary "
     "and future-tense promises do not count. Otherwise stay silent."
 )
