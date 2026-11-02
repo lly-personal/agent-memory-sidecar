@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.1 (2026-11-02)
+
+- Desktop memory operations now use the command installed with the Skill, without requiring a global CLI or source checkout.
+- Doctor checks that installed command from the current project, so a missing or unusable entry cannot be reported ready.
+- Deployment receipts render Chinese correctly on Windows and distinguish installed entry conditions from an actual Scout run.
+- Components: Core 0.5.1, Plugin 1.7.1, Bootstrap 2.3.1 and Scout 5.10.0; later-task behavior adoption remains separately verified.
+
 ## 0.5.0 (2026-10-19)
 
 - Synchronize the published global instruction document to enrolled Codex and Pi hosts with one preview/apply operation and reuse saved bindings on later runs.

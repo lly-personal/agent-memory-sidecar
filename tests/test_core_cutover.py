@@ -108,26 +108,9 @@ class CoreCutoverTests(unittest.TestCase):
             store.parent.mkdir()
             identity, approval_ref = _legacy_store(store, root)
             plan = preview_core_cutover(store_path=store)
-            fake_skill = SkillPlan(
-                path=root / "skill",
-                action="noop",
-                canonical_sha256="a" * 64,
-                installed_sha256="a" * 64,
-            )
             with (
                 patch.dict(os.environ, {"CODEX_HOME": str(codex)}),
-                patch(
-                    "agent_memory_sidecar.core_cutover.install_skill",
-                    return_value=fake_skill,
-                ),
-                patch(
-                    "agent_memory_sidecar.core_cutover.plan_skill_install",
-                    return_value=fake_skill,
-                ),
-                patch(
-                    "agent_memory_sidecar.codex_integration.installed_skill_sha256",
-                    return_value="a" * 64,
-                ),
+                patch("agent_memory_sidecar.skill.default_user_skill_root", return_value=root / "skills"),
             ):
                 result = apply_core_cutover(
                     store_path=store,

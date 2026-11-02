@@ -22,7 +22,7 @@ from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
 
 
-BOOTSTRAP_VERSION = "2.3.0"
+BOOTSTRAP_VERSION = "2.3.1"
 SCOUT_VERSION = "5.10.0"
 PACK_VERSION = "agent_memory_workstation_deployment_pack_v3"
 DESKTOP_PROJECT_INVENTORY_VERSION = "agent_memory_desktop_project_inventory_v1"
@@ -2683,9 +2683,9 @@ def render_pack(value: Any) -> str:
         f"| 期望发行身份 | Core `{desired['core_version']}` / Plugin `{desired['plugin_version']}` | Release `{desired['release_ref']}` / `{desired['source_commit'][:12]}` |",
         f"| Plugin 分发 | Marketplace `{distribution['marketplace']['status']}` / Plugin `{distribution['plugin']['status']}` | Ref `{distribution['plugin']['ref']}` / enabled `{str(distribution['plugin']['enabled']).lower()}` |",
         f"| 能力源同步 | Sidecar `{sources['sidecar']['status']}` / Global Owner `{sources['canonical_owner']['status']}` | 只更新本机受管缓存，不清理活跃工程 |",
-        f"| 主机物化 | Core `{material['core']['status']}` / Doctor `{material['doctor']}` / Scout `{material['scout_skill']['status']}` | Bootstrap {material['bootstrap_skill']['version']}；Scout {material['scout_skill']['version']} |",
+        f"| 主机物化 | Core `{material['core']['status']}` / Doctor `{material['doctor']}` / Scout `{material['scout_skill']['status']}` | Doctor 包含安装后的命令入口；Bootstrap {material['bootstrap_skill']['version']}；Scout {material['scout_skill']['version']} |",
         f"| 项目消费者范围 | `{scope['status']}` | Desktop 项目 {scope['desktop_project_count']}；已读 {scope['scanned_project_count']}；同名 Skill {scope['matching_skill_count']} |",
-        f"| 消费者采用 | Desktop 刷新 `{activation['desktop_reload']}` / 入口检查 `{activation['interactive_entry']}` | `verified` 仅表示安装与项目范围检查通过；Scheduled `{activation['scheduled']}` |",
+        f"| 消费者入口条件 | Desktop 刷新 `{activation['desktop_reload']}` / 入口检查 `{activation['interactive_entry']}` | `verified` 仅表示安装与项目范围检查通过；Scheduled `{activation['scheduled']}` |",
         "| Scout 实际运行 | 本次未运行 | 本次未验证 Scout 运行验收，不判断其他运行的验收结果 |",
     ]
     if scope["projects"]:
@@ -2874,6 +2874,10 @@ def self_test() -> None:
 
 
 def main() -> int:
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8", errors="strict" if stream is sys.stdin else "replace")
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
     sync = sub.add_parser("sync-sources")

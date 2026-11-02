@@ -434,6 +434,16 @@ def smoke_install(wheel: Path) -> None:
         run([str(python), "-m", "pip", "install", "--no-deps", str(wheel)], cwd=environment)
         output = run([str(python), "-m", "agent_memory_sidecar", "--help"], cwd=environment)
         require("agent-memory" in output and "rule" in output and "doctor" in output, "release_cli_smoke_failed")
+        skills = Path(temporary) / "skills"
+        run([str(python), "-B", "-c",
+             "from pathlib import Path; import sys; from agent_memory_sidecar.skill import install_skill; "
+             "install_skill(root=Path(sys.argv[1]))", str(skills)], cwd=environment)
+        # -S excludes the wheel's site-packages: only the installed Skill may supply Core.
+        output = run([str(python), "-B", "-S", str(skills / "agent-memory" / "scripts" / "agent-memory.py"),
+                      "--help"], cwd=Path(temporary),
+                     env={key: value for key, value in os.environ.items()
+                          if key not in {"PYTHONPATH", "PYTHONHOME"}})
+        require("{rule,doctor}" in output, "release_installed_skill_cli_smoke_failed")
 
 
 def smoke_install_sdist(sdist: Path) -> None:

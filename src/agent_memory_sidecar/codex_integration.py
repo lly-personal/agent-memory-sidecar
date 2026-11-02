@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,6 +25,7 @@ from .runtime_package import (
     sidecar_hooks_sha256,
 )
 from .skill import (
+    CLI_ENTRY,
     SkillSnapshot,
     discard_skill_snapshot,
     install_skill,
@@ -339,6 +341,24 @@ def doctor(*, identity: ProjectIdentity) -> dict[str, Any]:
                     "message": "installed Skill does not match the bound identity",
                 }
             )
+        else:
+            entry = plan_skill_install().path / CLI_ENTRY
+            env = {key: value for key, value in os.environ.items()
+                   if key not in {"PYTHONPATH", "PYTHONHOME"}}
+            try:
+                result = subprocess.run(
+                    [sys.executable, "-B", str(entry), "--help"],
+                    cwd=identity.cwd, env=env, capture_output=True,
+                    encoding="utf-8", timeout=30,
+                )
+                executable = result.returncode == 0 and "{rule,doctor}" in result.stdout
+            except (OSError, subprocess.TimeoutExpired, UnicodeError):
+                executable = False
+            if not executable:
+                errors.append({
+                    "code": "skill_cli_unavailable",
+                    "message": "installed Skill command cannot run from the current project without source injection",
+                })
     global_report: dict[str, Any] | None = None
     if binding is not None:
         source = binding.source_file

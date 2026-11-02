@@ -10,7 +10,7 @@
 Codex Desktop users register the tagged public Marketplace and install the plugin:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.3.11
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.5.1
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -24,10 +24,15 @@ confirmation before a fresh-hash atomic apply. The following task is needed
 only for reliable automatic discovery and consumer verification of newly installed Plugin/Skills.
 A checkout or Marketplace alone does not authorize source materialization or prove model adoption.
 
+The installed Agent Memory Skill includes its own Core command entry under `scripts/agent-memory.py`.
+Ordinary tasks run it from their project with an available Python 3.11+ interpreter; no global CLI or
+source environment is required. Doctor checks this installed entry. Installation and instruction sync
+remain with the verified Bootstrap; the daily entry does not expose setup or migration.
+
 Core-only consumers install the Release wheel and run:
 
 ```powershell
-python -m pip install .\agent_memory_sidecar-0.3.11-py3-none-any.whl
+python -m pip install .\agent_memory_sidecar-0.5.1-py3-none-any.whl
 agent-memory setup
 agent-memory setup --apply
 agent-memory doctor

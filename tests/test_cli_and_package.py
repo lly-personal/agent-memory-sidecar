@@ -4,6 +4,10 @@ import io
 import hashlib
 import json
 import os
+import shlex
+import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -38,7 +42,7 @@ from agent_memory_sidecar.runtime_package import (
     self_test_artifact,
 )
 from agent_memory_sidecar.skill import (
-    SkillPlan,
+    CLI_COMMAND,
     build_skill_files,
     install_skill,
     installed_skill_sha256,
@@ -47,6 +51,80 @@ from agent_memory_sidecar.skill import (
 
 
 class CliAndPackageTests(unittest.TestCase):
+    def test_installed_skill_operates_from_an_ordinary_project_without_source_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project, codex, skills = root / "ordinary project", root / "codex", root / "skills"
+            project.mkdir()
+            env = {key: value for key, value in os.environ.items()
+                   if key not in {"PYTHONPATH", "PYTHONHOME"}}
+            env["CODEX_HOME"] = str(codex)
+            with (patch.dict(os.environ, env, clear=True),
+                  patch("agent_memory_sidecar.skill.default_user_skill_root", return_value=skills)):
+                self.assertEqual("ok", setup(apply=True, identity=resolve_identity(project))["status"])
+            entry = skills / "agent-memory" / "scripts" / "agent-memory.py"
+            arguments = [sys.executable, "-B", str(entry), "rule", "list", "--target", "project_agents"]
+            if os.name == "nt":
+                shell = shutil.which("pwsh") or shutil.which("powershell")
+                self.assertIsNotNone(shell, "Windows entry acceptance requires PowerShell")
+                command = "& " + " ".join("'" + arg.replace("'", "''") + "'" for arg in arguments)
+                shell_args = [shell, "-NoProfile", "-NonInteractive", "-Command", command]
+            else:
+                shell_args = ["/bin/sh", "-c", shlex.join(arguments)]
+            shell_result = subprocess.run(shell_args, cwd=project, env=env, capture_output=True, encoding="utf-8")
+            self.assertEqual(0, shell_result.returncode, shell_result.stderr)
+            self.assertEqual([], json.loads(shell_result.stdout)["data"]["rules"])
+
+            def invoke(*args: str, success: bool = True) -> dict:
+                result = subprocess.run([sys.executable, "-B", str(entry), *args], cwd=project,
+                                        env=env, capture_output=True, encoding="utf-8")
+                self.assertEqual(0 if success else 1, result.returncode, result.stderr or result.stdout)
+                payload = json.loads(result.stdout)
+                self.assertEqual("agent_memory_result_v1", payload["contract_version"])
+                return payload
+
+            self.assertEqual([], invoke("rule", "list", "--target", "project_agents")["data"]["rules"])
+            store = codex / "agent-memory-sidecar" / "memory.sqlite"
+            before_installation = store.read_bytes()
+            for operation in (("setup", "--apply"), ("instructions", "sync"), ("maintenance", "core-cutover", "--apply")):
+                self.assertEqual("invalid_request", invoke(*operation, success=False)["error"]["code"])
+            self.assertEqual(before_installation, store.read_bytes())
+            proposal = {"trigger": "When checking a requested change.", "action": "Verify its real entrypoint.",
+                        "skip_boundary": "Skip unrelated work.", "scope": "project", "instruction_target": "project_agents",
+                        "why": "Avoid false readiness.", "evidence": "Isolated regression for an observed installation failure."}
+            content = json.dumps(proposal)
+            rejected = invoke("rule", "deploy", "--from-json", content, "--approval-ref", "user_prompt:missing", success=False)
+            self.assertEqual("approval_invalid", rejected["error"]["code"])
+            self.assertFalse((project / "AGENTS.md").exists())
+
+            def approval() -> str:
+                with CoreDatabase(codex / "agent-memory-sidecar" / "memory.sqlite") as db:
+                    event = RuntimeLedger(db).capture_prompt(identity=resolve_identity(project), source_session="entry-regression",
+                                                             prompt="Explicit isolated test authorization", metadata={})
+                    return f"user_prompt:{event.event_id}"
+
+            invoke("rule", "deploy", "--from-json", content, "--approval-ref", approval())
+            rules = invoke("rule", "list", "--target", "project_agents")["data"]["rules"]
+            self.assertEqual(1, len(rules))
+            rule_id = rules[0]["id"]
+            proposal["action"] = "Verify the installed entrypoint from the user's project."
+            invoke("rule", "deploy", "--from-json", json.dumps(proposal), "--supersedes", rule_id, "--approval-ref", approval())
+            rules = invoke("rule", "list", "--target", "project_agents")["data"]["rules"]
+            self.assertEqual(1, len(rules))
+            invoke("rule", "revoke", rules[0]["id"], "--approval-ref", approval())
+            self.assertEqual([], invoke("rule", "list", "--target", "project_agents")["data"]["rules"])
+            invoke("proposal", "create", "--from-json", content, "--source-event", approval())
+            invoke("proposal", "confirm", "--from-json", content, "--approval-ref", approval())
+            self.assertEqual(1, len(invoke("rule", "list", "--target", "project_agents")["data"]["rules"]))
+            self.assertFalse(list(skills.rglob("__pycache__")))
+            with (patch.dict(os.environ, env, clear=True),
+                  patch("agent_memory_sidecar.skill.default_user_skill_root", return_value=skills),
+                  patch("agent_memory_sidecar.codex_integration.subprocess.run",
+                        return_value=subprocess.CompletedProcess([], 0, "", ""))):
+                report = doctor(identity=resolve_identity(project))
+            self.assertEqual("error", report["status"])
+            self.assertIn("skill_cli_unavailable", [item["code"] for item in report["errors"]])
+
     def test_cli_reports_committed_state_after_cleanup_failure(self) -> None:
         self._assert_committed_cleanup_failure("agent_memory_sidecar.rule_service.shutil.rmtree")
 
@@ -394,26 +472,9 @@ class CliAndPackageTests(unittest.TestCase):
                 branch="main",
                 scope_key=str(project.resolve()),
             )
-            fake_skill = SkillPlan(
-                path=root / "skills" / "agent-memory",
-                action="noop",
-                canonical_sha256="a" * 64,
-                installed_sha256="a" * 64,
-            )
             with (
                 patch.dict(os.environ, {"CODEX_HOME": str(codex)}),
-                patch(
-                    "agent_memory_sidecar.codex_integration.plan_skill_install",
-                    return_value=fake_skill,
-                ),
-                patch(
-                    "agent_memory_sidecar.codex_integration.install_skill",
-                    return_value=fake_skill,
-                ),
-                patch(
-                    "agent_memory_sidecar.codex_integration.installed_skill_sha256",
-                    return_value="a" * 64,
-                ),
+                patch("agent_memory_sidecar.skill.default_user_skill_root", return_value=root / "skills"),
             ):
                 preview = setup(apply=False, identity=identity)
                 self.assertEqual(preview["status"], "ready")
@@ -450,18 +511,9 @@ class CliAndPackageTests(unittest.TestCase):
                 branch="main",
                 scope_key=str(project.resolve()),
             )
-            fake_skill = SkillPlan(
-                path=root / "skills" / "agent-memory",
-                action="noop",
-                canonical_sha256="a" * 64,
-                installed_sha256="a" * 64,
-            )
             with (
                 patch.dict(os.environ, {"CODEX_HOME": str(codex)}),
-                patch(
-                    "agent_memory_sidecar.codex_integration.plan_skill_install",
-                    return_value=fake_skill,
-                ),
+                patch("agent_memory_sidecar.skill.default_user_skill_root", return_value=root / "skills"),
                 patch(
                     "agent_memory_sidecar.codex_integration.self_test_artifact",
                     side_effect=CoreError(
@@ -535,26 +587,9 @@ class CliAndPackageTests(unittest.TestCase):
                 branch="main",
                 scope_key=str(project.resolve()),
             )
-            fake_skill = SkillPlan(
-                path=root / "skills" / "agent-memory",
-                action="noop",
-                canonical_sha256="a" * 64,
-                installed_sha256="a" * 64,
-            )
             with (
                 patch.dict(os.environ, {"CODEX_HOME": str(codex)}),
-                patch(
-                    "agent_memory_sidecar.codex_integration.plan_skill_install",
-                    return_value=fake_skill,
-                ),
-                patch(
-                    "agent_memory_sidecar.codex_integration.install_skill",
-                    return_value=fake_skill,
-                ),
-                patch(
-                    "agent_memory_sidecar.codex_integration.installed_skill_sha256",
-                    return_value="a" * 64,
-                ),
+                patch("agent_memory_sidecar.skill.default_user_skill_root", return_value=root / "skills"),
             ):
                 setup(apply=True, identity=identity)
                 store = codex / "agent-memory-sidecar" / "memory.sqlite"
@@ -699,7 +734,7 @@ class CliAndPackageTests(unittest.TestCase):
             self.assertEqual(str(new_source), plan["source_root"])
 
     def test_generated_skill_only_uses_core_v1_commands(self) -> None:
-        skill = build_skill_files()["SKILL.md"]
+        skill = build_skill_files()["SKILL.md"].replace(CLI_COMMAND + " ", "agent-memory ")
         self.assertIn("agent-memory rule deploy", skill)
         self.assertIn("agent-memory rule deploy-bundle", skill)
         self.assertIn("agent-memory rule preview --target-file", skill)
@@ -728,7 +763,7 @@ class CliAndPackageTests(unittest.TestCase):
         self.assertIn("future-tense promises do not count", capability)
 
     def test_generated_skill_enforces_conditional_visible_terminal_outcomes(self) -> None:
-        skill = build_skill_files()["SKILL.md"]
+        skill = build_skill_files()["SKILL.md"].replace(CLI_COMMAND + " ", "agent-memory ")
         self.assertIn("## Task boundary and visibility", skill)
         self.assertIn("## Terminal outcomes", skill)
         self.assertIn("an explicit audit of whether memory triggered", skill)
