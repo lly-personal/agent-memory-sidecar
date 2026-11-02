@@ -331,7 +331,7 @@ def install_skill(*, root: Path | None = None) -> SkillPlan:
 def _skill_markdown() -> str:
     return """---
 name: agent-memory
-description: Use after the user explicitly establishes a reusable future collaboration rule, corrects Agent behavior in a way that may apply again, explicitly asks to remember a rule, audits whether Agent Memory triggered or saved anything, or replies to the current memory proposal. Do not use for one-off instructions, project-owned facts, transient failures, guesses, secrets, ordinary continuation, status, or routine Git work.
+description: Manage collaboration rules when the user asks to remember, view, audit, edit or revoke one, or replies to a pending memory proposal. Also use after a concrete correction or stated preference applies to future tasks, even without a remember command. Do not use for one-off instructions, project-owned facts, transient failures, guesses, secrets, ordinary continuation, status, or routine Git work.
 ---
 
 # Agent Memory
@@ -353,7 +353,7 @@ remain with the verified Bootstrap; do not run setup from this installed project
 
 ## Task boundary and visibility
 
-Finish the current task before any Agent Memory process commentary. After the task, invoke this Skill only for an explicit remember, an explicit audit of whether memory triggered or saved anything, an evidenced reusable correction or stable preference, or a reply to the current proposal. Without one of those conditions, remain completely silent and do not create a proposal.
+Finish the current task before any Agent Memory process commentary. The description above is the single admission rule; if it does not apply, remain completely silent and do not create a proposal.
 
 Once this Skill is invoked, or the Agent tells the user that Agent Memory will be, is being, or was used, the final reply must end with exactly one real terminal artifact from **Terminal outcomes**. Commentary, capability delivery, a command starting, or a future-tense promise is never a result. If the host requires announcing implicit Skill use, announce it only after the current task is complete, then immediately continue through classification and zero or one mutation; the announcement never replaces the final artifact.
 
@@ -362,6 +362,10 @@ Never expose event refs, tokens, internal commands, raw JSON, or diagnostic labe
 ## Admission
 
 Mechanism development and its design corrections belong to project authority. Approval to improve or test the mechanism, or agreement with a candidate's value, does not authorize a formal Owner update. During engineering validation, exercise writes and revocation against isolated Owner, Store and test-event fixtures. If the user defers real use or acceptance, stop at technical delivery and do not reuse an earlier candidate confirmation to continue deployment. A test result neither grants production permission nor proves user acceptance.
+
+Distinguish a future collaboration preference from an instruction for this output only. A concrete future preference can qualify for a proposal without the word "remember"; it does not itself authorize deployment. Finish the ordinary task, inspect current coverage, then preview and create at most one proposal. Do not ask the user to repeat the preference as a remember command before showing that proposal.
+
+Requests to view, edit or revoke existing rules and replies to the current proposal are operations, not new candidates. Read current state and use the matching explicit or proposal command below. Resolve a natural-language revocation against the actual rules; an unambiguous request authorizes that scoped removal once, without another confirmation or a new proposal. Ambiguous targets remain unresolved. Confirm a pending proposal with the same rule content and the current reply's event; never replace confirmation with direct deployment. After mutation, read the actual target before reporting success.
 
 Before classifying an eligible candidate, including `already_covered`, inspect the actual rules with `agent-memory rule list`; when the target is already known, use `--target global_agents|project_agents` so an unrelated target cannot block the Fresh read. Reread any actual authority used to claim coverage; earlier conversation text or a previous file read does not prove its current contents. Compare only with the current instruction chain and project-authority documents already required for the task. Do not scan the whole project.
 

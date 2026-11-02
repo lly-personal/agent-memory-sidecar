@@ -98,11 +98,23 @@ class CliAndPackageTests(unittest.TestCase):
             self.assertEqual("approval_invalid", rejected["error"]["code"])
             self.assertFalse((project / "AGENTS.md").exists())
 
-            def approval() -> str:
+            artifact = next((codex / "agent-memory-sidecar" / "runtime").glob("*.pyz"))
+
+            def approval(prompt: str = "Explicit isolated test authorization") -> str:
+                result = subprocess.run(
+                    [sys.executable, "-B", str(artifact), "runtime-hook"], cwd=project, env=env,
+                    input=json.dumps({"hook_event_name": "UserPromptSubmit", "session_id": "entry-regression",
+                                      "cwd": str(project), "prompt": prompt}),
+                    capture_output=True, encoding="utf-8",
+                )
+                self.assertEqual(0, result.returncode, result.stderr)
+                context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
                 with CoreDatabase(codex / "agent-memory-sidecar" / "memory.sqlite") as db:
-                    event = RuntimeLedger(db).capture_prompt(identity=resolve_identity(project), source_session="entry-regression",
-                                                             prompt="Explicit isolated test authorization", metadata={})
-                    return f"user_prompt:{event.event_id}"
+                    event = RuntimeLedger(db).current_event(source_session="entry-regression")
+                    self.assertEqual(hashlib.sha256(prompt.encode()).hexdigest(), event.prompt_sha256)
+                    ref = f"user_prompt:{event.event_id}"
+                    self.assertIn(ref, context)
+                    return ref
 
             invoke("rule", "deploy", "--from-json", content, "--approval-ref", approval())
             rules = invoke("rule", "list", "--target", "project_agents")["data"]["rules"]
@@ -114,9 +126,25 @@ class CliAndPackageTests(unittest.TestCase):
             self.assertEqual(1, len(rules))
             invoke("rule", "revoke", rules[0]["id"], "--approval-ref", approval())
             self.assertEqual([], invoke("rule", "list", "--target", "project_agents")["data"]["rules"])
-            invoke("proposal", "create", "--from-json", content, "--source-event", approval())
-            invoke("proposal", "confirm", "--from-json", content, "--approval-ref", approval())
-            self.assertEqual(1, len(invoke("rule", "list", "--target", "project_agents")["data"]["rules"]))
+            invoke("proposal", "create", "--from-json", content, "--source-event", approval("以后也按这个要求处理。"))
+            pending = invoke("rule", "list", "--target", "project_agents")["data"]
+            self.assertEqual([], pending["rules"])
+            self.assertEqual(1, pending["pending_count"])
+            confirmation = approval("记住")
+            invoke("proposal", "confirm", "--from-json", content, "--approval-ref", confirmation)
+            active = invoke("rule", "list", "--target", "project_agents")["data"]
+            self.assertEqual(1, len(active["rules"]))
+            self.assertEqual(0, active["pending_count"])
+            self.assertNotEqual("ok", invoke("proposal", "confirm", "--from-json", content,
+                                             "--approval-ref", confirmation, success=False)["status"])
+            revoke = approval("撤销这条本项目规则。")
+            invoke("rule", "revoke", active["rules"][0]["id"], "--approval-ref", revoke)
+            self.assertEqual([], invoke("rule", "list", "--target", "project_agents")["data"]["rules"])
+            with CoreDatabase(store) as db:
+                for ref in (confirmation, revoke):
+                    self.assertEqual(1, db.conn.execute(
+                        "SELECT COUNT(*) FROM approval_consumptions WHERE source_event_id = ?", (ref.split(":", 1)[1],)
+                    ).fetchone()[0])
             self.assertFalse(list(skills.rglob("__pycache__")))
             with (patch.dict(os.environ, env, clear=True),
                   patch("agent_memory_sidecar.skill.default_user_skill_root", return_value=skills),
@@ -790,7 +818,6 @@ class CliAndPackageTests(unittest.TestCase):
             len(capability.encode("utf-8")),
             MAX_AMBIENT_CAPABILITY_BYTES,
         )
-        self.assertIn("explicit remember or memory audit", capability)
         self.assertIn("final reply must end with one real", capability)
         self.assertIn("future-tense promises do not count", capability)
 
@@ -798,7 +825,6 @@ class CliAndPackageTests(unittest.TestCase):
         skill = build_skill_files()["SKILL.md"].replace(CLI_COMMAND + " ", "agent-memory ")
         self.assertIn("## Task boundary and visibility", skill)
         self.assertIn("## Terminal outcomes", skill)
-        self.assertIn("an explicit audit of whether memory triggered", skill)
         self.assertIn("Commentary, capability delivery", skill)
         self.assertIn("do not silently exit after `rule list`", skill)
         self.assertIn(
