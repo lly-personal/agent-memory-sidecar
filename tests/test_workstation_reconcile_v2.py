@@ -226,9 +226,17 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "print(json.dumps({'id': 1, 'result': {}}), flush=True)\n"
             "time.sleep(60)\n",
         )
+        # Official npm launchers on Windows retain a parent and inherit child pipes.
+        launcher = self.fixture_root / "launcher.py"
+        launcher.write_text(
+            "import subprocess, sys\n"
+            "raise SystemExit(subprocess.call([sys.executable, sys.argv[1]]))\n",
+        )
         real_popen = subprocess.Popen
         def stalled_process(arguments, **kwargs):
-            return real_popen([sys.executable, str(server)], **kwargs)
+            if arguments[0] == "taskkill":
+                return real_popen(arguments, **kwargs)
+            return real_popen([sys.executable, str(launcher), str(server)], **kwargs)
         started = time.monotonic()
         self.native_patch.stop()
         with mock.patch.object(self.reconcile.shutil, "which", return_value=sys.executable), \

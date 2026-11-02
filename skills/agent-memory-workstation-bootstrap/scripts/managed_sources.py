@@ -12,6 +12,7 @@ import queue
 import threading
 import time
 import shutil
+import signal
 import sqlite3
 import stat
 import subprocess
@@ -1586,6 +1587,8 @@ def native_skill_catalog(codex_home: Path, project_roots: list[Path]) -> list[di
     with subprocess.Popen(
         [executable, "app-server", "--stdio"], cwd=codex_home, env=env,
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        start_new_session=os.name != "nt",
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
     ) as process:
         def read_messages() -> None:
             try:
@@ -1606,7 +1609,21 @@ def native_skill_catalog(codex_home: Path, project_roots: list[Path]) -> list[di
         reader = threading.Thread(target=read_messages, daemon=True)
         reader.start()
         # The same deadline covers blocked stdin writes as well as response reads.
-        watchdog = threading.Timer(NATIVE_SKILLS_TIMEOUT_SECONDS, process.kill)
+        def stop_process_tree() -> None:
+            if process.poll() is not None:
+                return
+            if os.name == "nt":
+                subprocess.run(
+                    ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5,
+                )
+            else:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+
+        watchdog = threading.Timer(NATIVE_SKILLS_TIMEOUT_SECONDS, stop_process_tree)
         watchdog.daemon = True
         watchdog.start()
         deadline = time.monotonic() + NATIVE_SKILLS_TIMEOUT_SECONDS
@@ -1646,7 +1663,7 @@ def native_skill_catalog(codex_home: Path, project_roots: list[Path]) -> list[di
             try:
                 process.wait(timeout=2)
             except subprocess.TimeoutExpired:
-                process.kill()
+                stop_process_tree()
                 process.wait()
             watchdog.cancel()
             reader.join(timeout=2)
