@@ -27,7 +27,8 @@ DELIVERY_STATUS = "prepared"
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 ARTIFACT_NAME_RE = re.compile(r"^global-owner-scout-review-pack-(?P<prefix>[0-9a-f]{16})\.md$")
 OPENED_COPY = "完整建议已打开，现有规则未改变。仅可确认文件中已通过预演的准确选择；写入前仍会核对当前规则。"
-QUEUED_COPY = "完整建议已准备，打开请求仍在排队。可先审阅；文件中的确认命令暂不可执行，现有规则未改变。"
+LEGACY_QUEUED_COPY = "完整建议已准备，打开请求仍在排队。可先审阅；文件中的确认命令暂不可执行，现有规则未改变。"
+QUEUED_COPY = "文件已校验并提供链接，打开请求仍在排队，尚未证明实际展示。审阅后回复准确选择即可恢复文件核验与规则预演，无需重复复盘。现有规则未改变。"
 FINAL_RECEIPT_PREFIX = (
     r"^# Global Owner Scout · 完整审阅包\n\n"
     r"\[打开完整审阅包\]\(<(?P<path>[^>\r\n]+)>\)\n\n"
@@ -38,7 +39,7 @@ FINAL_OPENED_RECEIPT_RE = re.compile(
     r"`surface_observation=open_succeeded`；`confirmation_eligible=true`。\n$"
 )
 FINAL_QUEUED_RECEIPT_RE = re.compile(
-    FINAL_RECEIPT_PREFIX + re.escape(QUEUED_COPY) + FINAL_RECEIPT_BINDING +
+    FINAL_RECEIPT_PREFIX + "(?:" + re.escape(QUEUED_COPY) + "|" + re.escape(LEGACY_QUEUED_COPY) + ")" + FINAL_RECEIPT_BINDING +
     r"`surface_observation=open_queued`；`confirmation_eligible=false`。\n$"
 )
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
@@ -439,6 +440,7 @@ def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
     require(manifest["delivery_manifest_sha256"] == match.group("manifest"), "actual task artifact does not match Delivery receipt")
     return {
         "status": surface_status,
+        "manifest": manifest,
         "delivery_manifest_sha256": manifest["delivery_manifest_sha256"],
         "artifact_sha256": manifest["artifact_sha256"],
         "artifact_bytes": manifest["artifact_bytes"],
@@ -446,6 +448,7 @@ def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
         "visible_cards": manifest["visible_cards"],
         "visible_actions": manifest["visible_actions"],
         "confirmation_eligible": confirmation_eligible,
+        "recovery_bundle": verify_visible_output(data.decode("utf-8"), surface="interactive")["recovery_bundle"],
     }
 
 

@@ -1,8 +1,8 @@
-# Global Owner Scout 5.9 contracts
+# Global Owner Scout 5.11 contracts
 
 ## Common rules
 
-- Skill `5.10.0`; Project result `global_owner_scout_project_v5`; Review Pack
+- Skill `5.11.0`; Project result `global_owner_scout_project_v5`; Review Pack
   `global_owner_scout_review_pack_v6`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
@@ -15,7 +15,7 @@
 `global_owner_scout_preflight_v1` has exact fields
 `contract_version, git_repository, execution_context, head, status_sha256, staged_diff_sha256, unstaged_diff_sha256,
 untracked_files_sha256, context_snapshot_sha256`. It emits no path. `execution_context` is `local` or `linked_worktree`; the snapshot
-hash covers every other field. Invoke it only through `python -B scripts/scout.py inspect-context` before any deep read.
+hash covers every other field. Invoke it only through `python -B scripts/scout.py inspect-context --project-root <bound-project-root>` before any deep read.
 
 ## Project result
 
@@ -85,23 +85,25 @@ git_worktree_eligible, binding_status
 
 Identity kind is `content` or `host_local`; binding is `bound`, `rebound`, or `ambiguous`. Raw local project IDs, paths, and remotes
 are forbidden. A Scheduled v5 run requires `content`, worktree eligibility, and non-ambiguous binding. The formal interactive entry
-starts in the current bound Git project task, performs preflight before all deep reads, and automatically projects Local into one
-independent host worktree executor. This formal invocation authorizes that one read-only executor task. Use a native project-task
-creation operation carrying the exact invocation as its initial prompt; never create an empty child or shell worktree. The user never
-creates that worktree or repeats the invocation. The front-door task exposes only the host-native created-task surface after a
-successful projection; that state is `routed`, not a completed review. The executor uses `manual_30d` and owns the Review Pack or
-Terminal result.
+starts and completes in the current bound Git project task. Local and an already selected worktree are both eligible for
+interactive read-only inspection. Use the absolute dispatcher with an available Python 3 interpreter and `-B`; pass
+`inspect-context --project-root <bound-project-root>` explicitly. Do not create a new task or worktree for interactive review.
+The current task owns `manual_30d` evidence, the immutable artifact, recovery and the final result. Scheduled still uses its
+isolated worktree and independent activation policy.
 
 Status is `ok`, `degraded`, `no_material_delta`, `failed`, or `output_budget_exceeded`. Coverage exact fields are:
 
 ```text
-task_index_limit, discovered_task_count, window_task_count, selected_task_count,
+task_index_limit, index_pages_read, index_terminals, discovered_task_count, window_task_count, selected_task_count,
 fully_read_task_count, turn_pages_read, excluded, truncated, status, discovery_methods
 ```
 
-Coverage is `complete`, `bounded`, or `degraded`. The first and only native index request uses limit 50. A yielded execution cell
-must be resumed on the same cell for up to two 60-second waits before classification; an unresumed cell is a failed execution
-protocol, not degraded coverage. `discovery_methods` contains only terminal enums:
+Coverage is `complete`, `bounded`, or `degraded`. `task_index_limit=50` is the per-page maximum, never the total cap.
+`index_pages_read` counts completed native history pages. `index_terminals` has exactly `active, archived`, each one of
+`window_boundary, eof, has_more, unavailable, failed`. Both partitions must reach a proved boundary/EOF for complete coverage;
+record the current host/source/frozen window in evidence, and deduplicate native task identities. Failed or unsupported history
+must be degraded and cannot be relabeled complete or a host-cap result. Every yielded execution cell is resumed to a terminal result; abandoned execution is a protocol failure.
+`discovery_methods` contains only terminal enums:
 
 ```text
 native_index_completed, native_index_host_cap, native_index_terminal_failure,
@@ -109,8 +111,8 @@ native_thread_pages_completed, native_thread_pages_terminal_failure,
 execution_protocol_failed
 ```
 
-Complete requires `native_index_completed + native_thread_pages_completed`, all selected tasks read, and no truncation. Bounded
-requires `native_index_host_cap + native_thread_pages_completed`, a proved host cap, and all selected tasks read. Degraded requires
+Complete requires `native_index_completed + native_thread_pages_completed`, both history partitions completed, all selected tasks read, and no truncation. Bounded
+requires `native_index_host_cap + native_thread_pages_completed`, an unfinished history partition, and all selected tasks read. Degraded requires
 an explicit `native_index_terminal_failure` or one proved index terminal result plus
 `native_thread_pages_terminal_failure`; the latter requires truncation and fewer fully read than selected tasks. In either degraded
 case, cards independently supported by formal project evidence remain. `execution_protocol_failed` requires Project status
@@ -203,8 +205,9 @@ discovery or silently truncating candidates. Deployment still validates the exac
 Routing is a recommendation until authorized formal Owner content and any mandatory `AGENTS.md` reading trigger are read back.
 Preserve each obligation, condition and exception at its correct authority; optional memory saves never substitute for deployment.
 For a confirmable card, `selection_token` is the 32-hex operation identity derived from card ID, project claim, proposal,
-sorted `supersedes`, instruction target, and the current canonical source hash. It is `null` otherwise. `edit` and
-`ignore` are always available. `confirm` exists only for matched-parity, `global_agents`, `add/replace/consolidate` cards. Project
+sorted `supersedes`, instruction target, and the current canonical source hash. It is `null` otherwise. Covered/no-persistence cards recommend `ignore` as a no-op disposition, with `allowed_actions=[]`
+and no required user choice. They remain complete reference material; the renderer counts only nonempty action sets as decisions.
+Other cards retain `edit` and `ignore`. `confirm` exists only for matched-parity, `global_agents`, `add/replace/consolidate` cards. Project
 Owner and Skill routes recommend `keep_project` and `make_skill`. Drift removes confirmation but never a card.
 
 Renderer order: warnings; surface-specific decision index; each card's decision summary with its exact Rule Projection; evidence;
@@ -214,7 +217,7 @@ has zero wrapper, and contains no Scheduled/Inbox/14-run copy. Scheduled uses `�
 records surface, `review_pack_hash`, `visible_body_sha256`, Project Card count, visible card count, a per-card action-count vector,
 total visible action count, atomic bundle action count, and wrapper count. `python -B scripts/scout.py verify-visible --surface ...` rejects body drift,
 lost or cross-card-moved actions, duplicate or
-non-final wrappers, raw JSON, trailing notes, and truncation. The verifier proves renderer/artifact bytes only; it does not prove the
+non-final wrappers, raw contract JSON outside the single canonical recovery block, trailing notes, and truncation. The verifier proves renderer/artifact bytes only; it does not prove the
 actual task final. Renderer failure may not be repaired by hand-written Markdown. `output_budget_exceeded` is a whole-run failure.
 Within a card, show the exact When/Do/Skip body once and reference that named field when another field repeats it exactly.
 Keep distinct qualifications, evidence and before/after facts; semantic similarity does not authorize compression.
@@ -241,26 +244,22 @@ protected project root. The helper creates a single-link regular Markdown file e
 while any different bytes, link/reparse point, unsafe root, write failure, or readback mismatch fails closed. It does not write a
 manifest file.
 
-Pre-render compact success, queued and blocked receipts from the manifest; success and queued rendering must receive both the exact
-artifact path and artifact root and must recheck direct-child containment, read-only state, bytes, hashes and visible-output
-conservation. Then make the current-task host artifact open the final tool call. Return the exact success receipt only for an explicit
-terminal opened/success result. An exact `queued` host result returns the content-bound queued receipt with the artifact link and
-confirmation disabled; its controller result is `surface_pending`, never Production qualification. `pending`, missing, failed, or
-unobservable results use the path-free blocked receipt with confirmation disabled. A
-separate controller reads the actual task final and runs `python -B scripts/scout.py verify-final --artifact-root <host-output-root>`.
-The artifact states that its confirmation commands depend on the current task's delivery state and exact selection preview.
-Queued copy says in Chinese that opening is still queued and the file's confirmation commands are not executable yet.
-The compact final carries only `delivery_manifest_sha256`, `surface_observation` and `confirmation_eligible` beside the artifact
-link and user-facing state. The controller reconstructs the remaining manifest fields from the artifact and its verified footer.
-Both `surface_pending` and `surface_observed` prove that the final receipt, artifact path, manifest hash, file bytes, Review Pack/body
-hashes, cards and actions conserve; only `surface_observed` proves the user surface and qualifies the host. Until the five-scenario
-entry matrix passes, the
-interactive product state is `production_unproven / interactive_host_blocked`.
-The controller normalizes line endings and accepts zero, one, or two terminal newlines; every other trailing or semantic
-edit fails closed.
-The controller also binds the canary's actual installed Skill identity before execution. Repository-local source presence is not
-runtime adoption. A task that resolves another Scout version or returns the legacy inline renderer envelope is ineligible rather
-than failed/passed, and cannot contribute to Production qualification.
+Pre-render opened, queued and blocked receipts, validating direct-child containment, read-only bytes and manifest identity.
+Open the artifact once in the current task and return the matching receipt. `queued` preserves `confirmation_eligible=false`;
+it is not evidence of display or approval. Do not retry opening or ask the user to switch windows. Technical delivery can close
+with the intact file and its link while actual display and adoption remain unverified. Unknown/failed open uses the blocked receipt.
+
+`verify-final` reads the actual previous receipt, recovers the same immutable file and returns its reconstructed `manifest` for
+reuse by existing receipt commands. New rendered reports preserve the existing exact Core bundle in one collapsed technical block
+inside the same hash-bound artifact; `verify-final` and Scheduled `verify-visible` return it as `recovery_bundle`. Historical reports
+without that block return null: recover the file, but never invent missing original bindings or claim old-token recovery. Reuse an
+exact retained bundle or refresh only the affected preview for new authorization. Legacy queued copy remains pending evidence.
+`surface_pending` means the queued receipt and artifact agree; `surface_observed` names a recorded opened receipt, which still
+needs independent native/UI evidence before any claim that the user saw it. No separate controller task is required.
+Normalize line endings and accept zero, one or two terminal newlines; other text or binding changes fail closed.
+A later exact human selection can restore this artifact check and then enter the installed Agent Memory bundle handoff with
+Fresh Owner comparison and Core preview. It neither rewrites old queued evidence nor authorizes unselected or changed content.
+Installed entry identity, real display and later adoption stay separate from source, fixture or file-integrity verification.
 
 Every Python helper invocation uses `python -B`. The installed Skill and its before/after proof contain no newly created or changed
 `__pycache__`, `.pyc`, or `.pyo`; any bytecode-cache write is an external side effect and fails read-only validation.
@@ -320,15 +319,13 @@ tasks prove adoption and revocation.
 ## Entry and Prompt gate
 
 The only formal user invocation is `$global-owner-scout 复盘当前项目` in the current bound target Git project task. It selects
-`manual_30d`, uses no automation memory, never asks for resource settings, and never displays Scheduled acceptance counters. When
-Local requires an isolated executor, the Scout supplies no model/thinking override; the executor's host-resolved requested and
-actual settings remain subject to the model-observation contract. A v5.4 Scheduled Prompt contains
+`manual_30d`, uses no automation memory, never asks for resource settings, and never displays Scheduled acceptance counters.
+The current task's host-resolved requested and actual settings remain subject to the model-observation contract; no override is supplied. A v5.4 Scheduled Prompt contains
 Skill/mode, rolling window, contract versions, model/reasoning, and safety boundaries only. Reject
 prompts containing a fixed `project_key`, absolute path, host project ID, project allowlist, expected candidate, or full review
   protocol. The current Desktop task binding supplies project identity and, when available, its distinct host-generated output root.
-The project task is the user-facing front door; Local is automatically forked to a host worktree executor before any deep read, while
-an already-worktree task continues in place. Projection failure is a preflight Terminal v1 result, not a request for the user to
-create a worktree.
+The current project task completes the read-only review in Local or its existing worktree; no new chat or worktree is required.
+Preflight failure returns Terminal v1 before deep reads, never a request for the user to prepare the environment.
 
 ## Production activation gate
 

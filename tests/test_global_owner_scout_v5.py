@@ -93,12 +93,12 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.3.1",
+                "version": "2.3.2",
                 "content_sha256": "b" * 64,
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.10.0",
+                "version": "5.11.0",
                 "content_sha256": "c" * 64,
             },
         }
@@ -847,8 +847,8 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         desired = {
             "release_ref": "v0.3.10", "source_commit": "a" * 40,
             "core_version": "0.3.10", "plugin_version": "1.5.1", "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.3.1", "bootstrap_sha256": "c" * 64,
-            "scout_version": "5.10.0", "scout_sha256": "d" * 64,
+            "bootstrap_version": "2.3.2", "bootstrap_sha256": "c" * 64,
+            "scout_version": "5.11.0", "scout_sha256": "d" * 64,
         }
         source_sha = "e" * 64
         pack = self.managed_sources.build_deployment_pack(
@@ -865,15 +865,15 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             host_materialization={
                 "core": {"status": "verified", "version": "0.3.10", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
                 "global_binding": "unavailable", "doctor": "verified",
-                "bootstrap_skill": {"status": "unchanged", "version": "2.3.1", "content_sha256": "c" * 64},
-                "scout_skill": {"status": "unchanged", "version": "5.10.0", "content_sha256": "d" * 64},
+                "bootstrap_skill": {"status": "unchanged", "version": "2.3.2", "content_sha256": "c" * 64},
+                "scout_skill": {"status": "unchanged", "version": "5.11.0", "content_sha256": "d" * 64},
             },
             requires_reload=True,
             consumer_verified=False,
             generated_at="2026-08-21T12:00:00+08:00",
         )
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("2.3.1", validated["desired_bundle"]["bootstrap_version"])
+        self.assertEqual("2.3.2", validated["desired_bundle"]["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
         for label in ("期望发行身份", "Plugin 分发", "能力源同步", "主机物化", "项目消费者范围", "消费者入口条件"):
             self.assertIn(label, rendered)
@@ -919,7 +919,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 json.loads(text),
                 expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
             )
-            self.assertEqual("v0.5.4", value["plugins"][0]["source"]["ref"])
+            self.assertEqual("v0.5.5", value["plugins"][0]["source"]["ref"])
         else:
             self.assertTrue(
                 (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()
@@ -1029,7 +1029,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_v5_prompt_has_no_fixed_binding(self) -> None:
         prompt = (
             "Use $global-owner-scout in project_scout mode for the current bound project; rolling 72 hours; "
-            "Skill 5.10.0; global_owner_scout_project_v5; global_owner_scout_review_pack_v6; "
+            "Skill 5.11.0; global_owner_scout_project_v5; global_owner_scout_review_pack_v6; "
             "gpt-5.6-sol; medium; read-only."
         )
         self.bootstrap.validate_prompt(prompt)
@@ -1133,8 +1133,10 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         finally:
             sys.path.pop(0)
         self.assertEqual(before, json.dumps(pack, ensure_ascii=False, sort_keys=True))
-        self.assertEqual(1, rendered.count(action))
-        self.assertEqual(1, rendered.count(skip))
+        human_body = rendered.split("## 技术附录", 1)[0]
+        self.assertEqual(1, human_body.count(action))
+        self.assertEqual(1, human_body.count(skip))
+        self.assertEqual(action, visible["recovery_bundle"]["items"][0]["proposal"]["action"])
         self.assertIn(independent_exception, rendered)
         self.assertIn("见本卡「Do」。", rendered)
         self.assertIn("见本卡「Skip」。", rendered)
@@ -1172,12 +1174,13 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             "native_index_completed",
             "execution_protocol_failed",
         ]
+        protocol_failure["session_coverage"]["index_terminals"] = {"active": "eof", "archived": "eof"}
         self.scout_validator.validate_project(protocol_failure)
         self.assertEqual([], protocol_failure["project_cards"])
 
     def test_single_runtime_dispatcher_renders_manifest_free_terminal(self) -> None:
         context = subprocess.run(
-            [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context"],
+            [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context", "--project-root", str(ROOT)],
             cwd=ROOT,
             capture_output=True,
             text=True,
@@ -1276,7 +1279,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             subprocess.run(["git", "config", "core.fsmonitor", "missing-scout-fsmonitor"], cwd=repository, check=True)
             (worktree / "tracked.txt").write_text("dirty working tree\n", encoding="utf-8")
             result = subprocess.run(
-                [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context"],
+                [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context", "--project-root", str(worktree)],
                 cwd=worktree,
                 capture_output=True,
                 text=True,
@@ -1287,10 +1290,23 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             self.assertEqual("linked_worktree", snapshot["execution_context"])
             self.assertNotIn(str(root), result.stdout)
 
+            # Installed helpers run outside the consumer repository. The bound
+            # project, including its dirty state, must not come from helper cwd.
+            explicit = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context", "--project-root", str(worktree)],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            )
+            self.assertEqual(snapshot, json.loads(explicit.stdout))
+            self.assertNotIn(str(root), explicit.stdout)
+
     def test_preflight_failure_is_path_free(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             result = subprocess.run(
-                [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context"],
+                [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context", "--project-root", temporary],
                 cwd=temporary,
                 capture_output=True,
                 text=True,
@@ -1302,6 +1318,81 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 json.loads(result.stderr),
             )
             self.assertNotIn(temporary, result.stderr)
+
+    def test_inspect_context_uses_explicit_project_from_skill_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary) / "project"
+            project.mkdir()
+            subprocess.run(["git", "init", str(project)], capture_output=True, check=True)
+            subprocess.run(["git", "-C", str(project), "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "fixture"], capture_output=True, check=True)
+            (project / "user-change.txt").write_text("preserve", encoding="utf-8")
+            result = subprocess.run([sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context", "--project-root", str(project)], cwd=SCOUT_SCRIPTS, capture_output=True, text=True)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertEqual("local", json.loads(result.stdout)["execution_context"])
+            self.assertNotIn(str(project), result.stdout)
+            self.assertEqual("preserve", (project / "user-change.txt").read_text(encoding="utf-8"))
+
+    def test_preflight_detects_untracked_symlink_retarget_without_following(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            subprocess.run(["git", "init", str(project)], capture_output=True, check=True)
+            subprocess.run(["git", "-C", str(project), "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "fixture"], capture_output=True, check=True)
+            link = project / "untracked-link"
+            try:
+                link.symlink_to("missing-first-target")
+            except OSError:
+                self.skipTest("host cannot create fixture symlinks")
+            command = [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context", "--project-root", str(project)]
+            before = json.loads(subprocess.run(command, cwd=SCOUT_SCRIPTS, capture_output=True, text=True, check=True).stdout)
+            link.unlink()
+            link.symlink_to("missing-second-target")
+            after = json.loads(subprocess.run(command, cwd=SCOUT_SCRIPTS, capture_output=True, text=True, check=True).stdout)
+            self.assertEqual(before["status_sha256"], after["status_sha256"])
+            self.assertNotEqual(before["context_snapshot_sha256"], after["context_snapshot_sha256"])
+
+    def test_history_coverage_counts_beyond_one_page_and_requires_both_partitions(self) -> None:
+        project = self.scout_validator.valid_project()
+        coverage = project["session_coverage"]
+        coverage.update(discovered_task_count=121, index_pages_read=4,
+                        index_terminals={"active": "window_boundary", "archived": "eof"})
+        self.scout_validator.validate_project(project)
+        coverage["index_terminals"]["archived"] = "has_more"
+        with self.assertRaises(self.scout_validator.ContractError):
+            self.scout_validator.validate_project(project)
+
+    def test_failed_history_partition_cannot_claim_only_a_host_cap(self) -> None:
+        for terminal in ("failed", "unavailable"):
+            with self.subTest(terminal=terminal):
+                project = self.scout_validator.valid_project(status="no_material_delta", card_count=0, coverage="bounded")
+                project["session_coverage"]["index_terminals"]["archived"] = terminal
+                with self.assertRaises(self.scout_validator.ContractError):
+                    self.scout_validator.validate_project(project)
+
+    def test_covered_cards_do_not_count_as_user_decisions(self) -> None:
+        sys.path.insert(0, str(SCOUT_SCRIPTS))
+        try:
+            renderer = load_module("scout_renderer_decisions", SCOUT_RENDERER)
+            pack = self.scout_validator.valid_review_pack()
+            review = pack["review_cards"][0]
+            review["integration_preview"]["global_relation"] = "already_covered_exact"
+            review["recommended_action"] = "ignore"
+            review["allowed_actions"] = []
+            review["selection_token"] = None
+            pack["selection_preview"] = {"core_artifact_sha256": None, "result": None, "error_code": "core_preview_unavailable"}
+            for item in pack["review_cards"]:
+                if item is not review:
+                    item["allowed_actions"] = self.scout_validator.READ_ONLY_ACTIONS.copy()
+                    item["recommended_action"] = "edit"
+                    item["selection_token"] = None
+            pack["review_pack_hash"] = self.scout_validator.review_pack_hash(pack)
+            rendered = renderer.render_review_pack(pack, surface="interactive")
+            first = rendered.split("## 决策卡 ", 1)[0]
+            self.assertIn("本次需要判断 1 项", first)
+            self.assertIn("已有覆盖或无需变更 1 项", first)
+            self.assertEqual(2, rendered.count("## 决策卡 "))
+            self.assertNotIn("忽略 example-project-card-1", rendered)
+        finally:
+            sys.path.pop(0)
 
     def test_task_artifact_delivery_conserves_realistic_pack_sizes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1419,10 +1510,11 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 self.assertEqual("surface_pending", pending["status"])
                 self.assertEqual(count, pending["visible_cards"])
                 self.assertFalse(pending["confirmation_eligible"])
+                self.assertEqual(manifest, pending["manifest"])
                 self.assertIn("打开请求仍在排队", queued_result.stdout)
-                self.assertIn("文件中的确认命令暂不可执行", queued_result.stdout)
+                self.assertIn("无需重复复盘", queued_result.stdout)
                 if count:
-                    self.assertIn("下面的确认命令暂不可执行", artifact.read_text(encoding="utf-8"))
+                    self.assertIn("排队不证明你已看到内容", artifact.read_text(encoding="utf-8"))
 
                 host_enveloped_result = subprocess.run(
                     [
@@ -1665,7 +1757,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             target = Path(temporary) / "global-owner-scout"
             source = ROOT / ".agents" / "skills" / "global-owner-scout"
             installed = self.bootstrap.install_skill(source, target)
-            self.assertEqual("5.10.0", installed["version"])
+            self.assertEqual("5.11.0", installed["version"])
             helper = target / "scripts" / "prepare_delivery.py"
             dispatcher = target / "scripts" / "scout.py"
             self.assertTrue(helper.is_file())
@@ -1679,6 +1771,17 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 check=True,
             )
             self.assertIn("render-terminal", dispatcher_result.stdout)
+            context_result = subprocess.run(
+                [sys.executable, "-B", str(dispatcher), "inspect-context", "--project-root", str(ROOT)],
+                cwd=dispatcher.parent,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            )
+            self.assertTrue(json.loads(context_result.stdout)["git_repository"])
+            self.assertNotIn(str(ROOT), context_result.stdout)
+            self.assertNotIn(str(target), context_result.stdout)
             result = subprocess.run(
                 [sys.executable, "-B", str(helper), "--self-test"],
                 cwd=helper.parent,
@@ -1745,7 +1848,6 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         self.assertIn("native_thread_pages_terminal_failure", combined)
         self.assertIn("global_owner_scout_terminal_v1", combined)
         self.assertIn("global_owner_scout_preflight_v1", combined)
-        self.assertIn("Host-native created-task surface", combined)
         self.assertIn("scripts/scout.py", combined)
         self.assertIn("automation-source canary", combined)
         self.assertIn("production_blocked", combined)
@@ -1756,9 +1858,6 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
 
         skill = (ROOT / ".agents" / "skills" / "global-owner-scout" / "SKILL.md").read_text(encoding="utf-8")
         protocol = (ROOT / ".agents" / "skills" / "global-owner-scout" / "references" / "deep-review-protocol.md").read_text(encoding="utf-8")
-        self.assertIn("turnLimit=10", skill + protocol)
-        self.assertIn("maxOutputCharsPerItem=20000", skill + protocol)
-        self.assertIn("artifact open is the final tool call", skill)
         self.assertIn("global_owner_scout_delivery_v1", combined + skill + protocol)
         self.assertIn("python -B", skill + protocol)
 

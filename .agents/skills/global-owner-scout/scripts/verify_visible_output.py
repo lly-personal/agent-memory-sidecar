@@ -12,7 +12,8 @@ from typing import Any
 
 from utf8_stdio import configure_utf8_stdio
 
-from validate_output import ContractError, valid_project, valid_review_pack
+from render_review import RECOVERY_BLOCK_END, RECOVERY_BLOCK_START
+from validate_output import ContractError, canonical_json, selection_token, valid_project, valid_review_pack
 
 
 HASH = r"[0-9a-f]{64}"
@@ -36,6 +37,8 @@ BUNDLE_ACTION_RE = re.compile(
 )
 CARD_BLOCK_RE = re.compile(r"(?ms)^## 决策卡 \d+：.*?(?=^## 决策卡 \d+：|^## 技术附录$)")
 RAW_JSON_RE = re.compile(r'(?m)^\s*[\[{]\s*"(?:contract_version|mode|project_result|review_cards)"\s*:')
+RECOVERY_BLOCK_RE = re.compile(re.escape(RECOVERY_BLOCK_START) + r"(?P<payload>[^\n]+)" + re.escape(RECOVERY_BLOCK_END))
+VISIBLE_SELECTION_RE = re.compile(r"(?:^- `确认 |^- \*\*组合确认标识\*\*：`)(?P<selection>[^`]+)`", re.MULTILINE)
 
 
 def require(condition: bool, message: str) -> None:
@@ -47,12 +50,36 @@ def normalized_text(value: str) -> str:
     return value.replace("\r\n", "\n").replace("\r", "\n")
 
 
+def recover_review_bundle(body: str) -> dict[str, Any] | None:
+    matches = list(RECOVERY_BLOCK_RE.finditer(body))
+    require(len(matches) <= 1 and body.count(RECOVERY_BLOCK_START) == len(matches), "recovery block is invalid or duplicated")
+    if not matches:
+        return None
+    payload = matches[0].group("payload")
+    try:
+        bundle = json.loads(payload)
+        require(canonical_json(bundle).decode("utf-8") == payload, "recovery bundle must be canonical JSON")
+        require(bundle["contract_version"] == "rule_revision_bundle_v2", "recovery bundle contract is invalid")
+        recovered = []
+        for item in bundle["items"]:
+            token = selection_token(card_id=item["card_id"], project_claim_hash=item["project_claim_hash"],
+                proposal=item["proposal"], supersedes=item["supersedes"], target_before_sha256=bundle["target_before_sha256"])
+            require(item["selection_token"] == token, "recovery selection token mismatch")
+            recovered.append(f"{item['card_id']}@{token}")
+        visible = VISIBLE_SELECTION_RE.findall(RECOVERY_BLOCK_RE.sub("", body))
+        require(bool(recovered) and sorted(recovered) == sorted(visible) and len(set(recovered)) == len(recovered),
+            "recovery bundle must match every visible content-bound selection")
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ContractError("recovery bundle is invalid") from exc
+    return bundle
+
+
 def verify_visible_output(value: str, *, surface: str) -> dict[str, Any]:
     require(surface in {"interactive", "scheduled"}, "surface must be interactive or scheduled")
     text = normalized_text(value)
     require(bool(text.strip()), "visible output must not be empty")
     require("```json" not in text.lower(), "visible output contains a JSON code fence")
-    require(not RAW_JSON_RE.search(text), "visible output contains raw contract JSON")
+    require(not RAW_JSON_RE.search(RECOVERY_BLOCK_RE.sub("", text)), "visible output contains raw contract JSON")
     expected_wrapper_count = 1 if surface == "scheduled" else 0
     require(text.count("::inbox-item{") == expected_wrapper_count, "visible output wrapper count does not match surface")
     require(text.count("校验回执：") == 1, "visible output must contain exactly one validation receipt")
@@ -125,6 +152,7 @@ def verify_visible_output(value: str, *, surface: str) -> dict[str, Any]:
         "bundle_action_count": bundle_actions,
         "surface": surface,
         "wrapper_count": expected_wrapper_count,
+        "recovery_bundle": recover_review_bundle(body),
     }
 
 

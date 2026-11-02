@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Owner: project_docs
-- Applies to: Scout 5.9 interactive delivery
+- Applies to: Scout 5.11 interactive delivery
 - Decision: [ADR 0076](../docs/decisions/0076-task-scoped-review-pack-delivery.zh.md)
 
 ## Purpose
@@ -63,50 +63,46 @@ preview to open the exact artifact. That host call is the last tool call.
 - `pending`, missing, failed, unobservable, or any other host outcome: return only `interactive_host_blocked` with
   `surface_observation=open_failed; confirmation_eligible=false`.
 
-The full Review Pack is never copied into the chat final. `surface_pending` restores artifact discoverability without claiming that
-the user surface opened. It is not success, does not enable confirmation, and does not count toward Production qualification.
-The artifact explains that its commands are conditional on the current task's delivery state and a valid exact preview. The queued
-receipt explicitly says in Chinese that its confirm commands cannot yet execute. The final shows the artifact link, a deterministic
-Chinese state, and only `delivery_manifest_sha256`, `surface_observation`, and `confirmation_eligible`; the unchanged manifest's
-remaining fields are reconstructed from the exact artifact bytes and visible-output receipt. No duplicated counts or content hashes
-need to be copied into the user-facing final. The interpreter remains content-bound and rejects changed text or binding.
+The full Review Pack is never copied into the final. Technical delivery requires the verified artifact and its link in the
+original task. `surface_pending` does not prove display, comprehension or authorization; do not poll opening or require a foreground
+switch. The new queued copy explains recovery; historical exact queued receipts remain valid as historical pending evidence.
+`confirmation_eligible=false` prevents interpreting the queued outcome as approval/readiness by itself. A subsequent real user
+selection of exact content-bound pairs may resume artifact checks and the existing Fresh Core authorization flow; it does not
+change the old surface observation or authorize other cards.
 
-## External qualification
+## Readback and recovery
 
-A separate controller reads the actual Scout task final and runs
-`python -B scripts/scout.py verify-final --artifact-root <host-output-root>`. It must parse the exact opened or queued compact receipt,
-constrain the linked file to that root, validate the reconstructed manifest hash, read and hash the artifact, and rerun visible-output
-verification. `status=surface_pending` proves an intact, discoverable artifact but not an opened user surface. Only
-`status=surface_observed` proves this task's delivery surface. Internal validation, `prepared`, file existence, queued host-open, or
-host-open invocation alone does not prove Production.
+Use the actual previous final as stdin to `verify-final --artifact-root <original-host-output-root>` in the same continuation,
+or an already authorized controller. The helper validates the exact receipt, direct-child immutable file, reconstructed manifest,
+body and per-card action conservation. It returns the reconstructed `manifest` for reuse with the existing receipt commands;
+new reports also return `recovery_bundle`, the existing `rule_revision_bundle_v2` payload saved in one collapsed technical block
+inside the same artifact. Its bytes participate in the visible-body and Delivery hashes. It contains only cards whose content-bound
+selection was actually offered, and is input to a fresh Core preview, never approval. Scheduled inline verification returns the
+same payload without requiring a file. Historical artifacts without that block return `recovery_bundle=null`: their file integrity
+can recover, but missing original proposal bindings must not be guessed. If the original exact bundle is unavailable, refresh only
+the affected preview and request authorization for the new binding; do not claim old-token recovery.
+No discovery rerun, new file, queue, database or cross-task bridge is required. It accepts CRLF/CR and zero to two terminal LF
+characters, rejecting other semantic/trailing edits. It can read a historical renderer artifact without migrating its contents.
 
-The controller normalizes CRLF/CR to LF and accepts zero, one, or two terminal LF characters observed in the Desktop final
-envelope. It rejects three or more terminal newlines, spaces, tail notes, field changes, missing fields, or any other receipt rewrite.
-
-`interactive_project_scout` remains `production_unproven / interactive_host_blocked` until the five-scenario entry matrix passes:
-Local clean automatic projection, Local dirty automatic projection, already-worktree execution, explicit thread-page terminal
-degradation, and missing-output-root Terminal v1. Happy-path cases additionally require artifact open, actual-final readback,
-artifact verification, and project/Owner/Store/Git read-only checks.
-Scheduled Scout remains independently production-blocked.
-
-Before task creation, the external controller must bind the exact installed Scout version and content identity resolved by the
-formal `$global-owner-scout` entry. A newer Skill file in the task worktree is not runtime adoption. A task that resolves another
-version, lacks Delivery v1, or returns the legacy inline renderer envelope is `ineligible / runtime_skill_identity_mismatch` and
-does not count toward the five-scenario matrix.
+The status describes the recorded receipt and byte integrity. `surface_observed` names a parsed opened receipt; it does not independently prove UI
+visibility; `queued` remains unobserved. Source implementation, installed identity, technical delivery, actual UI experience and
+later rule adoption are reported separately. No mandatory new controller task or manufactured canary is needed for technical delivery.
 
 ## Acceptance criteria
 
-1. 0/1/3/6/7/8/24-card fixtures conserve file bytes, hashes, cards, per-card actions, total actions, bundle action, and wrapper.
-2. Project-contained roots, link/reparse targets, multi-link artifacts, conflicting existing bytes, write/readback changes, receipt
-   edits, path escapes, and artifact tampering fail closed.
-3. No failure path emits partial cards or enables confirmation.
-4. An exact queued receipt remains content-bound, externally verifies as `surface_pending`, exposes the complete artifact link, and
-   never enables confirmation or counts toward Production qualification.
-5. Zero, one, or two terminal LF characters are accepted after CRLF/CR normalization; other trailing or semantic edits fail.
-6. The reviewed project, Owner, Store, Git state, and installed Skill cache remain unchanged.
-7. Review Pack v6 and `selection_token` remain unchanged; user confirmation continues through `rule_revision_bundle_v2` Fresh
-   recomputation.
-8. Canary eligibility binds the installed runtime Skill identity before task creation; mismatched or legacy consumers never count.
+1. 0/1/3/6/7/8/24-card fixtures conserve bytes, hashes, every card, per-card actions, bundle and wrapper.
+2. Existing files are reused only when identical; project-contained roots, links/reparse points, multiple hard links, path escapes,
+   receipt edits and tampering fail closed. Recovery preserves the original read-only bytes and does not repeat discovery.
+3. Covered/no-persistence cards have zero actions and are not counted as required decisions. Evidence and stable card identities
+   remain complete; rule text and actions must not be silently summarized or dropped.
+4. Queued recovery returns the same manifest and remains pending; no recovered result grants approval or claims UI visibility.
+   An exact later user selection still requires verified artifact content, Fresh Owner comparison and Core's existing real-event binding.
+5. Local clean/dirty and existing-worktree checks bind explicit project context and the full before/after snapshot, including
+   untracked content. Review never changes project, Owner, Store, Git or installed Skill cache.
+6. History covers both active/archived partitions to the frozen window boundary/EOF; a 50-item page is not a total cap. Failed
+   reads preserve independent evidence and exact coverage gaps.
+7. Real installed-entry discovery, display, comprehension, confirmation, adoption and revocation remain unverified until observed;
+   tests and installation do not replace these outcomes. Scheduled activation remains independently paused.
 
 ## Manifest-free terminal
 

@@ -77,10 +77,8 @@ flowchart LR
     MS --> HM["Host materialization：Core / binding / Skills / Doctor"]
     HM --> PF["项目任务前门：显式调用 $global-owner-scout"]
     PF --> PCF["前置 preflight：binding / Git / context / baseline"]
-    PCF -->|"Local"| WP["宿主原生项目 worktree task；携带初始 prompt"]
-    PCF -->|"already worktree"| EX["隔离 Review Executor"]
-    WP --> EX
-    PCF -->|"不可投影"| TR["Terminal v1：早停、不可确认"]
+    PCF -->|"Local 或已有 worktree"| EX["当前任务只读执行"]
+    PCF -->|"绑定或输出缺失"| TR["Terminal v1：早停、不可确认"]
     EX --> NI["原生任务索引：yield / wait / terminal"]
     NI --> TP["相关自然任务分页到窗口边界或 EOF"]
     TP --> SS["Global Owner Scout Skill：project_scout"]
@@ -97,9 +95,9 @@ flowchart LR
     DR --> VO["Visible-output verifier：交付前字节守恒"]
     VO --> DV["Delivery v1：不可变 task artifact + manifest"]
     DV --> HS["Host surface：当前任务打开或明确排队 artifact"]
-    HS --> EC["External controller：实际 final / artifact 回读"]
-    EC -->|"queued + bytes conserved"| SP["surface_pending：可发现、不可确认、不计 Production"]
-    EC --> U["当前任务完整可见；用户精确选择一张或多张"]
+    HS --> EC["当前任务：artifact 回读 / 后续 final 恢复"]
+    EC -->|"queued + bytes conserved"| SP["surface_pending：内容可核验、展示未证"]
+    EC --> U["用户审阅文件并准确选择；恢复原文件校验"]
     U -->|"确认 card_id@selection_token 集合"| A["Fresh Owner 联合重算 + 所见即所签原子规则包"]
     RP -.-> CR["Sidecar 按需 central_review"]
     BS -.-> SE["可选 Scheduled Enrollment"]
@@ -120,17 +118,17 @@ flowchart LR
 | Workstation Reconcile / Source Authority Cutover | 从 Release 构造统一期望身份，真实读取 Marketplace/Plugin/source/runtime/Skills，并以一次确认和 fresh `plan_hash` 共同调和分发与主机物化 | 放宽普通 sync、隐式启用已禁用 Plugin、移除 Owner、修改项目 checkout 或 Scheduled |
 | Deployment Pack v3 | 只从执行后 exact readback 与本轮 Desktop 项目清单构造中文分层结果，并把 Desktop reload、新任务采用、项目级同名 Skill 范围独立报告 | 接受调用方手填 Plugin 状态、用用户级安装替代项目消费者范围、自动修改项目 checkout、声称未验收的第二台设备成功 |
 | Consumer Scope Observer | 只读检查 Desktop primary folder 到 Git repo root 各层产品同名 `.agents/skills` 的版本与物理 hash，输出无路径 exact/drifted/bounded 报告 | 扫描固定仓库名单、读取 UI 文本、持久化路径或项目 ID、更新/删除项目 Skill |
-| Project Session Front Door | 接受当前绑定 Git 项目中的唯一正式调用，以 `preflight_v1` 先做无路径 Git 快照，并把 Local 调用自动投影到携带初始 prompt 的唯一隔离任务 | 要求用户手工创建 worktree、先深挖后检查环境、创建空子任务、复制 prompt |
-| Isolated Review Executor | 在宿主创建的独立 worktree 承载 30 天手动复盘并把结果留在该执行任务 | 修改活跃 Local、计入 Scheduled 14 次实验、重新询问项目身份 |
-| Host-native created-task surface | 在前门任务中把用户直接带到或链接到唯一 executor；只证明 `routed` | 冒充 Review Pack 已完成、要求用户复制 prompt、在前门输出部分结果 |
+| Project Session Front Door | 当前绑定项目内先预检、只读取证并交付；显式传 project-root 与完整快照 | 强制新聊天/worktree、把调度交给用户 |
+| Current Review Executor | 在同一任务复用 Local 或已有 worktree，完成 30 天复盘、只读校验和结果交付 | 修改项目、计入 Scheduled 实验、创建额外用户任务 |
+
 | Project Discovery | 关联 Desktop 项目、自然任务、Git 内容 identity 与安全资格 | 根据固定项目名或路径决定启用 |
 | Enrollment Pack | 用中文完整显示发现、活动覆盖、安全条件、现有状态和建议动作 | 未确认即创建 Scheduled Task |
 | Host Profile | 保存当前主机的 enrollment 决策、内容 identity hash、host project/automation 映射与 cadence | 证据、候选、Review Pack、Owner 正文、跨主机租约 |
 | Host Activation Control | 创建真实 automation-source canary、观察终态、调用宿主工具暂停/恢复任务并复读状态 | 项目证据、候选判断、Owner 写入、把 enrollment 冒充生产可用 |
 | Capability canary | 在真实 Scheduled 来源只验证独立任务创建与原生任务索引终态 | Project Scout 深挖、卡片生成、长期任务、用普通任务替代生产入口 |
 | Standalone Scheduled Task | 为一个已确认项目创建独立运行、绑定证据窗口和隔离 worktree | 复用活跃任务上下文、修改工作区、决定项目集合 |
-| Native task execution | 以固定上限 50 请求索引；若 yield 则恢复同一 cell 到终态；以 turn limit 10、单项输出 20000 字符分页读取所有选中任务 | 用重复索引调用替代 wait、探测更大分页、把运行中解释为 unavailable |
-| Scout runtime dispatcher | 以 `python -B scripts/scout.py <operation>` 统一进入活动 validator、resolver、renderer、delivery 与 terminal receipt | 让模型从相邻 helper 名推断入口、把 pre-manifest 失败交给 manifest receipt |
+| Native task execution | active/archived history 游标到窗口边界/EOF，选中自然任务正文分页；容量失败缩小同一请求并保留记录 | 将每页 50 项当总覆盖、丢弃失败页、未恢复 yield 就续跑 |
+| Scout runtime dispatcher | 可用 Python 3 + -B + 绝对脚本路径；inspect-context 显式传 project-root，复用既有 helper | 从 cwd 推断项目、创建新脚手架或状态控制面 |
 | `project_scout` | 项目任务普查、事实重建、因果复盘、候选穷举、反证、抽象、证据等级与本地 owner 建议 | 授权、proposal、持久化候选、global owner 修订 |
 | Project Card | 以 `project_claim_hash` 同时固定中文 Human Context、项目事实、因果、证据、抽象、Rule Projection 与本地 owner 判断 | global owner 写入、中央结论 |
 | Human Context | 使用简体中文和脱敏项目业务语境解释真实事件、成本、建议、行为变化与最大风险 | 抽象规则写入、翻译后补、私有细节泄漏 |
@@ -143,24 +141,18 @@ flowchart LR
 | Delivery v1 | 绑定 artifact 名称、完整文件 hash/bytes、Review Pack/body hash、卡片与动作守恒；final 只显示中文状态与最小绑定，其他字段从 artifact 重算 | 保存绝对路径、正文、任务 ID、授权或长期状态 |
 | Terminal v1 | 在没有 Delivery manifest 时绑定 phase、reason、项目状态与不可确认终态 | 生成部分卡片、替代 Review Pack、声称安装或用户表面成功 |
 | Task artifact | 在宿主为当前任务显式提供且位于项目外的 generated-output root 保存不可变完整 Review Pack；该 root 可位于宿主管理的 app storage | 项目文件、系统临时文件、任意猜测的 `$CODEX_HOME` 路径、Store、跨任务文件桥 |
-| Host surface / external controller | 在当前任务打开 artifact，并从另一个交互控制任务回读实际 final 与 artifact | 用内部 tool output、文件存在或模型自述冒充用户表面证明 |
+| Host surface / readback | 同任务一次打开；原回执恢复同文件并重建 manifest；展示观测另列 | 把 queued 或回执文字当作 UI 观测，要求反复切窗口 |
 | Cache-free helper runtime | 以 `python -B` 运行 helper；Bootstrap 原子安装时排除 Python 字节码缓存 | 让 Scout 写入或自清理个人 Skill 缓存 |
 | `central_review` | 在 Sidecar 当前任务中按需读取已经可见的 Review Pack，追加跨项目关系与并列注释 | Scheduled 自动摄取、隐藏来源卡、确认前置门禁 |
 | Review draft | 为用户提供完整判断上下文 | `待确认` proposal 或长期状态 |
 
-该链路不读写七表 Store，也不依赖 Scheduled Task 之间互相读取结果。唯一授权写入是当前任务 host-generated
-output root 下与 Review Pack hash 绑定的 artifact；它不计入项目或外部系统 mutation。交互与自动 Scout 的隔离快照
-前后必须一致；出现项目 diff、commit、push、其他外部写操作或无法证明的副作用时，该项目整包失败。活跃原工作区
-的并发变化只限定当前快照覆盖范围，不得让稳定隔离快照中的其他候选整体失效。
+该链路不读写七表 Store。唯一输出是当前任务明确授予目录下的不可变文件；Local 与已存在的 worktree 均可只读
+运行，前后完整 context snapshot（含未跟踪内容）必须一致。变化时保留原证据并撤回受影响的稳定性声明，不猜测归因。
+helper 从任意 cwd 执行时都显式接收当前绑定的 project-root；当前任务自行完成取证、文件读回和最终链接。
+`verify-final` 可在后续从原回执恢复 manifest 与原文件，无需重做发现或建立控制任务。queued 保留未观测；准确人类
+选择经文件核验和 Fresh Core 预演进入现有原子授权链，不把旧排队状态改称展示成功。
 
-项目任务前门必须在任何任务索引之前通过 `scripts/scout.py inspect-context` 完成 preflight；Local 入口通过宿主原生、
-携带初始 prompt 的项目 worktree 任务自动续跑，已在
-worktree 才直接进入 executor。原生任务调用返回运行中 cell 时，Scout 必须恢复同一 cell 到终态，且终态前不得发起第二次索引调用。Project 与
-Review Pack 结构通过校验后仍未完成链路；renderer 与 visible-output verifier 只证明交付前字节。interactive 必须
-继续创建并回读同任务 artifact、通过宿主工具打开，然后由外部 controller 读取实际 final/artifact 才完成呈现。
-宿主 open 是 Scout 的最后一个工具调用；之后只允许 compact Delivery receipt，不得再调用独立 memory 审计或追加尾注。
-
-Bootstrap 2.3.1 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 2.3.2 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得
@@ -191,22 +183,10 @@ Scout、测试、自动化和委派任务不计入；`eligible` 要求 Git workt
 automation-source canary 在 180 秒外部观察预算内取得原生索引终态。canary 不通过时 Host Activation Control
 复读任务为 `PAUSED` 并报告 `production_blocked`；只读 Scout 不负责自暂停。
 
-五条正式项目任务入口矩阵分别验证 Local clean 自动投影、Local dirty 自动投影、already-worktree 原地执行、
-thread-page 明确终态失败降级和 missing-output-root Terminal v1；happy-path 同时验证交互 Skill、Schema、renderer、
-task artifact、实际 final 回读、只读边界与同任务动作。通过后只提升
-`interactive_project_scout`。它们不拥有 Scheduled 恢复权，也不计入 Scheduled 14 次实验。automation-source canary
-通过后仍只恢复一个项目，直到一条 Scheduled Review Pack 与用户动作成立，才恢复其他 enrollment 项目。
-
-每条 canary 的前置消费者身份必须来自正式入口实际安装的 Scout version/hash，而不是待测 worktree 中同名 Skill
-文件。版本或内容身份不匹配、缺少 Delivery v1、或仍返回 legacy inline envelope 的任务统一标记为 `ineligible /
-runtime_skill_identity_mismatch`；它不会消耗五条入口矩阵样本，也不能用前台可见性单独提升结果层。
-
-交互入口不要求用户填写资源配置，也不为自动隔离 executor 注入 model/thinking override；使用该 executor 的宿主
-解析值并记录可观测 requested/actual。每个 Scheduled 确认项目在
-14 次有效运行期间显式固定 `gpt-5.6-sol` + `medium`；speed/service tier 不单独持久化，直接
-继承本机 Codex 当前配置。结果直接进入 Scheduled 收件箱，正常结果不得使用仅失败提醒。每个项目独立累计；
-另一项目或按需中央审阅失败不得清零其计数。共享源与 Anchor 不保存固定项目名、绝对路径、host `projectId`、automation ID
-或运行计数；同一 Git 内容 identity 可以在不同主机映射为不同 Host Enrollment。
+旧五场景投影矩阵是历史机制的证据，不外推到当前同任务入口。当前技术切片包括 Local clean/dirty、已有 worktree、
+30 天 active/archived history、明确分页失败、输出授权缺失、queued 原文件恢复及篡改拒绝。真实新任务是否采用安装
+Skill、实际 UI 展示和自然选择仍分别观察；安装源中的新文件不等于运行时采用，不为补齐证据新建测试任务。
+Scheduled 的模型、自动化 memory、激活 canary 与计数继续按对应 Skill 契约执行，不由交互修复恢复。
 
 ## 数据流
 
