@@ -3,6 +3,12 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.7 (2026-11-02)
+
+- Move Bootstrap and Scout development sources out of automatic project discovery; preserve the existing portable layout for installed Anchor upgrades.
+- Verify effective Skill entries through native discovery and enablement. Disabled copies no longer cause false drift; duplicate enabled entries and missing capabilities cannot qualify as ready.
+- Components: Core 0.5.7, Plugin 1.7.7, Bootstrap 2.4.0 and Scout 5.11.1. Deployment Pack v4 separates native scope/enablement from installation and actual adoption.
+
 ## 0.5.6 (2026-11-02)
 
 - Continue requested consumer checks in the original chat after deployment, without requiring another refresh, chat, or repeated request.

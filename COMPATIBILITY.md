@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.5.7 | 0.5.7 | 1.7.7 | 2.4.0 | 5.11.1 | v6 | 3.11–3.13 |
 | v0.5.6 | 0.5.6 | 1.7.6 | 2.3.3 | 5.11.0 | v6 | 3.11–3.13 |
 | v0.5.5 | 0.5.5 | 1.7.5 | 2.3.2 | 5.11.0 | v6 | 3.11–3.13 |
 | v0.5.4 | 0.5.4 | 1.7.4 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
@@ -85,5 +86,9 @@ action. Queued readback is not UI proof or approval; later exact human selection
 Bootstrap 2.3.2 and Plugin 1.7.5 carry the new bundle; real adoption and platform UI behavior remain separately observed.
 
 Bootstrap 2.3.3 and Plugin 1.7.6 allow requested consumer checks in the original task, including deployment-and-verification.
-Deployment Pack v3 stays wire-compatible: ready/verified cover installation and project scope only; legacy reload markers are
+Deployment Pack v4 stays wire-compatible: ready/verified cover installation and project scope only; legacy reload markers are
 not session-loading observations. Automatic loading, natural adoption and other-host experience remain unverified by this check.
+
+Bootstrap 2.4.0 reads native Skill discovery and enablement; Deployment Pack v4 records scope and enabled state.
+Core 0.5.7 moves development sources outside automatic discovery and preserves the published portable layout for old Anchor upgrades.
+Scout 5.11.1 updates its relocated source reference; review and delivery contracts are unchanged.

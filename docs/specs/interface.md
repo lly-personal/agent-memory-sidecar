@@ -325,7 +325,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。原生 Skill 支持自动发现；未显示或宿主明确要求时才提示刷新。source/host 物化与已请求的只读检查在当前任务完成，不能推导自动加载。
 
-`agent-memory-workstation-bootstrap` Skill 2.3.3 提供三个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.4.0 提供三个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
@@ -398,7 +398,7 @@ Marketplace checkout、可选 legacy install metadata 和 physical Plugin cache 
 parity 和物理安装的 Bootstrap/Scout version/hash。任一漂移生成 `host:materialize`；历史 cutover receipt 不参与当前
 `noop` 或 `ready` 判定。
 
-`agent_memory_workstation_deployment_pack_v3` 顶层精确包含：
+`agent_memory_workstation_deployment_pack_v4` 顶层精确包含：
 
 ```text
 contract_version, status, display_locale, generated_at, desired_bundle, distribution,
@@ -413,11 +413,11 @@ matching_skill_count, projects, limitations
 ```
 
 每个 project 精确包含 `project_ref, display_name, status, skills`；每个 Skill 精确包含
-`name, scope_level, version, content_sha256, relation`。临时输入 `agent_memory_desktop_project_inventory_v1` 顶层精确包含
-`contract_version, inventory_status, projects`，每项只含 `display_name, path, is_git_repository`；无本机 primary folder
-时 `path=null`。路径只供本轮只读检查，不得进入输出、Pack hash、Git 或持久状态。Git 项目从 primary folder 到 repo
-root 逐级检查两个产品同名 `.agents/skills`，非 Git 项目只检查 primary folder；缺失不是漂移，路径不可用、物理树别名、
-超出 512 文件系统条目或 8 MiB 读取预算、读取中变化、不可读或版本不可解析使范围为 `bounded`。
+`name, scope, enabled, version, content_sha256, relation`。原生 `skills/list` 负责发现与启用状态，调用时显式传入目标主机
+Codex home、每个项目 cwd 和 `forceReload=true`。每项能力必须恰有一个启用且内容匹配的入口；停用项以 `disabled`
+记录且不读正文，重复启用或内容不符为 drift，缺失或读取不完整为 bounded。物理树校验仍保持读取预算与防别名约束。
+临时 Desktop 项目清单保持 v1，路径不进入 Pack。CLI 清单不证明当前 Desktop 进程缓存或模型已采用。
+源码、安装及旧 Anchor 兼容路径由 [Workstation Reconcile](../../specs/workstation-reconcile-v2.md) 统一定义。
 
 `status` 只允许 `ready`、`reload_required`、`consumer_scope_drift`、`consumer_scope_bounded`、
 `distribution_reconcile_blocked`、`source_sync_blocked` 或 `host_materialization_blocked`。中文 renderer 固定先显示期望发行、
@@ -547,8 +547,8 @@ v5 保留主机身份与顶层字段，增加严格来源与发现关联；不�
 每个事件都有观察去向，每张卡准确关联一个观察；来源、事件、观察和卡片的引用必须互相解析，卡片的规范证据 hash
 从本卡 `direct_evidence` 重算。观察明确项目约束、通用增量、排除理由及精确 Owner，单项目正式接受可支持 E2。
 `no_material_delta` 必须有非空的有据观察及去向，只表示已覆盖范围未发现合格增量。来源不足时降级并保留独立支持的卡。
-精确字段由 [Scout contracts](../../.agents/skills/global-owner-scout/references/contracts.md) 拥有；
-[独立语料评分](../../.agents/skills/global-owner-scout/references/discovery-evaluation/rubric.md) 验证发现能力，不能用格式校验替代。
+精确字段由 [Scout contracts](https://github.com/lly-personal/agent-memory-sidecar/blob/main/skills/global-owner-scout/references/contracts.md) 拥有；
+[独立语料评分](https://github.com/lly-personal/agent-memory-sidecar/blob/main/skills/global-owner-scout/references/discovery-evaluation/rubric.md) 验证发现能力，不能用格式校验替代。
 交互 `manual_30d` 执行器在任务普查前运行 `inspect-output`，失败使用 `output_preflight_unavailable / preflight`；最终交付仍重新校验。
 Scheduled 使用既有最终 Inbox wrapper 与可见文本校验，不增加文件输出根或预览能力依赖。
 

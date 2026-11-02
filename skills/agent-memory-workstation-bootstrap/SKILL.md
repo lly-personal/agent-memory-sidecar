@@ -7,9 +7,9 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `2.3.3`
+- Skill version: `2.4.0`
 - Modes: `inspect`, `verify_consumer`, `apply_enrollment`
-- Deployment pack: `agent_memory_workstation_deployment_pack_v3`
+- Deployment pack: `agent_memory_workstation_deployment_pack_v4`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
 - Host profile: `global_owner_scout_host_profile_v1`
 - Read [references/contracts.md](references/contracts.md) completely before either mode.
@@ -55,14 +55,14 @@ migration continue through `inspect` below.
      root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
 3. Run exact-hash `workstation-reconcile --apply`. Marketplace/Plugin mutation participates in the source-cutover rollback
    transaction. The transaction then runs Core setup, binds the explicit or preserved canonical Owner, verifies Doctor, installs
-   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.3.3`, Scout `5.11.0`,
+   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.4.0`, Scout `5.11.1`,
    and every desired identity. The result is `reload_required`; it proves host materialization, not model adoption or project-level
    same-name Skill parity.
 4. If the user also requested verification, continue through `verify_consumer` in this same task after exact readback; that request
    already authorizes the read-only check. Otherwise finish installation here. Do not request a new chat, repeated instruction, or
    acceptance run. Skill changes support native automatic discovery; suggest refresh only for observed missing discovery or an
    explicit host requirement. Do not enumerate project activity or Scheduled tasks for ordinary installation.
-5. Build and validate one `agent_memory_workstation_deployment_pack_v3` from the reconciler's exact readback, render it with
+5. Build and validate one `agent_memory_workstation_deployment_pack_v4` from the reconciler's exact readback, render it with
    `python -B scripts/managed_sources.py render-pack`, and return the Chinese Markdown. Separately render an Enrollment Pack only
    when project discovery is useful to the user's request. Do not make enrollment a prerequisite for interactive Scout use.
 
@@ -81,8 +81,9 @@ Write only the exact temporary
 `agent_memory_desktop_project_inventory_v1` input required by the reconciler inside a fresh mode-0700 directory, then run
 `workstation-reconcile --verify-consumer --desktop-project-inventory <inventory>` against the same Resolver output. This mode is read-only: it requires an exact no-op plan,
 re-observes current managed sources, Core runtime, Owner parity, Doctor, installed Bootstrap/Scout bytes, distribution identities,
-and physically checks product same-name Skills from each local primary folder through its Git repository root (or only the primary
-folder for non-Git projects). Preserve enumerated projects without a local path as bounded entries. Delete the temporary directory
+and obtains effective candidates from native `skills/list` with the explicit Codex home and each local primary folder. It reads
+`scope` and `enabled`, then physically checks enabled product Skills. Each capability needs one matching enabled entry;
+disabled copies do not drift and duplicate enabled copies do, even when their versions match. Native unavailability stays bounded. Preserve enumerated projects without a local path as bounded entries. Delete the temporary directory
 after the command. A historical cutover receipt is never accepted as current host evidence. Project-level drift returns
 `consumer_scope_drift`; incomplete inventory or unsafe/unreadable scope returns `consumer_scope_bounded`. Neither state authorizes
 patching, pulling, deleting, or overwriting a project checkout. Report entry conditions separately from actual Scout execution;

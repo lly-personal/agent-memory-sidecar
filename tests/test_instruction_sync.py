@@ -344,7 +344,7 @@ class InstructionSyncTests(unittest.TestCase):
 
     def test_portable_entry_uses_verified_wheel_not_ambient_package(self):
         project = Path(__file__).resolve().parents[1]
-        script = project / ".agents/skills/agent-memory-workstation-bootstrap/scripts/sync_instructions.py"
+        script = project / "skills/agent-memory-workstation-bootstrap/scripts/sync_instructions.py"
         resolved = self.root / "resolved"
         portable = resolved / "portable"
         (portable / "core").mkdir(parents=True)

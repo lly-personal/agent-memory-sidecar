@@ -18,9 +18,9 @@ from agent_memory_sidecar.proposal import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BOOTSTRAP = ROOT / ".agents" / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "enrollment.py"
-MANAGED_SOURCES = ROOT / ".agents" / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "managed_sources.py"
-SCOUT_SCRIPTS = ROOT / ".agents" / "skills" / "global-owner-scout" / "scripts"
+BOOTSTRAP = ROOT / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "enrollment.py"
+MANAGED_SOURCES = ROOT / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "managed_sources.py"
+SCOUT_SCRIPTS = ROOT / "skills" / "global-owner-scout" / "scripts"
 SCOUT_VALIDATOR = SCOUT_SCRIPTS / "validate_output.py"
 SCOUT_RENDERER = SCOUT_SCRIPTS / "render_review.py"
 SCOUT_VISIBLE_VERIFIER = SCOUT_SCRIPTS / "verify_visible_output.py"
@@ -93,12 +93,12 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.3.3",
+                "version": "2.4.0",
                 "content_sha256": "b" * 64,
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.11.0",
+                "version": "5.11.1",
                 "content_sha256": "c" * 64,
             },
         }
@@ -250,9 +250,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             sidecar = codex_home / "agent-memory" / "sources" / "sidecar"
             enrollment = (
                 sidecar
-                / ".agents"
-                / "skills"
-                / "agent-memory-workstation-bootstrap"
+                / "skills" / "agent-memory-workstation-bootstrap"
                 / "scripts"
                 / "enrollment.py"
             )
@@ -308,7 +306,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             sidecar = source_root / "sidecar"
             owner = source_root / "canonical_owner"
             enrollment = (
-                sidecar / ".agents" / "skills" / "agent-memory-workstation-bootstrap"
+                sidecar / "skills" / "agent-memory-workstation-bootstrap"
                 / "scripts" / "enrollment.py"
             )
             enrollment.parent.mkdir(parents=True)
@@ -847,8 +845,8 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         desired = {
             "release_ref": "v0.3.10", "source_commit": "a" * 40,
             "core_version": "0.3.10", "plugin_version": "1.5.1", "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.3.3", "bootstrap_sha256": "c" * 64,
-            "scout_version": "5.11.0", "scout_sha256": "d" * 64,
+            "bootstrap_version": "2.4.0", "bootstrap_sha256": "c" * 64,
+            "scout_version": "5.11.1", "scout_sha256": "d" * 64,
         }
         source_sha = "e" * 64
         pack = self.managed_sources.build_deployment_pack(
@@ -865,15 +863,15 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             host_materialization={
                 "core": {"status": "verified", "version": "0.3.10", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
                 "global_binding": "unavailable", "doctor": "verified",
-                "bootstrap_skill": {"status": "unchanged", "version": "2.3.3", "content_sha256": "c" * 64},
-                "scout_skill": {"status": "unchanged", "version": "5.11.0", "content_sha256": "d" * 64},
+                "bootstrap_skill": {"status": "unchanged", "version": "2.4.0", "content_sha256": "c" * 64},
+                "scout_skill": {"status": "unchanged", "version": "5.11.1", "content_sha256": "d" * 64},
             },
             requires_reload=True,
             consumer_verified=False,
             generated_at="2026-08-21T12:00:00+08:00",
         )
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("2.3.3", validated["desired_bundle"]["bootstrap_version"])
+        self.assertEqual("2.4.0", validated["desired_bundle"]["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
         for label in ("期望发行身份", "Plugin 分发", "能力源同步", "主机物化", "项目消费者范围", "消费者入口条件"):
             self.assertIn(label, rendered)
@@ -919,7 +917,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 json.loads(text),
                 expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
             )
-            self.assertEqual("v0.5.6", value["plugins"][0]["source"]["ref"])
+            self.assertEqual("v0.5.7", value["plugins"][0]["source"]["ref"])
         else:
             self.assertTrue(
                 (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()
@@ -1029,7 +1027,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_v5_prompt_has_no_fixed_binding(self) -> None:
         prompt = (
             "Use $global-owner-scout in project_scout mode for the current bound project; rolling 72 hours; "
-            "Skill 5.11.0; global_owner_scout_project_v5; global_owner_scout_review_pack_v6; "
+            "Skill 5.11.1; global_owner_scout_project_v5; global_owner_scout_review_pack_v6; "
             "gpt-5.6-sol; medium; read-only."
         )
         self.bootstrap.validate_prompt(prompt)
@@ -1039,7 +1037,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
 
     def test_active_skill_source_has_no_historical_project_allowlist(self) -> None:
         historical_names = ("pdg-multi-level-partition-infra", "feishu-agent-lab")
-        for path in (ROOT / ".agents" / "skills").rglob("*"):
+        for path in [*(ROOT / ".agents" / "skills").rglob("*"), *(ROOT / "skills").rglob("*")]:
             if not path.is_file() or path.name.endswith("_v4.py") or path.suffix in {".pyc", ".pyo"}:
                 continue
             text = path.read_text(encoding="utf-8")
@@ -1755,9 +1753,9 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_installed_scout_contains_and_runs_delivery_helper(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary) / "global-owner-scout"
-            source = ROOT / ".agents" / "skills" / "global-owner-scout"
+            source = ROOT / "skills" / "global-owner-scout"
             installed = self.bootstrap.install_skill(source, target)
-            self.assertEqual("5.11.0", installed["version"])
+            self.assertEqual("5.11.1", installed["version"])
             helper = target / "scripts" / "prepare_delivery.py"
             dispatcher = target / "scripts" / "scout.py"
             self.assertTrue(helper.is_file())
@@ -1854,10 +1852,10 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         self.assertIn("$global-owner-scout 复盘当前项目", combined)
         self.assertIn("interactive_project_scout", combined)
         self.assertIn("冷启动", combined)
-        self.assertIn("agent_memory_workstation_deployment_pack_v3", combined)
+        self.assertIn("agent_memory_workstation_deployment_pack_v4", combined)
 
-        skill = (ROOT / ".agents" / "skills" / "global-owner-scout" / "SKILL.md").read_text(encoding="utf-8")
-        protocol = (ROOT / ".agents" / "skills" / "global-owner-scout" / "references" / "deep-review-protocol.md").read_text(encoding="utf-8")
+        skill = (ROOT / "skills" / "global-owner-scout" / "SKILL.md").read_text(encoding="utf-8")
+        protocol = (ROOT / "skills" / "global-owner-scout" / "references" / "deep-review-protocol.md").read_text(encoding="utf-8")
         self.assertIn("global_owner_scout_delivery_v1", combined + skill + protocol)
         self.assertIn("python -B", skill + protocol)
 

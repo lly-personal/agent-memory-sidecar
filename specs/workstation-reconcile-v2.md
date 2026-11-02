@@ -87,7 +87,7 @@ Plugin/Marketplace mutation is a participant in Source Authority Cutover v2, not
 3. removes/re-adds only the Agent Memory Plugin and Marketplace when the plan requires it;
 4. materializes Core, optional exact Owner binding, Bootstrap, Scout, and Doctor;
 5. reads Plugin/Marketplace, source receipts, runtime identity, and Skill content hashes back exactly;
-6. constructs and validates Deployment Pack v3 before committing the source receipt;
+6. constructs and validates Deployment Pack v4 before committing the source receipt;
 7. only then discards source, Skill, and distribution rollback state.
 
 Any failure before commit restores all touched managed sources, Skill targets, and Agent Memory distribution surfaces. It never
@@ -97,7 +97,7 @@ The atomic source receipt replacement is the commit point. A later rollback-snap
 discarded; the next run must re-observe the committed state.
 
 Successful apply returns `agent_memory_workstation_reconcile_receipt_v3` with exact
-`contract_version, status, plan_hash, deployment_pack`; its embedded Pack must be Deployment Pack v3.
+`contract_version, status, plan_hash, deployment_pack`; its embedded Pack must be Deployment Pack v4.
 
 ## Published-anchor compatibility
 
@@ -107,9 +107,9 @@ Bootstrap 2.0 routes its dry-run/apply and renderer to Workstation Reconcile v2.
 new Core/Skills behind an old Plugin or requiring a second migration cycle. A standalone source manifest without that Resolver
 shape retains the lower-level Source Authority Cutover v2 behavior.
 
-## Deployment Pack v3
+## Deployment Pack v4
 
-`agent_memory_workstation_deployment_pack_v3` has exact fields:
+`agent_memory_workstation_deployment_pack_v4` has exact fields:
 
 ```text
 contract_version, status, display_locale, generated_at, desired_bundle, distribution,
@@ -133,13 +133,13 @@ status, inventory_status, desktop_project_count, scanned_project_count,
 matching_skill_count, projects, limitations
 ```
 
-Each project has `project_ref, display_name, status, skills`; each Skill has
-`name, scope_level, version, content_sha256, relation`. The project inventory input is ephemeral
-`agent_memory_desktop_project_inventory_v1` with exact `contract_version, inventory_status, projects`, where each project contains
-only `display_name, path, is_git_repository`. `path` may be null for an enumerated project without a local primary folder. Paths are
-used for the current read and must never appear in Pack output or persisted state. Git projects are scanned from the primary folder
-through the repository root; non-Git projects scan only the primary folder. Project-controlled trees have fixed file/byte budgets
-and a repeated version/hash read; overflow or concurrent change is bounded rather than accepted.
+Each project has `project_ref, display_name, status, skills`. The ephemeral Desktop inventory remains
+`agent_memory_desktop_project_inventory_v1` with `contract_version, inventory_status, projects`; each project contains
+`display_name, path, is_git_repository`, and path may be null for an unavailable remote primary folder.
+
+Each Skill has `name, scope, enabled, version, content_sha256, relation`. The native `skills/list` response for each target-host project cwd owns discovery and enablement; Bootstrap calls it with `forceReload=true` and the explicit Codex home, without creating tasks or changing configuration. A disabled candidate has `relation=disabled` and unavailable version/hash; its contents are not read. Each product capability requires exactly one enabled candidate with the expected bytes. Duplicate enabled candidates are drifted even if their bytes match. Missing candidates, native errors, unsupported/unavailable discovery, unreadable trees or incomplete inventory are bounded. Enabled trees retain the existing bounded physical version/hash checks. Paths remain ephemeral and never enter the Pack. A native CLI catalog proves same-host discovery, not the already-running Desktop process cache or model adoption.
+
+Development Bootstrap/Scout sources live under `skills/`, outside native automatic project discovery. Installation still materializes one copy per capability under the Codex user Skill root. The portable ZIP retains its existing `.agents/skills/` transport layout for already-published Anchor resolvers, with exactly one copy per capability; it is not the development checkout layout. No fallback discovery scanner or override registry is added.
 
 `ready` never proves Scheduled activation, another workstation, continuity, or product effect.
 
@@ -147,7 +147,7 @@ and a repeated version/hash read; overflow or concurrent change is bounded rathe
 
 - Fresh host: install Marketplace, Plugin, managed source, Core, Skills, and Doctor; return `reload_required`.
 - Exact live host: plan is `noop`; read-only same-task verification re-observes it and may return `ready`.
-- Exact host with a stale project-level same-name Skill: return `consumer_scope_drift`, identify the project/Skill without paths,
+- Exact host with an enabled stale or duplicate same-name Skill: return `consumer_scope_drift`, identify the project/Skill without paths,
   and do not modify the checkout.
 - Incomplete Desktop inventory or unreadable project/Skill tree: return `consumer_scope_bounded`; never infer `ready`.
 - Missing or drifted Core/Doctor/Bootstrap/Scout: plan contains `host:materialize`; a prior green receipt cannot suppress repair.
