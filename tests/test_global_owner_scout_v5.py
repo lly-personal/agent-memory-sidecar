@@ -1290,6 +1290,19 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             self.assertEqual("linked_worktree", snapshot["execution_context"])
             self.assertNotIn(str(root), result.stdout)
 
+            # Installed helpers run outside the consumer repository. The bound
+            # project, including its dirty state, must not come from helper cwd.
+            explicit = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-context", "--project-root", str(worktree)],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            )
+            self.assertEqual(snapshot, json.loads(explicit.stdout))
+            self.assertNotIn(str(root), explicit.stdout)
+
     def test_preflight_failure_is_path_free(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             result = subprocess.run(
@@ -1758,6 +1771,17 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 check=True,
             )
             self.assertIn("render-terminal", dispatcher_result.stdout)
+            context_result = subprocess.run(
+                [sys.executable, "-B", str(dispatcher), "inspect-context", "--project-root", str(ROOT)],
+                cwd=dispatcher.parent,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+            )
+            self.assertTrue(json.loads(context_result.stdout)["git_repository"])
+            self.assertNotIn(str(ROOT), context_result.stdout)
+            self.assertNotIn(str(target), context_result.stdout)
             result = subprocess.run(
                 [sys.executable, "-B", str(helper), "--self-test"],
                 cwd=helper.parent,

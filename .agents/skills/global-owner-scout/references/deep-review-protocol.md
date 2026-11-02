@@ -118,6 +118,9 @@ source obligations and accepted/reversed paths, including partially represented
 ones, and challenge each projected obligation rather than attach one decorative
 counterexample to an entire compound card. Correct evidence-backed defects and
 recheck associations, privacy and semantic hashes before the final freeze.
+After the source inventory is frozen, give the reviewer the exact Human Context and Rule Projection fields, not only draft summaries
+or an inaccessible tool-output reference. Check each card's event, cost, before/after and strongest counterpoint against its sources;
+generic filler and circular references cannot replace those decision fields. Structural validation does not perform this semantic check.
 Preserve earlier failed evaluation records; a correction is not retroactive
 blind discovery. If independent context is unavailable, record that coverage
 limitation instead of claiming a self-review is independent qualification.

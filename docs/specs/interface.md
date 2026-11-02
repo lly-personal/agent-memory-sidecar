@@ -762,7 +762,7 @@ Store、常驻规则或独立更新器。正常工程任务按需选择方法，
 - 活跃原工作区的并发变化只记录为当前隔离快照之外的限制；稳定隔离快照中的卡不得因此整体失效。
 - 2026-08-11 的三个真实 v5.1 Scheduled 运行及最小 automation-source probe 证明本主机原生任务索引未取得终态。
   每个 Host Enrollment 保持 `0/14`，自动化保持 `PAUSED`；普通 worktree 前向测试不再拥有恢复权。只有新的真实
-  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 Skill 5.10.0 项目 canary；
+  automation-source canary 在外部 180 秒观察预算内取得终态后，才可恢复一个 当前已发布 Skill 的项目 canary；
   在 14 次有效运行期间必须显式请求
   `gpt-5.6-sol` 与 `medium` reasoning，并记录请求值、
   宿主可见的实际值和 telemetry 可用性。只有 request 不能证明实际模型；不可观测时诚实标记 `request_only`，
