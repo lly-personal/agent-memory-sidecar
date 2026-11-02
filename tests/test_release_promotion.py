@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "publish_release.py"
 COMMIT = "a" * 40
+TAG_OBJECT = "b" * 40
 REPOSITORY = "example/agent-memory-sidecar"
 TAG = "v0.3.7"
 
@@ -86,6 +87,23 @@ class FakeRunner:
         self.published = False
         self.immutable_after_publish = True
         self.calls: list[tuple[str, ...]] = []
+        self.verification = {
+            "verificationResult": {
+                "statement": {
+                    "_type": "https://in-toto.io/Statement/v1",
+                    "predicateType": "https://in-toto.io/attestation/release/v0.2",
+                    "predicate": {
+                        "repository": REPOSITORY,
+                        "tag": TAG,
+                        "purl": f"pkg:github/{REPOSITORY}@{TAG}",
+                    },
+                    "subject": [
+                        {"uri": f"pkg:github/{REPOSITORY}@{TAG}", "digest": {"sha1": TAG_OBJECT}},
+                        *({"name": item["name"], "digest": {"sha256": item["sha256"]}} for item in assets),
+                    ],
+                }
+            }
+        }
 
     def __call__(self, command: list[str], root: Path) -> str:
         del root
@@ -96,7 +114,7 @@ class FakeRunner:
         if call[:3] == ("git", "rev-parse", "HEAD"):
             return COMMIT
         if call[:3] == ("git", "rev-parse", "--verify"):
-            return COMMIT
+            return TAG_OBJECT if call[-1] == TAG else COMMIT
         if call[:3] == ("git", "cat-file", "-t"):
             return "tag"
         if call[:4] == ("git", "remote", "get-url", "origin"):
@@ -124,7 +142,7 @@ class FakeRunner:
             self.published = True
             return ""
         if call[:3] in (("gh", "release", "verify"), ("gh", "release", "verify-asset")):
-            return "{}"
+            return json.dumps(self.verification)
         raise AssertionError(f"unexpected command: {command}")
 
 
@@ -159,8 +177,11 @@ class ReleasePromotionTests(unittest.TestCase):
             self.assertEqual("public_published", receipt["status"])
             self.assertTrue(receipt["is_immutable"])
             self.assertEqual(len(runner.assets), receipt["asset_count"])
-            verified_assets = [call for call in runner.calls if call[:3] == ("gh", "release", "verify-asset")]
-            self.assertEqual(len(runner.assets), len(verified_assets))
+            verification_calls = [call for call in runner.calls if call[:3] in (
+                ("gh", "release", "verify"), ("gh", "release", "verify-asset")
+            )]
+            self.assertEqual(1, len(verification_calls))
+            self.assertEqual(("gh", "release", "verify"), verification_calls[0][:3])
 
     def test_stale_release_copy_blocks_inspect(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -232,6 +253,73 @@ class ReleasePromotionTests(unittest.TestCase):
                     **inputs,
                     plan_hash=plan["plan_hash"],
                     wait=lambda _: None,
+                )
+
+    def test_verified_statement_must_bind_the_exact_release_and_all_assets(self) -> None:
+        cases = (
+            "raw_envelope_only", "statement_type", "predicate_type", "repository", "tag", "purl",
+            "tag_object", "missing", "extra", "duplicate", "digest", "algorithm",
+        )
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                asset_dir = make_fixture(root)
+                runner = FakeRunner(self.promotion, asset_dir)
+                statement = runner.verification["verificationResult"]["statement"]
+                if case == "raw_envelope_only":
+                    runner.verification = {"attestation": {"bundle": {"statement": statement}}}
+                elif case in ("statement_type", "predicate_type"):
+                    statement["_type" if case == "statement_type" else "predicateType"] = "unverified"
+                elif case in ("repository", "tag", "purl"):
+                    statement["predicate"][case] = "wrong-identity"
+                elif case == "tag_object":
+                    statement["subject"][0]["digest"]["sha1"] = COMMIT
+                elif case == "missing":
+                    statement["subject"].pop()
+                elif case in ("extra", "duplicate"):
+                    item = dict(statement["subject"][-1])
+                    if case == "extra":
+                        item["name"] = "unexpected.zip"
+                    statement["subject"].append(item)
+                elif case == "digest":
+                    statement["subject"][-1]["digest"]["sha256"] = "f" * 64
+                elif case == "algorithm":
+                    statement["subject"][-1]["digest"] = {"sha1": COMMIT}
+                assets, _ = self.promotion._release_files(asset_dir)
+                with self.assertRaises(self.promotion.PromotionError):
+                    self.promotion.verify_release_assets(
+                        root=root, asset_dir=asset_dir, repository=REPOSITORY, tag=TAG,
+                        expected_assets=assets, runner=runner,
+                    )
+
+    def test_assets_are_read_again_after_native_verification(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            asset_dir = make_fixture(root)
+            runner = FakeRunner(self.promotion, asset_dir)
+            assets, _ = self.promotion._release_files(asset_dir)
+
+            def changing_runner(command, cwd):
+                output = runner(command, cwd)
+                if command[:3] == ["gh", "release", "verify"]:
+                    (asset_dir / "source-manifest.json").write_text('{"changed":true}\n', encoding="utf-8")
+                    manifest_path = asset_dir / "release-manifest.json"
+                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    for item in manifest["artifacts"]:
+                        path = asset_dir / item["path"]
+                        item.update(bytes=path.stat().st_size, sha256=sha256(path))
+                    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                    paths = [path for path in asset_dir.rglob("*") if path.is_file() and path.name != "SHA256SUMS"]
+                    (asset_dir / "SHA256SUMS").write_text(
+                        "".join(f"{sha256(path)}  {path.relative_to(asset_dir).as_posix()}\n" for path in paths),
+                        encoding="utf-8",
+                    )
+                return output
+
+            with self.assertRaisesRegex(self.promotion.PromotionError, "promotion_local_assets_changed"):
+                self.promotion.verify_release_assets(
+                    root=root, asset_dir=asset_dir, repository=REPOSITORY, tag=TAG,
+                    expected_assets=assets, runner=changing_runner,
                 )
 
 
