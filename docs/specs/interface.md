@@ -8,6 +8,21 @@
 - Evidence: 用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[确定性 Release 发布 ADR](../decisions/0077-deterministic-release-promotion.zh.md)、[真实读回工作站调和 ADR](../decisions/0078-workstation-reconcile-v2-observed-state.zh.md)
 - Extended by: [项目任务前门与确定性终态 ADR](../decisions/0079-project-session-front-door-and-scout-terminal-contract.zh.md)、[消费者可见 Skill 范围 ADR](../decisions/0080-consumer-visible-skill-scope-reconciliation.zh.md)
 
+## 普通任务的安装入口
+
+设计依据、原生能力比较和失败场景见 [ADR 0082](../decisions/0082-installed-memory-command-entry.zh.md)。
+
+Desktop 安装的 Agent Memory Skill 必须随包携带 `scripts/agent-memory.py` 与同一 Core 源码，
+通过当前宿主的 Python 3.11+ 执行；命令中的 Skill 根目录来自本次实际加载路径。该安装投影使用现有
+Skill 内容 hash、原子替换与回滚，不增加 Store、PATH 配置、包管理器或独立更新器。wheel 的
+`agent-memory` console script 继续支持 CLI-only 用户，但不是 Desktop 的前置条件。
+
+Doctor 只有在安装内容一致、并从当前项目目录以移除 `PYTHONPATH`/`PYTHONHOME` 的子进程成功执行
+安装入口后，才可报告就绪。该检查证明入口可执行，不证明任何规则已部署、Scout 已运行或后续自然采用。
+回归必须覆盖无全局 console script、无源码注入的安装后规则查询、显式部署、提案确认、修改、撤销及
+未授权拒绝；工程验证只写隔离 Owner 与 Store。中文部署回执的 stdin/stdout/stderr 固定 UTF-8，
+包括宿主默认管道编码不是 UTF-8 的场景。
+
 ## 七字段提案
 
 进入授权或 proposal hash 的 payload 必须精确包含：
@@ -304,7 +319,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。可靠自动发现边界仍是一次 Codex 刷新或下一任务，但 source/host 物化必须在当前部署任务完成。
 
-`agent-memory-workstation-bootstrap` Skill 2.3.0 提供两个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.3.1 提供两个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
@@ -400,13 +415,16 @@ root 逐级检查两个产品同名 `.agents/skills`，非 Git 项目只检查 p
 `status` 只允许 `ready`、`reload_required`、`consumer_scope_drift`、`consumer_scope_bounded`、
 `distribution_reconcile_blocked`、`source_sync_blocked` 或 `host_materialization_blocked`。中文 renderer 固定先显示期望发行、
 Plugin 分发、源同步、主机物化、消费者范围、消费者采用，再显示未证明事项与唯一下一步。apply 固定不越过模型采用层，
-返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.3.0 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
+返回 `reload_required`；一次 Desktop 刷新后，只有已加载 2.3.1 Bootstrap 的新任务执行只读 `--verify-consumer`、所有主机
 读回仍 exact、Desktop 项目枚举完整且项目级同名 Skill 全部 exact，才允许 `ready`。任何本机结果都保留真实第二台设备、
 Scheduled、连续性与产品收益未证明边界。
 
 安装交付在 `reload_required` 结束；它提示下次使用前刷新 Desktop，不要求用户立即创建新任务或重复部署。
 只有用户后续主动要求检查消费者时才进入只读 `verify_consumer`。该检查证明所声明的加载与安装范围，真实理解、
 自然采用和收益独立保留；用户延后验收不阻塞技术交付。所有 Anchor、Bootstrap、SOP 与 renderer 使用这一分工。
+v3 的 `consumer_activation.interactive_entry=verified` 只表示安装与项目范围检查通过，并以调用方满足新任务已加载
+Bootstrap 为前提；它不证明 Scout 被实际调用或运行验收通过。保持 v3 字段和值兼容；中文回执分别显示入口检查和 Scout 实际运行状态，
+明确本次检查未运行 Scout，不能据此判断其他运行的验收结果。
 
 `global_owner_scout_enrollment_pack_v1` 顶层精确包含：
 

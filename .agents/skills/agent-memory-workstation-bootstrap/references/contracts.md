@@ -74,7 +74,7 @@ An apply result uses `agent_memory_workstation_reconcile_receipt_v3` with exact
 
 - `status`: `ready`, `reload_required`, `consumer_scope_drift`, `consumer_scope_bounded`,
   `distribution_reconcile_blocked`, `source_sync_blocked`, or `host_materialization_blocked`.
-- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.3.0`.
+- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.3.1`.
 - `consumer_scope`: exact fields `status, inventory_status, desktop_project_count, scanned_project_count,
   matching_skill_count, projects, limitations`; status is `not_observed`, `exact`, `drifted`, or `bounded`.
 - Each consumer project has exact `project_ref, display_name, status, skills`; each Skill has exact
@@ -92,11 +92,14 @@ An apply result uses `agent_memory_workstation_reconcile_receipt_v3` with exact
   `available_next_task`; only read-only `--verify-consumer` from a newly loaded Bootstrap task with complete exact consumer scope
   may return `verified` and `ready`. Drift returns `ambiguous`; bounded coverage returns `unproven`. Managed-layer blocked status
   returns `blocked`, does not request a reload, and cannot route the user to Project Scout.
+- In v3, `interactive_entry=verified` means the installation and project scope checks passed, assuming the caller satisfies the
+  new-task Bootstrap precondition; it does not attest an actual Scout invocation or its acceptance. Keep the machine contract
+  compatible. The renderer separately reports the entry check and that Scout was not run by this check, without asserting other runs.
 - `limitations` must explicitly retain the real-second-device proof boundary when only a same-host clean-profile test exists.
 - `pack_hash` is SHA-256 of canonical UTF-8 JSON excluding `pack_hash`.
 
 The renderer produces one Chinese result table ordered as `desired release / Plugin distribution / source synchronization /
-host materialization / project consumer scope / consumer adoption`. It never exposes source URLs, absolute paths, project IDs,
+host materialization / project consumer scope / consumer entry conditions`. It never exposes source URLs, absolute paths, project IDs,
 automation IDs, raw JSON, or credentials.
 
 ## Enrollment Pack
@@ -110,7 +113,7 @@ automation_change_count, allowed_actions, limitations, pack_hash
 ```
 
 - `status`: `ready`, `bounded`, or `host_activation_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `2.3.0`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `2.3.1`.
 - `portable_layer` exact fields: `sidecar`, `canonical_owner`, `core_setup`, `doctor`, `scout_skill_version`,
   `scout_skill_hash`. State values are `synced`, `unchanged`, `installed`, `verified`, `failed`, or `unavailable`.
 - `discovery` exact fields: `inventory_status`, `activity_status`, `desktop_project_count`, `accessible_count`,

@@ -5,6 +5,8 @@ import contextlib
 import hashlib
 import io
 import json
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -44,7 +46,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "core_version": "0.3.10",
             "plugin_version": "1.5.1",
             "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.3.0",
+            "bootstrap_version": "2.3.1",
             "bootstrap_sha256": "c" * 64,
             "scout_version": "5.10.0",
             "scout_sha256": "d" * 64,
@@ -93,7 +95,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "unavailable",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.3.0", "content_sha256": "c" * 64,
+                "status": "unchanged", "version": "2.3.1", "content_sha256": "c" * 64,
             },
             "scout_skill": {
                 "status": "unchanged", "version": "5.10.0", "content_sha256": "d" * 64,
@@ -152,7 +154,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             skill = project / ".agents" / "skills" / "agent-memory-workstation-bootstrap"
             skill.mkdir(parents=True)
             skill_file = skill / "SKILL.md"
-            skill_file.write_text("# Bootstrap\n\n- Skill version: `2.3.0`\n", encoding="utf-8")
+            skill_file.write_text("# Bootstrap\n\n- Skill version: `2.3.1`\n", encoding="utf-8")
             desired = self.desired_bundle()
             desired["bootstrap_sha256"] = self.reconcile.physical_tree_hash(skill)
 
@@ -161,12 +163,12 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             )
             self.assertEqual("exact", exact["status"])
 
-            skill_file.write_text("# Bootstrap\n\n- Skill version: `2.3.0`\n\nChanged.\n", encoding="utf-8")
+            skill_file.write_text("# Bootstrap\n\n- Skill version: `2.3.1`\n\nChanged.\n", encoding="utf-8")
             drifted = self.reconcile.observe_consumer_scope(
                 self.desktop_inventory(("Project", project)), desired=desired,
             )
             self.assertEqual("drifted", drifted["status"])
-            self.assertEqual("2.3.0", drifted["projects"][0]["skills"][0]["version"])
+            self.assertEqual("2.3.1", drifted["projects"][0]["skills"][0]["version"])
 
     def test_consumer_scope_fails_bounded_on_project_skill_parent_alias(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -234,7 +236,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             skill = project / ".agents" / "skills" / "agent-memory-workstation-bootstrap"
             skill.mkdir(parents=True)
             (skill / "SKILL.md").write_text(
-                "# Bootstrap\n\n- Skill version: `2.3.0`\n", encoding="utf-8",
+                "# Bootstrap\n\n- Skill version: `2.3.1`\n", encoding="utf-8",
             )
             for index in range(self.reconcile.CONSUMER_SKILL_MAX_ENTRIES):
                 (skill / f"extra-{index:03d}.txt").write_text("x", encoding="utf-8")
@@ -268,6 +270,18 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         }
         ready = self.reconcile.build_deployment_pack(**common, consumer_scope=exact_scope)
         self.assertEqual("ready", ready["status"])
+        rendered_ready = self.reconcile.render_pack(ready)
+        self.assertIn("入口检查 `verified`", rendered_ready)
+        self.assertIn("仅表示安装与项目范围检查通过", rendered_ready)
+        self.assertIn("Scout 实际运行 | 本次未运行", rendered_ready)
+        self.assertIn("不判断其他运行的验收结果", rendered_ready)
+        result = subprocess.run(
+            [sys.executable, "-B", str(MANAGED_SOURCES), "render-pack"],
+            input=json.dumps(ready), capture_output=True, encoding="utf-8",
+            env={**os.environ, "PYTHONIOENCODING": "cp1252"},
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(rendered_ready, result.stdout)
 
         drifted_scope = {
             **exact_scope,
@@ -287,6 +301,8 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         rendered = self.reconcile.render_pack(drifted)
         self.assertIn("&lt;Project&gt;\\|Name", rendered)
         self.assertNotIn("<Project>", rendered)
+        self.assertIn("入口检查 `ambiguous`", rendered)
+        self.assertIn("Scout 实际运行 | 本次未运行", rendered)
 
         bounded_scope = {
             **exact_scope,
@@ -432,7 +448,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.3.0",
+                "version": "2.3.1",
                 "content_sha256": "c" * 64,
             },
             "scout_skill": {
@@ -476,7 +492,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "verified",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.3.0", "content_sha256": "c" * 64,
+                "status": "unchanged", "version": "2.3.1", "content_sha256": "c" * 64,
             },
             "scout_skill": {
                 "status": "unchanged", "version": "5.10.0", "content_sha256": "d" * 64,
@@ -544,7 +560,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             plugin_manifest.parent.mkdir()
             plugin_manifest.write_text(json.dumps({"version": "1.5.1"}), encoding="utf-8")
             (bootstrap / "SKILL.md").write_text(
-                "# Bootstrap\n\n- Skill version: `2.3.0`\n", encoding="utf-8",
+                "# Bootstrap\n\n- Skill version: `2.3.1`\n", encoding="utf-8",
             )
             (scout / "SKILL.md").write_text(
                 "# Scout\n\n- Skill version: `5.10.0`\n", encoding="utf-8",
@@ -573,7 +589,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 },
                 "versions": {
                     "core": "0.3.10", "plugin": "1.5.1",
-                    "bootstrap": "2.3.0", "scout": "5.10.0",
+                    "bootstrap": "2.3.1", "scout": "5.10.0",
                 },
                 "artifacts": [],
                 "verification": {},
@@ -606,7 +622,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
 
             self.assertEqual("v0.3.10", desired["release_ref"])
             self.assertEqual("1.5.1", desired["plugin_version"])
-            self.assertEqual("2.3.0", desired["bootstrap_version"])
+            self.assertEqual("2.3.1", desired["bootstrap_version"])
             self.assertEqual("a" * 40, sidecar.expected_commit)
             self.assertRegex(source_hash, r"^[0-9a-f]{64}$")
             self.assertRegex(desired["plugin_sha256"], r"^[0-9a-f]{64}$")
@@ -740,7 +756,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             codex_home = root / "codex-home"
             self.reconcile.sync_sources(codex_home, spec)
             for name, version in (
-                ("agent-memory-workstation-bootstrap", "2.3.0"),
+                ("agent-memory-workstation-bootstrap", "2.3.1"),
                 ("global-owner-scout", "5.10.0"),
             ):
                 skill = codex_home / "skills" / name
@@ -771,7 +787,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             self.assertEqual("verified", observed["core"]["status"])
             self.assertEqual(commit, observed["core"]["source_commit"])
             self.assertEqual("verified", observed["doctor"])
-            self.assertEqual("2.3.0", observed["bootstrap_skill"]["version"])
+            self.assertEqual("2.3.1", observed["bootstrap_skill"]["version"])
             self.assertRegex(observed["scout_skill"]["content_sha256"], r"^[0-9a-f]{64}$")
 
     def test_distribution_participant_rolls_back_with_source_transaction(self) -> None:

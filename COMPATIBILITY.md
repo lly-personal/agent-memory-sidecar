@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.5.1 | 0.5.1 | 1.7.1 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.5.0 | 0.5.0 | 1.7.0 | 2.3.0 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.4.0 | 0.4.0 | 1.6.0 | 2.2.5 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.3.16 | 0.3.16 | 1.6.0 | 2.2.4 | 5.9.2 | v6 | 3.11–3.13 |
@@ -56,3 +57,7 @@ not moved, and the corrected public lane advances to `v0.3.7`.
 Core 0.5.0 adds whole-document global instruction synchronization for Codex and Pi. Bootstrap 2.3.0 preserves its verified Owner
 snapshot during workstation reconciliation, and Plugin 1.7.0 exposes the shared release-bound Anchor. Scout remains 5.10.0;
 Pi instruction distribution does not install Codex Hooks or prove model adoption.
+
+Core 0.5.1 installs the generated Skill with its own Core command entry and verifies execution without source injection.
+Bootstrap 2.3.1 renders UTF-8 receipts and distinguishes entry conditions from actual Scout execution.
+Plugin 1.7.1 carries the updated release identity; Engineering Contract Review and Scout behavior are unchanged.

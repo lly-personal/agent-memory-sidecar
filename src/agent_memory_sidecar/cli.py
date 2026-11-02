@@ -31,13 +31,13 @@ class ResultParser(argparse.ArgumentParser):
         raise CoreError("invalid_request", message)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Sequence[str] | None = None, *, daily_only: bool = False) -> int:
     _configure_stdio()
     operation = "unknown"
     scope: str | None = None
     target: str | None = None
     try:
-        parser = build_parser()
+        parser = build_parser(daily_only=daily_only)
         args = parser.parse_args(
             list(argv) if argv is not None else sys.argv[1:]
         )
@@ -105,7 +105,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(*, daily_only: bool = False) -> argparse.ArgumentParser:
     parser = ResultParser(
         prog="agent-memory",
         description="Publish user-authorized collaboration rules.",
@@ -121,21 +121,22 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(
         dest="command",
         required=True,
-        metavar="{rule,setup,doctor,instructions}",
+        metavar="{rule,doctor}" if daily_only else "{rule,setup,doctor,instructions}",
     )
 
-    instructions = commands.add_parser("instructions", help="Synchronize published global instructions to Codex and Pi.")
-    instruction_commands = instructions.add_subparsers(dest="instruction_command", required=True)
-    sync = instruction_commands.add_parser("sync", help="Preview or apply whole-document workstation synchronization.")
-    sync.add_argument("--source", type=Path)
-    sync.add_argument("--codex-home", type=Path)
-    sync.add_argument("--pi-agent-dir", type=Path)
-    sync.add_argument("--state-dir", type=Path)
-    sync.add_argument("--apply", action="store_true")
-    sync.add_argument("--plan-hash")
-    sync.add_argument("--adopt-existing", action="append", metavar="HOST=SHA256",
-                      help="First enrollment only: bind an explicitly reviewed existing document hash.")
-    _bind(sync, "instructions.sync", cmd_instruction_sync)
+    if not daily_only:
+        instructions = commands.add_parser("instructions", help="Synchronize published global instructions to Codex and Pi.")
+        instruction_commands = instructions.add_subparsers(dest="instruction_command", required=True)
+        sync = instruction_commands.add_parser("sync", help="Preview or apply whole-document workstation synchronization.")
+        sync.add_argument("--source", type=Path)
+        sync.add_argument("--codex-home", type=Path)
+        sync.add_argument("--pi-agent-dir", type=Path)
+        sync.add_argument("--state-dir", type=Path)
+        sync.add_argument("--apply", action="store_true")
+        sync.add_argument("--plan-hash")
+        sync.add_argument("--adopt-existing", action="append", metavar="HOST=SHA256",
+                          help="First enrollment only: bind an explicitly reviewed existing document hash.")
+        _bind(sync, "instructions.sync", cmd_instruction_sync)
 
     rule = commands.add_parser("rule", help="List, deploy, or revoke rules.")
     rule_commands = rule.add_subparsers(
@@ -211,42 +212,44 @@ def build_parser() -> argparse.ArgumentParser:
     discard.add_argument("--approval-ref", required=True)
     _bind(discard, "proposal.discard", cmd_proposal_discard)
 
-    setup_parser = commands.add_parser(
-        "setup", help="Preview or install the immutable Desktop runtime."
-    )
-    setup_parser.add_argument("--apply", action="store_true")
-    setup_parser.add_argument("--global-rules-source")
-    setup_parser.add_argument(
-        "--rebind-global-rules-source",
-        action="store_true",
-        help="Explicitly migrate an existing drift-free global binding to the selected source.",
-    )
-    _bind(setup_parser, "setup", cmd_setup)
+    if not daily_only:
+        setup_parser = commands.add_parser(
+            "setup", help="Preview or install the immutable Desktop runtime."
+        )
+        setup_parser.add_argument("--apply", action="store_true")
+        setup_parser.add_argument("--global-rules-source")
+        setup_parser.add_argument(
+            "--rebind-global-rules-source",
+            action="store_true",
+            help="Explicitly migrate an existing drift-free global binding to the selected source.",
+        )
+        _bind(setup_parser, "setup", cmd_setup)
 
     doctor_parser = commands.add_parser(
         "doctor", help="Verify Core Store and Desktop integration."
     )
     _bind(doctor_parser, "doctor", cmd_doctor)
 
-    maintenance = commands.add_parser("maintenance", help=argparse.SUPPRESS)
-    maintenance_commands = maintenance.add_subparsers(
-        dest="maintenance_command",
-        required=True,
-    )
-    cutover = maintenance_commands.add_parser(
-        "core-cutover", help=argparse.SUPPRESS
-    )
-    mode = cutover.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--dry-run", action="store_true")
-    mode.add_argument("--apply", action="store_true")
-    cutover.add_argument("--plan-hash")
-    cutover.add_argument("--approval-ref")
-    _bind(cutover, "maintenance.core-cutover", cmd_core_cutover)
-    self_test = maintenance_commands.add_parser(
-        "self-test", help=argparse.SUPPRESS
-    )
-    self_test.add_argument("--store", dest="self_test_store", required=True)
-    _bind(self_test, "maintenance.self-test", cmd_self_test)
+    if not daily_only:
+        maintenance = commands.add_parser("maintenance", help=argparse.SUPPRESS)
+        maintenance_commands = maintenance.add_subparsers(
+            dest="maintenance_command",
+            required=True,
+        )
+        cutover = maintenance_commands.add_parser(
+            "core-cutover", help=argparse.SUPPRESS
+        )
+        mode = cutover.add_mutually_exclusive_group(required=True)
+        mode.add_argument("--dry-run", action="store_true")
+        mode.add_argument("--apply", action="store_true")
+        cutover.add_argument("--plan-hash")
+        cutover.add_argument("--approval-ref")
+        _bind(cutover, "maintenance.core-cutover", cmd_core_cutover)
+        self_test = maintenance_commands.add_parser(
+            "self-test", help=argparse.SUPPRESS
+        )
+        self_test.add_argument("--store", dest="self_test_store", required=True)
+        _bind(self_test, "maintenance.self-test", cmd_self_test)
 
     commands._choices_actions[:] = [  # type: ignore[attr-defined]
         item

@@ -13,6 +13,8 @@ from .file_security import _is_trusted_host_directory_alias, logical_absolute
 
 
 SKILL_NAME = "agent-memory"
+CLI_ENTRY = "scripts/agent-memory.py"
+CLI_COMMAND = '"<python>" -B "<skill-dir>/scripts/agent-memory.py"'
 
 
 @dataclass(frozen=True)
@@ -178,12 +180,22 @@ def _physical_skill_directory_exists(path: Path) -> bool:
 
 def build_skill_files() -> dict[str, str]:
     return {
-        "SKILL.md": _skill_markdown(),
+        "SKILL.md": _skill_markdown().replace("agent-memory ", CLI_COMMAND + " "),
         "agents/openai.yaml": (
             "interface:\n"
             "  display_name: Agent Memory\n"
             "  short_description: Publish authorized collaboration rules.\n"
         ),
+        CLI_ENTRY: (
+            "import sys\n"
+            "sys.dont_write_bytecode = True\n"
+            "from agent_memory_sidecar.cli import main\n"
+            "raise SystemExit(main(daily_only=True))\n"
+        ),
+        **{
+            f"scripts/agent_memory_sidecar/{path.name}": path.read_text(encoding="utf-8")
+            for path in sorted(Path(__file__).parent.glob("*.py"))
+        },
     }
 
 
@@ -325,6 +337,19 @@ description: Use after the user explicitly establishes a reusable future collabo
 # Agent Memory
 
 North star: `discover -> authorize -> deploy -> later-task behavior -> revoke`.
+
+## Installed command entry
+
+Resolve `<skill-dir>` from the actual loaded path of this SKILL.md and `<python>` from an available
+Python 3.11+ interpreter on this host (normally `python3` on macOS/Linux or `python` on Windows).
+Replace both placeholders with observed absolute paths in every command below. Execute from the current
+primary project directory and preserve its active CODEX_HOME. In PowerShell, prefix each quoted interpreter
+command with the call operator `&`; POSIX shells execute the quoted path directly. The installed script includes the Core;
+do not depend on a global console command, pip installation, source checkout or PYTHONPATH injection.
+Keep `-B` so running the Skill does not change its installed content. This entry uses the existing Store,
+authorization and Owner contracts; it does not grant permission to modify a real Owner during testing.
+Only rule, proposal and doctor operations are available here. Installation and instruction synchronization
+remain with the verified Bootstrap; do not run setup from this installed projection.
 
 ## Task boundary and visibility
 
