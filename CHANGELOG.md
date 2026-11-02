@@ -3,6 +3,12 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.2 (2026-11-02)
+
+- Workstation updates no longer fail their runtime self-test when normal event retention removes expired records or another task records an event.
+- Successful and failed self-tests remove only their own probe records and preserve unrelated runtime activity.
+- Components: Core 0.5.2, Plugin 1.7.2, Bootstrap 2.3.1 and Scout 5.10.0; installed daily operations and authorization contracts are unchanged.
+
 ## 0.5.1 (2026-11-02)
 
 - Desktop memory operations now use the command installed with the Skill, without requiring a global CLI or source checkout.

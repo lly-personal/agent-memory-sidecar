@@ -10,7 +10,7 @@
 Codex Desktop users register the tagged public Marketplace and install the plugin:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.5.1
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.5.2
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -32,7 +32,7 @@ remain with the verified Bootstrap; the daily entry does not expose setup or mig
 Core-only consumers install the Release wheel and run:
 
 ```powershell
-python -m pip install .\agent_memory_sidecar-0.5.1-py3-none-any.whl
+python -m pip install .\agent_memory_sidecar-0.5.2-py3-none-any.whl
 agent-memory setup
 agent-memory setup --apply
 agent-memory doctor

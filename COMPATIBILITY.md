@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.5.2 | 0.5.2 | 1.7.2 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.5.1 | 0.5.1 | 1.7.1 | 2.3.1 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.5.0 | 0.5.0 | 1.7.0 | 2.3.0 | 5.10.0 | v6 | 3.11–3.13 |
 | v0.4.0 | 0.4.0 | 1.6.0 | 2.2.5 | 5.10.0 | v6 | 3.11–3.13 |
@@ -61,3 +62,6 @@ Pi instruction distribution does not install Codex Hooks or prove model adoption
 Core 0.5.1 installs the generated Skill with its own Core command entry and verifies execution without source injection.
 Bootstrap 2.3.1 renders UTF-8 receipts and distinguishes entry conditions from actual Scout execution.
 Plugin 1.7.1 carries the updated release identity; Engineering Contract Review and Scout behavior are unchanged.
+
+Core 0.5.2 scopes runtime self-test evidence and cleanup to its own probe session. Event retention and unrelated runtime activity
+no longer invalidate successful capture. Plugin 1.7.2 carries the release identity; Bootstrap and Scout remain unchanged.
