@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 
 
-SCRIPTS = Path(__file__).resolve().parents[1] / ".agents/skills/global-owner-scout/scripts"
+SCRIPTS = Path(__file__).resolve().parents[1] / "skills/global-owner-scout/scripts"
 
 
 class ScoutDiscoveryTests(unittest.TestCase):

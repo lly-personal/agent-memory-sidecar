@@ -99,20 +99,20 @@ def version_facts(root: Path = ROOT) -> dict[str, str]:
         (root / "plugins" / "agent-memory-sidecar" / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
     )["version"]
     bootstrap_text = (
-        root / ".agents" / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "managed_sources.py"
+        root / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "managed_sources.py"
     ).read_text(encoding="utf-8")
     bootstrap_match = re.search(r'^BOOTSTRAP_VERSION\s*=\s*"([^"]+)"', bootstrap_text, re.MULTILINE)
     managed_scout_match = re.search(r'^SCOUT_VERSION\s*=\s*"([^"]+)"', bootstrap_text, re.MULTILINE)
     enrollment_text = (
-        root / ".agents" / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "enrollment.py"
+        root / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "enrollment.py"
     ).read_text(encoding="utf-8")
     enrollment_bootstrap_match = re.search(r'^BOOTSTRAP_VERSION\s*=\s*"([^"]+)"', enrollment_text, re.MULTILINE)
     enrollment_scout_match = re.search(r'^SCOUT_VERSION\s*=\s*"([^"]+)"', enrollment_text, re.MULTILINE)
     bootstrap_skill_text = (
-        root / ".agents" / "skills" / "agent-memory-workstation-bootstrap" / "SKILL.md"
+        root / "skills" / "agent-memory-workstation-bootstrap" / "SKILL.md"
     ).read_text(encoding="utf-8")
     bootstrap_skill_match = re.search(r"Skill version:\s*`([^`]+)`", bootstrap_skill_text)
-    scout_text = (root / ".agents" / "skills" / "global-owner-scout" / "SKILL.md").read_text(encoding="utf-8")
+    scout_text = (root / "skills" / "global-owner-scout" / "SKILL.md").read_text(encoding="utf-8")
     scout_match = re.search(r"Skill version:\s*`([^`]+)`", scout_text)
     require(
         all(match is not None for match in (
@@ -411,6 +411,11 @@ def _archive_files(paths: Iterable[Path], root: Path) -> list[Path]:
 
 def deterministic_zip(*, output: Path, root: Path, files: Iterable[Path], generated: dict[str, bytes]) -> None:
     entries = [(path.relative_to(root).as_posix(), path.read_bytes()) for path in _archive_files(files, root)]
+    # Retain the published portable layout for already-installed Anchor resolvers.
+    # Source checkouts use skills/ and are never an implicit runtime discovery root.
+    entries = [(".agents/" + name if name.startswith((
+        "skills/agent-memory-workstation-bootstrap/", "skills/global-owner-scout/",
+    )) else name, data) for name, data in entries]
     entries.extend((name, data) for name, data in generated.items())
     names = [name for name, _ in entries]
     require(len(names) == len(set(names)), "release_archive_duplicate")
@@ -717,8 +722,8 @@ def build(
             root=root,
             files=[
                 root / ".agents" / "skills" / "agent-memory-bootstrap-anchor",
-                root / ".agents" / "skills" / "agent-memory-workstation-bootstrap",
-                root / ".agents" / "skills" / "global-owner-scout",
+                root / "skills" / "agent-memory-workstation-bootstrap",
+                root / "skills" / "global-owner-scout",
                 root / ".agents" / "plugins" / "marketplace.json",
                 root / "plugins" / "agent-memory-sidecar",
                 root / "docs" / "specs",
@@ -752,8 +757,8 @@ def build(
                 _spdx_package(name="agent-memory-portable", spdx_id="SPDXRef-Package-Portable", version=versions["core"], checksum=digest(portable), repository_url=repository, commit=commit, license_expression=license_expression),
                 _spdx_package(name="agent-memory-sidecar", spdx_id="SPDXRef-Package-Core", version=versions["core"], checksum=digest(wheel), repository_url=repository, commit=commit, license_expression=license_expression),
                 _spdx_package(name="agent-memory-plugin", spdx_id="SPDXRef-Package-Plugin", version=versions["plugin"], checksum=tree_digest(root / "plugins/agent-memory-sidecar"), repository_url=repository, commit=commit, license_expression=license_expression),
-                _spdx_package(name="agent-memory-bootstrap", spdx_id="SPDXRef-Package-Bootstrap", version=versions["bootstrap"], checksum=tree_digest(root / ".agents/skills/agent-memory-workstation-bootstrap"), repository_url=repository, commit=commit, license_expression=license_expression),
-                _spdx_package(name="global-owner-scout", spdx_id="SPDXRef-Package-Scout", version=versions["scout"], checksum=tree_digest(root / ".agents/skills/global-owner-scout"), repository_url=repository, commit=commit, license_expression=license_expression),
+                _spdx_package(name="agent-memory-bootstrap", spdx_id="SPDXRef-Package-Bootstrap", version=versions["bootstrap"], checksum=tree_digest(root / "skills/agent-memory-workstation-bootstrap"), repository_url=repository, commit=commit, license_expression=license_expression),
+                _spdx_package(name="global-owner-scout", spdx_id="SPDXRef-Package-Scout", version=versions["scout"], checksum=tree_digest(root / "skills/global-owner-scout"), repository_url=repository, commit=commit, license_expression=license_expression),
             ],
             "relationships": [
                 {"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Package-Portable"},

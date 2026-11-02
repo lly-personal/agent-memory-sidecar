@@ -62,7 +62,7 @@ The observer uses Codex JSON output and physical readback. A current Codex clean
 `.codex-marketplace-install.json`; when that metadata exists it remains strictly validated, and otherwise the ref comes from the
 validated tracked Marketplace manifest. None of these fields may be filled from a fixture or Agent assertion.
 
-`agent_memory_workstation_deployment_pack_v3` has these exact top-level fields:
+`agent_memory_workstation_deployment_pack_v4` has these exact top-level fields:
 
 ```text
 contract_version, status, display_locale, generated_at, desired_bundle, distribution,
@@ -74,15 +74,19 @@ An apply result uses `agent_memory_workstation_reconcile_receipt_v3` with exact
 
 - `status`: `ready`, `reload_required`, `consumer_scope_drift`, `consumer_scope_bounded`,
   `distribution_reconcile_blocked`, `source_sync_blocked`, or `host_materialization_blocked`.
-- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.3.3`.
+- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.4.0`.
 - `consumer_scope`: exact fields `status, inventory_status, desktop_project_count, scanned_project_count,
   matching_skill_count, projects, limitations`; status is `not_observed`, `exact`, `drifted`, or `bounded`.
 - Each consumer project has exact `project_ref, display_name, status, skills`; each Skill has exact
-  `name, scope_level, version, content_sha256, relation`, where relation is `exact`, `drifted`, or `unreadable`.
+  `name, scope, enabled, version, content_sha256, relation`. Discovery and enablement come from native `skills/list` with
+  explicit Codex home/project cwd and forceReload. Disabled candidates have unavailable version/hash and are not read.
+  Exactly one enabled, byte-matching candidate per capability is required; duplicates drift, absent/native errors bound.
+  Physical hash limits remain; no filesystem discovery fallback or configuration mutation. CLI catalog is not Desktop adoption.
+
 - The ephemeral input `agent_memory_desktop_project_inventory_v1` has exact `contract_version, inventory_status, projects`; each
   item has only `display_name, path, is_git_repository`; path may be null when the native inventory has no local primary folder.
-  Input paths never enter Pack output or persisted state. Git projects scan each discovery directory from primary folder through
-  repository root; non-Git projects scan only primary folder. Unsafe, oversized, concurrently changing, or unreadable trees are bounded.
+  Input paths never enter Pack output or persisted state. Native discovery owns scope traversal; Bootstrap does not replace
+  native failures with directory guesses. Unsafe, oversized, concurrently changing, or unreadable enabled trees are bounded.
 - `distribution` is an exact post-operation re-observation with the same Marketplace and Plugin fields as the plan.
 - `source_sync` contains exact `sidecar` and `canonical_owner` receipts. Each receipt has `status`, `ref`, and `commit`; status is
   `synced`, `unchanged`, `unavailable`, or `failed`.
@@ -115,7 +119,7 @@ automation_change_count, allowed_actions, limitations, pack_hash
 ```
 
 - `status`: `ready`, `bounded`, or `host_activation_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `2.3.3`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `2.4.0`.
 - `portable_layer` exact fields: `sidecar`, `canonical_owner`, `core_setup`, `doctor`, `scout_skill_version`,
   `scout_skill_hash`. State values are `synced`, `unchanged`, `installed`, `verified`, `failed`, or `unavailable`.
 - `discovery` exact fields: `inventory_status`, `activity_status`, `desktop_project_count`, `accessible_count`,

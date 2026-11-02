@@ -52,8 +52,8 @@
 7. 已请求的消费者检查复用当前任务的已验证 Resolver 输出，不以刷新或新聊天为前提。通过目标主机的 Codex Desktop
    project API 取得本轮完整项目清单，再把临时清单交给
    只读 `--verify-consumer --desktop-project-inventory <inventory>`。只有 dry-run 为 exact `noop`、live
-   Core/Doctor/Owner/用户级 Skills 仍 exact，且所有 Desktop 可见项目级同名 Skill 也 exact 时才返回 `ready`。
-   项目同名 Skill 差异返回 `consumer_scope_drift`；清单或读取不完整返回 `consumer_scope_bounded`。两者都不自动修改项目。
+   Core/Doctor/Owner/用户级 Skills 仍 exact，且原生 `skills/list` 为每项能力提供恰好一个启用、内容匹配的入口时才返回 `ready`。
+   重复启用或启用项内容差异返回 `consumer_scope_drift`；清单或读取不完整返回 `consumer_scope_bounded`。两者都不自动修改项目。
    远端检查须由远端执行器和清单支持；只有本机工具时保留远端未验，不能用本机结果替代或要求用户代测。
 8. 已发布的 Anchor 1.x 会调用旧命令名；当且仅当输入是 Resolver 的完整目录形态时，Bootstrap 2.0 自动把该命令路由
    到 v2 计划与事务。用户不需要先迁移 Anchor、重复部署或刷新两次。
@@ -84,7 +84,7 @@
 ## 验收清单
 
 - Fresh host、exact no-op、旧 Plugin + 新 Skills、新 Plugin + 旧 source、Marketplace identity drift，以及含/不含 legacy metadata 的 clean checkout。
-- 完整清单且无项目同名 Skill、完整清单且同名 Skill exact、旧版本/同版本不同 hash、项目不可访问、物理树别名、bounded 清单。
+- 完整原生清单、同名启用副本、已停用旧副本、无启用入口、原生读取失败、旧版本/同版本不同 hash、项目不可访问、物理树别名与 bounded 清单。
 - Plugin cache 缺失、CLI 状态不可读、显式禁用、执行中失败、最终读回不一致。
 - 任一失败后的 Marketplace/Plugin/source/Skill target 与执行前一致。
 - apply 返回 `reload_required`；已请求的同任务只读检查在 exact 主机和完整 exact 项目范围下才到 `ready`，仍不证明自动加载或采用。

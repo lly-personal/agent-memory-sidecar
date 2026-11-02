@@ -19,7 +19,7 @@ from agent_memory_sidecar.runtime_package import build_runtime_artifact
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / ".agents/skills/global-owner-scout/scripts"
+SCRIPTS = ROOT / "skills/global-owner-scout/scripts"
 
 
 def bundle_for(target: Path, entries: list[tuple[dict, list[str]]]) -> RuleBundle:

@@ -53,7 +53,7 @@ publication with explicit local-sync scope, use this same lane, never a second s
      dry-run, and only the fresh hash may apply;
    - an explicitly disabled Plugin, Owner ambiguity, unreadable state, dirty tracked source, unresolved ref, or stale plan stops.
 3. `workstation-reconcile --apply` owns Plugin/Marketplace compensation, source synchronization, Core/global Owner materialization,
-   Doctor, atomic Bootstrap/Scout installation, and exact readback. Return its Chinese Deployment Pack v3. A successful mutation
+   Doctor, atomic Bootstrap/Scout installation, and exact readback. Return its Chinese Deployment Pack v4. A successful mutation
    ends at `reload_required`, which completes installation but does not prove session loading or adoption. Do not create an
    acceptance task or ask for a repeated request; suggest refresh only for missing discovery or an explicit host requirement.
 4. When the user requests consumer verification, including in the deployment request or the same chat, continue with the verified

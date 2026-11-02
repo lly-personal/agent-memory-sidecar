@@ -6,9 +6,11 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -17,9 +19,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 MANAGED_SOURCES = (
     ROOT
-    / ".agents"
-    / "skills"
-    / "agent-memory-workstation-bootstrap"
+    / "skills" / "agent-memory-workstation-bootstrap"
     / "scripts"
     / "managed_sources.py"
 )
@@ -39,6 +39,44 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.reconcile = load_module("workstation_reconcile_v2", MANAGED_SOURCES)
 
+    def setUp(self):
+        self.fixture = tempfile.TemporaryDirectory()
+        self.addCleanup(self.fixture.cleanup)
+        self.fixture_root = Path(self.fixture.name).resolve()
+        self.native_entries = []
+        self.native_hashes = {}
+        for name, version in (("agent-memory-workstation-bootstrap", "2.4.0"), ("global-owner-scout", "5.11.1")):
+            root = self.fixture_root / "codex" / "skills" / name
+            root.mkdir(parents=True)
+            (root / "SKILL.md").write_text(f"---\nname: {name}\ndescription: Fixture\n---\n# Fixture\n- Skill version: `{version}`\n")
+            self.native_hashes[name] = self.reconcile.physical_tree_hash(root)
+            self.native_entries.append({"name": name, "path": str(root / "SKILL.md"), "scope": "user", "enabled": True})
+        self.native_patch = mock.patch.object(self.reconcile, "native_skill_catalog", side_effect=self.catalog)
+        self.native_mock = self.native_patch.start()
+        self.addCleanup(self.native_patch.stop)
+
+    def catalog(self, codex_home, roots):
+        return [{"cwd": str(root), "skills": self.native_entries, "errors": []} for root in roots]
+
+    def scope(self, *, inventory=None):
+        project = self.fixture_root / "project"
+        project.mkdir(exist_ok=True)
+        return self.reconcile.observe_consumer_scope(
+            inventory or self.desktop_inventory(("Project", project)), desired=self.desired_bundle(),
+            codex_home=self.fixture_root / "codex",
+        )
+
+    def extra_candidate(self, *, enabled=True, stale=True):
+        entry = dict(self.native_entries[0])
+        root = self.fixture_root / "project" / ".agents" / "skills" / entry["name"]
+        root.mkdir(parents=True)
+        shutil.copyfile(entry["path"], root / "SKILL.md")
+        if stale:
+            with (root / "SKILL.md").open("a") as stream: stream.write("Old source.\n")
+        entry.update(path=str(root / "SKILL.md"), scope="repo", enabled=enabled)
+        self.native_entries.insert(0, entry)
+        return root
+
     def desired_bundle(self) -> dict[str, object]:
         return {
             "release_ref": "v0.3.10",
@@ -46,10 +84,10 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "core_version": "0.3.10",
             "plugin_version": "1.5.1",
             "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.3.3",
-            "bootstrap_sha256": "c" * 64,
-            "scout_version": "5.11.0",
-            "scout_sha256": "d" * 64,
+            "bootstrap_version": "2.4.0",
+            "bootstrap_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
+            "scout_version": "5.11.1",
+            "scout_sha256": self.native_hashes["global-owner-scout"],
         }
 
     def exact_distribution(self) -> dict[str, object]:
@@ -95,10 +133,10 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "unavailable",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.3.3", "content_sha256": "c" * 64,
+                "status": "unchanged", "version": "2.4.0", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
             },
             "scout_skill": {
-                "status": "unchanged", "version": "5.11.0", "content_sha256": "d" * 64,
+                "status": "unchanged", "version": "5.11.1", "content_sha256": self.native_hashes["global-owner-scout"],
             },
         }
 
@@ -112,141 +150,117 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             ],
         }
 
-    def test_consumer_scope_detects_stale_project_skill_without_mutation_or_path_leak(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            project = Path(temporary) / "active-project"
-            skill = project / ".agents" / "skills" / "agent-memory-workstation-bootstrap"
-            skill.mkdir(parents=True)
-            skill_file = skill / "SKILL.md"
-            skill_file.write_text("# Bootstrap\n\n- Skill version: `1.9.0`\n", encoding="utf-8")
-            before = skill_file.read_bytes()
+    def test_consumer_scope_uses_native_enablement_and_preserves_disabled_source(self):
+        source = self.extra_candidate(enabled=False)
+        before = (source / "SKILL.md").read_bytes()
+        scope = self.scope()
+        self.assertEqual("exact", scope["status"])
+        self.assertEqual("disabled", scope["projects"][0]["skills"][0]["relation"])
+        self.assertEqual(before, (source / "SKILL.md").read_bytes())
+        self.assertNotIn(str(self.fixture_root), json.dumps(scope))
+        self.native_mock.assert_called_once()
 
-            scope = self.reconcile.observe_consumer_scope(
-                self.desktop_inventory(("Active Project", project)),
-                desired=self.desired_bundle(),
-            )
+    def test_consumer_scope_rejects_duplicate_enabled_entries_even_matching_bytes(self):
+        self.extra_candidate(stale=False)
+        scope = self.scope()
+        self.assertEqual("drifted", scope["status"])
+        self.assertEqual(2, sum(item["relation"] == "drifted" for item in scope["projects"][0]["skills"]))
 
-            self.assertEqual("drifted", scope["status"])
-            self.assertEqual("drifted", scope["projects"][0]["skills"][0]["relation"])
-            self.assertEqual(before, skill_file.read_bytes())
-            self.assertNotIn(str(project), json.dumps(scope, ensure_ascii=False))
+    def test_consumer_scope_detects_enabled_content_drift(self):
+        path = Path(self.native_entries[0]["path"])
+        with path.open("a") as stream: stream.write("Changed.\n")
+        self.assertEqual("drifted", self.scope()["status"])
 
-    def test_consumer_scope_requires_complete_inventory_and_exact_skill_hash(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            project = Path(temporary) / "project"
-            project.mkdir()
-            bounded = self.reconcile.observe_consumer_scope(
-                self.desktop_inventory(("Project", project), status="bounded"),
-                desired=self.desired_bundle(),
-            )
-            self.assertEqual("bounded", bounded["status"])
+    def test_consumer_scope_requires_native_catalog_and_each_enabled_capability(self):
+        for response in ([], [{"cwd": str(self.fixture_root / "project"), "skills": [], "errors": []}],
+                         [{"cwd": str(self.fixture_root / "project"), "skills": [], "errors": [{"message": "unreadable"}]}]):
+            with self.subTest(response=response), mock.patch.object(self.reconcile, "native_skill_catalog", return_value=response):
+                self.assertEqual("bounded", self.scope()["status"])
+        self.native_entries[0]["enabled"] = False
+        self.assertEqual("bounded", self.scope()["status"])
+        with mock.patch.object(self.reconcile, "native_skill_catalog", side_effect=self.reconcile.BootstrapError("unavailable")):
+            self.assertEqual("bounded", self.scope()["status"])
 
-            exact = self.reconcile.observe_consumer_scope(
-                self.desktop_inventory(("Project", project)),
-                desired=self.desired_bundle(),
-            )
-            self.assertEqual("exact", exact["status"])
-            self.assertEqual(0, exact["matching_skill_count"])
-
-    def test_consumer_scope_distinguishes_exact_bytes_from_same_version_drift(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            project = Path(temporary) / "project"
-            skill = project / ".agents" / "skills" / "agent-memory-workstation-bootstrap"
-            skill.mkdir(parents=True)
-            skill_file = skill / "SKILL.md"
-            skill_file.write_text("# Bootstrap\n\n- Skill version: `2.3.3`\n", encoding="utf-8")
-            desired = self.desired_bundle()
-            desired["bootstrap_sha256"] = self.reconcile.physical_tree_hash(skill)
-
-            exact = self.reconcile.observe_consumer_scope(
-                self.desktop_inventory(("Project", project)), desired=desired,
-            )
-            self.assertEqual("exact", exact["status"])
-
-            skill_file.write_text("# Bootstrap\n\n- Skill version: `2.3.3`\n\nChanged.\n", encoding="utf-8")
-            drifted = self.reconcile.observe_consumer_scope(
-                self.desktop_inventory(("Project", project)), desired=desired,
-            )
-            self.assertEqual("drifted", drifted["status"])
-            self.assertEqual("2.3.3", drifted["projects"][0]["skills"][0]["version"])
-
-    def test_consumer_scope_fails_bounded_on_project_skill_parent_alias(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            project = root / "project"
-            project.mkdir()
-            external = root / "external-agents"
-            (external / "skills").mkdir(parents=True)
-            try:
-                (project / ".agents").symlink_to(external, target_is_directory=True)
-            except OSError as exc:
-                self.skipTest(f"directory symbolic links unavailable: {exc}")
-
-            scope = self.reconcile.observe_consumer_scope(
-                self.desktop_inventory(("Project", project)), desired=self.desired_bundle(),
-            )
-
-            self.assertEqual("bounded", scope["status"])
-            self.assertEqual("bounded", scope["projects"][0]["status"])
-            self.assertEqual([], scope["projects"][0]["skills"])
-
-    def test_consumer_scope_counts_remote_or_unavailable_project_as_bounded(self) -> None:
-        inventory = {
-            "contract_version": "agent_memory_desktop_project_inventory_v1",
-            "inventory_status": "complete",
-            "projects": [{
-                "display_name": "Remote Project", "path": None, "is_git_repository": True,
-            }],
-        }
-
-        scope = self.reconcile.observe_consumer_scope(inventory, desired=self.desired_bundle())
-
+    def test_consumer_scope_preserves_incomplete_or_remote_inventory(self):
+        project = self.fixture_root / "project"
+        project.mkdir()
+        inventory = self.desktop_inventory(("Project", project), status="bounded")
+        self.assertEqual("bounded", self.scope(inventory=inventory)["status"])
+        inventory["projects"].append({"display_name": "Remote", "path": None, "is_git_repository": True})
+        scope = self.scope(inventory=inventory)
         self.assertEqual("bounded", scope["status"])
-        self.assertEqual(1, scope["desktop_project_count"])
-        self.assertEqual(0, scope["scanned_project_count"])
-        self.assertEqual("Remote Project", scope["projects"][0]["display_name"])
+        self.assertEqual(1, scope["scanned_project_count"])
 
-    def test_consumer_scope_scans_from_primary_folder_to_repository_root(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            repository = Path(temporary) / "repository"
-            primary = repository / "nested" / "primary"
-            primary.mkdir(parents=True)
-            self.reconcile.run_git(["init", "-q", "-b", "main"], cwd=repository)
-            skill = repository / ".agents" / "skills" / "agent-memory-workstation-bootstrap"
-            skill.mkdir(parents=True)
-            (skill / "SKILL.md").write_text(
-                "# Bootstrap\n\n- Skill version: `1.9.0`\n", encoding="utf-8",
-            )
-            inventory = {
-                "contract_version": "agent_memory_desktop_project_inventory_v1",
-                "inventory_status": "complete",
-                "projects": [{
-                    "display_name": "Nested Project", "path": str(primary), "is_git_repository": True,
-                }],
-            }
+    def test_consumer_scope_bounds_alias_and_oversized_enabled_tree(self):
+        root = Path(self.native_entries[0]["path"]).parent
+        alias = self.fixture_root / "alias"
+        try: alias.symlink_to(root, target_is_directory=True)
+        except OSError as exc: self.skipTest(str(exc))
+        self.native_entries[0]["path"] = str(alias / "SKILL.md")
+        self.assertEqual("bounded", self.scope()["status"])
+        self.native_entries[0]["path"] = str(root / "SKILL.md")
+        with mock.patch.object(self.reconcile, "CONSUMER_SKILL_MAX_BYTES", 1):
+            self.assertEqual("bounded", self.scope()["status"])
 
-            scope = self.reconcile.observe_consumer_scope(inventory, desired=self.desired_bundle())
+    def test_pack_validator_rejects_forged_exact_duplicates_or_missing_entry(self):
+        import copy
+        scope = self.scope()
+        duplicate = copy.deepcopy(scope)
+        duplicate["projects"][0]["skills"].append(dict(duplicate["projects"][0]["skills"][0]))
+        duplicate["matching_skill_count"] += 1
+        missing = copy.deepcopy(scope)
+        missing["projects"][0]["skills"].pop()
+        missing["matching_skill_count"] -= 1
+        omitted = {**scope, "projects": [], "matching_skill_count": 0}
+        with self.assertRaisesRegex(self.reconcile.BootstrapError, "every project"):
+            self.reconcile.validate_consumer_scope(omitted)
+        for forged in (duplicate, missing):
+            with self.assertRaisesRegex(self.reconcile.BootstrapError, "unique and exact|each enabled capability"):
+                self.reconcile.validate_consumer_scope(forged)
 
-            self.assertEqual("drifted", scope["status"])
-            self.assertEqual(2, scope["projects"][0]["skills"][0]["scope_level"])
+    def test_native_catalog_deadline_covers_blocked_request_write(self):
+        server = self.fixture_root / "stalled_server.py"
+        server.write_text(
+            "import sys, json, time\n"
+            "json.loads(sys.stdin.readline())\n"
+            "print(json.dumps({'id': 1, 'result': {}}), flush=True)\n"
+            "time.sleep(60)\n",
+        )
+        real_popen = subprocess.Popen
+        def stalled_process(arguments, **kwargs):
+            return real_popen([sys.executable, str(server)], **kwargs)
+        started = time.monotonic()
+        self.native_patch.stop()
+        with mock.patch.object(self.reconcile.shutil, "which", return_value=sys.executable), \
+             mock.patch.object(self.reconcile.subprocess, "Popen", side_effect=stalled_process), \
+             mock.patch.object(self.reconcile, "NATIVE_SKILLS_TIMEOUT_SECONDS", 1):
+            with self.assertRaises((OSError, self.reconcile.BootstrapError)):
+                self.reconcile.native_skill_catalog(self.fixture_root / "codex", [self.fixture_root / ("x" * 500)] * 500)
+        self.assertLess(time.monotonic() - started, 5)
 
-    def test_consumer_scope_bounds_project_controlled_skill_tree_size(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            project = Path(temporary) / "project"
-            skill = project / ".agents" / "skills" / "agent-memory-workstation-bootstrap"
-            skill.mkdir(parents=True)
-            (skill / "SKILL.md").write_text(
-                "# Bootstrap\n\n- Skill version: `2.3.3`\n", encoding="utf-8",
-            )
-            for index in range(self.reconcile.CONSUMER_SKILL_MAX_ENTRIES):
-                (skill / f"extra-{index:03d}.txt").write_text("x", encoding="utf-8")
+    def test_development_sources_are_outside_automatic_discovery(self):
+        for name in self.reconcile.CONSUMER_SKILLS:
+            self.assertTrue((ROOT / "skills" / name / "SKILL.md").is_file())
+            self.assertFalse((ROOT / ".agents" / "skills" / name).exists())
 
-            scope = self.reconcile.observe_consumer_scope(
-                self.desktop_inventory(("Project", project)), desired=self.desired_bundle(),
-            )
-
-            self.assertEqual("bounded", scope["status"])
-            self.assertEqual("unreadable", scope["projects"][0]["skills"][0]["relation"])
+    @unittest.skipUnless(shutil.which("codex"), "native Codex CLI unavailable")
+    def test_real_native_catalog_disabled_source_and_single_installed_entry(self):
+        self.native_patch.stop()
+        project = self.fixture_root / "project"
+        project.mkdir()
+        subprocess.run(["git", "init", "-q", str(project)], check=True)
+        codex_home = self.fixture_root / "codex"
+        source = self.extra_candidate(stale=False)
+        # Two byte-identical enabled candidates must not qualify.
+        self.assertEqual("drifted", self.scope()["status"])
+        (codex_home / "config.toml").write_text(
+            "[[skills.config]]\npath = " + json.dumps(str(source / "SKILL.md")) + "\nenabled = false\n",
+        )
+        self.assertEqual("exact", self.scope()["status"])
+        source.rename(project / "development-source")
+        scope = self.scope()
+        self.assertEqual("exact", scope["status"])
+        self.assertEqual(2, scope["matching_skill_count"])
 
     def test_pack_revokes_ready_for_drifted_or_bounded_consumer_scope(self) -> None:
         exact_scope = {
@@ -288,12 +302,15 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         drifted_scope = {
             **exact_scope,
             "status": "drifted", "desktop_project_count": 1, "scanned_project_count": 1,
-            "matching_skill_count": 1,
+            "matching_skill_count": 2,
             "projects": [{
                 "project_ref": "desktop-project-example", "display_name": "<Project>|Name", "status": "drifted",
                 "skills": [{
                     "name": "agent-memory-workstation-bootstrap", "version": "1.9.0",
-                    "scope_level": 0, "content_sha256": "9" * 64, "relation": "drifted",
+                    "scope": "repo", "enabled": True, "content_sha256": "9" * 64, "relation": "drifted",
+                }, {
+                    "name": "global-owner-scout", "version": "5.11.1", "scope": "user", "enabled": True,
+                    "content_sha256": self.native_hashes["global-owner-scout"], "relation": "exact",
                 }],
             }],
         }
@@ -488,13 +505,13 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.3.3",
-                "content_sha256": "c" * 64,
+                "version": "2.4.0",
+                "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.11.0",
-                "content_sha256": "d" * 64,
+                "version": "5.11.1",
+                "content_sha256": self.native_hashes["global-owner-scout"],
             },
         }
         source_sync = {
@@ -532,10 +549,10 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "verified",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.3.3", "content_sha256": "c" * 64,
+                "status": "unchanged", "version": "2.4.0", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
             },
             "scout_skill": {
-                "status": "unchanged", "version": "5.11.0", "content_sha256": "d" * 64,
+                "status": "unchanged", "version": "5.11.1", "content_sha256": self.native_hashes["global-owner-scout"],
             },
         }
         source_sync = {
@@ -600,10 +617,10 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             plugin_manifest.parent.mkdir()
             plugin_manifest.write_text(json.dumps({"version": "1.5.1"}), encoding="utf-8")
             (bootstrap / "SKILL.md").write_text(
-                "# Bootstrap\n\n- Skill version: `2.3.3`\n", encoding="utf-8",
+                "# Bootstrap\n\n- Skill version: `2.4.0`\n", encoding="utf-8",
             )
             (scout / "SKILL.md").write_text(
-                "# Scout\n\n- Skill version: `5.11.0`\n", encoding="utf-8",
+                "# Scout\n\n- Skill version: `5.11.1`\n", encoding="utf-8",
             )
             source_manifest = {
                 "contract_version": "agent_memory_source_manifest_v1",
@@ -629,7 +646,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 },
                 "versions": {
                     "core": "0.3.10", "plugin": "1.5.1",
-                    "bootstrap": "2.3.3", "scout": "5.11.0",
+                    "bootstrap": "2.4.0", "scout": "5.11.1",
                 },
                 "artifacts": [],
                 "verification": {},
@@ -662,7 +679,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
 
             self.assertEqual("v0.3.10", desired["release_ref"])
             self.assertEqual("1.5.1", desired["plugin_version"])
-            self.assertEqual("2.3.3", desired["bootstrap_version"])
+            self.assertEqual("2.4.0", desired["bootstrap_version"])
             self.assertEqual("a" * 40, sidecar.expected_commit)
             self.assertRegex(source_hash, r"^[0-9a-f]{64}$")
             self.assertRegex(desired["plugin_sha256"], r"^[0-9a-f]{64}$")
@@ -796,8 +813,8 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             codex_home = root / "codex-home"
             self.reconcile.sync_sources(codex_home, spec)
             for name, version in (
-                ("agent-memory-workstation-bootstrap", "2.3.3"),
-                ("global-owner-scout", "5.11.0"),
+                ("agent-memory-workstation-bootstrap", "2.4.0"),
+                ("global-owner-scout", "5.11.1"),
             ):
                 skill = codex_home / "skills" / name
                 skill.mkdir(parents=True)
@@ -827,7 +844,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             self.assertEqual("verified", observed["core"]["status"])
             self.assertEqual(commit, observed["core"]["source_commit"])
             self.assertEqual("verified", observed["doctor"])
-            self.assertEqual("2.3.3", observed["bootstrap_skill"]["version"])
+            self.assertEqual("2.4.0", observed["bootstrap_skill"]["version"])
             self.assertRegex(observed["scout_skill"]["content_sha256"], r"^[0-9a-f]{64}$")
 
     def test_distribution_participant_rolls_back_with_source_transaction(self) -> None:

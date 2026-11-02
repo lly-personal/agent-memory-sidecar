@@ -8,6 +8,9 @@ import hashlib
 import json
 import os
 import re
+import queue
+import threading
+import time
 import shutil
 import sqlite3
 import stat
@@ -22,9 +25,9 @@ from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
 
 
-BOOTSTRAP_VERSION = "2.3.3"
-SCOUT_VERSION = "5.11.0"
-PACK_VERSION = "agent_memory_workstation_deployment_pack_v3"
+BOOTSTRAP_VERSION = "2.4.0"
+SCOUT_VERSION = "5.11.1"
+PACK_VERSION = "agent_memory_workstation_deployment_pack_v4"
 DESKTOP_PROJECT_INVENTORY_VERSION = "agent_memory_desktop_project_inventory_v1"
 WORKSTATION_RECONCILE_PLAN_VERSION = "agent_memory_workstation_reconcile_plan_v2"
 WORKSTATION_RECONCILE_RECEIPT_VERSION = "agent_memory_workstation_reconcile_receipt_v3"
@@ -90,11 +93,13 @@ CONSUMER_SCOPE_FIELDS = {
     "matching_skill_count", "projects", "limitations",
 }
 CONSUMER_PROJECT_FIELDS = {"project_ref", "display_name", "status", "skills"}
-CONSUMER_SKILL_FIELDS = {"name", "scope_level", "version", "content_sha256", "relation"}
+CONSUMER_SKILL_FIELDS = {"name", "scope", "enabled", "version", "content_sha256", "relation"}
 CONSUMER_SKILLS = {
     "agent-memory-workstation-bootstrap": ("bootstrap_version", "bootstrap_sha256"),
     "global-owner-scout": ("scout_version", "scout_sha256"),
 }
+NATIVE_SKILLS_TIMEOUT_SECONDS = 30
+NATIVE_SKILLS_MAX_BYTES = 16 * 1024 * 1024
 CONSUMER_SKILL_MAX_ENTRIES = 512
 CONSUMER_SKILL_MAX_BYTES = 8 * 1024 * 1024
 DESKTOP_PROJECT_MAX_COUNT = 500
@@ -1516,16 +1521,14 @@ def validate_consumer_scope(value: Any) -> dict[str, Any]:
         require(project["status"] in {"exact", "drifted", "bounded"}, "consumer project status invalid")
         require(isinstance(project["skills"], list), "consumer project skills invalid")
         project_relations: set[str] = set()
-        skill_identities: set[tuple[str, int]] = set()
         for skill_index, skill in enumerate(project["skills"]):
             exact(skill, CONSUMER_SKILL_FIELDS, f"$.consumer_scope.projects[{index}].skills[{skill_index}]")
             require(skill["name"] in CONSUMER_SKILLS, "consumer skill name invalid")
-            require(isinstance(skill["scope_level"], int) and skill["scope_level"] >= 0, "consumer skill scope level invalid")
-            skill_identity = (skill["name"], skill["scope_level"])
-            require(skill_identity not in skill_identities, "consumer skill duplicated")
-            skill_identities.add(skill_identity)
-            require(skill["relation"] in {"exact", "drifted", "unreadable"}, "consumer skill relation invalid")
-            if skill["relation"] == "unreadable":
+            require(skill["scope"] in {"repo", "user", "system", "admin"}, "consumer skill scope invalid")
+            require(isinstance(skill["enabled"], bool), "consumer skill enabled invalid")
+            require(skill["relation"] in {"exact", "drifted", "unreadable", "disabled"}, "consumer skill relation invalid")
+            require((skill["relation"] == "disabled") == (not skill["enabled"]), "consumer skill enabled inconsistent")
+            if skill["relation"] in {"unreadable", "disabled"}:
                 require(skill["version"] == "unavailable", "unreadable consumer skill version invalid")
                 require(skill["content_sha256"] == "unavailable", "unreadable consumer skill hash invalid")
             else:
@@ -1538,6 +1541,12 @@ def validate_consumer_scope(value: Any) -> dict[str, Any]:
             else ("drifted" if "drifted" in project_relations else "exact")
         )
         require(project["status"] == expected_project_status, "consumer project status inconsistent")
+        if project["status"] in {"exact", "drifted"}:
+            for name in CONSUMER_SKILLS:
+                enabled = [item for item in project["skills"] if item["name"] == name and item["enabled"]]
+                require(enabled, "qualified consumer project requires each enabled capability")
+                if project["status"] == "exact":
+                    require(len(enabled) == 1 and enabled[0]["relation"] == "exact", "consumer effective entry must be unique and exact")
         has_drift = has_drift or "drifted" in project_relations
         has_bounded = has_bounded or project["status"] == "bounded"
     require(value["matching_skill_count"] == matching_skill_count, "consumer skill count invalid")
@@ -1558,6 +1567,7 @@ def validate_consumer_scope(value: Any) -> dict[str, Any]:
         require(value["status"] == expected_status, "consumer scope status inconsistent")
         if value["status"] in {"exact", "drifted"}:
             require(value["inventory_status"] == "complete", "qualified consumer scope requires complete inventory")
+            require(len(value["projects"]) == value["desktop_project_count"], "qualified consumer scope requires every project")
             require(
                 value["scanned_project_count"] == value["desktop_project_count"],
                 "qualified consumer scope requires complete project read",
@@ -1567,25 +1577,95 @@ def validate_consumer_scope(value: Any) -> dict[str, Any]:
     return value
 
 
-def _consumer_discovery_roots(project_root: Path, *, is_git_repository: bool) -> list[Path]:
-    if not is_git_repository:
-        return [project_root]
-    repository_root = Path(run_git(["rev-parse", "--show-toplevel"], cwd=project_root)).resolve()
-    require(
-        repository_root == project_root or repository_root in project_root.parents,
-        "consumer_repository_root_invalid",
-    )
-    roots: list[Path] = []
-    current = project_root
-    while True:
-        roots.append(current)
-        if current == repository_root:
-            return roots
-        current = current.parent
+def native_skill_catalog(codex_home: Path, project_roots: list[Path]) -> list[dict[str, Any]]:
+    """Ask the native discovery owner; never start a task or change enablement."""
+    executable = shutil.which("codex")
+    require(executable is not None, "codex_cli_unavailable")
+    env = {**os.environ, "CODEX_HOME": str(codex_home)}
+    messages: queue.Queue = queue.Queue()
+    with subprocess.Popen(
+        [executable, "app-server", "--stdio"], cwd=codex_home, env=env,
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+    ) as process:
+        def read_messages() -> None:
+            try:
+                total = 0
+                while True:
+                    line = process.stdout.readline(NATIVE_SKILLS_MAX_BYTES + 1)
+                    if not line:
+                        break
+                    total += len(line)
+                    if total > NATIVE_SKILLS_MAX_BYTES:
+                        break
+                    messages.put(json.loads(line))
+            except (OSError, ValueError):
+                pass
+            finally:
+                messages.put(None)
+
+        reader = threading.Thread(target=read_messages, daemon=True)
+        reader.start()
+        # The same deadline covers blocked stdin writes as well as response reads.
+        watchdog = threading.Timer(NATIVE_SKILLS_TIMEOUT_SECONDS, process.kill)
+        watchdog.daemon = True
+        watchdog.start()
+        deadline = time.monotonic() + NATIVE_SKILLS_TIMEOUT_SECONDS
+
+        def send(message: dict[str, Any]) -> None:
+            process.stdin.write(canonical(message) + b"\n")
+            process.stdin.flush()
+
+        def receive(identifier: int) -> dict[str, Any]:
+            while True:
+                try:
+                    message = messages.get(timeout=max(0, deadline - time.monotonic()))
+                except queue.Empty as exc:
+                    raise BootstrapError("native_skills_timeout") from exc
+                require(isinstance(message, dict), "native_skills_output_invalid")
+                if message.get("id") == identifier:
+                    require("error" not in message and isinstance(message.get("result"), dict), "native_skills_failed")
+                    return message["result"]
+
+        try:
+            send({"id": 1, "method": "initialize", "params": {
+                "clientInfo": {"name": "agent_memory_bootstrap", "version": BOOTSTRAP_VERSION},
+            }})
+            receive(1)
+            send({"method": "initialized"})
+            send({"id": 2, "method": "skills/list", "params": {
+                "cwds": [str(path) for path in project_roots], "forceReload": True,
+            }})
+            result = receive(2)
+            require(isinstance(result.get("data"), list), "native_skills_output_invalid")
+            return result["data"]
+        finally:
+            try:
+                process.stdin.close()
+            except OSError:
+                pass
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+            watchdog.cancel()
+            reader.join(timeout=2)
 
 
-def observe_consumer_scope(inventory: Any, *, desired: dict[str, Any]) -> dict[str, Any]:
-    """Read product same-name project Skills from one ephemeral Desktop inventory."""
+def _consumer_skill_path(raw_path: Any) -> Path:
+    require(isinstance(raw_path, str), "native_skill_path_invalid")
+    path = Path(raw_path)
+    require(path.is_absolute() and path.name == "SKILL.md", "native_skill_path_invalid")
+    # Permit OS-owned top-level mappings, but not aliases in the Skill tree or its parents.
+    for parent in (path.parent, *path.parent.parents):
+        value = parent.lstat()
+        os_mapping = os.name == "posix" and value.st_uid == 0 and len(parent.parts) <= 2
+        require((not stat.S_ISLNK(value.st_mode) and not _is_reparse(value)) or os_mapping, "consumer_skill_parent_unsafe")
+    return path.parent
+
+
+def observe_consumer_scope(inventory: Any, *, desired: dict[str, Any], codex_home: Path) -> dict[str, Any]:
+    """Read effective native candidates, then verify enabled product Skill bytes."""
     desired = validate_desired_bundle(desired)
     exact(inventory, DESKTOP_PROJECT_INVENTORY_FIELDS, "$.desktop_project_inventory")
     require(
@@ -1623,6 +1703,19 @@ def observe_consumer_scope(inventory: Any, *, desired: dict[str, Any]) -> dict[s
         )
     )
 
+    catalogs: dict[str, dict[str, Any]] = {}
+    native_available = False
+    roots = [path for _, path, _ in normalized if path is not None]
+    if roots:
+        try:
+            for entry in native_skill_catalog(codex_home, roots):
+                require(isinstance(entry, dict) and isinstance(entry.get("cwd"), str), "native_skills_output_invalid")
+                identity = os.path.normcase(str(Path(entry["cwd"]).resolve()))
+                require(identity in seen_paths and identity not in catalogs, "native_skills_cwd_invalid")
+                catalogs[identity] = entry
+            native_available = True
+        except (BootstrapError, OSError, ValueError):
+            catalogs = {}
     projects: list[dict[str, Any]] = []
     scanned_project_count = 0
     for index, (display_name, project_root, is_git_repository) in enumerate(normalized):
@@ -1636,61 +1729,49 @@ def observe_consumer_scope(inventory: Any, *, desired: dict[str, Any]) -> dict[s
             root_state = project_root.lstat()
             require(stat.S_ISDIR(root_state.st_mode) and not _is_reparse(root_state), "consumer_project_unreadable")
             scanned_project_count += 1
-            discovery_roots = _consumer_discovery_roots(
-                project_root, is_git_repository=is_git_repository,
-            )
-            for scope_level, scope_root in enumerate(discovery_roots):
-                agents_root = scope_root / ".agents"
-                skills_root = agents_root / "skills"
-                if agents_root.exists() or agents_root.is_symlink():
-                    agents_state = agents_root.lstat()
-                    require(
-                        stat.S_ISDIR(agents_state.st_mode) and not stat.S_ISLNK(agents_state.st_mode) and not _is_reparse(agents_state),
-                        "consumer_skill_parent_unsafe",
-                    )
-                if not skills_root.exists() and not skills_root.is_symlink():
-                    continue
-                skills_state = skills_root.lstat()
-                require(
-                    stat.S_ISDIR(skills_state.st_mode) and not stat.S_ISLNK(skills_state.st_mode) and not _is_reparse(skills_state),
-                    "consumer_skill_parent_unsafe",
-                )
-                for name, (version_field, hash_field) in CONSUMER_SKILLS.items():
-                    skill_root = skills_root / name
-                    if not skill_root.exists() and not skill_root.is_symlink():
-                        continue
+            entry = catalogs.get(os.path.normcase(str(project_root)))
+            require(native_available and isinstance(entry, dict), "native_skills_unavailable")
+            require(entry.get("errors") == [] and isinstance(entry.get("skills"), list), "native_skills_incomplete")
+            require(all(isinstance(item, dict) for item in entry["skills"]), "native_skills_output_invalid")
+            candidates = [item for item in entry["skills"] if item.get("name") in CONSUMER_SKILLS]
+            seen_candidates: set[str] = set()
+            for item in candidates:
+                name = item["name"]
+                require(isinstance(item.get("enabled"), bool), "native_skill_enabled_missing")
+                require(item.get("scope") in {"repo", "user", "system", "admin"}, "native_skill_scope_invalid")
+                raw_path = item.get("path")
+                require(isinstance(raw_path, str) and Path(raw_path).is_absolute(), "native_skill_path_invalid")
+                identity = os.path.normcase(os.path.abspath(raw_path))
+                require(identity not in seen_candidates, "native_skill_path_duplicated")
+                seen_candidates.add(identity)
+                version = content_sha256 = "unavailable"
+                relation = "disabled"
+                if item["enabled"]:
                     try:
-                        version = _skill_version(skill_root)
+                        skill_root = _consumer_skill_path(raw_path)
                         content_sha256 = bounded_physical_tree_hash(
-                            skill_root,
-                            max_entries=CONSUMER_SKILL_MAX_ENTRIES,
-                            max_bytes=CONSUMER_SKILL_MAX_BYTES,
+                            skill_root, max_entries=CONSUMER_SKILL_MAX_ENTRIES, max_bytes=CONSUMER_SKILL_MAX_BYTES,
                         )
-                        require(version == _skill_version(skill_root), "consumer_skill_changed_during_read")
-                        require(
-                            content_sha256 == bounded_physical_tree_hash(
-                                skill_root,
-                                max_entries=CONSUMER_SKILL_MAX_ENTRIES,
-                                max_bytes=CONSUMER_SKILL_MAX_BYTES,
-                            ),
-                            "consumer_skill_changed_during_read",
-                        )
-                        relation = (
-                            "exact"
-                            if version == desired[version_field] and content_sha256 == desired[hash_field]
-                            else "drifted"
-                        )
+                        version = _skill_version(skill_root)
+                        require(content_sha256 == bounded_physical_tree_hash(
+                            skill_root, max_entries=CONSUMER_SKILL_MAX_ENTRIES, max_bytes=CONSUMER_SKILL_MAX_BYTES,
+                        ), "consumer_skill_changed_during_read")
+                        version_field, hash_field = CONSUMER_SKILLS[name]
+                        relation = "exact" if version == desired[version_field] and content_sha256 == desired[hash_field] else "drifted"
                     except (BootstrapError, OSError, UnicodeError):
-                        version = "unavailable"
-                        content_sha256 = "unavailable"
+                        version = content_sha256 = "unavailable"
                         relation = "unreadable"
-                    skills.append({
-                        "name": name,
-                        "scope_level": scope_level,
-                        "version": version,
-                        "content_sha256": content_sha256,
-                        "relation": relation,
-                    })
+                skills.append({
+                    "name": name, "scope": item["scope"], "enabled": item["enabled"],
+                    "version": version, "content_sha256": content_sha256, "relation": relation,
+                })
+            for name in CONSUMER_SKILLS:
+                enabled = [item for item in skills if item["name"] == name and item["enabled"]]
+                require(enabled, "consumer_skill_no_enabled_entry")
+                if len(enabled) > 1:
+                    for item in enabled:
+                        if item["relation"] != "unreadable":
+                            item["relation"] = "drifted"
             relations = {item["relation"] for item in skills}
             project_status = (
                 "bounded" if "unreadable" in relations
@@ -1852,7 +1933,7 @@ def materialize_host(
             "source_cutover_owner_state_ambiguous",
         )
         canonical_owner = _current_owner_root(codex_home)
-    enrollment = sidecar / ".agents" / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "enrollment.py"
+    enrollment = sidecar / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "enrollment.py"
     require(enrollment.is_file(), "managed_bootstrap_missing")
     skill_root = _installed_skill_root(codex_home, create=True)
     env = dict(os.environ)
@@ -1862,12 +1943,12 @@ def materialize_host(
 
     bootstrap_result = run_json([
         sys.executable, "-B", str(enrollment), "install-skill",
-        "--source", str(sidecar / ".agents" / "skills" / "agent-memory-workstation-bootstrap"),
+        "--source", str(sidecar / "skills" / "agent-memory-workstation-bootstrap"),
         "--target", str(skill_root / "agent-memory-workstation-bootstrap"), "--version", BOOTSTRAP_VERSION,
     ], cwd=sidecar, env=env)
     scout_result = run_json([
         sys.executable, "-B", str(enrollment), "install-skill",
-        "--source", str(sidecar / ".agents" / "skills" / "global-owner-scout"),
+        "--source", str(sidecar / "skills" / "global-owner-scout"),
         "--target", str(skill_root / "global-owner-scout"), "--version", SCOUT_VERSION,
     ], cwd=sidecar, env=env)
     setup_command = [
@@ -2407,7 +2488,7 @@ def verify_workstation_consumer(
     inventory = _load_json_file(
         Path(desktop_project_inventory_path), "desktop_project_inventory_unreadable",
     )
-    consumer_scope = observe_consumer_scope(inventory, desired=context["desired"])
+    consumer_scope = observe_consumer_scope(inventory, desired=context["desired"], codex_home=codex_home)
     return build_deployment_pack(
         desired=context["desired"],
         observed_distribution=context["observed"],
@@ -2662,7 +2743,7 @@ def render_pack(value: Any) -> str:
     status = {
         "ready": "本机托管能力和 Desktop 项目消费者范围已对齐",
         "reload_required": "本机安装与读回已完成；消费者范围及真实采用尚未验证",
-        "consumer_scope_drift": "托管能力已对齐，但 Desktop 可见项目存在不同版本或内容的同名 Skill",
+        "consumer_scope_drift": "托管能力已对齐，但 Desktop 可见项目存在重复启用或内容不符的同名 Skill",
         "consumer_scope_bounded": "托管能力已对齐，但 Desktop 项目消费者范围尚未完整观察",
         "distribution_reconcile_blocked": "Plugin 或 Marketplace 尚未精确对齐",
         "source_sync_blocked": "远端能力源同步受阻",
@@ -2689,15 +2770,16 @@ def render_pack(value: Any) -> str:
         f"| 消费者入口条件 | 入口检查 `{activation['interactive_entry']}` | `verified` 仅表示安装与项目范围检查通过；Scheduled `{activation['scheduled']}` |",
         "| Scout 实际运行 | 本次未运行 | 本次未验证 Scout 运行验收，不判断其他运行的验收结果 |",
     ]
-    if scope["projects"]:
+    attention = [project for project in scope["projects"] if project["status"] != "exact"]
+    if attention:
         lines.extend(["", "## Desktop 可见项目级同名 Skill", "", "| 项目 | Skill | 版本 | 关系 |", "|---|---|---|---|"])
-        for project in scope["projects"]:
+        for project in attention:
             display_name = _markdown_table_text(project["display_name"])
             if not project["skills"]:
                 lines.append(f"| {display_name} | 无法完整读取 | unavailable | `{project['status']}` |")
             for skill in project["skills"]:
                 lines.append(
-                    f"| {display_name} | `{skill['name']}@scope-{skill['scope_level']}` | `{skill['version']}` | `{skill['relation']}` |"
+                    f"| {display_name} | `{skill['name']}@{skill['scope']} enabled={str(skill['enabled']).lower()}` | `{skill['version']}` | `{skill['relation']}` |"
                 )
     if pack["limitations"]:
         lines.extend(["", "## 尚未证明", ""])
@@ -2705,7 +2787,7 @@ def render_pack(value: Any) -> str:
     next_step = {
         "reload_required": "本次安装交付到此完成。若本次已要求验收，Agent 继续在同一主机、同一聊天完成只读消费者检查，无需重复请求。未要求时到此结束；仅在能力未显示或宿主明确要求时提示刷新。",
         "ready": "已完成所请求的安装与项目范围检查。实际使用继续沿用目标工程的现有入口，无需另建验收聊天。",
-        "consumer_scope_drift": "下一步：先判断上表项目级同名 Skill 是待发布开发版本还是陈旧副本；更新或移除该项目来源后重新验收。调和器不会自动修改 checkout。",
+        "consumer_scope_drift": "下一步：Agent 根据已授权范围处理重复启用或内容不符的来源；可复用原生按路径停用，不能自动覆盖 checkout 或重新启用已停用项。",
         "consumer_scope_bounded": "下一步：恢复完整 Desktop 项目枚举与只读访问后，继续你已请求的只读消费者检查；无需重复部署。",
         "distribution_reconcile_blocked": "下一步：处理上表显示的 Plugin/Marketplace 唯一阻断后，再发送“同步并部署本机 Agent Memory”。",
         "source_sync_blocked": "下一步：恢复期望来源的只读访问或消除来源歧义后，再发送“同步并部署本机 Agent Memory”。",

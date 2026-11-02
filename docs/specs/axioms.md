@@ -187,7 +187,8 @@ integration preview，并把完整中文审阅包直接呈现给用户；用户�
 27. **失败终态不依赖成功产物**：任何发生在 Delivery manifest 之前的阻断必须通过
     `global_owner_scout_terminal_v1` 确定性渲染；不得手写恢复 Markdown，也不得调用依赖 manifest 的 receipt 路径。
 28. **托管物化不冒充消费者范围**：用户级安装 exact 不能证明 Desktop 可见项目级同名 Skill exact。完整声明必须由
-    本轮原生项目清单和只读项目 Skill 检查界定；范围缺失返回 bounded，差异返回 drift，不得自动修改项目 checkout。
+    本轮原生项目清单、原生有效 Skill 清单和只读内容检查界定；范围缺失返回 bounded，启用入口缺失返回 bounded，重复启用或内容差异返回 drift；停用项不计有效入口，不得自动修改项目 checkout。
+    开发用 Bootstrap/Scout 源码位于非自动发现目录，正式安装副本才作为普通任务入口；不以工程版本对齐代替入口唯一。
 
 该实验分层报告：技术实现与安装可独立交付；展示、自然发现、准确选择、后续采用及用户成本只有实际观察后才成立。
 未取得真实体验证据时保留未证，不制造更多测试聊天或要求用户配合。Scheduled 的执行源资格与暂停状态独立维护；

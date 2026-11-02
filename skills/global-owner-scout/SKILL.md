@@ -7,7 +7,7 @@ description: Run an explicitly requested, evidence-first, project-read-only 30-d
 
 ## Contract
 
-- Skill version: `5.11.0`
+- Skill version: `5.11.1`
 - Project result: `global_owner_scout_project_v5`
 - User review: `global_owner_scout_review_pack_v6`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
