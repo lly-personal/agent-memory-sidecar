@@ -2,7 +2,7 @@
 
 ## Common rules
 
-- Skill `5.11.1`; Project result `global_owner_scout_project_v5`; Review Pack
+- Skill `5.12.0`; Project result `global_owner_scout_project_v5`; Review Pack
   `global_owner_scout_review_pack_v6`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
@@ -244,22 +244,20 @@ protected project root. The helper creates a single-link regular Markdown file e
 while any different bytes, link/reparse point, unsafe root, write failure, or readback mismatch fails closed. It does not write a
 manifest file.
 
-Pre-render opened, queued and blocked receipts, validating direct-child containment, read-only bytes and manifest identity.
-Open the artifact once in the current task and return the matching receipt. `queued` preserves `confirmation_eligible=false`;
-it is not evidence of display or approval. Do not retry opening or ask the user to switch windows. Technical delivery can close
-with the intact file and its link while actual display and adoption remain unverified. Unknown/failed open uses the blocked receipt.
+Default to `render-receipt not_requested` with the exact artifact/root. Return the artifact-bound overview and first
+recommendation plus the evidence link; do not automatically open the report. Only an explicit request uses native preview once.
+Queued/failed preview still returns verified advice and the link, without polling, user window switching or approval claims.
+`not_requested`, `open_queued` and `open_failed` keep confirmation false; opened with no confirmable bundle also keeps it false.
+The manifest schema and Review Pack/Card/Core contracts remain unchanged.
 
-`verify-final` reads the actual previous receipt, recovers the same immutable file and returns its reconstructed `manifest` for
-reuse by existing receipt commands. New rendered reports preserve the existing exact Core bundle in one collapsed technical block
-inside the same hash-bound artifact; `verify-final` and Scheduled `verify-visible` return it as `recovery_bundle`. Historical reports
-without that block return null: recover the file, but never invent missing original bindings or claim old-token recovery. Reuse an
-exact retained bundle or refresh only the affected preview for new authorization. Legacy queued copy remains pending evidence.
-`surface_pending` means the queued receipt and artifact agree; `surface_observed` names a recorded opened receipt, which still
-needs independent native/UI evidence before any claim that the user saw it. No separate controller task is required.
-Normalize line endings and accept zero, one or two terminal newlines; other text or binding changes fail closed.
-A later exact human selection can restore this artifact check and then enter the installed Agent Memory bundle handoff with
-Fresh Owner comparison and Core preview. It neither rewrites old queued evidence nor authorizes unselected or changed content.
-Installed entry identity, real display and later adoption stay separate from source, fixture or file-integrity verification.
+`verify-final` receives the original delivery receipt for the report being discussed, not necessarily the latest assistant reply.
+Recover it from native chat history across ordinary intervening replies. It reconstructs the same manifest, verifies the original
+file, compares new receipt advice byte-for-byte to its hash-bound brief, and returns the existing recovery bundle when present.
+Historical opened/queued receipts remain valid; old files are not migrated. Missing historical bundles stay null. `artifact_verified`
+means no preview was requested; `surface_pending` means queued; `surface_unavailable` means preview failed. None proves comprehension.
+Current conversation holds follow-up progress; authorized maintenance uses the existing project or Skill workflow. Natural feedback
+and native choice tools do not grant rule approval. Exact global selections still need Fresh Owner/Core and real-event authorization.
+Normalize line endings and accept zero, one or two terminal newlines; reject advice, link, binding and other semantic edits.
 
 Every Python helper invocation uses `python -B`. The installed Skill and its before/after proof contain no newly created or changed
 `__pycache__`, `.pyc`, or `.pyo`; any bytecode-cache write is an external side effect and fails read-only validation.

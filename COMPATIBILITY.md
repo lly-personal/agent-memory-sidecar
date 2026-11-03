@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.5.9 | 0.5.9 | 1.7.9 | 2.4.2 | 5.12.0 | v6 | 3.11–3.13 |
 | v0.5.8 | 0.5.8 | 1.7.8 | 2.4.1 | 5.11.1 | v6 | 3.11–3.13 |
 | v0.5.7 | 0.5.7 | 1.7.7 | 2.4.0 | 5.11.1 | v6 | 3.11–3.13 |
 | v0.5.6 | 0.5.6 | 1.7.6 | 2.3.3 | 5.11.0 | v6 | 3.11–3.13 |
@@ -93,3 +94,8 @@ not session-loading observations. Automatic loading, natural adoption and other-
 Bootstrap 2.4.0 reads native Skill discovery and enablement; Deployment Pack v4 records scope and enabled state.
 Core 0.5.7 moves development sources outside automatic discovery and preserves the published portable layout for old Anchor upgrades.
 Scout 5.11.1 updates its relocated source reference; review and delivery contracts are unchanged.
+
+Scout 5.12.0 adds artifact-bound conversational advice and `not_requested` delivery, preserving Project v5, Review Pack v6,
+Delivery v1 manifest and Core rule-bundle schemas. Historical opened/queued receipts remain readable. Native implicit selection
+is scoped to follow-up on an identifiable delivered report; fresh reviews still require explicit invocation. Bootstrap 2.4.2
+installs the matching Scout. These technical changes do not establish natural Desktop or remote-host adoption.

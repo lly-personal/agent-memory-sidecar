@@ -139,6 +139,13 @@ principles. A method route names its actual entry, inputs, applicable task and r
 entry remains a delivery gap. Keep every supported source obligation visible across these destinations, even when the resulting
 global set fits. Do not relocate a mandatory behavior merely to pass capacity. Weak or risky ideas may remain without persistence.
 
+For each destination compare the actual maintained implementation, not just the existence of a rule. A documented obligation can
+be fully covered globally while its project implementation or method still fails. Represent a supported residual maintenance delta
+as an existing `route_to_owner` Project Card with its concrete before/after and versioned Owner; use `route_supported` for its
+integration. Existing global coverage must not turn that card into ignore. If the target already satisfies the finding, retain
+the exact Owner evidence as an exclusion instead. Do not invent work from the number of observations. Before freezing, order
+actionable recommendations by evidenced user impact and dependencies; preserve that order afterward, with no candidate cap.
+
 For `make_skill`, name the versioned source Owner and whether the existing entry can absorb the method. Follow the
 [method handoff SOP](https://github.com/lly-personal/agent-memory-sidecar/blob/main/docs/specs/interface.md#按需方法的维护与交接) after an authorized maintenance request;
 the read-only Scout recommendation itself never installs a Skill or updates an Owner.
@@ -195,7 +202,8 @@ If the resolver returns `unavailable`, remove confirmation and report the limita
 `AGENTS.md` as a substitute, or guess a canonical path from the current checkout.
 
 For delivery, use the single artifact and receipt sequence in SKILL.md and the [Delivery contract](https://github.com/lly-personal/agent-memory-sidecar/blob/main/specs/global-owner-scout-delivery-v1.md).
-The renderer puts actual decisions first and covered/no-change evidence in a reference index. No action is needed for covered
+The renderer provides a short overview and expands the first actionable recommendation in the same chat. Complete evidence is
+linked and opened only on request; absence of an open call is not an error. It puts actual decisions first and covered/no-change evidence in a reference index. No action is needed for covered
 cards; every source and card still conserves. A queued request is not proof of display. Technical completion and the result link
 stay in this task; no separate controller chat is required to finish the review.
 

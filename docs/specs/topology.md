@@ -94,10 +94,11 @@ flowchart LR
     RP --> DR["Deterministic renderer：interactive surface + 精确多选动作"]
     DR --> VO["Visible-output verifier：交付前字节守恒"]
     VO --> DV["Delivery v1：不可变 task artifact + manifest"]
-    DV --> HS["Host surface：当前任务打开或明确排队 artifact"]
-    HS --> EC["当前任务：artifact 回读 / 后续 final 恢复"]
+    DV --> EC["当前任务：已验证简明建议与链接 / 原交付回执恢复"]
+    EC -.->|"用户按需打开"| HS["Host surface：打开 / 排队 / 失败另行观察"]
     EC -->|"queued + bytes conserved"| SP["surface_pending：内容可核验、展示未证"]
-    EC --> U["用户审阅文件并准确选择；恢复原文件校验"]
+    EC --> U["总览并展开首项；当前对话讨论、修改或选择"]
+    U -->|"获准的项目或方法维护"| PM["既有工程 / Skill 维护与交付"]
     U -->|"确认 card_id@selection_token 集合"| A["Fresh Owner 联合重算 + 所见即所签原子规则包"]
     RP -.-> CR["Sidecar 按需 central_review"]
     BS -.-> SE["可选 Scheduled Enrollment"]
@@ -138,10 +139,10 @@ flowchart LR
 | Project Review Pack | 将全部 E2/E3 卡渲染为中文分层 Markdown：状态、决策索引、准确规则与选择、核对依据；完全重复文本引用一次已显示原文 | 近义压缩、补写项目语义、原始 JSON 用户界面、跨任务传输、行为 owner |
 | Deterministic renderer | 从 scripts 目录读取已验证 Review Pack；interactive 输出零 wrapper，scheduled 输出唯一末尾 wrapper | 动态导入、失败后手工重写、修复项目语义 |
 | Visible-output verifier | 按 surface 重新验证 renderer/artifact 字节的正文 hash、卡片、动作、wrapper 数量和无尾注 | 声称已经观察实际用户 final、生成卡片、替代 renderer |
-| Delivery v1 | 绑定 artifact 名称、完整文件 hash/bytes、Review Pack/body hash、卡片与动作守恒；final 只显示中文状态与最小绑定，其他字段从 artifact 重算 | 保存绝对路径、正文、任务 ID、授权或长期状态 |
+| Delivery v1 | 绑定 artifact 名称、完整文件 hash/bytes、Review Pack/body hash、卡片与动作守恒；final 展示文件内简明建议、链接与最小绑定 | 在 manifest 保存绝对路径、正文、任务 ID、授权或长期状态 |
 | Terminal v1 | 在没有 Delivery manifest 时绑定 phase、reason、项目状态与不可确认终态 | 生成部分卡片、替代 Review Pack、声称安装或用户表面成功 |
 | Task artifact | 在宿主为当前任务显式提供且位于项目外的 generated-output root 保存不可变完整 Review Pack；该 root 可位于宿主管理的 app storage | 项目文件、系统临时文件、任意猜测的 `$CODEX_HOME` 路径、Store、跨任务文件桥 |
-| Host surface / readback | 同任务一次打开；原回执恢复同文件并重建 manifest；展示观测另列 | 把 queued 或回执文字当作 UI 观测，要求反复切窗口 |
+| Host surface / readback | 默认不打开；用户请求时同任务打开；从对应原交付回执恢复同文件，展示观测另列 | 把 not_requested、queued 或回执文字当作 UI 观测，要求反复切窗口 |
 | Cache-free helper runtime | 以 `python -B` 运行 helper；Bootstrap 原子安装时排除 Python 字节码缓存 | 让 Scout 写入或自清理个人 Skill 缓存 |
 | `central_review` | 在 Sidecar 当前任务中按需读取已经可见的 Review Pack，追加跨项目关系与并列注释 | Scheduled 自动摄取、隐藏来源卡、确认前置门禁 |
 | Review draft | 为用户提供完整判断上下文 | `待确认` proposal 或长期状态 |
@@ -152,7 +153,7 @@ helper 从任意 cwd 执行时都显式接收当前绑定的 project-root；当�
 `verify-final` 可在后续从原回执恢复 manifest 与原文件，无需重做发现或建立控制任务。queued 保留未观测；准确人类
 选择经文件核验和 Fresh Core 预演进入现有原子授权链，不把旧排队状态改称展示成功。
 
-Bootstrap 2.4.1 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 2.4.2 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得

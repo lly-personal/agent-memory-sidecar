@@ -15,7 +15,7 @@ from typing import Any, Callable, Iterable
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.11.1"
+SKILL_VERSION = "5.12.0"
 PROJECT_CONTRACT = "global_owner_scout_project_v5"
 REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v6"
 DISPLAY_LOCALE = "zh-CN"
@@ -1018,10 +1018,15 @@ def expected_action_policy(card: dict[str, Any], parity_status: str, relation: s
     relation = relation or ("already_covered_exact" if card["classification"] == "already_covered" else card["classification"])
     if global_mutation_candidate(card, relation, parity_status):
         return ("confirm", copy.deepcopy(ALL_ACTIONS)) if projection_ready else ("edit", copy.deepcopy(READ_ONLY_ACTIONS))
-    if relation == "already_covered_exact" or card["owner_recommendation"] == "no_persistence":
+    if card["owner_recommendation"] == "no_persistence":
         return "ignore", []
     if relation in {"globalization_challenged", "needs_project_clarification"}:
         return "edit", copy.deepcopy(READ_ONLY_ACTIONS)
+    if card["classification"] == "route_to_owner" and card["owner_recommendation"] in {"project_owner", "skill"}:
+        action = "keep_project" if card["owner_recommendation"] == "project_owner" else "make_skill"
+        return action, copy.deepcopy(READ_ONLY_ACTIONS)
+    if relation == "already_covered_exact":
+        return "ignore", []
     if card["owner_recommendation"] == "skill":
         return "make_skill", copy.deepcopy(READ_ONLY_ACTIONS)
     if card["classification"] == "route_to_owner" or card["owner_recommendation"] == "project_owner":

@@ -93,12 +93,12 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.4.1",
+                "version": "2.4.2",
                 "content_sha256": "b" * 64,
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.11.1",
+                "version": "5.12.0",
                 "content_sha256": "c" * 64,
             },
         }
@@ -845,8 +845,8 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         desired = {
             "release_ref": "v0.3.10", "source_commit": "a" * 40,
             "core_version": "0.3.10", "plugin_version": "1.5.1", "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.4.1", "bootstrap_sha256": "c" * 64,
-            "scout_version": "5.11.1", "scout_sha256": "d" * 64,
+            "bootstrap_version": "2.4.2", "bootstrap_sha256": "c" * 64,
+            "scout_version": "5.12.0", "scout_sha256": "d" * 64,
         }
         source_sha = "e" * 64
         pack = self.managed_sources.build_deployment_pack(
@@ -863,15 +863,15 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             host_materialization={
                 "core": {"status": "verified", "version": "0.3.10", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
                 "global_binding": "unavailable", "doctor": "verified",
-                "bootstrap_skill": {"status": "unchanged", "version": "2.4.1", "content_sha256": "c" * 64},
-                "scout_skill": {"status": "unchanged", "version": "5.11.1", "content_sha256": "d" * 64},
+                "bootstrap_skill": {"status": "unchanged", "version": "2.4.2", "content_sha256": "c" * 64},
+                "scout_skill": {"status": "unchanged", "version": "5.12.0", "content_sha256": "d" * 64},
             },
             requires_reload=True,
             consumer_verified=False,
             generated_at="2026-08-21T12:00:00+08:00",
         )
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("2.4.1", validated["desired_bundle"]["bootstrap_version"])
+        self.assertEqual("2.4.2", validated["desired_bundle"]["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
         for label in ("期望发行身份", "Plugin 分发", "能力源同步", "主机物化", "项目消费者范围", "消费者入口条件"):
             self.assertIn(label, rendered)
@@ -917,7 +917,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 json.loads(text),
                 expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
             )
-            self.assertEqual("v0.5.8", value["plugins"][0]["source"]["ref"])
+            self.assertEqual("v0.5.9", value["plugins"][0]["source"]["ref"])
         else:
             self.assertTrue(
                 (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()
@@ -1027,7 +1027,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_v5_prompt_has_no_fixed_binding(self) -> None:
         prompt = (
             "Use $global-owner-scout in project_scout mode for the current bound project; rolling 72 hours; "
-            "Skill 5.11.1; global_owner_scout_project_v5; global_owner_scout_review_pack_v6; "
+            "Skill 5.12.0; global_owner_scout_project_v5; global_owner_scout_review_pack_v6; "
             "gpt-5.6-sol; medium; read-only."
         )
         self.bootstrap.validate_prompt(prompt)
@@ -1131,7 +1131,9 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         finally:
             sys.path.pop(0)
         self.assertEqual(before, json.dumps(pack, ensure_ascii=False, sort_keys=True))
-        human_body = rendered.split("## 技术附录", 1)[0]
+        brief = renderer.extract_conversation_brief(rendered)
+        self.assertEqual(1, brief.count(action))
+        human_body = rendered.split("## 决策卡 ", 1)[1].split("## 技术附录", 1)[0]
         self.assertEqual(1, human_body.count(action))
         self.assertEqual(1, human_body.count(skip))
         self.assertEqual(action, visible["recovery_bundle"]["items"][0]["proposal"]["action"])
@@ -1392,6 +1394,173 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         finally:
             sys.path.pop(0)
 
+    def test_covered_global_rule_does_not_erase_owner_maintenance(self) -> None:
+        for owner, action in (("project_owner", "keep_project"), ("skill", "make_skill")):
+            card = self.scout_validator.valid_project()["project_cards"][0]
+            card.update(owner_recommendation=owner, classification="route_to_owner")
+            recommendation, allowed = self.scout_validator.expected_action_policy(
+                card, "matched", "already_covered_exact", False,
+            )
+            self.assertEqual(action, recommendation)
+            self.assertNotIn("confirm", allowed)
+            for relation in ("globalization_challenged", "needs_project_clarification"):
+                self.assertEqual("edit", self.scout_validator.expected_action_policy(card, "matched", relation, False)[0])
+            card["classification"] = "already_covered"
+            self.assertEqual(("ignore", []), self.scout_validator.expected_action_policy(
+                card, "matched", "already_covered_exact", False,
+            ))
+        card["owner_recommendation"] = "no_persistence"
+        for relation in self.scout_validator.GLOBAL_RELATIONS:
+            self.assertEqual(("ignore", []), self.scout_validator.expected_action_policy(card, "matched", relation, False))
+
+    def test_followup_receipt_without_opening_preserves_advice_and_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            pack = json.loads(self._review_pack_json(1))
+            result = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_RUNTIME), "prepare-delivery", "--artifact-dir", str(output),
+                 "--protected-root", str(ROOT)],
+                input=json.dumps(pack), capture_output=True, text=True, encoding="utf-8", check=True,
+            )
+            manifest = json.loads(result.stdout)
+            artifact = output / manifest["artifact_name"]
+            original = artifact.read_bytes()
+            for outcome, status in (("not_requested", "artifact_verified"), ("open_failed", "surface_unavailable")):
+                receipt = subprocess.run(
+                    [sys.executable, "-B", str(SCOUT_RUNTIME), "render-receipt", outcome,
+                     "--artifact-path", str(artifact), "--artifact-root", str(output)],
+                    input=result.stdout, capture_output=True, text=True, encoding="utf-8",
+                )
+                self.assertEqual(0, receipt.returncode, receipt.stderr)
+                self.assertIn("首项建议", receipt.stdout)
+                self.assertIn(pack["project_result"]["project_cards"][0]["human_context"]["concrete_after"], receipt.stdout)
+                self.assertNotIn("确认 example-project-card-1@", receipt.stdout)
+                recovered = subprocess.run(
+                    [sys.executable, "-B", str(SCOUT_RUNTIME), "verify-final", "--artifact-root", str(output)],
+                    input=receipt.stdout, capture_output=True, text=True, encoding="utf-8", check=True,
+                )
+                observed = json.loads(recovered.stdout)
+                self.assertEqual(status, observed["status"])
+                self.assertFalse(observed["confirmation_eligible"])
+                self.assertEqual(manifest["delivery_manifest_sha256"], observed["delivery_manifest_sha256"])
+                changed = receipt.stdout.replace("首项建议", "替换建议", 1)
+                tampered = subprocess.run(
+                    [sys.executable, "-B", str(SCOUT_RUNTIME), "verify-final", "--artifact-root", str(output)],
+                    input=changed, capture_output=True, text=True, encoding="utf-8",
+                )
+                self.assertNotEqual(0, tampered.returncode)
+            self.assertEqual(original, artifact.read_bytes())
+
+    def test_interactive_evidence_may_discuss_scheduled_limits(self) -> None:
+        pack = json.loads(self._review_pack_json(1))
+        pack["limitations"].append("Scheduled 与 Inbox 的自然采用未验，不能把 0/14 或 14 次记录当作本次交互验收。")
+        pack["project_result"]["limitations"] = list(pack["limitations"])
+        pack["review_pack_hash"] = self.scout_validator.review_pack_hash(pack)
+        rendered = subprocess.run(
+            [sys.executable, "-B", str(SCOUT_RUNTIME), "render-review", "--surface", "interactive"],
+            input=json.dumps(pack), capture_output=True, text=True, encoding="utf-8", check=True,
+        )
+        verified = subprocess.run(
+            [sys.executable, "-B", str(SCOUT_RUNTIME), "verify-visible", "--surface", "interactive"],
+            input=rendered.stdout, capture_output=True, text=True, encoding="utf-8",
+        )
+        self.assertEqual(0, verified.returncode, verified.stderr)
+        bad = subprocess.run(
+            [sys.executable, "-B", str(SCOUT_RUNTIME), "verify-visible", "--surface", "interactive"],
+            input=rendered.stdout + '\n::inbox-item{title="误用" summary="错误模式"}\n',
+            capture_output=True, text=True, encoding="utf-8",
+        )
+        self.assertNotEqual(0, bad.returncode)
+
+    def test_no_delta_brief_has_no_invented_first_item_or_confirmation(self) -> None:
+        sys.path.insert(0, str(SCOUT_SCRIPTS))
+        try:
+            renderer = load_module("scout_renderer_no_delta_brief", SCOUT_RENDERER)
+            for count in (0, 1):
+                pack = json.loads(self._review_pack_json(count))
+                for review in pack["review_cards"]:
+                    review["integration_preview"]["global_relation"] = "already_covered_exact"
+                    review.update(recommended_action="ignore", allowed_actions=[], selection_token=None)
+                pack["selection_preview"] = None
+                pack["review_pack_hash"] = self.scout_validator.review_pack_hash(pack)
+                rendered = renderer.render_review_pack(pack, surface="interactive")
+                brief = renderer.extract_conversation_brief(rendered)
+                self.assertNotIn("首项建议", brief)
+                self.assertIn("无需确认或逐项忽略", brief)
+                self.assertNotIn("审阅后可回复准确选择", rendered)
+        finally:
+            sys.path.pop(0)
+
+    def test_brief_preserves_failure_and_current_integration_judgment(self) -> None:
+        sys.path.insert(0, str(SCOUT_SCRIPTS))
+        try:
+            renderer = load_module("scout_renderer_brief_judgment", SCOUT_RENDERER)
+            for status in ("failed", "output_budget_exceeded"):
+                pack = self.scout_validator.valid_review_pack(self.scout_validator.valid_project(status=status, card_count=0))
+                brief = renderer.extract_conversation_brief(renderer.render_review_pack(pack, surface="interactive"))
+                self.assertNotIn("已核查范围没有", brief)
+                self.assertNotIn("首项建议", brief)
+                self.assertIn("未完成", brief)
+            pack = json.loads(self._review_pack_json(1))
+            review = pack["review_cards"][0]
+            review["integration_preview"]["global_relation"] = "globalization_challenged"
+            review.update(recommended_action="edit", allowed_actions=self.scout_validator.READ_ONLY_ACTIONS.copy(),
+                          selection_token=None, recommended_action_reason="只适用于项目，应先撤回全局提升建议。")
+            pack["selection_preview"] = None
+            pack["review_pack_hash"] = self.scout_validator.review_pack_hash(pack)
+            rendered = renderer.render_review_pack(pack, surface="interactive")
+            brief = renderer.extract_conversation_brief(rendered)
+            self.assertIn(review["recommended_action_reason"], brief)
+            self.assertIn("当前处理：修改", brief)
+            self.assertIn("原建议", brief)
+        finally:
+            sys.path.pop(0)
+
+    def test_advice_uses_the_bytes_that_passed_manifest_validation(self) -> None:
+        sys.path.insert(0, str(SCOUT_SCRIPTS))
+        try:
+            delivery = load_module("scout_delivery_validated_snapshot", SCOUT_DELIVERY)
+            renderer = load_module("scout_renderer_validated_snapshot", SCOUT_RENDERER)
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                pack = json.loads(self._review_pack_json(1))
+                manifest, artifact = delivery.prepare_delivery(pack, artifact_dir=root, protected_roots=[ROOT])
+                original = artifact.read_bytes()
+                replacement = (renderer.BRIEF_START + "替换后的未核验建议" + renderer.BRIEF_END).encode()
+                with mock.patch.object(delivery, "safe_artifact_bytes", side_effect=[original, replacement]):
+                    receipt = delivery.render_delivery_receipt(manifest, artifact_path=artifact, artifact_root=root,
+                                                               outcome="not_requested")
+                self.assertNotIn("替换后的未核验建议", receipt)
+                self.assertIn(pack["project_result"]["project_cards"][0]["human_context"]["concrete_after"], receipt)
+        finally:
+            sys.path.pop(0)
+
+    def test_historical_receipts_recover_without_rewriting_the_artifact(self) -> None:
+        sys.path.insert(0, str(SCOUT_SCRIPTS))
+        try:
+            renderer = load_module("scout_renderer_legacy_receipt", SCOUT_RENDERER)
+            delivery = load_module("scout_delivery_legacy_receipt", SCOUT_DELIVERY)
+            pack = json.loads(self._review_pack_json(1))
+            rendered = renderer.render_review_pack(pack, surface="interactive")
+            body, separator, receipt = rendered.partition("---\n校验回执：")
+            old_hash = renderer.visible_body_sha256(body)
+            body = body.replace(renderer.BRIEF_START + renderer.extract_conversation_brief(body) + renderer.BRIEF_END + "\n", "")
+            historical = body + separator + receipt.replace(old_hash, renderer.visible_body_sha256(body))
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                name = f"global-owner-scout-review-pack-{pack['review_pack_hash'][:16]}.md"
+                artifact = root / name
+                delivery.write_immutable_artifact(artifact, historical.encode("utf-8"))
+                manifest = delivery.artifact_manifest(historical.encode("utf-8"), name)
+                opened = delivery.render_opened_receipt(manifest, artifact_path=artifact, artifact_root=root)
+                queued = delivery.render_queued_receipt(manifest, artifact_path=artifact, artifact_root=root)
+                for value in (opened, queued, queued.replace(delivery.QUEUED_COPY, delivery.LEGACY_QUEUED_COPY)):
+                    recovered = delivery.verify_final_receipt(value, artifact_root=root)
+                    self.assertEqual(manifest["artifact_sha256"], recovered["artifact_sha256"])
+                    self.assertEqual(historical.encode("utf-8"), artifact.read_bytes())
+        finally:
+            sys.path.pop(0)
+
     def test_task_artifact_delivery_conserves_realistic_pack_sizes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -1462,7 +1631,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 observed = json.loads(observed_result.stdout)
                 self.assertEqual("surface_observed", observed["status"])
                 self.assertEqual(count, observed["visible_cards"])
-                self.assertTrue(observed["confirmation_eligible"])
+                self.assertEqual(count > 0, observed["confirmation_eligible"])
                 self.assertIn("现有规则未改变", receipt_result.stdout)
                 self.assertNotIn("artifact_bytes=", receipt_result.stdout)
                 self.assertNotIn("visible_cards=", receipt_result.stdout)
@@ -1755,7 +1924,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             target = Path(temporary) / "global-owner-scout"
             source = ROOT / "skills" / "global-owner-scout"
             installed = self.bootstrap.install_skill(source, target)
-            self.assertEqual("5.11.1", installed["version"])
+            self.assertEqual("5.12.0", installed["version"])
             helper = target / "scripts" / "prepare_delivery.py"
             dispatcher = target / "scripts" / "scout.py"
             self.assertTrue(helper.is_file())

@@ -45,6 +45,64 @@ SCOPE_LABELS = {
 SURFACES = {"interactive", "scheduled"}
 RECOVERY_BLOCK_START = "<details>\n<summary>恢复准确选择（不代表授权或当前可写）</summary>\n\n```text\n"
 RECOVERY_BLOCK_END = "\n```\n\n</details>"
+BRIEF_START = "<!-- scout:brief:start -->\n"
+BRIEF_END = "\n<!-- scout:brief:end -->"
+
+
+def extract_conversation_brief(body: str) -> str | None:
+    if BRIEF_START not in body and BRIEF_END not in body:
+        return None
+    if body.count(BRIEF_START) != 1 or body.count(BRIEF_END) != 1:
+        raise ContractError("conversation brief markers must be unique")
+    _, _, remainder = body.partition(BRIEF_START)
+    brief, end, _ = remainder.partition(BRIEF_END)
+    if not end or not brief.strip():
+        raise ContractError("conversation brief is incomplete")
+    return brief
+
+
+def render_conversation_brief(pack: dict[str, Any]) -> str:
+    if pack["status"] in {"failed", "output_budget_exceeded"}:
+        return f"本次复盘未完成：{STATUS_LABELS[pack['status']]}。这不表示没有增量；现有规则未改变，本次没有可推进建议。具体失败与未覆盖范围保留在完整依据中。"
+    cards = {card["project_claim_hash"]: card for card in pack["project_result"]["project_cards"]}
+    actionable = [review for review in pack["review_cards"] if review["allowed_actions"]]
+    references = len(pack["review_cards"]) - len(actionable)
+    unproven = sum(item["disposition"]["kind"] == "insufficient_evidence" for item in pack["project_result"]["observations"])
+    lines = [f"本次有 {len(actionable)} 项建议可继续讨论；{references} 项已有覆盖或无需变更，{unproven} 项证据不足。现有规则未改变。"]
+    if pack["status"] == "degraded":
+        lines.append("部分资料未覆盖；以下建议只适用于已取得的证据，完整缺口见原报告。")
+    if not actionable:
+        lines.extend(["", "已核查范围没有可直接推进的新增建议，无需确认或逐项忽略。证据不足不代表已验收，也不要求你补做测试。"])
+        return "\n".join(lines)
+    counts = {owner: sum(cards[item["project_claim_hash"]]["owner_recommendation"] == owner for item in actionable)
+              for owner in ("project_owner", "skill", "global_agents")}
+    lines.extend([f"去向：项目维护 {counts['project_owner']} 项，方法维护 {counts['skill']} 项，全局行为讨论 {counts['global_agents']} 项。", ""])
+    if len(actionable) > 1:
+        lines.extend(["建议索引：", ""])
+        for number, review in enumerate(actionable, 1):
+            card = cards[review["project_claim_hash"]]
+            lines.append(f"{number}. {card['human_context']['decision_title']}（{ACTION_LABELS[review['recommended_action']]}）")
+        lines.append("")
+    first_review = actionable[0]
+    first = cards[first_review["project_claim_hash"]]
+    human = first["human_context"]
+    qualified = first_review["recommended_action"] == "edit"
+    proposal_label = "项目原建议" if qualified else "建议"
+    scope_label = "原建议范围与归属" if qualified else "范围与归属"
+    lines.extend([
+        f"**首项建议：{human['decision_title']}**", "",
+        f"当前处理：{ACTION_LABELS[first_review['recommended_action']]}。{first_review['recommended_action_reason']}", "",
+        f"用户成本：{human['user_cost']}", "",
+        f"当前：{human['concrete_before']}", "",
+        *([f"{proposal_label}与调整后：{human['concrete_after']}", ""]
+          if human['recommended_outcome'] == human['concrete_after'] else
+          [f"{proposal_label}：{human['recommended_outcome']}", "", f"调整后：{human['concrete_after']}", ""]),
+        f"{scope_label}：{SCOPE_LABELS[first['owner_recommendation']]}。{first['owner_rationale']}", "",
+        f"例外与风险：{human['strongest_counterpoint']}", "",
+        f"依据：{'、'.join(human['evidence_refs'])}", "",
+        "可在当前对话展开其他项、调整范围、暂缓或批量推进；已有授权继续有效，讨论本身不会写入规则。",
+    ])
+    return "\n".join(lines)
 
 
 def visible_body_sha256(body: str) -> str:
@@ -293,7 +351,9 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         "**本次规则变更**：无。建议经明确确认并成功写入后，才会改变相应作用域的后续任务。",
         "",
     ]
-    if surface == "interactive" and pack["review_cards"]:
+    if surface == "interactive":
+        lines.extend([BRIEF_START + render_conversation_brief(pack) + BRIEF_END, ""])
+    if surface == "interactive" and any(review["selection_token"] for review in pack["review_cards"]):
         lines.extend([
             "> **确认条件**：本文件没有改变规则。审阅后可回复准确选择；Agent 会先恢复本文件的完整性校验，再核对当前规则并预演。打开请求排队不证明你已看到内容，也不代替你的授权；文件或预演校验失败时不写入。",
             "",

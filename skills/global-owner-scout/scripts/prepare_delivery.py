@@ -14,7 +14,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Iterable
 
-from render_review import render_review_pack
+from render_review import extract_conversation_brief, render_review_pack
 from utf8_stdio import configure_utf8_stdio
 from validate_output import ContractError, valid_project, valid_review_pack
 from verify_visible_output import verify_visible_output
@@ -42,6 +42,18 @@ FINAL_QUEUED_RECEIPT_RE = re.compile(
     FINAL_RECEIPT_PREFIX + "(?:" + re.escape(QUEUED_COPY) + "|" + re.escape(LEGACY_QUEUED_COPY) + ")" + FINAL_RECEIPT_BINDING +
     r"`surface_observation=open_queued`；`confirmation_eligible=false`。\n$"
 )
+ADVICE_RECEIPT_RE = re.compile(
+    r"^# Global Owner Scout · 复盘结论与建议\n\n[\s\S]+?\n\n"
+    r"\[完整依据\]\(<(?P<path>[^>\r\n]+)>\)\n\n[\s\S]+?" + FINAL_RECEIPT_BINDING +
+    r"`surface_observation=(?P<surface>not_requested|open_succeeded|open_queued|open_failed)`；"
+    r"`confirmation_eligible=(?P<eligible>true|false)`。\n$"
+)
+SURFACE_COPY = {
+    "not_requested": "完整依据已校验，按需打开；文件交付不代表已展示、理解或采用。",
+    "open_succeeded": "文件打开请求已成功；实际理解与后续采用仍需分别观察。",
+    "open_queued": "文件打开请求仍在排队；可继续讨论以上建议，无需重复复盘或切换窗口。",
+    "open_failed": "文件预览未成功；已验证的建议和文件链接仍可使用，展示情况未证。",
+}
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 TERMINAL_REASON_MAPPINGS = {
     "project_binding_unavailable": (
@@ -343,10 +355,10 @@ def prepare_delivery(pack: dict[str, Any], *, artifact_dir: Path, protected_root
 
 
 def markdown_path(path: Path) -> str:
-    return path.resolve(strict=False).as_posix()
+    return path.absolute().as_posix()
 
 
-def validate_manifest_artifact(manifest: dict[str, Any], *, artifact_path: Path, artifact_root: Path) -> Path:
+def validate_manifest_artifact(manifest: dict[str, Any], *, artifact_path: Path, artifact_root: Path) -> bytes:
     manifest = validate_delivery_manifest(manifest)
     root = safe_existing_directory(artifact_root, label="artifact-root")
     require(artifact_path.is_absolute(), "artifact path must be absolute")
@@ -372,31 +384,43 @@ def validate_manifest_artifact(manifest: dict[str, Any], *, artifact_path: Path,
         "wrapper_count",
     ):
         require(visible[field] == manifest[field], f"artifact {field} does not match manifest")
-    return artifact_path
+    return data
+
+
+def render_delivery_receipt(manifest: dict[str, Any], *, artifact_path: Path, artifact_root: Path, outcome: str) -> str:
+    manifest = validate_delivery_manifest(manifest)
+    data = validate_manifest_artifact(manifest, artifact_path=artifact_path, artifact_root=artifact_root)
+    require(outcome in SURFACE_COPY, "unknown file surface outcome")
+    body = data.decode("utf-8")
+    brief = extract_conversation_brief(body)
+    if brief is None and outcome in {"open_succeeded", "open_queued"}:
+        copy = OPENED_COPY if outcome == "open_succeeded" else QUEUED_COPY
+        eligible = outcome == "open_succeeded"
+        return (
+            "# Global Owner Scout · 完整审阅包\n\n"
+            f"[打开完整审阅包](<{markdown_path(artifact_path)}>)\n\n"
+            f"{copy}\n\n交付回执："
+            f"`delivery_manifest_sha256={manifest['delivery_manifest_sha256']}`；"
+            f"`surface_observation={outcome}`；`confirmation_eligible={str(eligible).lower()}`。\n"
+        )
+    if brief is None:
+        brief = "原报告已校验。此历史文件没有首项摘要，可在当前对话依据原文件继续讨论；现有规则未改变。"
+    eligible = outcome == "open_succeeded" and bool(verify_visible_output(body, surface="interactive")["recovery_bundle"])
+    return (
+        "# Global Owner Scout · 复盘结论与建议\n\n"
+        f"{brief}\n\n[完整依据](<{markdown_path(artifact_path)}>)\n\n"
+        f"{SURFACE_COPY[outcome]}\n\n交付回执："
+        f"`delivery_manifest_sha256={manifest['delivery_manifest_sha256']}`；"
+        f"`surface_observation={outcome}`；`confirmation_eligible={str(eligible).lower()}`。\n"
+    )
 
 
 def render_opened_receipt(manifest: dict[str, Any], *, artifact_path: Path, artifact_root: Path) -> str:
-    manifest = validate_delivery_manifest(manifest)
-    artifact_path = validate_manifest_artifact(manifest, artifact_path=artifact_path, artifact_root=artifact_root)
-    return (
-        "# Global Owner Scout · 完整审阅包\n\n"
-        f"[打开完整审阅包](<{markdown_path(artifact_path)}>)\n\n"
-        f"{OPENED_COPY}\n\n交付回执："
-        f"`delivery_manifest_sha256={manifest['delivery_manifest_sha256']}`；"
-        "`surface_observation=open_succeeded`；`confirmation_eligible=true`。\n"
-    )
+    return render_delivery_receipt(manifest, artifact_path=artifact_path, artifact_root=artifact_root, outcome="open_succeeded")
 
 
 def render_queued_receipt(manifest: dict[str, Any], *, artifact_path: Path, artifact_root: Path) -> str:
-    manifest = validate_delivery_manifest(manifest)
-    artifact_path = validate_manifest_artifact(manifest, artifact_path=artifact_path, artifact_root=artifact_root)
-    return (
-        "# Global Owner Scout · 完整审阅包\n\n"
-        f"[打开完整审阅包](<{markdown_path(artifact_path)}>)\n\n"
-        f"{QUEUED_COPY}\n\n交付回执："
-        f"`delivery_manifest_sha256={manifest['delivery_manifest_sha256']}`；"
-        "`surface_observation=open_queued`；`confirmation_eligible=false`。\n"
-    )
+    return render_delivery_receipt(manifest, artifact_path=artifact_path, artifact_root=artifact_root, outcome="open_queued")
 
 
 def render_blocked_receipt(manifest: dict[str, Any]) -> str:
@@ -423,6 +447,14 @@ def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
         match = FINAL_QUEUED_RECEIPT_RE.fullmatch(text)
         surface_status = "surface_pending"
         confirmation_eligible = False
+    advice = None
+    if match is None:
+        advice = ADVICE_RECEIPT_RE.fullmatch(text)
+        match = advice
+        if advice:
+            surface_status = {"not_requested": "artifact_verified", "open_succeeded": "surface_observed",
+                              "open_queued": "surface_pending", "open_failed": "surface_unavailable"}[advice.group("surface")]
+            confirmation_eligible = advice.group("eligible") == "true"
     require(match is not None, "actual task final is not an exact opened or queued Delivery receipt")
     root = safe_existing_directory(artifact_root, label="artifact-root")
     artifact_path = Path(match.group("path"))
@@ -438,6 +470,9 @@ def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
     data = safe_artifact_bytes(artifact_path)
     manifest = artifact_manifest(data, artifact_path.name)
     require(manifest["delivery_manifest_sha256"] == match.group("manifest"), "actual task artifact does not match Delivery receipt")
+    if advice:
+        expected = render_delivery_receipt(manifest, artifact_path=artifact_path, artifact_root=root, outcome=advice.group("surface"))
+        require(text == expected, "actual task final is not an exact opened or queued Delivery receipt or verified advice receipt")
     return {
         "status": surface_status,
         "manifest": manifest,
@@ -468,7 +503,7 @@ def run_self_test() -> None:
             observed = verify_final_receipt(receipt, artifact_root=artifact_dir)
             assert observed["status"] == "surface_observed"
             assert observed["visible_cards"] == count
-            assert "confirmation_eligible=true" in receipt
+            assert observed["confirmation_eligible"] == (count > 0)
             queued_receipt = render_queued_receipt(manifest, artifact_path=artifact_path, artifact_root=artifact_dir)
             pending = verify_final_receipt(queued_receipt, artifact_root=artifact_dir)
             assert pending["status"] == "surface_pending"
@@ -557,7 +592,7 @@ def main() -> int:
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--artifact-dir", type=Path)
     parser.add_argument("--protected-root", action="append", type=Path, default=[])
-    parser.add_argument("--render-receipt", choices=("open_succeeded", "open_queued", "open_failed"))
+    parser.add_argument("--render-receipt", choices=tuple(SURFACE_COPY))
     parser.add_argument("--render-terminal", action="store_true")
     parser.add_argument("--artifact-path", type=Path)
     parser.add_argument("--artifact-root", type=Path)
@@ -573,16 +608,13 @@ def main() -> int:
             print(render_terminal_receipt(load_stdin_json()), end="")
         elif args.render_receipt is not None:
             manifest = validate_delivery_manifest(load_stdin_json())
-            if args.render_receipt == "open_succeeded":
-                require(args.artifact_path is not None, "--artifact-path is required for an opened receipt")
-                require(args.artifact_root is not None, "--artifact-root is required for an opened receipt")
-                print(render_opened_receipt(manifest, artifact_path=args.artifact_path, artifact_root=args.artifact_root), end="")
-            elif args.render_receipt == "open_queued":
-                require(args.artifact_path is not None, "--artifact-path is required for a queued receipt")
-                require(args.artifact_root is not None, "--artifact-root is required for a queued receipt")
-                print(render_queued_receipt(manifest, artifact_path=args.artifact_path, artifact_root=args.artifact_root), end="")
-            else:
+            if args.render_receipt == "open_failed" and args.artifact_path is None and args.artifact_root is None:
                 print(render_blocked_receipt(manifest), end="")
+            else:
+                require(args.artifact_path is not None, "--artifact-path is required")
+                require(args.artifact_root is not None, "--artifact-root is required")
+                print(render_delivery_receipt(manifest, artifact_path=args.artifact_path, artifact_root=args.artifact_root,
+                                              outcome=args.render_receipt), end="")
         else:
             require(args.artifact_dir is not None, "--artifact-dir is required")
             manifest, _ = prepare_delivery(load_stdin_json(), artifact_dir=args.artifact_dir, protected_roots=args.protected_root)

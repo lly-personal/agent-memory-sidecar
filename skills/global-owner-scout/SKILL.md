@@ -1,20 +1,20 @@
 ---
 name: global-owner-scout
-description: Run an explicitly requested, evidence-first, project-read-only 30-day review in the currently bound Codex project and deliver a complete Chinese Review Pack through a task-scoped host artifact. Use only when the user invokes $global-owner-scout or for a separately configured Scheduled experiment; never trigger for ordinary project work.
+description: Review a project when explicitly invoked, or continue discussing a previously delivered Scout review. Give a brief overview and the first concrete recommendation in the current chat, with complete evidence available by link. Do not restart discovery for follow-up questions or trigger for unrelated ordinary project work.
 ---
 
 # Global Owner Scout
 
 ## Contract
 
-- Skill version: `5.11.1`
+- Skill version: `5.12.0`
 - Project result: `global_owner_scout_project_v5`
 - User review: `global_owner_scout_review_pack_v6`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
 - Preflight snapshot: `global_owner_scout_preflight_v1`
 - Mode: `project_scout`; interactive-only `central_review` remains optional.
-- Read [references/contracts.md](references/contracts.md) and execute
-  [references/deep-review-protocol.md](references/deep-review-protocol.md) completely.
+- For a new review, read [references/contracts.md](references/contracts.md) and execute
+  [references/deep-review-protocol.md](references/deep-review-protocol.md) completely. For follow-up, use Recovery and continuation below.
 
 This Skill creates project-read-only review drafts. It never creates proposals, approval refs, Owner mutations, project files,
 database rows, commits, pushes, or external-system writes. Its only output write is an immutable Review Pack artifact under the
@@ -25,6 +25,9 @@ and never asks the user to provide resource settings. The Scout uses the current
 project name, path, project ID, candidate hint, or the deep-review procedure.
 
 ## Mode: `project_scout`
+
+Implicit selection is only for follow-up to an identifiable delivered Scout report. It never authorizes a new review or write.
+Without such a report, do not run discovery implicitly; ordinary project work stays in its existing workflow.
 
 Use the currently bound project task for the entire review and delivery. Read-only inspection does not require a new chat or
 worktree. Keep a worktree the user already selected; never create a user-facing task merely to run this Skill. The current task
@@ -39,7 +42,7 @@ owns completion, including recovery and the final result. Do not return after di
    A host-declared generated-output directory outside the reviewed project is eligible even when it is inside host app storage.
    Do not infer that metadata is absent merely because one tool does not expose it. Never construct a path from a username,
    task ID, date or a familiar `visualizations` pattern. If no unambiguous grant exists, return Terminal v1 before deep work.
-   Run `inspect-output --artifact-dir <host-output-root> --protected-root <bound-project-root>` and check file-preview availability.
+   Run `inspect-output --artifact-dir <host-output-root> --protected-root <bound-project-root>`. File preview is optional and checked only when requested.
 3. Execute all seven phases in `references/deep-review-protocol.md`. Use native `list_threads` **history** on the current host,
    `source=codex`, `limit=50`, with active and archived histories separately. Follow each exact returned cursor to the window
    boundary or EOF. Keep natural work turns in mixed engineering/Scout tasks before this invocation; exclude only Scout-generated
@@ -52,6 +55,9 @@ owns completion, including recovery and the final result. Do not return after di
    including unmanaged principles, by trigger, required action and exception. Recombining already-covered obligations is not a
    new rule. Name the specific uncovered behavior and a concrete future failure before recommending an addition. Keep method
    details in their existing Skill and project facts in their existing project owner. Uncertainty is not a new user decision.
+   Compare coverage and actual implementation separately: an existing global rule does not erase a concrete project or method
+   repair. Give an evidenced maintenance delta an existing `route_to_owner` card and exact source Owner; use `project_only` or
+   `skill_only` exclusions only when no actionable delta remains. Never turn every observation into a task.
 5. Freeze and validate Project v5, resolve Owner parity through `resolve-owner-parity`, then read only the returned host-local
    Owner and verify its hash. Never guess or search for the canonical Owner. Build Review Pack v6 and call `prepare-review` to
    bind actual installed Core single/combined previews. Validate the returned pack unchanged. Covered/no-persistence cards have
@@ -60,34 +66,51 @@ owns completion, including recovery and the final result. Do not return after di
    stable-review claim; do not blame Scout for a concurrent change without attribution. Check Skill/cache and external-write
    boundaries. On privacy, integrity or read-only failure, use Terminal v1 and no actionable partial pack.
 7. For interactive delivery, pass the validated pack to `prepare-delivery --artifact-dir <host-output-root> --protected-root <bound-project-root>`.
-   This creates the single immutable file, verifies its bytes and emits Delivery v1. Pre-render opened, queued and failed receipts
-   with `render-receipt`, passing exact artifact/root arguments for opened or queued. Open the same artifact once using the native
-   file tool. Return the appropriate deterministic receipt unchanged; never copy the full pack into chat or invent an opened state.
-   A host returning `queued` has accepted the request, not proved a displayed file. Do not poll or ask the user to switch windows.
+   This creates the single immutable file, verifies its bytes and emits Delivery v1. Return `render-receipt not_requested`
+   with exact artifact/root arguments unchanged: a brief overview, first actionable recommendation and complete-evidence link.
+   Do not open the report by default. If the user explicitly requests opening, pre-render the opened/queued/failed outcomes,
+   call the native file tool once and return the matching receipt. Pass artifact/root arguments even for a failed preview so
+   verified advice stays usable. A queued or failed open does not block discussion or prove display. Do not poll or ask for a window switch.
    A failure before a manifest uses `render-terminal`, never a hand-written receipt or `render-receipt` with an invalid manifest.
 
 Scheduled keeps its existing inline `render-review --surface scheduled` and `verify-visible` path, with one Inbox wrapper,
 isolated worktree and bounded automation memory. It does not require an interactive artifact root or open call; activation remains paused.
 
-## Recovery and completion
+## Recovery and continuation
 
 Technical delivery ends with an immutable, verified artifact and its result link in this task. User display, comprehension,
 confirmation and later adoption are separate evidence; missing UI observation does not justify more test chats or artificial
 confirmation. Source and technical fixes may ship while genuine later experience remains unverified.
 
-On continuation, read the actual previous final and run `verify-final --artifact-root <original-host-output-root>` with that final
+For “基于这份复盘给沉淀建议”, “先看这一项”, scope edits, deferral or batch requests, continue in this chat; do not run a new census.
+Find the original delivery receipt for the referenced report in native chat history, including across intervening ordinary replies.
+Use the report explicitly selected by the user or the unambiguous current discussion; never substitute another report just because it is newer.
+Only unresolved ambiguity between reports needs a question. Run `verify-final --artifact-root <original-host-output-root>` with that original final
 on stdin. It reconstructs and returns the manifest from the original file, verifies direct-child containment, read-only bytes and
 all card/action hashes. Use the returned `recovery_bundle` for exact Core input. Historical files may return null; if the original
 exact bundle is no longer available, refresh only the affected preview for new authorization and never invent old bindings. Keep the same artifact; do not rerun discovery or recompose a large payload. An explicit later request to
 open it may reuse the returned manifest and existing `render-receipt`; repeated `queued` remains pending.
 
-If the user sends an exact selection from that pack, restore the file checks first, then route to the installed `agent-memory`
+After recovery, compare the selected findings with their current project or Skill Owner and any new facts. Give the real delta,
+recommended change, source location, scope, exception and evidence. Start with an overview and the first useful item; allow natural
+switching, edits, batch discussion and deferral. Covered/no-change items need no repeated decision; insufficient evidence is not a test assignment.
+Preserve discussion progress in this chat; do not add a queue or persistent proposal store. Deferral applies to this discussion, not a permanent mute.
+Use native async choices only for a material unresolved decision; ordinary text is sufficient. Existing authorization persists.
+“按推荐” inherits the exact operation previously presented. When the recommendation is `edit`, scope clarification or choosing
+an Owner, it authorizes refining that recommendation, not editing project/Skill files. Do not turn a challenged global proposal
+into an authorized project implementation. First prepare the concrete change and scope; continue existing implementation
+authorization when it already covers that change, otherwise obtain the necessary decision once after the change is reviewable.
+When the user authorizes project or method maintenance, hand off to that existing engineering/Skill workflow in this chat and
+read back the actual change. The read-only review itself never writes an Owner. Discussion or choosing a route is not global-rule authorization.
+
+If the user sends an exact rule selection from that pack, restore the file checks first, then route to the installed `agent-memory`
 Scout bundle handoff for Fresh Owner comparison, exact Core preview and one real user authorization. Pending display is not
 permission, and neither recovered bytes nor tool-relayed text is an approval. No rule changes inside this read-only Scout run.
 If the artifact or selection cannot be verified, leave confirmation closed and explain the specific failure.
 
-After the host open, emit only the pre-rendered receipt. No separate memory audit or tail note is needed. A later controller may
-read the actual final with `verify-final`; it proves artifact integrity and the recorded receipt, not independent UI observation.
+The initial review emits the deterministic advice receipt; follow-up discussion is ordinary chat and need not itself be a receipt.
+No separate memory audit or tail note is needed. A later continuation verifies the original delivery receipt, not the latest discussion reply.
+This proves artifact integrity and the recorded receipt, not independent UI observation.
 The original five-scenario evidence remains historical. Current technical acceptance covers Local clean/dirty, existing worktree,
 window/EOF history, explicit page failure, missing output grant, queued recovery and tampering; real installed-entry adoption and
 user experience remain unverified until observed. These checks do not authorize canary chats or changes to a real Owner.

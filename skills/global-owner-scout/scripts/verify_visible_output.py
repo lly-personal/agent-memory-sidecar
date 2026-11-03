@@ -12,7 +12,7 @@ from typing import Any
 
 from utf8_stdio import configure_utf8_stdio
 
-from render_review import RECOVERY_BLOCK_END, RECOVERY_BLOCK_START
+from render_review import RECOVERY_BLOCK_END, RECOVERY_BLOCK_START, extract_conversation_brief
 from validate_output import ContractError, canonical_json, selection_token, valid_project, valid_review_pack
 
 
@@ -101,8 +101,9 @@ def verify_visible_output(value: str, *, surface: str) -> dict[str, Any]:
         require(WRAPPER_RE.fullmatch(tail[3]) is not None, "inbox wrapper is invalid or is not final")
         require("本次需要判断" not in body, "scheduled output contains interactive decision copy")
     else:
-        for forbidden in ("Scheduled", "Inbox", "0/14", "今日需要判断", "14 次"):
-            require(forbidden not in text, f"interactive output contains forbidden copy: {forbidden}")
+        require(not re.search(r"^## 今日需要判断 \d+ 项$", body, re.MULTILINE),
+                "interactive output contains scheduled decision structure")
+        extract_conversation_brief(body)
         if CARD_RE.search(body):
             require("本次需要判断" in body, "interactive output is missing interactive decision copy")
 
