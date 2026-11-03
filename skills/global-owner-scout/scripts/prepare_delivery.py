@@ -478,15 +478,16 @@ def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
     # A real final may include engineering closeout and host annotations. Only the
     # unique receipt is evidence; never choose between reports or trim its advice.
     starts = list(re.finditer(r"(?m)^# Global Owner Scout · (?:完整审阅包|复盘结论与建议)\n", text))
-    ends = list(re.finditer(r"(?m)^交付回执：[^\n]*\n", text))
+    ends = list(re.finditer(r"(?m)^交付回执：`delivery_manifest_sha256=[^\n]*\n", text))
     require(len(starts) == len(ends) == 1 and starts[0].start() < ends[0].start(),
             "actual task final must contain exactly one complete Delivery receipt")
-    directives = list(re.finditer(r'(?m)^visualize(?P<payload>[^\n]+)\n', text))
-    require(len(directives) == text.count('visualize') and len(directives) <= 1,
-            "invalid or ambiguous native visual pointer")
-    directive = directives[0] if directives else None
-    if directive:
-        require(directive.start() >= ends[0].end(), "native visual pointer must follow the receipt")
+    # Only the immediately following visual belongs to this receipt. Other task
+    # visuals and other products' receipts are outside Scout's evidence boundary.
+    following_line = text[ends[0].end():].lstrip().split("\n", 1)[0].rstrip()
+    directive = None
+    if following_line.startswith('visualize'):
+        directive = VISUAL_DIRECTIVE_RE.fullmatch("\n" + following_line + "\n")
+        require(directive is not None, "invalid native visual pointer")
         try:
             visual_pointer = json.loads(directive.group("payload"))
         except ValueError as exc:

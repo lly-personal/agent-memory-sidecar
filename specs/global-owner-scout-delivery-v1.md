@@ -108,7 +108,9 @@ Locate the original delivery receipt for the report referenced in the current di
 intervening ordinary replies. Do not assume the latest assistant message is a receipt or silently switch to a newer report.
 Feed that actual final, including ordinary closeout prose and host annotations, to `verify-final --artifact-root <original-host-output-root>`.
 It locates exactly one complete receipt by its heading and binding line, without interpreting surrounding prose as verified advice
-or authorization. Missing/duplicate receipt boundaries and ambiguous or mismatched visual pointers fail closed; do not silently
+or authorization. Other products' receipt lines and unrelated visuals outside this block do not block Scout recovery. Only the
+visual immediately following the Scout binding line is its companion and must match the frozen descriptor.
+Missing/duplicate Scout receipt boundaries and malformed or mismatched companion pointers fail closed; do not silently
 pick the newest or a convenient valid block. The receipt itself remains byte-exact after line-ending normalization.
 It validates direct-child containment,
 immutable file identity, reconstructed manifest, body and action conservation. New advice receipts must match the exact brief

@@ -91,7 +91,9 @@ class ScoutProjectMapTests(unittest.TestCase):
             for outcome in d.SURFACE_COPY:
                 receipt = d.render_delivery_receipt(manifest, artifact_path=artifact, artifact_root=root, outcome=outcome)
                 # Actual delivery shape: source/release closeout, exact receipt, inline map, host footer.
-                final = '发布与部署已完成。\n\n- 后续采用仍未证。\n\n' + receipt + '\n本轮没有用户测试操作。\n'
+                final = ('发布与部署已完成。\n\n- 后续采用仍未证。\n\n'
+                         'visualize{"path":"unrelated-chart.html"}\n\n'
+                         '交付回执：工程代码已交付。\n\n' + receipt + '\n本轮没有用户测试操作。\n')
                 with self.subTest(outcome=outcome):
                     recovered = d.verify_final_receipt(final, artifact_root=root)
                     self.assertEqual(d.verify_final_receipt(receipt, artifact_root=root), recovered)
@@ -99,6 +101,7 @@ class ScoutProjectMapTests(unittest.TestCase):
                     self.assertEqual(original, artifact.read_bytes())
                 for invalid in [final.replace('让用户完成目标。', '已证明用户采用。'),
                                 final + receipt,
+                                final.replace(manifest['visual_name'], 'another.html').replace('\nvisualize{"path": ', '\n  \n  visualize{"path": '),
                                 final.replace(manifest['visual_name'], 'another.html')]:
                     with self.subTest(invalid=invalid[-100:]), self.assertRaises(v.ContractError):
                         d.verify_final_receipt(invalid, artifact_root=root)
