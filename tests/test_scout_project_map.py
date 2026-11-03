@@ -124,7 +124,7 @@ class ScoutProjectMapTests(unittest.TestCase):
             self.assertEqual(map_pack()['project_result']['project_identity'], recovered['project_map_bundle']['context']['project_identity'])
             self.assertEqual(map_pack()['project_result']['read_only_proof']['after_context_snapshot_hash'], recovered['project_map_bundle']['context']['context_snapshot_hash'])
             artifact.chmod(0o600)
-            artifact.write_text(artifact.read_text().replace('让用户完成目标。', '改写用户目标。'))
+            artifact.write_text(artifact.read_text(encoding='utf-8').replace('让用户完成目标。', '改写用户目标。'), encoding='utf-8')
             artifact.chmod(0o400)
             with self.assertRaises(v.ContractError): d.verify_final_receipt(receipt, artifact_root=root)
 
