@@ -55,6 +55,21 @@ separate claims. Label design, implementation, observation, inference and unknow
 links visible. Do not fabricate a complete graph or demand a fixed number of cells. Semantic coverage is checked against user
 outcomes and source material, not node counts. No new recommendations is compatible with a useful engineering map.
 
+Before arranging the view, outline how a reader can connect the goal and boundary to the main responsibilities, a concrete
+entry-to-result path, and its maintenance or recovery point. Distinguish structural containment/dependency, execution handoffs
+and state authority; a flat inventory with identical arrows does not explain all three. Choose the representation by the
+question: grouped structure for responsibility, an ordered path for handoffs, a state view for recovery, or a matrix for actual
+environment/evidence comparisons. Do not force every relation into one graph or require a fixed layer/node count. Overview,
+path and matrix keep the same object/source identities and reading context. The main explanation remains readable without
+interaction; selection reveals relevant detail instead of requiring the reader to assemble the whole system across tabs.
+
+Use the existing fixed renderer and current host's presentation contract. Upstream templates or guideline servers are research
+inputs, not proof of host compatibility or a reason to add a renderer, client or MCP. Verify a concrete missing capability at its
+consumer before reuse; omit interactions and decorative structure that add no observable value. Keep semantic coverage, layout
+checks and user comprehension separate. Explicit design rejection remains a failed review, even when technical checks pass;
+preserve the unaffected evidence. The current [presentation contract](https://github.com/lly-personal/agent-memory-sidecar/blob/main/docs/specs/interface.md#project-scout-global_owner_scout_project_v6)
+and M1 evaluation own these requirements; do not create another design checklist or regenerate an immutable report to conceal a failure.
+
 For inspect, perform this current-design reconstruction only. Sessions are not applicable; still declare unavailable design,
 implementation or runtime evidence. Freeze the map without manufacturing events/cards or reading Global Owner. For review,
 continue the following source/causal phases and link real maintenance deltas to map objects. Project/Skill improvements survive

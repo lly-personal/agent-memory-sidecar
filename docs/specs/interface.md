@@ -528,6 +528,13 @@ v6 继承 v5 证据字段，增加 `purpose=inspect|review` 和 `project_map`，
 `inspect` 不运行会话普查、Owner 解析或 Core 预演；`session_coverage=null`、事件/观察/卡片为空，状态为 view_ready 或 degraded。
 `review` 保留完整发现流程。Pack v7 与 Project v6 配对，inspect 的 Owner parity 和 selection preview 为 null。
 同一冻结结果生成 Markdown 和原生交互视图。原生 tabs/details/theme/后续消息用于阅读与讨论，不增加写入权限。
+呈现先让用户理解目标、边界、主要分工和关键路径，再按需展开交接、环境、依据及维护归属；模块清单或视图数量
+不能证明全貌已可理解。结构归属、执行顺序与状态权威须表达清楚，不把不同语义画成无区别的连线。路径和矩阵
+延续同一报告、对象及来源，切换视角不能要求用户重新拼接上下文。不点击时仍可理解主干；窄屏通过重排和分层
+阅读保留它，不靠缩小文字或裁去必要信息。图型与展开深度随问题选择，不规定固定层数、节点数或矩阵格数。
+技术校验、布局检查和用户理解分别报告。已有用户反馈否决设计时，准确标为审阅未通过，不能降为未观察或被
+测试通过抵消。方法与验收分别沿现有
+[Deep Review](../../skills/global-owner-scout/references/deep-review-protocol.md) 和发现评估维护，不增设另一设计流程。
 恢复保留项目身份和完整快照，核对 HEAD 及 dirty/untracked 变化；旧 v5/v6 报告只读恢复，不补造图谱。
 
 v5 保留主机身份与顶层字段，增加严格来源与发现关联；不接收旧 v4 载荷，不允许为旧结果补造来源后迁移。
