@@ -32,8 +32,8 @@
     [`ADR 0074`](decisions/0074-public-operations-closure.zh.md)、[`ADR 0075`](decisions/0075-unified-workstation-reconcile.zh.md)：
     公开 Release 解析、统一工作站调和与存量主机显式换源。
 17. [`global-owner-scout-delivery-v1.md`](../specs/global-owner-scout-delivery-v1.md) 与
-    [`ADR 0076`](decisions/0076-task-scoped-review-pack-delivery.zh.md)：任务级 Review Pack artifact、compact receipt 与
-    实际任务表面资格。
+    [`ADR 0079 当前修订`](decisions/0079-project-session-front-door-and-scout-terminal-contract.zh.md)：当前对话的简明建议、
+    按需完整证据、原报告恢复及实际任务表面资格；[`ADR 0076`](decisions/0076-task-scoped-review-pack-delivery.zh.md) 保留 artifact 方案溯源。
 18. [`release-promotion-v1.md`](../specs/release-promotion-v1.md) 与
     [`ADR 0077`](decisions/0077-deterministic-release-promotion.zh.md)：verified draft 到 attested immutable Release 的
     确定性 inspect/apply 与终态回读。
@@ -44,8 +44,9 @@
 
 Global Owner Scout 的确认交接还必须读取 [`ADR 0070`](decisions/0070-atomic-review-pack-rule-bundles.zh.md)：用户可以
 精确多选，同一 target 以一个原子规则包提交；逐卡只是批次大小为一的兼容形式。
-其用户可见交付必须再读取 [`ADR 0076`](decisions/0076-task-scoped-review-pack-delivery.zh.md)：完整 Review Pack 位于
-当前任务的 host artifact，聊天只返回 compact receipt；真实任务表面未回读前不得声明 Production Proven。
+其用户可见交付按 [`Delivery 契约`](../specs/global-owner-scout-delivery-v1.md) 和
+[`ADR 0079 当前修订`](decisions/0079-project-session-front-door-and-scout-terminal-contract.zh.md)：当前聊天给出总览及首项具体建议，
+完整依据按需打开，后续讨论恢复原交付回执；文件交付不证明实际展示、理解或采用。
 
 若上述活动来源冲突，L1 决定原则，L2 决定 owner，L3 和细粒度契约决定接口；停止完成态声明并先修正规范，
 不得从历史文档静默选择实现。

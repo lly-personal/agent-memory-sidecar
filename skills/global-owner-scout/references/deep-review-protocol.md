@@ -1,4 +1,4 @@
-# Deep Review Protocol 5.11
+# Deep Review Protocol
 
 ## Evidence posture
 
@@ -227,4 +227,9 @@ Terminal meanings:
 - `failed`: execution protocol, privacy, integrity, mutation, required-source, render, or read-only failure; no cards.
 - `output_budget_exceeded`: not every card fits; no partial cards.
 - `surface_pending`: the exact artifact and final link are externally verified after a host `queued` result; content is discoverable, but the user surface remains unproved and no authorization is inferred.
-- `interactive_host_blocked`: no safe task output root, artifact/open failure, or an actual final without a verifiable opened/queued receipt; no partial cards or confirmation.
+- `interactive_host_blocked`: no safe task output root before artifact creation; no partial cards or confirmation.
+
+Artifact creation or integrity failure uses the existing failure contract in [contracts.md](contracts.md#manifest-free-terminal).
+After the artifact is verified, delivery observations follow the
+[Interactive Delivery contract](contracts.md#interactive-delivery): not requesting a preview is valid, and a queued or failed preview
+does not block discussion of the verified advice. Neither observation proves display or grants authorization.

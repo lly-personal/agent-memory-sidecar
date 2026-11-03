@@ -1,15 +1,15 @@
-# Global Owner Scout 5.11 contracts
+# Global Owner Scout contracts
 
 ## Common rules
 
-- Skill `5.12.0`; Project result `global_owner_scout_project_v5`; Review Pack
+- Skill `5.12.1`; Project result `global_owner_scout_project_v5`; Review Pack
   `global_owner_scout_review_pack_v6`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
 - `project_claim_hash` covers every Project Card field except itself. `review_pack_hash` covers the pack except itself.
 - Evidence references may identify owner sections, ADRs, tests, commits, or event classes. They may not contain absolute paths,
   raw dialogue, complete commands, accounts, tokens, raw remotes, project IDs, automation IDs, or diagnostic bodies.
-- E1 remains an observation. Every E2/E3 card is shown; no fixed project denominator, count cap, ranking, or silent truncation.
+- E1 remains an observation. Every E2/E3 card is shown; no fixed project denominator, count cap, rank-based exclusion, or silent truncation. Order actionable advice by evidenced impact and dependencies before freezing.
 - Human Context is Simplified Chinese and project-specific; Rule Projection is abstract and Owner-ready.
 
 `global_owner_scout_preflight_v1` has exact fields
@@ -213,7 +213,8 @@ Owner and Skill routes recommend `keep_project` and `make_skill`. Drift removes 
 Renderer order: warnings; surface-specific decision index; each card's decision summary with its exact Rule Projection; evidence;
 technical appendix; validation receipt; and only for Scheduled, one final Inbox wrapper. Invoke `python -B scripts/scout.py
 render-review --surface interactive|scheduled` from the Skill root with the validated Pack on stdin. Interactive uses `本次需要判断`,
-has zero wrapper, and contains no Scheduled/Inbox/14-run copy. Scheduled uses `今日需要判断` and exactly one wrapper. The receipt
+has zero wrapper, and rejects the Scheduled decision heading and Inbox wrapper. Factual prose may discuss other modes and
+their unverified scope; those words alone are not an invalid interactive structure. Scheduled uses `今日需要判断` and exactly one wrapper. The receipt
 records surface, `review_pack_hash`, `visible_body_sha256`, Project Card count, visible card count, a per-card action-count vector,
 total visible action count, atomic bundle action count, and wrapper count. `python -B scripts/scout.py verify-visible --surface ...` rejects body drift,
 lost or cross-card-moved actions, duplicate or
