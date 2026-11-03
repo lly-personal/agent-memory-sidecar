@@ -55,6 +55,11 @@ separate claims. Label design, implementation, observation, inference and unknow
 links visible. Do not fabricate a complete graph or demand a fixed number of cells. Semantic coverage is checked against user
 outcomes and source material, not node counts. No new recommendations is compatible with a useful engineering map.
 
+This is a reusable capability across target projects and environments. The Sidecar repository owns its implementation, not
+the reviewed project's topology. Order journeys by the reader's main outcome, then supporting/recovery paths; the first journey
+anchors the overview. Derive every label, step, owner and environment from the target evidence. Do not copy the example project's
+memory lifecycle, release mechanism or path counts into other projects, or draw a sequence between unrelated journeys.
+
 Before arranging the view, outline how a reader can connect the goal and boundary to the main responsibilities, a concrete
 entry-to-result path, and its maintenance or recovery point. Distinguish structural containment/dependency, execution handoffs
 and state authority; a flat inventory with identical arrows does not explain all three. Choose the representation by the

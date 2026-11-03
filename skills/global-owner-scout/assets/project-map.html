@@ -1,152 +1,239 @@
-<div id="__SCOUT_ROOT__" aria-label="工程全貌与复盘" class="scout-map">
-  <style>
-    #__SCOUT_ROOT__ { display: grid; gap: calc(var(--font-size-base) * 1); overflow-wrap: anywhere; }
-    #__SCOUT_ROOT__ .map-section { display: grid; gap: calc(var(--font-size-base) * .75); min-width: 0; }
-    #__SCOUT_ROOT__ .map-flow { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--font-size-base) * .5); }
-    #__SCOUT_ROOT__ .map-header { padding-inline-end: 90px; min-height: 50px; }
-    #__SCOUT_ROOT__ [hidden] { display: none; }
-    #__SCOUT_ROOT__ ol, #__SCOUT_ROOT__ ul { padding-inline-start: calc(var(--font-size-base) * 1.5); }
-  </style>
-  <div class="map-header map-section"><h2 data-title></h2><p data-goal></p></div>
-  <p class="text-small" data-snapshot></p>
-  <div class="nav nav-pills" role="tablist" aria-label="工程视角">
-    <button type="button" class="nav-link active" role="tab" id="__SCOUT_ROOT__-tab-overview" aria-controls="__SCOUT_ROOT__-overview" aria-selected="true" data-view="overview">总览</button>
-    <button type="button" class="nav-link" role="tab" id="__SCOUT_ROOT__-tab-paths" aria-controls="__SCOUT_ROOT__-paths" aria-selected="false" data-view="paths">路径</button>
-    <button type="button" class="nav-link" role="tab" id="__SCOUT_ROOT__-tab-matrix" aria-controls="__SCOUT_ROOT__-matrix" aria-selected="false" data-view="matrix">矩阵</button>
-  </div>
-  <section class="map-section" id="__SCOUT_ROOT__-overview" role="tabpanel" aria-labelledby="__SCOUT_ROOT__-tab-overview"></section>
-  <section class="map-section" id="__SCOUT_ROOT__-paths" role="tabpanel" aria-labelledby="__SCOUT_ROOT__-tab-paths" hidden></section>
-  <section class="map-section" id="__SCOUT_ROOT__-matrix" role="tabpanel" aria-labelledby="__SCOUT_ROOT__-tab-matrix" hidden></section>
-  <hr>
-  <section class="map-section" aria-label="选中环节" data-detail></section>
-  <p class="text-small" data-status role="status" aria-live="polite"></p>
-  <noscript>当前环境未启用交互。完整审阅文件保留同一工程全貌、路径、矩阵及来源，可在当前聊天继续讨论。</noscript>
-</div>
+<div id="__SCOUT_ROOT__" lang="zh-CN">
+<style>
+#__SCOUT_ROOT__{--at-bg:light-dark(#fcfcfb,#1c1d1f);--at-fg:light-dark(#202326,#efeff0);--at-muted:light-dark(#666b70,#b0b4ba);--at-line:light-dark(#d7dade,#44484e);--at-soft:light-dark(#f1f3f4,#272a2e);--at-blue:light-dark(#285b91,#a1c5ed);--at-selection:light-dark(#eaf0f7,#293748);--at-amber:light-dark(#875b20,#e1bc82);--at-r:6px;--at-space:8px;--at-small:12px;--at-body:14px;--at-node:17px;--at-heading:22px;--at-title:30px;font:400 var(--at-body)/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--at-fg);-webkit-font-smoothing:antialiased}
+#__SCOUT_ROOT__ *{box-sizing:border-box}
+#__SCOUT_ROOT__ [hidden]{display:none!important}
+#__SCOUT_ROOT__ .at-page{background:var(--at-bg);border:1px solid var(--at-line);border-radius:var(--at-r);padding:calc(var(--at-space)*4);overflow-wrap:anywhere}
+#__SCOUT_ROOT__ p,#__SCOUT_ROOT__ h2,#__SCOUT_ROOT__ h3,#__SCOUT_ROOT__ h4{margin:0}
+#__SCOUT_ROOT__ h2{font-size:var(--at-title);line-height:1.3;font-weight:600;letter-spacing:-.02em}
+#__SCOUT_ROOT__ h3{font-size:var(--at-heading);line-height:1.4;font-weight:600}
+#__SCOUT_ROOT__ h4{font-size:var(--at-node);line-height:1.5;font-weight:600}
+#__SCOUT_ROOT__ button,#__SCOUT_ROOT__ summary{font:inherit;color:inherit;touch-action:manipulation}
+#__SCOUT_ROOT__ button{background:transparent;border:0;border-radius:var(--at-r);text-align:left}
+#__SCOUT_ROOT__ a{color:var(--at-blue);text-underline-offset:3px}
+#__SCOUT_ROOT__ .at-meta{font-size:var(--at-small);color:var(--at-muted)}
+#__SCOUT_ROOT__ .at-header{display:grid;gap:var(--at-space);padding-right:70px}
+#__SCOUT_ROOT__ .at-header h2{margin-top:var(--at-space)}
+#__SCOUT_ROOT__ .at-heading-copy{max-width:34em;color:var(--at-muted)}
+#__SCOUT_ROOT__ .at-figure{margin-top:calc(var(--at-space)*4)}
+#__SCOUT_ROOT__ .at-section-title{display:flex;align-items:baseline;justify-content:space-between;gap:var(--at-space);flex-wrap:wrap}
+#__SCOUT_ROOT__ .at-section-title h3{font-size:var(--at-node)}
+#__SCOUT_ROOT__ .at-primary{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));list-style:none;margin:calc(var(--at-space)*3) 0 0;padding:0;gap:calc(var(--at-space)*2)}
+#__SCOUT_ROOT__ .at-primary li{position:relative;min-width:0}
+
+#__SCOUT_ROOT__ .at-node{display:grid;gap:var(--at-space);width:100%;padding:var(--at-space);min-height:104px;align-content:start}
+#__SCOUT_ROOT__ .at-node strong{font-size:var(--at-node);font-weight:600;overflow-wrap:anywhere}
+#__SCOUT_ROOT__ .at-node .at-meta{line-height:1.45}
+#__SCOUT_ROOT__ .at-node .at-index{font-size:var(--at-small);color:var(--at-muted);font-variant-numeric:tabular-nums}
+#__SCOUT_ROOT__ .at-owner{background:var(--at-soft)}
+#__SCOUT_ROOT__ .at-return{margin:var(--at-space) var(--at-space) 0;text-align:right}
+#__SCOUT_ROOT__ .at-return button{font-size:var(--at-small);color:var(--at-blue);padding:var(--at-space) 0;min-height:36px}
+#__SCOUT_ROOT__ .at-support{margin-top:calc(var(--at-space)*4);padding-top:calc(var(--at-space)*3);border-top:1px solid var(--at-line)}
+#__SCOUT_ROOT__ .at-support-head{display:flex;justify-content:space-between;align-items:baseline;gap:var(--at-space);flex-wrap:wrap}
+#__SCOUT_ROOT__ .at-support-head h3{font-size:var(--at-body);font-weight:500}
+#__SCOUT_ROOT__ .at-loop{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:calc(var(--at-space)*4);margin-top:calc(var(--at-space)*2)}
+#__SCOUT_ROOT__ .at-loop-item{position:relative;min-width:0}
+#__SCOUT_ROOT__ .at-loop-item button{padding:var(--at-space) 0;display:grid;gap:var(--at-space);width:100%}
+#__SCOUT_ROOT__ .at-loop-item strong{font-size:var(--at-body);font-weight:600}
+#__SCOUT_ROOT__ .at-context-link{margin-top:calc(var(--at-space)*2);display:flex;gap:var(--at-space);align-items:center;font-size:var(--at-small);color:var(--at-muted)}
+#__SCOUT_ROOT__ .at-context-link:before{content:"↳";font-size:var(--at-node)}
+#__SCOUT_ROOT__ .at-bottom{margin-top:calc(var(--at-space)*4);padding-top:calc(var(--at-space)*2);border-top:1px solid var(--at-line);display:flex;align-items:center;justify-content:space-between;gap:var(--at-space);flex-wrap:wrap}
+#__SCOUT_ROOT__ .at-link{color:var(--at-blue);padding:var(--at-space) 0;min-height:36px}
+#__SCOUT_ROOT__ .at-breadcrumb{display:flex;gap:var(--at-space);align-items:center;flex-wrap:wrap;font-size:var(--at-small);color:var(--at-muted);padding-right:70px;margin-bottom:calc(var(--at-space)*2)}
+#__SCOUT_ROOT__ .at-breadcrumb button{color:var(--at-blue);padding:var(--at-space) 0;min-height:36px}
+#__SCOUT_ROOT__ .at-context{display:flex;gap:var(--at-space);align-items:center;color:var(--at-muted);font-size:var(--at-small);flex-wrap:wrap;margin-top:var(--at-space)}
+#__SCOUT_ROOT__ .at-context strong{font-weight:500;color:var(--at-fg)}
+#__SCOUT_ROOT__ .at-focus-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:calc(var(--at-space)*4);margin-top:calc(var(--at-space)*4)}
+#__SCOUT_ROOT__ .at-timeline{list-style:none;margin:0;padding:0}
+#__SCOUT_ROOT__ .at-timeline li{position:relative;padding-bottom:var(--at-space)}
+#__SCOUT_ROOT__ .at-timeline li:not(:last-child):before{content:"";position:absolute;width:1px;background:var(--at-line);left:19px;top:39px;bottom:-4px}
+#__SCOUT_ROOT__ .at-timeline button{display:flex;gap:var(--at-space);align-items:center;padding:var(--at-space);width:100%;min-height:48px}
+#__SCOUT_ROOT__ .at-timeline button span{font-size:var(--at-small);color:var(--at-muted);width:24px;flex-shrink:0;font-variant-numeric:tabular-nums}
+#__SCOUT_ROOT__ .at-timeline button[aria-current="step"]{background:var(--at-selection);color:var(--at-blue);font-weight:600}
+#__SCOUT_ROOT__ .at-detail{min-width:0;border-left:1px solid var(--at-line);padding-left:calc(var(--at-space)*3)}
+#__SCOUT_ROOT__ .at-detail-label{font-size:var(--at-small);color:var(--at-muted);margin-bottom:var(--at-space)}
+#__SCOUT_ROOT__ .at-detail h4{margin-bottom:calc(var(--at-space)*2)}
+#__SCOUT_ROOT__ .at-detail dl{display:grid;gap:var(--at-space);margin:0}
+#__SCOUT_ROOT__ dt{font-size:var(--at-small);color:var(--at-muted)}
+#__SCOUT_ROOT__ dd{margin:0 0 var(--at-space)}
+#__SCOUT_ROOT__ .at-recovery{margin-top:calc(var(--at-space)*2);font-size:var(--at-small);color:var(--at-muted)}
+#__SCOUT_ROOT__ .at-recovery strong{font-weight:500;color:var(--at-fg)}
+#__SCOUT_ROOT__ details{margin-top:calc(var(--at-space)*3);border-top:1px solid var(--at-line)}
+#__SCOUT_ROOT__ summary{padding:calc(var(--at-space)*2) 0;min-height:44px}
+#__SCOUT_ROOT__ .at-evidence{padding-bottom:calc(var(--at-space)*2)}
+#__SCOUT_ROOT__ .at-evidence ul{padding-left:20px;margin:var(--at-space) 0}
+#__SCOUT_ROOT__ .at-evidence li+li{margin-top:var(--at-space)}
+#__SCOUT_ROOT__ .at-primary-action{background:var(--at-fg);color:var(--at-bg);padding:10px 14px;min-height:40px;font-weight:500}
+#__SCOUT_ROOT__ .at-notice{font-size:var(--at-small);color:var(--at-muted);margin-top:var(--at-space)}
+#__SCOUT_ROOT__ .at-advice{margin-top:calc(var(--at-space)*4)}
+#__SCOUT_ROOT__ .at-advice h4{margin-bottom:var(--at-space)}
+#__SCOUT_ROOT__ .at-advice p{margin-bottom:calc(var(--at-space)*2)}
+#__SCOUT_ROOT__ .at-table{width:100%;border-collapse:collapse;margin-top:calc(var(--at-space)*3);font-size:var(--at-small)}
+#__SCOUT_ROOT__ .at-table th,#__SCOUT_ROOT__ .at-table td{text-align:left;border-bottom:1px solid var(--at-line);padding:12px 8px;vertical-align:top;font-weight:400}
+#__SCOUT_ROOT__ .at-table thead th{color:var(--at-muted)}
+#__SCOUT_ROOT__ .at-table tbody th{font-weight:500}
+@media(hover:hover){#__SCOUT_ROOT__ button:hover{background:var(--at-soft)}#__SCOUT_ROOT__ .at-primary-action:hover{background:var(--at-blue);color:var(--at-bg)}}
+@media(max-width:560px){#__SCOUT_ROOT__ .at-page{padding:calc(var(--at-space)*2)}#__SCOUT_ROOT__ .at-header{padding-right:54px}#__SCOUT_ROOT__ .at-primary{grid-template-columns:1fr;gap:0;margin-top:calc(var(--at-space)*2)}#__SCOUT_ROOT__ .at-node{grid-template-columns:24px minmax(0,1fr);min-height:70px;align-items:center;column-gap:var(--at-space)}#__SCOUT_ROOT__ .at-node .at-meta{grid-column:2}#__SCOUT_ROOT__ .at-primary li:not(:last-child):after{content:"";width:1px;background:var(--at-line);left:19px;top:58px;bottom:-6px;right:auto}#__SCOUT_ROOT__ .at-loop{grid-template-columns:1fr;gap:calc(var(--at-space)*2)}#__SCOUT_ROOT__ .at-loop-item button{padding-left:var(--at-space)}#__SCOUT_ROOT__ .at-focus-body{grid-template-columns:1fr;gap:calc(var(--at-space)*2);margin-top:calc(var(--at-space)*3)}#__SCOUT_ROOT__ .at-timeline button{min-height:44px}#__SCOUT_ROOT__ .at-detail{border-left:0;border-top:1px solid var(--at-line);padding:calc(var(--at-space)*2) 0 0}#__SCOUT_ROOT__ .at-table th,#__SCOUT_ROOT__ .at-table td{padding:10px 4px}#__SCOUT_ROOT__ .at-bottom{align-items:flex-start}#__SCOUT_ROOT__ h2{font-size:26px}}
+#__SCOUT_ROOT__ .at-relationship{display:grid;gap:var(--at-space);margin-top:var(--at-space)}
+#__SCOUT_ROOT__ .at-relationship button{padding:var(--at-space);min-height:44px}
+</style>
+<article class="at-page" aria-label="工程全貌与复盘">
+ <section data-overview>
+  <header class="at-header"><p class="at-meta" data-purpose></p><h2 data-title></h2><p class="at-heading-copy" data-goal></p></header>
+  <section class="at-figure" data-primary></section>
+  <section class="at-support" data-support></section>
+  <details><summary class="cursor-interaction">工程范围、参与者与覆盖边界</summary><div class="at-evidence" data-boundary></div></details>
+  <div class="at-bottom"><span class="at-meta" data-snapshot></span><button type="button" data-review class="at-link cursor-interaction">查看建议 →</button></div>
+ </section>
+ <section data-focus hidden>
+  <nav class="at-breadcrumb" aria-label="当前位置"><button type="button" data-home class="cursor-interaction">← 工程全貌</button><span>/</span><span data-location></span></nav>
+  <h2 data-focus-title></h2><p class="at-context" data-context></p>
+  <div class="at-focus-body" data-path><ol class="at-timeline" aria-label="完整执行路径" data-timeline></ol><section class="at-detail" aria-live="polite" data-detail></section></div>
+  <section data-matrix hidden></section>
+  <section class="at-advice" data-advice hidden></section>
+  <details data-evidence><summary class="cursor-interaction">依据与适用边界</summary><div class="at-evidence" data-sources></div></details>
+  <div class="at-bottom"><button type="button" data-discuss class="at-primary-action cursor-interaction">继续讨论此处</button><button type="button" data-view class="at-link cursor-interaction">核对环境与证据</button></div>
+  <p class="at-notice" role="status" aria-live="polite" data-status></p>
+ </section>
+ <noscript>当前环境未启用交互。完整审阅文件保留同一工程全貌、路径、矩阵及来源，可在当前聊天继续讨论。</noscript>
+</article>
 <script>
 (() => {
-  const root = document.getElementById('__SCOUT_ROOT__');
-  const data = __SCOUT_DATA__;
-  const map = data.project_map;
-  const sources = new Map(data.evidence_sources.flatMap(s => s.refs).map(r => [r.ref, r]));
-  const objects = {node: new Map(map.nodes.map(n => [n.id, n])), edge: new Map(map.edges.map(e => [e.id, e])), journey: new Map(map.journeys.map(j => [j.id, j]))};
-  let selection = {kind: 'node', id: map.nodes[0].id};
-  let view = 'overview';
-  const status = root.querySelector('[data-status]');
-  const el = (tag, text, cls) => { const x = document.createElement(tag); if (text !== undefined) x.textContent = text; if (cls) x.className = cls; return x; };
-  const button = (kind, item, label) => {
-    const b = el('button', label || item.label, 'btn'); b.type = 'button';
-    b.dataset.kind = kind; b.dataset.id = item.id;
-    b.setAttribute('aria-pressed', String(selection.kind === kind && selection.id === item.id)); return b;
-  };
-  const evidence = refs => {
-    const details = el('details'); details.append(el('summary', '查看来源'));
-    const list = el('ul');
-    for (const ref of refs) list.append(el('li', ref + '：' + sources.get(ref).summary));
-    if (!refs.length) list.append(el('li', '尚无直接证据。'));
-    details.append(list); return details;
-  };
-  const flow = journey => {
-    const row = el('div', undefined, 'map-flow');
-    row.append(button('node', objects.node.get(journey.entry)));
-    for (const id of journey.edge_ids) {
-      const edge = objects.edge.get(id);
-      row.append(el('span', '→'), button('edge', edge), el('span', '→'), button('node', objects.node.get(edge.target)));
-    }
-    return row;
-  };
-  root.querySelector('[data-title]').textContent = map.title;
-  root.querySelector('[data-goal]').textContent = map.goal;
-  root.querySelector('[data-snapshot]').textContent = (data.purpose === 'inspect' ? '当前设计查看，未执行近期协作复盘。' : '工程复盘快照。') + '观察于 ' + map.observed_at + ' · 来源 ' + map.source_revision.slice(0, 12);
-  const overview = root.querySelector('#__SCOUT_ROOT__-overview');
-  overview.append(el('p', map.boundary));
-  for (const j of map.journeys) {
-    const section = el('div', undefined, 'map-section');
-    section.append(button('journey', j), flow(j)); overview.append(section);
+ const root = document.getElementById('__SCOUT_ROOT__');
+ const data = __SCOUT_DATA__, map = data.project_map;
+ const q = s => root.querySelector(s);
+ const sources = new Map(data.evidence_sources.flatMap(s => s.refs).map(r => [r.ref, r]));
+ const objects = {node: new Map(map.nodes.map(n => [n.id, n])), edge: new Map(map.edges.map(e => [e.id, e])), journey: new Map(map.journeys.map(j => [j.id, j])), advice: new Map(data.advice.map(c => [c.card_id, c]))};
+ const actionable = data.advice.filter(c => c.recommended_action && c.recommended_action !== 'ignore');
+ const ownerLabels = {project_owner:'项目维护', skill:'方法维护', global_agents:'全局规则候选', no_persistence:'无需持久化'};
+ const actionLabels = {confirm:'待准确确认', edit:'先澄清或调整', keep_project:'进入项目维护', make_skill:'进入方法维护', ignore:'无需处理'};
+ const el = (tag, text, cls) => { const x=document.createElement(tag); if(text !== undefined)x.textContent=text; if(cls)x.className=cls; return x; };
+ const button = (kind, id, label, journey='') => {
+  const b=el('button',label,'cursor-interaction'); b.type='button'; b.dataset.kind=kind; b.dataset.id=id; b.dataset.journey=journey; return b;
+ };
+ const steps = journey => [{kind:'node', id:journey.entry}, ...journey.edge_ids.flatMap(id => [{kind:'edge',id}, {kind:'node',id:objects.edge.get(id).target}])];
+ const label = s => {const item=objects[s.kind].get(s.id); return item.label || item.title;};
+ const itemFor = () => objects[state.selection.kind].get(state.selection.id);
+ let state={screen:'overview', journey:map.journeys[0]?.id || '', selection:{kind:'node',id:map.journeys[0]?.entry || map.nodes[0].id}, view:'path'};
+ const facts = pairs => { const dl=el('dl'); for(const [name,value] of pairs) if(value)dl.append(el('dt',name),el('dd',value)); return dl; };
+ const adviceButtons = ids => {
+  const row=el('div',undefined,'at-relationship');
+  for(const c of actionable.filter(c => ids.includes(c.card_id)))row.append(button('advice',c.card_id,'建议：'+c.title,state.journey));
+  return row;
+ };
+ function evidence(refs) {
+  const list=el('ul');
+  for(const ref of [...new Set(refs)])list.append(el('li',ref+'：'+(sources.get(ref)?.summary || '见原报告中的事件或卡片依据。')));
+  if(!refs.length)list.append(el('li','尚无直接证据。'));
+  return list;
+ }
+ function renderOverview() {
+  q('[data-title]').textContent=map.title; q('[data-goal]').textContent=map.goal;
+  q('[data-purpose]').textContent=data.purpose==='inspect'?'SCOUT / 工程全貌 / 当前设计查看':'SCOUT / 工程全貌 / 深度复盘';
+  q('[data-snapshot]').textContent='观察于 '+map.observed_at+' · 来源 '+map.source_revision.slice(0,12)+(data.purpose==='inspect'?'。本次未执行近期协作复盘。':'。各项证据与未知分别判断。');
+  const primary=q('[data-primary]'), support=q('[data-support]'); primary.replaceChildren(); support.replaceChildren();
+  const first=map.journeys[0];
+  if(first){
+   const heading=el('div',undefined,'at-section-title');heading.append(el('h3',first.label));primary.append(heading); const ol=el('ol',undefined,'at-primary');ol.setAttribute('aria-label',first.label);
+   const path=[first.entry,...first.edge_ids.map(id=>objects.edge.get(id).target)];
+   path.forEach((id,i)=>{const n=objects.node.get(id),li=el('li'),b=button('node',id,undefined,first.id);b.classList.add('at-node');b.append(el('span',String(i+1).padStart(2,'0'),'at-index'),el('strong',n.label),el('span',i ? "→ " + objects.edge.get(first.edge_ids[i-1]).label : n.kind,'at-meta'));li.append(b);ol.append(li);});
+   primary.append(ol,el('p',first.outcome,'at-context-link'));
+  }else primary.append(el('p','当前证据尚未建立完整路径，已知能力与缺口保留在下方。'));
+  support.hidden=map.journeys.length<2;
+  if(!support.hidden){
+   const heading=el('div',undefined,'at-support-head');heading.append(el('h3','关联路径'));support.append(heading);const list=el('div',undefined,'at-loop');
+   for(const j of map.journeys.slice(1)){const div=el('div',undefined,'at-loop-item'),b=button('journey',j.id,undefined,j.id);b.append(el('strong',j.label),el('span',j.outcome,'at-meta'));div.append(b);list.append(div);}support.append(list);
   }
-  overview.append(el('h3', '能力与参与者'));
-  const grid = el('div', undefined, 'viz-grid');
-  for (const n of map.nodes) { const b = button('node', n); b.classList.add('viz-tile'); grid.append(b); }
-  overview.append(grid);
-  const paths = root.querySelector('#__SCOUT_ROOT__-paths');
-  for (const j of map.journeys) {
-    const section = el('details'); section.append(el('summary', j.label));
-    const content = el('div', undefined, 'map-section');
-    content.append(flow(j), el('p', '结果：' + j.outcome), el('p', '恢复与例外：' + j.recovery), evidence(j.evidence_refs), button('journey', j, '查看这条路径'));
-    section.append(content); paths.append(section);
+  const boundary=q('[data-boundary]');boundary.replaceChildren(el('p',map.boundary),el('h4','能力与参与者'));
+  const nodes=el('div',undefined,'at-relationship');for(const n of map.nodes)nodes.append(button('node',n.id,n.label+' · '+n.owner));boundary.append(nodes,el('h4','覆盖边界'));
+  for(const c of map.coverage){boundary.append(el('p',c.dimension+' · '+data.coverage_labels[c.status]+'：'+c.explanation),evidence(c.evidence_refs));}
+  q('[data-review]').hidden=!actionable.length;
+ }
+ function render() {
+  q('[data-overview]').hidden=state.screen!=='overview';q('[data-focus]').hidden=state.screen!=='focus';
+  const item=itemFor(), journey=objects.journey.get(state.journey), isAdvice=state.selection.kind==='advice';
+  q('[data-location]').textContent=journey?.label || (isAdvice?'维护建议':'能力与关系');
+  q('[data-focus-title]').textContent=isAdvice?item.title:(journey?.label || item.label);
+  q('[data-context]').textContent=isAdvice?(ownerLabels[item.owner_recommendation] || '见原报告维护归属'):(journey?.outcome || item.summary || item.label);
+  q('[data-path]').hidden=isAdvice || state.view!=='path';q('[data-advice]').hidden=!isAdvice;q('[data-matrix]').hidden=isAdvice || state.view!=='matrix';
+  q('[data-view]').hidden=isAdvice&&!state.returnTo;q('[data-view]').textContent=isAdvice?'返回所选环节':state.view==='matrix'?'返回当前路径':'核对环境与证据';
+  const timeline=q('[data-timeline]');timeline.replaceChildren();
+  const sequence=journey?steps(journey):[state.selection];
+  const stages=journey?sequence.filter(s=>s.kind==='node'):sequence;
+  stages.forEach((s,i)=>{const li=el('li'),b=button(s.kind,s.id,undefined,state.journey);const active=s.kind===state.selection.kind&&s.id===state.selection.id || state.selection.kind==='edge'&&s.id===item.target;b.setAttribute('aria-current',active?'step':'false');b.append(el('span',String(i+1).padStart(2,'0')),el('strong',label(s)));li.append(b);timeline.append(li);});
+  const detail=q('[data-detail]');detail.replaceChildren(el('p','当前环节 / '+(journey?.label || '工程关系'),'at-detail-label'),el('h4',label(state.selection)));
+  if(!isAdvice){
+   detail.append(facts([['职责',item.summary],['维护归属',item.owner],['结果',item.outcome]]));
+   if(state.selection.kind==='edge')detail.append(facts([['交接',objects.node.get(item.source).label+' → '+item.label+' → '+objects.node.get(item.target).label]]));
+   for(const c of item.claims || [])detail.append(facts([[data.layer_labels[c.layer]+' · '+c.environment,c.statement]]));
+   if(journey)detail.append(el('p','恢复与例外：'+journey.recovery,'at-recovery'));
+   const related=el('div',undefined,'at-relationship'),others=el('div',undefined,'at-relationship');
+   if(state.selection.kind==='node')for(const e of map.edges.filter(e=>e.source===item.id||e.target===item.id)){
+    const target=!journey||journey.edge_ids.includes(e.id)?related:others;
+    target.append(button('edge',e.id,objects.node.get(e.source).label+' → '+e.label+' → '+objects.node.get(e.target).label,state.journey));
+   }
+   if(state.selection.kind==='edge')for(const id of [item.source,item.target])related.append(button('node',id,objects.node.get(id).label,state.journey));
+   for(const j of map.journeys.filter(j=>j.id!==state.journey&&steps(j).some(s=>s.kind===state.selection.kind&&s.id===state.selection.id)))others.append(button('journey',j.id,'关联路径：'+j.label,j.id));
+   detail.append(related);
+   if(others.childElementCount){const more=el('details');more.append(el('summary','其他关联路径'),others);detail.append(more);}
+   detail.append(adviceButtons([...new Set([...(item.card_ids || []),...(journey?.card_ids || [])])]));
   }
-  if (!map.journeys.length) paths.append(el('p', '当前证据尚未建立关键路径，见覆盖边界。'));
-  const matrix = root.querySelector('#__SCOUT_ROOT__-matrix');
-  const table = el('table', undefined, 'table'); const head = el('thead'); const tr = el('tr');
-  for (const label of ['对象', '证据层次 / 环境', '事实与未证范围']) { const th = el('th', label); th.scope = 'col'; tr.append(th); }
-  head.append(tr); table.append(head); const tbody = el('tbody');
-  for (const [kind, values] of [['node', map.nodes], ['edge', map.edges]]) for (const item of values) for (const c of item.claims) {
-    const row = el('tr'); const label = el('td'); label.append(button(kind, item));
-    row.append(label, el('td', data.layer_labels[c.layer] + ' · ' + c.environment), el('td', c.statement)); tbody.append(row);
+  const matrix=q('[data-matrix]');matrix.replaceChildren();
+  const table=el('table',undefined,'at-table'),head=el('thead'),tr=el('tr');
+  for(const title of ['对象 / 归属','证据层次 / 环境','事实与未证范围']){const th=el('th',title);th.scope='col';tr.append(th);}head.append(tr);table.append(head);
+  const tbody=el('tbody'), seen=new Set();
+  for(const s of sequence){const key=s.kind+':'+s.id;if(seen.has(key))continue;seen.add(key);const obj=objects[s.kind].get(s.id);
+   for(const c of obj.claims || []){const row=el('tr'),name=el('th');name.scope='row';name.append(button(s.kind,s.id,obj.label,state.journey));if(obj.owner)name.append(el('p',obj.owner,'at-meta'));const content=el('td',c.statement);const more=el('details');more.append(el('summary','来源'),evidence(c.evidence_refs));content.append(more);row.append(name,el('td',data.layer_labels[c.layer]+' · '+c.environment),content);tbody.append(row);}}
+  table.append(tbody);matrix.append(table);
+  const advice=q('[data-advice]');advice.replaceChildren();
+  if(isAdvice){const h=item.human_context;
+   advice.append(el('p',(actionLabels[item.recommended_action] || '见原报告')+'。'+(item.recommended_action_reason || ''),'at-meta'));
+   if(h)advice.append(facts([['用户成本',h.user_cost],['当前',h.concrete_before],[item.recommended_action==='edit'?'项目原建议':'建议',h.recommended_outcome],['调整后',h.concrete_after],['维护归属',item.owner_rationale],['例外与风险',h.strongest_counterpoint],['未证范围',(item.unproven || []).join('；')]]));
+   else advice.append(el('p',item.recommendation),el('p','详细变化与例外请从同一原报告恢复，旧报告不补造新字段。','at-meta'));
+   advice.append(adviceButtons(actionable.filter(c=>c.card_id!==item.card_id).map(c=>c.card_id)));
   }
-  table.append(tbody); matrix.append(table, el('h3', '覆盖边界'));
-  for (const c of map.coverage) matrix.append(el('p', c.dimension + ' · ' + data.coverage_labels[c.status] + '：' + c.explanation));
-
-  function save() {
-    if (!window.openai?.setWidgetState) return;
-    try { Promise.resolve(window.openai.setWidgetState({modelContent: {report_hash: data.report_hash, selection}, privateContent: {view}})).catch(() => {}); } catch (_) { /* presentation state only */ }
+  const refs=isAdvice?(item.human_context?.evidence_refs || []):[...(item.evidence_refs || []),...(item.claims || []).flatMap(c=>c.evidence_refs),...(journey?.evidence_refs || [])];
+  q('[data-sources]').replaceChildren(evidence(refs));q('[data-status]').textContent='';
+ }
+ function save(){try{Promise.resolve(window.openai?.setWidgetState?.({modelContent:{report_hash:data.report_hash,selection:state.selection},privateContent:{screen:state.screen,journey:state.journey,view:state.view,returnTo:state.returnTo || null}})).catch(()=>{});}catch{ /* convenience only */ }}
+ function restore(value){
+  const content=value?.modelContent,next=content?.selection;
+  if(content?.report_hash!==data.report_hash||!Object.hasOwn(objects,next?.kind)||!objects[next.kind].has(next.id))return false;
+  const saved=value.privateContent || {}, journey=objects.journey.get(saved.journey);
+  state={selection:{kind:next.kind,id:next.id},screen:saved.screen==='overview'?'overview':'focus',journey:journey&&steps(journey).some(s=>s.kind===next.kind&&s.id===next.id)?journey.id:'',view:saved.view==='matrix'?'matrix':'path'};
+  if(next.kind==='journey')state.journey=next.id;
+  if(next.kind==='advice'&&journey)state.journey=journey.id;
+  const previous=saved.returnTo, selection=previous?.selection;
+  if(next.kind==='advice'&&['node','edge','journey'].includes(selection?.kind)&&objects[selection.kind].has(selection.id)){
+   const path=objects.journey.get(previous.journey);
+   state.returnTo={selection:{kind:selection.kind,id:selection.id},journey:path&&(selection.kind==='journey'?selection.id===path.id:steps(path).some(s=>s.kind===selection.kind&&s.id===selection.id))?path.id:''};
   }
-  function detail() {
-    const item = objects[selection.kind].get(selection.id);
-    const target = root.querySelector('[data-detail]'); target.replaceChildren();
-    target.append(el('h3', item.label));
-    if (item.summary) target.append(el('p', item.summary));
-    if (item.owner) target.append(el('p', '维护归属：' + item.owner));
-    for (const c of item.claims || []) target.append(el('p', data.layer_labels[c.layer] + ' · ' + c.environment + '：' + c.statement));
-    if (item.recovery) target.append(el('p', '结果：' + item.outcome), el('p', '恢复与例外：' + item.recovery));
-    const refs = [...new Set([...item.evidence_refs, ...(item.claims || []).flatMap(c => c.evidence_refs)])];
-    target.append(evidence(refs));
-    if (selection.kind === 'node') {
-      const related = el('div', undefined, 'map-flow');
-      for (const edge of map.edges.filter(e => e.source === item.id || e.target === item.id)) related.append(button('edge', edge, objects.node.get(edge.source).label + ' → ' + edge.label + ' → ' + objects.node.get(edge.target).label));
-      target.append(related);
-    }
-    for (const id of item.card_ids) {
-      const advice = data.advice.find(c => c.card_id === id);
-      target.append(el('p', '关联建议：' + advice.title + '。' + advice.recommendation));
-    }
-    const discuss = el('button', '继续讨论此处', 'btn btn-primary'); discuss.type = 'button';
-    discuss.addEventListener('click', async () => {
-      if (!window.openai?.sendFollowUpMessage) { status.textContent = '当前环境没有会话续问接口，可在原聊天直接提及“' + item.label + '”。'; return; }
-      discuss.disabled = true; status.textContent = '正在请求继续讨论；本操作不批准任何写入。';
-      try {
-        const prompt = '继续讨论已交付的工程图谱。报告 ' + data.report_hash + '，对象 ' + selection.kind + ':' + item.id + '（' + item.label + '）。请恢复原报告，解释此处的依据、关系、例外和关联建议；不要重跑普查，也不要将本次讨论视为写入授权。';
-        await window.openai.sendFollowUpMessage({prompt, title: '继续讨论“' + item.label + '”'});
-        status.textContent = '续问请求已提交；是否完成发送以宿主反馈为准，现有规则未改变。';
-      } catch (_) { status.textContent = '续问未完成，图谱和原报告仍可阅读。'; }
-      finally { discuss.disabled = false; }
-    });
-    target.append(discuss);
-    for (const b of root.querySelectorAll('[data-kind]')) b.setAttribute('aria-pressed', String(b.dataset.kind === selection.kind && b.dataset.id === selection.id));
-  }
-  function restore(state) {
-    const content = state?.modelContent;
-    if (content?.report_hash !== data.report_hash) return;
-    const next = content.selection;
-    if (Object.hasOwn(objects, next?.kind) && objects[next.kind].has(next.id)) selection = {kind: next.kind, id: next.id};
-    const savedView = state.privateContent?.view;
-    if (['overview', 'paths', 'matrix'].includes(savedView)) {
-      view = savedView;
-      for (const b of root.querySelectorAll('[data-view]')) { const active = b.dataset.view === view; b.classList.toggle('active', active); b.setAttribute('aria-selected', String(active)); root.querySelector('#' + b.getAttribute('aria-controls')).hidden = !active; }
-    }
-    detail();
-  }
-  root.addEventListener('click', event => {
-    const selected = event.target.closest('[data-kind]');
-    if (selected && root.contains(selected)) { selection = {kind: selected.dataset.kind, id: selected.dataset.id}; detail(); save(); }
-    const tab = event.target.closest('[data-view]');
-    if (tab && root.contains(tab)) { view = tab.dataset.view; save(); }
-  });
-  root.addEventListener('keyup', event => {
-    if (!event.target.closest('[data-view]')) return;
-    const active = root.querySelector('[data-view][aria-selected="true"]');
-    if (active && view !== active.dataset.view) { view = active.dataset.view; save(); }
-  });
-  detail(); restore(window.openai?.widgetState);
-  window.addEventListener('openai:set_globals', event => restore(event.detail?.globals?.widgetState));
+  return true;
+ }
+ function select(kind,id,journeyId){
+  const returnTo=kind==='advice'?(state.selection.kind==='advice'?state.returnTo:state.screen==='focus'?{selection:{...state.selection},journey:state.journey}:null):null;
+  const associated=map.journeys.filter(j=>steps(j).some(s=>s.kind===kind&&s.id===id));
+  const journey=kind==='journey'?id:(associated.find(j=>j.id===journeyId)?.id || associated[0]?.id || '');
+  state={screen:'focus',selection:{kind,id},journey:kind==='advice'?journeyId || '':journey,view:'path',returnTo};
+ }
+ root.addEventListener('click',event=>{
+  const b=event.target.closest('button');if(!b||!root.contains(b)||b.hasAttribute('data-discuss'))return;
+  if(b.hasAttribute('data-kind'))select(b.dataset.kind,b.dataset.id,b.dataset.journey);
+  else if(b.hasAttribute('data-home'))state.screen='overview';
+  else if(b.hasAttribute('data-review'))select('advice',actionable[0].card_id,'');
+  else if(b.hasAttribute('data-view')){if(state.selection.kind==='advice'&&state.returnTo){const back=state.returnTo;state={...state,...back,view:'path',returnTo:null};}else state.view=state.view==='matrix'?'path':'matrix';}else return;
+  const fromTimeline=Boolean(b.closest('[data-timeline]'));
+  render();save();q('[data-evidence]').open=false;
+  const focus=state.screen==='overview'?q('[data-primary] button') || q('[data-boundary] button'):b.hasAttribute('data-view')?q('[data-view]'):q('[data-home]');const selected=fromTimeline?[...q('[data-timeline]').querySelectorAll('button')].find(x=>x.dataset.kind===state.selection.kind&&x.dataset.id===state.selection.id):null;(selected || focus)?.focus({preventScroll:true});
+ });
+ q('[data-discuss]').addEventListener('click',async()=>{
+  const selected={...state.selection},name=label(selected),b=q('[data-discuss]');b.disabled=true;
+  const prompt='继续讨论已交付的工程图谱。报告 '+data.report_hash+'，对象 '+selected.kind+':'+selected.id+'（'+name+'）。请恢复原报告，解释此处的依据、关系、例外和关联建议；不要重跑普查，也不要将本次讨论视为写入授权。';
+  try{if(!window.openai?.sendFollowUpMessage)throw Error('unavailable');await window.openai.sendFollowUpMessage({prompt,title:'继续讨论“'+name+'”'});q('[data-status]').textContent='续问请求已提交；以聊天中的实际消息为准。';}
+  catch{q('[data-status]').textContent='此端无法发起续问。可在当前聊天继续讨论报告 '+data.report_hash+' 中的 '+selected.kind+':'+selected.id+'（'+name+'）。';}finally{b.disabled=false;}
+ });
+ renderOverview();restore(window.openai?.widgetState);render();
+ window.addEventListener('openai:set_globals',event=>{if(restore(event.detail?.globals?.widgetState))render();});
 })();
 </script>
+</div>

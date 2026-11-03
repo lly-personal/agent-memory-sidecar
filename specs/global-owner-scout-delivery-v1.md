@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Owner: project_docs
-- Applies to: Scout 5.12 interactive delivery
+- Applies to: Scout 5.13 interactive delivery; legacy receipts remain readable
 - Decision: [ADR 0076](../docs/decisions/0076-task-scoped-review-pack-delivery.zh.md)
 
 
@@ -26,6 +26,11 @@ Default file opening remains zero; `surface_observation=not_requested` means no 
 Inspect delivers current design with null Owner parity/preview and zero cards; it does not claim a deep review. Review retains
 existing rule preview and actual user authorization. Overview, path and matrix projections share evidence layers and source refs.
 Historical v1 receipt parsing remains read-only. The following v1 field and safety descriptions apply unchanged where not extended above.
+
+The fixed presentation follows the accepted overview/focus/return interaction. Shared objects retain their selected journey;
+opening related advice retains the originating object in best-effort local widget state and offers a return to it. This does not
+track maintenance progress or confer approval. Derived advice carries its verified Human Context, ownership and current disposition,
+without reproducing confirmation commands. Target-project content is independent of the repository maintaining the renderer.
 
 ## Purpose
 

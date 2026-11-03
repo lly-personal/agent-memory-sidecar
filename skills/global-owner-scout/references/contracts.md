@@ -26,6 +26,11 @@ The renderer freezes the map and its declared source/linked-advice context in th
 state store. Missing or changed HTML is reported separately and cannot block verified Markdown discussion or grant approval.
 The initial preparation verifies both files; recovery never repairs an old artifact silently. Native follow-up messages carry
 the report hash, object kind and ID; widget state is best effort and cannot replace this binding or Core authorization.
+The target project's journeys are ordered by user outcomes; the first anchors the overview. Names, counts, tools, owners and
+environments are evidence-derived, never a fixed Sidecar topology. Derived advice preserves Human Context, owner recommendation
+and rationale, current recommended action/reason and unproven scope. It contains no confirmation token or duplicate rule text.
+Covered advice remains in the frozen report but creates no UI task; challenged advice retains its current clarification status.
+Older contexts without these fields stay readable from their original artifacts rather than being regenerated or embellished.
 
 ## Common rules
 

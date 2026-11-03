@@ -5,6 +5,9 @@ their own component versions in `COMPATIBILITY.md`.
 
 ## 0.5.11 (2026-11-03)
 
+- Integrate the accepted overview and focused-path design with frozen project evidence, contextual matrices and same-chat continuation; derive topology from each target project instead of hardcoding Sidecar workflows.
+- Preserve recommendation costs, before/after, exceptions, ownership and current review disposition in the map; covered items do not create work and clarification is not presented as approval.
+
 - Separate current-project viewing from deep review, reconstructing real entrypoints, handoffs, environments, recovery and maintenance responsibilities.
 - Deliver an evidence-bound overview, journey and matrix in the current conversation using native controls, source disclosure and explicit follow-up. Browsing never authorizes a write.
 - Bind Markdown and interactive content to one frozen result; retain legacy report recovery and readable evidence when interaction is unavailable.

@@ -49,7 +49,57 @@ def map_pack(purpose='inspect'):
     return pack
 
 
+def browser_packs():
+    """Public, synthetic cross-project inputs for the native-preview browser check."""
+    real = map_pack(); m = real['project_result']['project_map']
+    m.update(title='离线校对工具', goal='从导入、校对到下游消费，并能够回滚。')
+    template = m['nodes'][0]
+    m['nodes'] = [dict(copy.deepcopy(template), id=id_, label=label, owner=owner)
+                  for id_, label, owner in [('entry', '导入入口', '导入模块'), ('review', '人工校对', '校对模块'),
+                      ('owner', '已确认结果', '结果文件'), ('consumer', '下游消费者', '消费工具'), ('rollback', '回滚入口', '恢复工具')]]
+    edge = m['edges'][0]
+    m['edges'] = [dict(copy.deepcopy(edge), id=id_, source=source, target=target, label=label)
+                  for id_, source, target, label in [('load', 'entry', 'review', '导入内容'),
+                      ('accept', 'review', 'owner', '确认结果'), ('adopt', 'owner', 'consumer', '消费与采用'),
+                      ('restore', 'rollback', 'owner', '恢复结果')]]
+    journey = m['journeys'][0]
+    m['journeys'] = [dict(copy.deepcopy(journey), id='ordinary', label='导入并消费', edge_ids=['load', 'accept', 'adopt']),
+                      dict(copy.deepcopy(journey), id='revoke', label='回滚与撤销', entry='rollback', edge_ids=['restore', 'adopt'])]
+    advice = v.valid_review_pack()
+    advice.update(contract_version='global_owner_scout_review_pack_v7')
+    advice['project_result'].update(contract_version='global_owner_scout_project_v6', purpose='review', project_map=map_project()['project_map'])
+    advice['project_result']['project_map']['nodes'][0]['card_ids'] = [advice['project_result']['project_cards'][0]['card_id']]
+    other = map_pack(); m = other['project_result']['project_map']
+    m.update(title='离线数据校对', goal='将导入数据交给人工校对后导出。')
+    m['nodes'][0].update(label='离线导入', owner='导入模块')
+    m['nodes'][1].update(label='人工校对与导出', owner='校对工具')
+    unknown = copy.deepcopy(other); unknown['project_result']['project_map']['journeys'] = []
+    result = dict(real=real, advice=advice, other=other, unknown=unknown)
+    for pack in result.values():
+        pack['review_pack_hash'] = v.review_pack_hash(pack)
+        v.validate_review_pack(pack)
+    return result
+
+
 class ScoutProjectMapTests(unittest.TestCase):
+    def test_cross_project_and_partial_topologies_are_valid(self):
+        packs = browser_packs()
+        self.assertEqual([2, 1, 1, 0], [len(p['project_result']['project_map']['journeys']) for p in packs.values()])
+
+    def test_visual_advice_preserves_context_and_current_disposition(self):
+        from project_map import map_context
+        pack = v.valid_review_pack()
+        card = pack['project_result']['project_cards'][0]
+        pack['project_result'].update(purpose='review', project_map=map_project()['project_map'])
+        advice = map_context(pack)['advice'][0]
+        self.assertEqual(card['human_context'], advice['human_context'])
+        self.assertEqual(card['owner_rationale'], advice['owner_rationale'])
+        self.assertEqual(card['owner_recommendation'], advice['owner_recommendation'])
+        self.assertEqual(pack['review_cards'][0]['recommended_action'], advice['recommended_action'])
+        self.assertEqual(pack['review_cards'][0]['recommended_action_reason'], advice['recommended_action_reason'])
+        self.assertNotIn('selection_token', advice)
+        self.assertNotIn('rule_payload', advice)
+
     def test_inspect_has_no_census_or_owner_resolution(self):
         import prepare_review
         with mock.patch.object(prepare_review, 'resolve', side_effect=AssertionError('must not resolve')):
@@ -168,4 +218,11 @@ class ScoutProjectMapTests(unittest.TestCase):
             self.assertEqual('verified', missing['visual_status'])
 
 
-if __name__ == '__main__': unittest.main()
+if __name__ == '__main__':
+    if len(sys.argv) == 3 and sys.argv[1] == '--browser-fixtures':
+        from project_map import map_context, render_visual
+        output = Path(sys.argv[2]); output.mkdir(parents=True, exist_ok=True)
+        for name, pack in browser_packs().items():
+            (output / (name + '-map.html')).write_text(render_visual(map_context(pack), pack['review_pack_hash']), encoding='utf-8')
+    else:
+        unittest.main()

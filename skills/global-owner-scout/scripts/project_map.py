@@ -78,11 +78,17 @@ def validate_map(project):
 
 def map_context(pack):
     p = pack['project_result']
+    reviews = {r['project_claim_hash']: r for r in pack['review_cards']}
     return {'purpose': p['purpose'], 'project_key': p['project_key'], 'project_map': p['project_map'],
             'project_identity': p['project_identity'], 'context_snapshot_hash': p['read_only_proof']['after_context_snapshot_hash'],
             'evidence_sources': p['evidence_sources'],
             'advice': [{'card_id': c['card_id'], 'title': c['human_context']['decision_title'],
-                        'recommendation': c['human_context']['recommended_outcome']} for c in p['project_cards']]}
+                        'recommendation': c['human_context']['recommended_outcome'],
+                        'human_context': c['human_context'], 'owner_recommendation': c['owner_recommendation'],
+                        'owner_rationale': c['owner_rationale'], 'unproven': c['unproven'],
+                        'recommended_action': reviews[c['project_claim_hash']]['recommended_action'],
+                        'recommended_action_reason': reviews[c['project_claim_hash']]['recommended_action_reason']}
+                       for c in p['project_cards']]}
 
 
 def render_visual(context, pack_hash):
