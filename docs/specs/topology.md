@@ -63,7 +63,13 @@ Store 相邻目录，成功后删除；它只用于崩溃恢复，不是行为�
 
 Global Owner Scout 位于 Core 拓扑之外：
 
-Project v5 在现有结果中保留六类来源覆盖、事件与结构化观察去向；事件与卡片分别守恒，所有引用回到本轮声明的
+
+当前 Scout 先区分查看、复盘与续接。查看按当前源码和有效规范重建图谱，跳过会话普查与全局规则集成；
+复盘在同一图谱上核查近期协作、跨模块交接、恢复与演进机会。两者复用固定模板生成总览、路径、矩阵，
+默认在当前会话呈现，按需展开来源与讨论；没有建议仍可理解工程。原生交互不可用时保留 Markdown 同源内容。
+图谱只是冻结证据的投影，不成为第二 Owner、长期状态或授权来源。完整快照变化先定位受影响来源并形成新快照。
+
+Project v6 在现有结果中保留六类来源覆盖、事件与结构化观察去向；事件与卡片分别守恒，所有引用回到本轮声明的
 来源。Agent 负责语义发现及反证，validator 负责引用、去向和卡片完整性；盲测样本负责发现能力评估。没有新增
 长期候选库、后台任务或规则 authority。活动工程知识与近期 Session 是并列输入，不以会话覆盖替代工程覆盖。
 
@@ -82,18 +88,18 @@ flowchart LR
     EX --> NI["原生任务索引：yield / wait / terminal"]
     NI --> TP["相关自然任务分页到窗口边界或 EOF"]
     TP --> SS["Global Owner Scout Skill：project_scout"]
-    SS --> PC["Immutable project_v5 Project Cards"]
+    SS --> PC["Immutable project_v6：工程图谱与 Project Cards"]
     PC --> HC["Human Context：zh-CN 项目语境"]
     PC --> RPJ["Rule Projection：When / Do / Skip"]
     GB["Core global_instruction_binding"] --> OR["Deterministic Owner resolver"]
     GO["Canonical source 与本机 global target"] --> OR
     OR --> IP["Integration preview"]
     RPJ --> IP
-    HC --> RP["Validated review_pack_v6"]
+    HC --> RP["Validated review_pack_v7"]
     IP --> RP
     RP --> DR["Deterministic renderer：interactive surface + 精确多选动作"]
     DR --> VO["Visible-output verifier：交付前字节守恒"]
-    VO --> DV["Delivery v1：不可变 task artifact + manifest"]
+    VO --> DV["Delivery v2：Markdown + 原生交互投影"]
     DV --> EC["当前任务：已验证简明建议与链接 / 原交付回执恢复"]
     EC -.->|"用户按需打开"| HS["Host surface：打开 / 排队 / 失败另行观察"]
     EC -->|"queued + bytes conserved"| SP["surface_pending：内容可核验、展示未证"]
@@ -139,7 +145,7 @@ flowchart LR
 | Project Review Pack | 将全部 E2/E3 卡渲染为中文分层 Markdown：状态、决策索引、准确规则与选择、核对依据；完全重复文本引用一次已显示原文 | 近义压缩、补写项目语义、原始 JSON 用户界面、跨任务传输、行为 owner |
 | Deterministic renderer | 从 scripts 目录读取已验证 Review Pack；interactive 输出零 wrapper，scheduled 输出唯一末尾 wrapper | 动态导入、失败后手工重写、修复项目语义 |
 | Visible-output verifier | 按 surface 重新验证 renderer/artifact 字节的正文 hash、卡片、动作、wrapper 数量和无尾注 | 声称已经观察实际用户 final、生成卡片、替代 renderer |
-| Delivery v1 | 绑定 artifact 名称、完整文件 hash/bytes、Review Pack/body hash、卡片与动作守恒；final 展示文件内简明建议、链接与最小绑定 | 在 manifest 保存绝对路径、正文、任务 ID、授权或长期状态 |
+| Delivery v2 | 绑定 artifact 名称、完整文件 hash/bytes、Review Pack/body hash、卡片与动作守恒；final 展示文件内简明建议、链接与最小绑定 | 在 manifest 保存绝对路径、正文、任务 ID、授权或长期状态 |
 | Terminal v1 | 在没有 Delivery manifest 时绑定 phase、reason、项目状态与不可确认终态 | 生成部分卡片、替代 Review Pack、声称安装或用户表面成功 |
 | Task artifact | 在宿主为当前任务显式提供且位于项目外的 generated-output root 保存不可变完整 Review Pack；该 root 可位于宿主管理的 app storage | 项目文件、系统临时文件、任意猜测的 `$CODEX_HOME` 路径、Store、跨任务文件桥 |
 | Host surface / readback | 默认不打开；用户请求时同任务打开；从对应原交付回执恢复同文件，展示观测另列 | 把 not_requested、queued 或回执文字当作 UI 观测，要求反复切窗口 |

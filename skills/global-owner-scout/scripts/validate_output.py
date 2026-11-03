@@ -15,16 +15,18 @@ from typing import Any, Callable, Iterable
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.12.1"
-PROJECT_CONTRACT = "global_owner_scout_project_v5"
-REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v6"
+SKILL_VERSION = "5.13.0"
+PROJECT_CONTRACT = "global_owner_scout_project_v6"
+REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v7"
+LEGACY_PROJECT_CONTRACT = "global_owner_scout_project_v5"
+LEGACY_REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v6"
 DISPLAY_LOCALE = "zh-CN"
 PILOT_MODEL = "gpt-5.6-sol"
 PILOT_REASONING = "medium"
 PILOT_POLICY_DATE = "2026-08-06"
 PILOT_TASK_INDEX_LIMIT = 50
 
-STATUSES = {"ok", "degraded", "no_material_delta", "failed", "output_budget_exceeded"}
+STATUSES = {"ok", "degraded", "no_material_delta", "failed", "output_budget_exceeded", "view_ready"}
 COVERAGE_STATUSES = {"complete", "bounded", "degraded"}
 SOURCE_KINDS = {"sessions", "owners", "decisions", "successes", "failures", "acceptance"}
 DISPOSITIONS = {"candidate", "already_covered", "project_only", "skill_only", "insufficient_evidence", "not_reusable"}
@@ -721,16 +723,21 @@ def validate_discovery_trace(obj: dict[str, Any]) -> None:
 
 def validate_project(value: Any) -> dict[str, Any]:
     obj = require_object(value, "$")
+    mapped = obj.get('contract_version') == PROJECT_CONTRACT
+    inspect = mapped and obj.get('purpose') == 'inspect'
     require_exact_keys(
         obj,
         {
             "contract_version", "mode", "status", "display_locale", "project_key", "project_identity", "run_id", "task_id", "skill_version",
             "evidence_window", "model_observation", "owner_snapshot", "session_coverage", "evidence_sources",
             "events", "observations", "project_cards", "read_only_proof", "limitations",
-        },
+        } | ({'purpose', 'project_map'} if mapped else set()),
         "$",
     )
-    require(obj["contract_version"] == PROJECT_CONTRACT, "$.contract_version invalid")
+    require(obj["contract_version"] in {PROJECT_CONTRACT, LEGACY_PROJECT_CONTRACT}, "$.contract_version invalid")
+    if mapped:
+        require(obj['purpose'] in {'inspect', 'review'}, 'invalid project purpose')
+    require(obj['status'] != 'view_ready' or inspect, 'view_ready is only for inspection')
     require(obj["mode"] == "project_scout", "$.mode invalid")
     require(obj["display_locale"] == DISPLAY_LOCALE, f"$.display_locale must be {DISPLAY_LOCALE}")
     status = obj["status"]
@@ -745,17 +752,21 @@ def validate_project(value: Any) -> dict[str, Any]:
         require(obj["project_identity"]["binding_status"] != "ambiguous", "Scheduled v5 run rejects ambiguous binding")
     window = require_object(obj["evidence_window"], "$.evidence_window")
     require_exact_keys(window, {"kind", "start", "end"}, "$.evidence_window")
-    require(window["kind"] in {"manual_30d", "rolling_72h"}, "$.evidence_window.kind invalid")
+    require(window["kind"] in ({'current'} if inspect else {"manual_30d", "rolling_72h"}), "$.evidence_window.kind invalid")
     start = validate_iso(window["start"], "$.evidence_window.start")
     end = validate_iso(window["end"], "$.evidence_window.end")
     require(start <= end, "$.evidence_window start exceeds end")
-    validate_model_observation(obj["model_observation"], "$.model_observation", window_kind=window["kind"])
+    validate_model_observation(obj["model_observation"], "$.model_observation", window_kind='manual_30d' if inspect else window["kind"])
     owner = require_object(obj["owner_snapshot"], "$.owner_snapshot")
     require_exact_keys(owner, {"project_instruction_hash", "owners_read"}, "$.owner_snapshot")
     validate_hash(owner["project_instruction_hash"], "$.owner_snapshot.project_instruction_hash")
     for index, item in enumerate(require_list(owner["owners_read"], "$.owner_snapshot.owners_read", nonempty=True)):
         require_string(item, f"$.owner_snapshot.owners_read[{index}]")
-    validate_session_coverage(obj["session_coverage"], "$.session_coverage", status)
+    if inspect:
+        require(obj['session_coverage'] is None and not obj['events'] and not obj['observations'] and not obj['project_cards'], 'inspection cannot claim census, discoveries or actions')
+        require(status in {'view_ready', 'degraded'}, 'inspection status invalid')
+    else:
+        validate_session_coverage(obj["session_coverage"], "$.session_coverage", status)
     sources = require_list(obj["evidence_sources"], "$.evidence_sources", nonempty=True)
     source_statuses: dict[str, str] = {}
     for index, raw in enumerate(sources):
@@ -768,7 +779,10 @@ def validate_project(value: Any) -> dict[str, Any]:
         source_statuses[kind] = item["status"]
         require_string(item["coverage"], f"{path}.coverage")
     require("sessions" in source_statuses, "$.evidence_sources must include sessions")
-    discovery_methods = set(obj["session_coverage"]["discovery_methods"])
+    discovery_methods = set() if inspect else set(obj["session_coverage"]["discovery_methods"])
+    if inspect:
+        require(source_statuses['sessions'] == 'not_applicable', 'inspection must not claim Session coverage')
+        require(source_statuses.get('owners') in {'available', 'degraded'}, 'inspection needs current project sources')
     if "native_thread_pages_terminal_failure" in discovery_methods:
         require(source_statuses["sessions"] == "degraded", "$.evidence_sources sessions must be degraded after a thread-page terminal failure")
     if discovery_methods & {"native_index_terminal_failure", "execution_protocol_failed"}:
@@ -801,7 +815,7 @@ def validate_project(value: Any) -> dict[str, Any]:
     limitations = require_list(obj["limitations"], "$.limitations")
     for index, item in enumerate(limitations):
         require_string(item, f"$.limitations[{index}]")
-    coverage = obj["session_coverage"]["status"]
+    coverage = None if inspect else obj["session_coverage"]["status"]
     if status == "ok":
         require(cards and coverage in {"complete", "bounded"}, "ok requires cards and complete or bounded coverage")
     elif status == "degraded":
@@ -810,6 +824,12 @@ def validate_project(value: Any) -> dict[str, Any]:
         require(not cards and coverage in {"complete", "bounded"}, "no_material_delta requires no cards and complete or bounded coverage")
     else:
         require(not cards, f"{status} must not contain Project Cards")
+    if mapped:
+        if status in {'failed', 'output_budget_exceeded'}:
+            require(obj['project_map'] is None, 'failed review must not expose a partial map')
+        else:
+            from project_map import validate_map
+            validate_map(obj)
     validate_privacy_surface(obj)
     validate_user_facing_language(obj)
     return obj
@@ -1041,13 +1061,18 @@ def validate_review_pack(value: Any, *, require_preview: bool = True) -> dict[st
         {"contract_version", "mode", "status", "display_locale", "skill_version", "project_result", "owner_parity", "review_cards", "selection_preview", "limitations", "review_pack_hash"},
         "$",
     )
-    require(obj["contract_version"] == REVIEW_PACK_CONTRACT, "$.contract_version invalid")
+    require(obj["contract_version"] in {REVIEW_PACK_CONTRACT, LEGACY_REVIEW_PACK_CONTRACT}, "$.contract_version invalid")
     require(obj["mode"] == "review_pack", "$.mode invalid")
     require(obj["display_locale"] == DISPLAY_LOCALE, f"$.display_locale must be {DISPLAY_LOCALE}")
     require(obj["skill_version"] == SKILL_VERSION, "$.skill_version invalid")
     project = validate_project(obj["project_result"])
+    require((obj['contract_version'] == REVIEW_PACK_CONTRACT) == (project['contract_version'] == PROJECT_CONTRACT), 'pack and project generations differ')
     require(obj["status"] == project["status"], "$.status must match project_result.status")
-    parity = validate_owner_parity(obj["owner_parity"], "$.owner_parity")
+    if project.get('purpose') == 'inspect':
+        require(obj['owner_parity'] is None and not obj['review_cards'] and obj['selection_preview'] is None, 'inspection cannot use Owner integration or approval')
+        parity = None
+    else:
+        parity = validate_owner_parity(obj["owner_parity"], "$.owner_parity")
     cards = require_list(obj["review_cards"], "$.review_cards")
     project_cards = project["project_cards"]
     require(len(cards) == len(project_cards), "$.review_cards must conserve every Project Card")
@@ -1247,7 +1272,7 @@ def valid_project(
     if thread_pages_terminal_failure:
         limitations = ["至少一个相关任务分页返回明确终态错误；仅保留其他正式证据独立支持的卡片。"]
     project = {
-        "contract_version": PROJECT_CONTRACT,
+        "contract_version": LEGACY_PROJECT_CONTRACT,
         "mode": "project_scout",
         "status": status,
         "display_locale": DISPLAY_LOCALE,
@@ -1421,7 +1446,7 @@ def valid_review_pack(project: dict[str, Any] | None = None, *, parity_status: s
                 target_before_sha256=parity["canonical_source_hash"],
             )
     pack = {
-        "contract_version": REVIEW_PACK_CONTRACT,
+        "contract_version": REVIEW_PACK_CONTRACT if project['contract_version'] == PROJECT_CONTRACT else LEGACY_REVIEW_PACK_CONTRACT,
         "mode": "review_pack",
         "status": project["status"],
         "display_locale": DISPLAY_LOCALE,

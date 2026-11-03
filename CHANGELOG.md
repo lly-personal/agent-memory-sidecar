@@ -3,6 +3,16 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.11 (2026-11-03)
+
+- Integrate the accepted overview and focused-path design with frozen project evidence, contextual matrices and same-chat continuation; derive topology from each target project instead of hardcoding Sidecar workflows.
+- Preserve recommendation costs, before/after, exceptions, ownership and current review disposition in the map; covered items do not create work and clarification is not presented as approval.
+
+- Separate current-project viewing from deep review, reconstructing real entrypoints, handoffs, environments, recovery and maintenance responsibilities.
+- Deliver an evidence-bound overview, journey and matrix in the current conversation using native controls, source disclosure and explicit follow-up. Browsing never authorizes a write.
+- Bind Markdown and interactive content to one frozen result; retain legacy report recovery and readable evidence when interaction is unavailable.
+- Components: Core 0.5.11, Plugin 1.7.11, Bootstrap 2.4.4 and Scout 5.13.0; Project v6, Review Pack v7 and Delivery v2.
+
 ## 0.5.10 (2026-11-03)
 
 - Align active Scout guidance with conversational delivery: verified advice remains usable without opening the report or after a failed preview, and factual discussion of other modes is allowed.

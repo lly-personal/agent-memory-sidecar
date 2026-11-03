@@ -42,6 +42,53 @@ Scheduled retains its verified inline/Inbox surface and has no artifact-root or 
 
 ## Phase 2: project fact reconstruction
 
+Start from user outcomes, not a catalogue of normative clauses. Reconstruct the engineering map before choosing lessons:
+identify goals and boundaries, actors and real entry points, critical journeys, module/tool consumers, state ownership,
+environment differences, failure/recovery/revoke paths, and the maintenance/release/deployment chain. Follow the actual handoffs
+through code, interfaces and available runtime evidence. For each critical path, explain preconditions, input/output,
+authorization, state transitions and failure recovery. A module inventory or correct documentation does not prove this path works.
+
+Use `project_map.nodes/edges/journeys` and coverage dimensions suited to this project's goals and risks. A relation claim can
+record the handoff's prerequisites and input/output; journey recovery names the actual entry and authorization boundary.
+Compare intended and effective behavior across relevant environments; installation, enablement, execution and adoption remain
+separate claims. Label design, implementation, observation, inference and unknown explicitly. Keep counterevidence and missing
+links visible. Do not fabricate a complete graph or demand a fixed number of cells. Semantic coverage is checked against user
+outcomes and source material, not node counts. No new recommendations is compatible with a useful engineering map.
+
+This is a reusable capability across target projects and environments. The Sidecar repository owns its implementation, not
+the reviewed project's topology. Order journeys by the reader's main outcome, then supporting/recovery paths; the first journey
+anchors the overview. Derive every label, step, owner and environment from the target evidence. Do not copy the example project's
+memory lifecycle, release mechanism or path counts into other projects, or draw a sequence between unrelated journeys.
+
+Before arranging the view, outline how a reader can connect the goal and boundary to the main responsibilities, a concrete
+entry-to-result path, and its maintenance or recovery point. Distinguish structural containment/dependency, execution handoffs
+and state authority; a flat inventory with identical arrows does not explain all three. Choose the representation by the
+question: grouped structure for responsibility, an ordered path for handoffs, a state view for recovery, or a matrix for actual
+environment/evidence comparisons. Do not force every relation into one graph or require a fixed layer/node count. Overview,
+path and matrix keep the same object/source identities and reading context. The main explanation remains readable without
+interaction; selection reveals relevant detail instead of requiring the reader to assemble the whole system across tabs.
+
+Before styling, prioritize the reader's questions and content/actions: what the project accomplishes, how its main journey
+works, how supporting capabilities connect, then the selected object's evidence, exceptions and maintenance. Use that priority
+to choose type hierarchy, alignment, proximity and visual emphasis in the existing template. Avoid equal-weight module grids
+or a permanent stack of overview, navigation, path and every detail. Progressive disclosure preserves context and return paths;
+it does not remove difficult relations from coverage. Public designer discussions and design systems can challenge this choice,
+but record the concrete transferred decision and its limits instead of copying a brand, adding a dependency or treating a source's
+reputation as acceptance. Keep source-backed design principles in the existing presentation contract, not a parallel style authority.
+
+Use the existing fixed renderer and current host's presentation contract. Upstream templates or guideline servers are research
+inputs, not proof of host compatibility or a reason to add a renderer, client or MCP. Verify a concrete missing capability at its
+consumer before reuse; omit interactions and decorative structure that add no observable value. Keep semantic coverage, layout
+checks and user comprehension separate. Explicit design rejection remains a failed review, even when technical checks pass;
+preserve the unaffected evidence. The current [presentation contract](https://github.com/lly-personal/agent-memory-sidecar/blob/main/docs/specs/interface.md#project-scout-global_owner_scout_project_v6)
+and M1 evaluation own these requirements; do not create another design checklist or regenerate an immutable report to conceal a failure.
+
+For inspect, perform this current-design reconstruction only. Sessions are not applicable; still declare unavailable design,
+implementation or runtime evidence. Freeze the map without manufacturing events/cards or reading Global Owner. For review,
+continue the following source/causal phases and link real maintenance deltas to map objects. Project/Skill improvements survive
+existing global coverage; route repeatable methods to an existing Skill or Engineering Contract Review when appropriate.
+
+
 Read the project instruction chain, L1/L2/L3 or equivalent Owners, current-status Owner, relevant ADR/specs, windowed Git changes,
 tests, failures, acceptance, and bound project snapshot. Recheck Session leads against these sources. Record each source's availability.
 
@@ -173,6 +220,11 @@ all declared events conserve. It does not require a card for every paragraph.
 
 ## Phase 6: freeze project semantics
 
+Freeze map and recommendations together. Recheck each critical journey against original implementation and observed handoffs,
+including recovery and environment differences; the independent pass must challenge whole-path omissions as well as obligations.
+Map `source_revision` is the read-only snapshot HEAD, and `observed_at` is the frozen observation time. Preserve exact source
+references and advice links. Static and interactive views must derive from these same fields.
+
 Create all complete Project Cards, validate privacy/Chinese narrative/evidence refs, compute normalized evidence hash, then compute
 `project_claim_hash` over every semantic field. Validate the entire Project result before global comparison.
 Compute `normalized_evidence_hash` from the exact canonical `direct_evidence`
@@ -201,7 +253,7 @@ a dynamic import or an inline import that can create `__pycache__`.
 If the resolver returns `unavailable`, remove confirmation and report the limitation. Never search upward, inspect the project-root
 `AGENTS.md` as a substitute, or guess a canonical path from the current checkout.
 
-For delivery, use the single artifact and receipt sequence in SKILL.md and the [Delivery contract](https://github.com/lly-personal/agent-memory-sidecar/blob/main/specs/global-owner-scout-delivery-v1.md).
+For delivery, use the frozen projections and receipt sequence in SKILL.md and the [Delivery contract](https://github.com/lly-personal/agent-memory-sidecar/blob/main/specs/global-owner-scout-delivery-v1.md).
 The renderer provides a short overview and expands the first actionable recommendation in the same chat. Complete evidence is
 linked and opened only on request; absence of an open call is not an error. It puts actual decisions first and covered/no-change evidence in a reference index. No action is needed for covered
 cards; every source and card still conserves. A queued request is not proof of display. Technical completion and the result link

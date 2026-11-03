@@ -1,15 +1,15 @@
 ---
 name: global-owner-scout
-description: Review a project when explicitly invoked, or continue discussing a previously delivered Scout review. Give a brief overview and the first concrete recommendation in the current chat, with complete evidence available by link. Do not restart discovery for follow-up questions or trigger for unrelated ordinary project work.
+description: Show a project overview or deeply review it when explicitly requested; continue discussing an identifiable delivered Scout map or review. Give a brief overview and the first concrete recommendation in the current chat, with complete evidence available by link. Do not restart discovery for follow-up questions or trigger for unrelated ordinary project work.
 ---
 
 # Global Owner Scout
 
 ## Contract
 
-- Skill version: `5.12.1`
-- Project result: `global_owner_scout_project_v5`
-- User review: `global_owner_scout_review_pack_v6`
+- Skill version: `5.13.0`
+- Project result: `global_owner_scout_project_v6`
+- User review: `global_owner_scout_review_pack_v7`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
 - Preflight snapshot: `global_owner_scout_preflight_v1`
 - Mode: `project_scout`; interactive-only `central_review` remains optional.
@@ -19,10 +19,28 @@ description: Review a project when explicitly invoked, or continue discussing a 
 This Skill creates project-read-only review drafts. It never creates proposals, approval refs, Owner mutations, project files,
 database rows, commits, pushes, or external-system writes. Its only output write is an immutable Review Pack artifact under the
 current task's explicit host-generated output root, outside the reviewed project and every capability/state root not explicitly
-granted as that task output surface. The formal product entry is the exact explicit invocation
-`$global-owner-scout 复盘当前项目` in the currently bound target Git project task. It always uses `manual_30d`, never reads automation memory,
+granted as that task output surface. The explicit entry is `$global-owner-scout 复盘当前项目` or “看懂当前工程全貌” in the currently bound target Git project task. Review uses `manual_30d`; inspect uses `current`. Interactive runs never read automation memory,
 and never asks the user to provide resource settings. The Scout uses the current task's host-resolved model/reasoning settings and records observable requested/actual values; it supplies no override. The current Desktop project binding is authoritative; no Prompt may contain a
 project name, path, project ID, candidate hint, or the deep-review procedure.
+
+## Purpose and native presentation
+
+Choose from the user's actual request, not the repository name. “看懂当前工程全貌” uses `purpose=inspect`: recover an existing
+map if identifiable, check its source revision and relevant source changes, and reuse it when still current. If absent or stale,
+reconstruct current design with the project-map method in Phase 2; skip the task census, candidate search, Global Owner resolver
+and Core preview. Freeze `view_ready` or `degraded` with the uncovered scope. Do not label this a deep review.
+“复盘当前工程” uses `purpose=review` and the complete protocol, including whole-system reconstruction before candidate selection.
+Both purposes deliver a map even with zero recommendations. Ordinary authorized development maintains the affected Owner and
+acceptance through its existing workflow; it does not start a whole-project review. The user chooses model, reasoning and time
+investment; do not inject overrides or impose a fixed matrix size, advice count or review time limit.
+
+Use the fixed `assets/project-map.html` projection emitted by Delivery v2. Preserve the accepted overview, focused-path and return
+interaction, using in-conversation theme, native controls/details, keyboard access, optional widget state and `sendFollowUpMessage`;
+do not generate another UI or add a server. All graph content comes from the bound target project, not the Sidecar example. Return the verified
+native visualization reference in the current chat with the deterministic receipt. Do not automatically open a browser or file
+preview. Inspecting a node stays local; only “继续讨论此处” requests a follow-up with report/object identity. This request does not
+approve maintenance or rules. If inline rendering or follow-up is unavailable, use the same Markdown map and current conversation;
+report that interaction is unverified. File verification never proves rendering, comprehension or adoption.
 
 ## Mode: `project_scout`
 
@@ -43,7 +61,7 @@ owns completion, including recovery and the final result. Do not return after di
    Do not infer that metadata is absent merely because one tool does not expose it. Never construct a path from a username,
    task ID, date or a familiar `visualizations` pattern. If no unambiguous grant exists, return Terminal v1 before deep work.
    Run `inspect-output --artifact-dir <host-output-root> --protected-root <bound-project-root>`. File preview is optional and checked only when requested.
-3. Execute all seven phases in `references/deep-review-protocol.md`. Use native `list_threads` **history** on the current host,
+3. For `review`, execute all seven phases in `references/deep-review-protocol.md`. Use native `list_threads` **history** on the current host,
    `source=codex`, `limit=50`, with active and archived histories separately. Follow each exact returned cursor to the window
    boundary or EOF. Keep natural work turns in mixed engineering/Scout tasks before this invocation; exclude only Scout-generated
    turns there, and dedicated test/review tasks. A page size is not a total coverage cap. Use `read_thread` pages for every selected natural task, starting
@@ -58,15 +76,16 @@ owns completion, including recovery and the final result. Do not return after di
    Compare coverage and actual implementation separately: an existing global rule does not erase a concrete project or method
    repair. Give an evidenced maintenance delta an existing `route_to_owner` card and exact source Owner; use `project_only` or
    `skill_only` exclusions only when no actionable delta remains. Never turn every observation into a task.
-5. Freeze and validate Project v5, resolve Owner parity through `resolve-owner-parity`, then read only the returned host-local
-   Owner and verify its hash. Never guess or search for the canonical Owner. Build Review Pack v6 and call `prepare-review` to
+5. Freeze and validate Project v6 with its map. For `review`, resolve Owner parity through `resolve-owner-parity`, then read only the returned host-local
+   Owner and verify its hash. Never guess or search for the canonical Owner. Build Review Pack v7 and call `prepare-review` to
    bind actual installed Core single/combined previews. Validate the returned pack unchanged. Covered/no-persistence cards have
    no required action; preserve their evidence without asking the user to confirm or ignore them. No fixed candidate cap.
+   For `inspect`, keep Owner parity and selection preview null and skip all rule integration; `prepare-review` returns without resolving an Owner.
 6. Re-run `inspect-context --project-root <bound-project-root>` and compare the full snapshot. Changed evidence invalidates a
    stable-review claim; do not blame Scout for a concurrent change without attribution. Check Skill/cache and external-write
    boundaries. On privacy, integrity or read-only failure, use Terminal v1 and no actionable partial pack.
 7. For interactive delivery, pass the validated pack to `prepare-delivery --artifact-dir <host-output-root> --protected-root <bound-project-root>`.
-   This creates the single immutable file, verifies its bytes and emits Delivery v1. Return `render-receipt not_requested`
+   This creates immutable Markdown and HTML from one frozen result, verifies both and emits Delivery v2. Return `render-receipt not_requested`
    with exact artifact/root arguments unchanged: a brief overview, first actionable recommendation and complete-evidence link.
    Do not open the report by default. If the user explicitly requests opening, pre-render the opened/queued/failed outcomes,
    call the native file tool once and return the matching receipt. Pass artifact/root arguments even for a failed preview so
@@ -82,12 +101,13 @@ Technical delivery ends with an immutable, verified artifact and its result link
 confirmation and later adoption are separate evidence; missing UI observation does not justify more test chats or artificial
 confirmation. Source and technical fixes may ship while genuine later experience remains unverified.
 
-For “基于这份复盘给沉淀建议”, “先看这一项”, scope edits, deferral or batch requests, continue in this chat; do not run a new census.
+For “解释这里”, “看这条路径”, native report/object follow-ups, “基于这份复盘给沉淀建议”, “先看这一项”, scope edits, deferral or batch requests, continue in this chat; do not run a new census.
 Find the original delivery receipt for the referenced report in native chat history, including across intervening ordinary replies.
 Use the report explicitly selected by the user or the unambiguous current discussion; never substitute another report just because it is newer.
 Only unresolved ambiguity between reports needs a question. Run `verify-final --artifact-root <original-host-output-root>` with that original final
-on stdin. It reconstructs and returns the manifest from the original file, verifies direct-child containment, read-only bytes and
-all card/action hashes. Use the returned `recovery_bundle` for exact Core input. Historical files may return null; if the original
+on stdin; pass `--project-root <current-native-bound-root>` to check the full current snapshot, including dirty and untracked sources. Compare the returned `project_identity` with the native binding before treating the map as this project. `source_status=changed` needs relevant source review and a new snapshot; HEAD equality alone is insufficient. It reconstructs and returns the manifest from the original file, verifies direct-child containment, read-only bytes and
+all card/action hashes. Use `project_map_bundle.context` to resolve the exact selected object and source references. Never infer an object from another report or from widget state alone. Validate the map source revision against the current project before claiming currentness; inspect relevant changes and create a new snapshot for affected facts, preserving history. A stale map remains historical evidence, not current maintenance authority. Missing/tampered HTML sets `visual_status=unavailable` while verified Markdown remains usable. Old files without a map remain readable without fabricating one.
+Use the returned `recovery_bundle` for exact Core input. Historical files may return null; if the original
 exact bundle is no longer available, refresh only the affected preview for new authorization and never invent old bindings. Keep the same artifact; do not rerun discovery or recompose a large payload. An explicit later request to
 open it may reuse the returned manifest and existing `render-receipt`; repeated `queued` remains pending.
 
@@ -120,7 +140,7 @@ cache-free installation. Preserve all independently supported evidence under deg
 
 ## Entry-specific resource policy
 
-- Interactive entry: fixed `manual_30d`; never prompt for or inject model/thinking overrides. Use the current task's
+- Interactive review: `manual_30d`; inspect: `current`; never prompt for or inject model/thinking overrides. Use the current task's
   host-resolved model, reasoning, and Speed; if runtime metadata is observable, actual values must equal that task's requested
   values. Manual runs never read or update automation memory and never count toward `0/14`.
 - Scheduled experiment: optional and currently paused; fixed `gpt-5.6-sol + medium`, rolling 72 hours, host Speed inherited.

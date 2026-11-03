@@ -577,6 +577,8 @@ def inspect_portable(
                 ".agents/skills/agent-memory-workstation-bootstrap/scripts/enrollment.py",
                 ".agents/skills/global-owner-scout/scripts/validate_output.py",
                 ".agents/skills/global-owner-scout/scripts/prepare_delivery.py",
+                ".agents/skills/global-owner-scout/scripts/project_map.py",
+                ".agents/skills/global-owner-scout/assets/project-map.html",
                 ".agents/skills/global-owner-scout/scripts/prepare_review.py",
                 ".agents/skills/global-owner-scout/scripts/scout.py",
             }

@@ -38,6 +38,8 @@ def installed_core(codex_home: Path) -> tuple[Path, str]:
 
 def prepare_review(value: Any, *, codex_home: Path, selected_card_ids: list[str] | None = None) -> dict[str, Any]:
     pack = copy.deepcopy(validate_review_pack(value, require_preview=False))
+    if pack['project_result'].get('purpose') == 'inspect':
+        return pack
     if resolve(codex_home) != pack["owner_parity"]:
         raise ContractError("owner_parity_changed_before_preview")
     bundle = review_bundle(pack)

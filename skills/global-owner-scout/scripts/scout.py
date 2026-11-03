@@ -147,6 +147,7 @@ def main() -> int:
     commands.add_parser("render-terminal")
     verify_final = commands.add_parser("verify-final")
     verify_final.add_argument("--artifact-root", type=Path, required=True)
+    verify_final.add_argument("--project-root", type=Path)
     args = parser.parse_args()
 
     try:
@@ -190,7 +191,17 @@ def main() -> int:
         elif args.command == "render-terminal":
             print(render_terminal_receipt(load_stdin_json()), end="")
         else:
-            print(json.dumps(verify_final_receipt(sys.stdin.read(), artifact_root=args.artifact_root), ensure_ascii=False, separators=(",", ":")))
+            result = verify_final_receipt(sys.stdin.read(), artifact_root=args.artifact_root)
+            result["source_status"] = "not_checked"
+            if args.project_root and result["project_map_bundle"]:
+                try:
+                    snapshot = inspect_git_context(args.project_root)
+                    context = result["project_map_bundle"]["context"]
+                    result["source_status"] = "unchanged" if snapshot["context_snapshot_sha256"] == context["context_snapshot_hash"] else "changed"
+                except (ContractError, OSError) as exc:
+                    result["source_status"] = "unavailable"
+                    result["source_reason"] = str(exc)
+            print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
         return 0
     except (ContractError, AssertionError, OSError, UnicodeError, ValueError) as exc:
         message = ("git_context_unavailable" if args.command == "inspect-context" else

@@ -521,7 +521,35 @@ before/after 与作用域的确认。用户已明确延后真实使用时，Agen
 使用观察或用户反馈校准；模型自评和“30 秒判断”等界面文案均不构成体验证据。控制证据只保存为该次验收产物，
 不新增长期用户行为库或第二状态 Owner。
 
-### Project Scout：`global_owner_scout_project_v5`
+### Project Scout：`global_owner_scout_project_v6`
+
+v6 继承 v5 证据字段，增加 `purpose=inspect|review` 和 `project_map`，精确字段由 Scout contracts 维护。
+图谱从用户结果重建实体、交接、关键路径、来源、覆盖缺口和关联建议；区分设计、实现、运行、推断和未知。
+`inspect` 不运行会话普查、Owner 解析或 Core 预演；`session_coverage=null`、事件/观察/卡片为空，状态为 view_ready 或 degraded。
+`review` 保留完整发现流程。Pack v7 与 Project v6 配对，inspect 的 Owner parity 和 selection preview 为 null。
+同一冻结结果生成 Markdown 和原生交互视图。原生 tabs/details/theme/后续消息用于阅读与讨论，不增加写入权限。
+该能力服务多个目标工程与环境，Sidecar 只负责实现和维护。首条有据用户路径作为总览主线，其余路径按关系展开；
+名称、数量、步骤、维护者和环境从目标工程取证，不将本仓库的记忆或发布流程固化为通用模板。
+呈现先让用户理解目标、边界、主要分工和关键路径，再按需展开交接、环境、依据及维护归属；模块清单或视图数量
+不能证明全貌已可理解。结构归属、执行顺序与状态权威须表达清楚，不把不同语义画成无区别的连线。路径和矩阵
+延续同一报告、对象及来源，切换视角不能要求用户重新拼接上下文。不点击时仍可理解主干；窄屏通过重排和分层
+阅读保留它，不靠缩小文字或裁去必要信息。图型与展开深度随问题选择，不规定固定层数、节点数或矩阵格数。
+技术校验、布局检查和用户理解分别报告。已有用户反馈否决设计时，准确标为审阅未通过，不能降为未观察或被
+测试通过抵消。方法与验收分别沿现有
+[Deep Review](../../skills/global-owner-scout/references/deep-review-protocol.md) 和发现评估维护，不增设另一设计流程。
+
+视觉层级由用户问题与信息关系决定。首层优先解释工程目标、主路径及其与支撑能力的关系；组件名、来源版本和
+辅助操作不能与主干争夺同等视觉重量。用文字层级、对齐、间距和必要的线条表达主次、分组与交接，不把所有
+模块套入等重卡片，也不以减少字数或节点数代替组织。完整覆盖不要求同时展开：选择路径后仍能定位其在工程中
+的位置，查看证据、环境、恢复或建议后可回到同一对象。当前聊天继续承担讨论和授权，不再造另一工作台或审批面。
+字体、颜色、间距与交互状态沿同一固定模板和当前宿主约定维护；强调色用于当前选择或有据状态，不能把设计路径
+染成已验证成功。按阅读关系确定样式，不能将某份设计稿的字号、层数、布局或模型设置升级为所有工程的硬约束。
+检查实际呈现及相关窄屏、明暗和键盘状态；默认总览、进入路径、返回和续问分别观察。消融装饰、重复导航和
+永久详情面板时，保留理解主干、定位来源和继续讨论所需的信息及入口。原生接口存在、局部预览或参数替身通过
+各自只证明该层；用户明确要求先审阅设计时，在设计接受前不把候选提升为正式交付。
+恢复保留项目身份和完整快照，核对 HEAD 及 dirty/untracked 变化；旧 v5/v6 报告只读恢复，不补造图谱。
+总览、路径聚焦和返回沿同一对象；矩阵与来源围绕当前路径展开。关联建议投影完整 Human Context、实际维护归属、
+当前集成处理及未证范围，不复制规则确认命令。已有覆盖项不形成待办，需澄清项不能显示成已获准推荐。
 
 v5 保留主机身份与顶层字段，增加严格来源与发现关联；不接收旧 v4 载荷，不允许为旧结果补造来源后迁移。
 顶层必须包含 `display_locale=zh-CN`、`project_identity`、运行 identity、证据窗口、模型观测、项目 owner 快照、结构化
@@ -610,7 +638,7 @@ Project Card 是目标工程线程的语义结论。Human Context 与 Rule Proje
 `count, project_refs, basis, coverage_note`。E2 的 count 通常为 1；E3 至少为 2。refs 必须是隐私安全的 opaque
 identity，`basis` 与 `coverage_note` 必须说明独立证据与覆盖边界，不得再使用固定分母。
 
-### Project Review Pack：`global_owner_scout_review_pack_v6`
+### Project Review Pack：`global_owner_scout_review_pack_v7`
 
 Project Scout 固定全部 Project Card 后，读取同一时刻的 canonical global `AGENTS.md` source 与活动宿主的本机
 global `AGENTS.md` target，生成独立 `integration_preview`。每项 preview 只包含原卡 hash、global relation、一手调研、owner 对比、精确
@@ -656,9 +684,9 @@ Markdown 字节，不得改写内容或成为新的语义层。默认
 wrapper 数量、恢复块之外无原始 JSON 和无手工尾注；它不证明实际用户 final。`degraded` 仍显示有独立正式证据的卡；
 `failed` 显示可见失败终态，不制造空白结果。
 
-### Interactive Delivery：`global_owner_scout_delivery_v1`
+### Interactive Delivery：`global_owner_scout_delivery_v2`
 
-精确 manifest、不可变文件与回执仍由 [Delivery v1](../../specs/global-owner-scout-delivery-v1.md) 维护。
+精确 manifest、两份不可变投影与回执由 [Delivery v2](../../specs/global-owner-scout-delivery-v1.md) 维护。
 `prepare-delivery` 只写当前明确授予且位于项目之外的单一文件；逐字读回、完整性及动作守恒校验后，默认返回
 `render-receipt not_requested` 的总览、首项建议和文件链接。摘要由现有 Human Context、归属与当前集成动作/理由渲染并绑定原文件；
 失败终态先于零增量文案，质疑或待澄清时明确标注原建议与当前处理意见；摘要消费通过 manifest 核验的同一份字节。

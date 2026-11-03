@@ -21,6 +21,12 @@ Changes to CLI, Hook, installation, approval, filesystem, Store, Skill, Plugin, 
 real consumer boundary. Do not commit local Store files, Hook configuration, absolute paths, task IDs, credentials, generated caches,
 or private Global Owner contents.
 
+For Scout presentation changes, `python -B tests/test_scout_project_map.py --browser-fixtures <output-directory>` renders public
+synthetic projects through the production template. Wrap the four `*-map.html` fragments using the host's native preview as
+`*-preview.html`, then run the function in `tests/scout_project_map_browser.js` with a Playwright page and `{baseURL, outputDir}`.
+The check exercises shared-path context, recommendation return, scoped state recovery, keyboard use, narrow/light/dark layouts,
+different project topologies and missing paths. It stubs the follow-up bridge and cannot prove Desktop message delivery or adoption.
+
 ## Pull requests
 
 Keep one coherent behavior change per pull request. Explain the user-visible problem, owner/spec change, failure behavior, tests, and

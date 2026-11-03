@@ -1,9 +1,41 @@
 # Global Owner Scout contracts
 
+## Current project-map contracts
+
+New results use Project v6, Review Pack v7 and Delivery v2. Historical Project v5/Review Pack v6/Delivery v1
+remain readable; do not rewrite old artifacts or infer a missing map. The definitions below remain the review lane's shared
+fields. Project v6 additionally requires `purpose` (`inspect` or `review`) and `project_map`.
+
+`project_map` has exact fields `title, goal, boundary, observed_at, source_revision, nodes, edges, journeys, coverage`.
+Each node has `id, label, kind, summary, owner, evidence_refs, claims, card_ids`.
+Each edge has `id, source, target, label, evidence_refs, claims, card_ids`.
+Each claim has `layer, environment, statement, evidence_refs`; layers are `design, implementation, observed, inference, unknown`.
+Each journey has `id, label, entry, edge_ids, outcome, recovery, evidence_refs, card_ids`.
+Each coverage item has `dimension, status, explanation, evidence_refs`; status is `covered, partial, unknown, not_applicable`.
+IDs are unique within their kind; edges resolve nodes; journeys form a connected directed path from entry. All evidence refs
+resolve declared available/degraded sources, and card IDs resolve actual Project Cards. Unknown claims and uncovered dimensions
+remain explicit; no synthetic edge or fixed dimension quota proves completeness. Source revision binds the read-only proof's HEAD. Recovery also retains the existing project identity and full after-context snapshot hash, including dirty/untracked state; a matching HEAD alone does not prove currentness.
+
+Inspect uses `status=view_ready` (or `degraded` with limitations), `evidence_window.kind=current`, and `session_coverage=null`.
+Events, observations and cards are empty. Session sources are not applicable. Review Pack has `owner_parity=null`,
+`selection_preview=null` and no review actions. Inspect never runs Owner resolution or Core preview. Review retains its actual
+census, discovery dispositions, Owner comparison and exact confirmation boundaries.
+
+The renderer freezes the map and its declared source/linked-advice context in the same Markdown body hash. Delivery v2 adds
+`visual_name, visual_sha256, visual_bytes` for its fixed-template HTML projection. The projection is presentation, not another
+state store. Missing or changed HTML is reported separately and cannot block verified Markdown discussion or grant approval.
+The initial preparation verifies both files; recovery never repairs an old artifact silently. Native follow-up messages carry
+the report hash, object kind and ID; widget state is best effort and cannot replace this binding or Core authorization.
+The target project's journeys are ordered by user outcomes; the first anchors the overview. Names, counts, tools, owners and
+environments are evidence-derived, never a fixed Sidecar topology. Derived advice preserves Human Context, owner recommendation
+and rationale, current recommended action/reason and unproven scope. It contains no confirmation token or duplicate rule text.
+Covered advice remains in the frozen report but creates no UI task; challenged advice retains its current clarification status.
+Older contexts without these fields stay readable from their original artifacts rather than being regenerated or embellished.
+
 ## Common rules
 
-- Skill `5.12.1`; Project result `global_owner_scout_project_v5`; Review Pack
-  `global_owner_scout_review_pack_v6`; Delivery `global_owner_scout_delivery_v1`; manifest-free terminal
+- Skill `5.13.0`; Project result `global_owner_scout_project_v6`; Review Pack
+  `global_owner_scout_review_pack_v7`; Delivery `global_owner_scout_delivery_v2`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
 - `project_claim_hash` covers every Project Card field except itself. `review_pack_hash` covers the pack except itself.
@@ -67,13 +99,13 @@ separate blind source exercise with an independently held rubric checks importan
 learning recall, correct exclusions and useful abstraction; it never imposes a
 card quota. Future-task adoption and revocation remain separate acceptance.
 
-`global_owner_scout_project_v5` has these exact top-level fields:
+`global_owner_scout_project_v6` has these exact top-level fields (legacy v5 omits purpose and project_map):
 
 ```text
 contract_version, mode, status, display_locale, project_key, project_identity,
 run_id, task_id, skill_version, evidence_window, model_observation, owner_snapshot,
 session_coverage, evidence_sources, events, observations, project_cards,
-read_only_proof, limitations
+read_only_proof, limitations, purpose, project_map
 ```
 
 `project_identity` exact fields:
@@ -91,7 +123,7 @@ interactive read-only inspection. Use the absolute dispatcher with an available 
 The current task owns `manual_30d` evidence, the immutable artifact, recovery and the final result. Scheduled still uses its
 isolated worktree and independent activation policy.
 
-Status is `ok`, `degraded`, `no_material_delta`, `failed`, or `output_budget_exceeded`. Coverage exact fields are:
+Review status is `ok`, `degraded`, `no_material_delta`, `failed`, or `output_budget_exceeded`; inspect uses `view_ready` or `degraded`. Review coverage exact fields are:
 
 ```text
 task_index_limit, index_pages_read, index_terminals, discovered_task_count, window_task_count, selected_task_count,
@@ -150,7 +182,7 @@ not. `rule_payload` is exactly `trigger, action, skip_boundary, scope, why, evid
 
 ## Review Pack
 
-`global_owner_scout_review_pack_v6` exact top-level fields (Project result remains v5):
+`global_owner_scout_review_pack_v7` exact top-level fields (Project result v6; legacy Pack v6 pairs with Project v5):
 
 ```text
 contract_version, mode, status, display_locale, skill_version, project_result,
@@ -225,13 +257,13 @@ Keep distinct qualifications, evidence and before/after facts; semantic similari
 
 ## Interactive Delivery
 
-`global_owner_scout_delivery_v1` has these exact fields:
+`global_owner_scout_delivery_v2` has these exact fields (legacy v1 omits visual_name/visual_sha256/visual_bytes):
 
 ```text
 contract_version, status, delivery_surface, artifact_name, artifact_sha256,
 artifact_bytes, review_pack_hash, visible_body_sha256, project_cards,
 visible_cards, visible_action_counts, visible_actions, bundle_action_count,
-wrapper_count, delivery_manifest_sha256
+wrapper_count, delivery_manifest_sha256, visual_name, visual_sha256, visual_bytes
 ```
 
 Status is exactly `prepared`; surface is exactly `task_artifact`; wrapper count is zero. The artifact name is
@@ -249,7 +281,7 @@ Default to `render-receipt not_requested` with the exact artifact/root. Return t
 recommendation plus the evidence link; do not automatically open the report. Only an explicit request uses native preview once.
 Queued/failed preview still returns verified advice and the link, without polling, user window switching or approval claims.
 `not_requested`, `open_queued` and `open_failed` keep confirmation false; opened with no confirmable bundle also keeps it false.
-The manifest schema and Review Pack/Card/Core contracts remain unchanged.
+Card and Core authorization structures remain unchanged; Project/Pack/Delivery evolve as specified above.
 
 `verify-final` receives the original delivery receipt for the report being discussed, not necessarily the latest assistant reply.
 Recover it from native chat history across ordinary intervening replies. It reconstructs the same manifest, verifies the original
