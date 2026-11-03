@@ -325,7 +325,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。原生 Skill 支持自动发现；未显示或宿主明确要求时才提示刷新。source/host 物化与已请求的只读检查在当前任务完成，不能推导自动加载。
 
-`agent-memory-workstation-bootstrap` Skill 2.4.1 提供三个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.4.2 提供三个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
@@ -633,7 +633,8 @@ Project Card 数必须等于 Review Pack 卡数。每个可确认卡还必须包
 
 `scout.py prepare-review` 从只读 runtime installation 绑定取得并验证实际 Core artifact，通过其 `preview-bundle` 对当前
 本机 Owner 字节执行单项及完整组合预演。`selection_preview` 记录 artifact hash 与 Core 回执或明确错误；纯归属/已覆盖
-结果为 `null`。Global relation 决定动作，不能沿用冻结 Project classification 推断全局增量。只有通过准确组合预演才
+结果为 `null`。Global relation 决定全局动作，不能沿用冻结 Project classification 推断全局增量；项目或方法的
+`route_to_owner` 卡保留有据维护动作，不被全局已有覆盖消除。只有通过准确组合预演才
 显示对应组合确认；失败时完整保留候选，先整理合并、替换或归属，再对新选择预演。预演不消耗批准，也不写 Owner/Store。
 
 活动 Skill 使用可用 Python 3、`-B` 和绝对 dispatcher 路径，项目检查显式传入 `--project-root`；dispatcher 复用
@@ -649,8 +650,8 @@ import、直接猜选相邻 helper 或 renderer 失败后的模型手工重写�
 最多四列，before/after 使用两列表格；不得依赖 HTML 折叠、自定义 App UI 或图片。宿主文件预览只承载相同
 Markdown 字节，不得改写内容或成为新的语义层。默认
 最终回执不显示原始 JSON。报告仅在技术附录的单个折叠块保留现有 `rule_revision_bundle_v2`，供准确恢复；不把项目 Pack 或其他原始 JSON 倾倒给用户。renderer 回执包含 surface、可见正文 SHA-256、Project Card 数、可见卡数、
-逐卡动作计数向量、动作总数和 wrapper 数。interactive 不得出现 Scheduled/Inbox/`0/14`/14 次文案且 wrapper
-必须为零；scheduled 必须生成唯一且最后一个 Inbox wrapper。只读
+逐卡动作计数向量、动作总数和 wrapper 数。interactive 的 wrapper 必须为零且不能使用“今日需要判断”的模式标题；
+正文允许说明 Scheduled、Inbox 或历史计数的未验范围。scheduled 必须生成唯一且最后一个 Inbox wrapper。只读
 `scout.py verify-visible --surface ...` 校验 renderer 或 artifact 的正文 hash、卡片和动作守恒、surface-specific
 wrapper 数量、恢复块之外无原始 JSON 和无手工尾注；它不证明实际用户 final。`degraded` 仍显示有独立正式证据的卡；
 `failed` 显示可见失败终态，不制造空白结果。
@@ -658,9 +659,18 @@ wrapper 数量、恢复块之外无原始 JSON 和无手工尾注；它不证明
 ### Interactive Delivery：`global_owner_scout_delivery_v1`
 
 精确 manifest、不可变文件与回执仍由 [Delivery v1](../../specs/global-owner-scout-delivery-v1.md) 维护。
-`prepare-delivery` 只写当前明确授予且位于项目之外的单一文件；逐字读回、完整性及动作守恒校验后再调用宿主打开一次。
+`prepare-delivery` 只写当前明确授予且位于项目之外的单一文件；逐字读回、完整性及动作守恒校验后，默认返回
+`render-receipt not_requested` 的总览、首项建议和文件链接。摘要由现有 Human Context、归属与当前集成动作/理由渲染并绑定原文件；
+失败终态先于零增量文案，质疑或待澄清时明确标注原建议与当前处理意见；摘要消费通过 manifest 核验的同一份字节。
+不重复完整卡片的确认命令或计数。零增量不制造首项，零可确认项不邀请确认。用户明确要求时才调用宿主打开一次。
 `queued` 返回原链接与 `confirmation_eligible=false`，保留展示未证；不得轮询打开或要求用户保持前台。
-`verify-final` 输入实际原回执，约束原输出目录并从同一文件重建 `manifest`，不写入、不重做发现。
+`verify-final` 输入所讨论报告的实际原交付回执，约束原输出目录并从同一文件重建 `manifest`，不写入、不重做发现。
+原生聊天历史可以跨过普通讨论找回原回执，不要求最新助手消息是回执。新回执的建议须与文件内摘要逐字相符。
+`not_requested` 对应 `artifact_verified`；带已验证文件的 `open_failed` 对应 `surface_unavailable`，均保留链接及讨论入口，
+不授予确认或证明展示。旧 opened/queued 回执兼容读回，不迁移旧文件。自然续问沿当前对话展开、修改、暂缓或批量推进；
+已授权项目/方法维护沿既有工程链执行，实际变化分别读回，不增加候选库或逐项强制确认。
+“按推荐”继承已展示的具体动作：修改建议、澄清范围或选择归属只推进讨论稿，不自动授权修改项目或 Skill 文件。
+先准备具体变化及作用域；已有实施授权覆盖时继续，否则仅就该必要决定确认一次，不把待澄清的全局建议直接改成项目写入。
 它证明记录与文件一致，不能单凭 opened 回执文字证明 UI 已展示。技术交付可据此收口，真实体验另列未证。
 用户后续给出同包准确选择时，先恢复该文件检查，再由已安装 Agent Memory Skill 执行 Fresh Owner 对比、Core 预演与
 真实用户事件授权。旧 queued 事实保持不变；工具代发、缺失/变化文件或过期选择均不授权写入。
@@ -697,11 +707,11 @@ render_integrity_failed -> render_integrity_failed / delivery / unchanged|unveri
 output_budget_exceeded -> output_budget_exceeded / project_review / unchanged|unverified
 ```
 
-宿主 open 发生在 manifest 形成后，只能走 manifest-bound blocked/queued/opened receipt，不属于 Terminal reason。
+默认 not_requested 及按需宿主 open 都发生在 manifest 形成后，走 manifest-bound receipt，不属于 Terminal reason。
 
 已有完整覆盖或无需持久化的卡片没有动作，不要求用户逐项忽略；其他卡保留 `edit` 与 `ignore`。parity matched、去向为 `global_agents`、实际 `global_relation` 为
 `add/replace/consolidate` 且对应 Core 预演通过时才允许 `confirm`；项目初始 classification 不决定 Global 差量。
-实际 Global 关系 `already_covered_exact` 或去向 `no_persistence` 推荐 `ignore`，`project_owner/route_to_owner` 推荐 `keep_project`，
+除有据的项目/方法 `route_to_owner` 卡外，实际 Global 关系 `already_covered_exact` 或去向 `no_persistence` 推荐 `ignore`；`project_owner/route_to_owner` 推荐 `keep_project`，
 `skill` 推荐 `make_skill`，上述卡均不提供直接确认。parity 漂移或不可用时移除所有 `confirm`。用户要改变
 Owner 去向时必须先通过 `edit` 生成刷新卡。用户在同一 Scout 任务中可以精确选择一张或多张同 scope/target
 的可确认卡；renderer 把动作显示为 `确认 <card_id>@<selection_token>`，并明确可用 `、` 一次连接多个完整
@@ -746,9 +756,10 @@ Store、常驻规则或独立更新器。正常工程任务按需选择方法，
   显示失败终态；不得输出未通过校验的卡。
 - pre-manifest 失败必须通过 Terminal v1 renderer 输出，不得把失败对象交给 Delivery manifest receipt，也不得手写
   `interactive_host_blocked`。
-- renderer、artifact 创建/回读、宿主打开或实际 final 回读失败，正文 hash/卡片/动作不守恒、surface/wrapper
+- renderer、artifact 创建/回读或实际交付回执核验失败，正文 hash/卡片/动作不守恒、surface/wrapper
   不匹配或存在手工尾注时，整次运行使用 `render_integrity_failed`、`output_budget_exceeded` 或
   `interactive_host_blocked` 失败终态；不得展示部分卡片或手工生成替代 Markdown。
+- 已验证文件的按需预览失败返回 `surface_unavailable`，保留原链接与确定性建议，不把预览故障当成内容失败。
 - 宿主明确返回 `queued` 时，必须保留经同一 manifest 绑定的 artifact 链接并返回 `surface_pending`；它只证明内容
   可发现且可核验，不证明展示或授权；准确人类选择可按上述原文件恢复链继续。
 - Python helper 产生或修改字节码缓存时按外部副作用失败；缓存清理由安装阶段负责，自动 Scout 不得自清理。

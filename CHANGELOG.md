@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.9 (2026-11-03)
+
+- Show a brief review overview and the first concrete recommendation in the current chat; keep complete evidence available by link and open it only on request.
+- Continue discussing the original report across intervening replies, preserving project and method improvements even when global rules already cover the lesson.
+- Keep clarification, failed reviews and preview failures distinct, and verify advice against the same immutable evidence without granting new write authority.
+- Components: Core 0.5.9, Plugin 1.7.9, Bootstrap 2.4.2 and Scout 5.12.0; historical opened and queued receipts remain readable.
+
 ## 0.5.8 (2026-11-02)
 
 - Keep Bootstrap instructions consistent with Deployment Pack v4 by removing stale duplicate version claims; native entry verification and installation behavior are unchanged.

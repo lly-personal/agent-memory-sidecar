@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Owner: project_docs
-- Applies to: Scout 5.11 interactive delivery
+- Applies to: Scout 5.12 interactive delivery
 - Decision: [ADR 0076](../docs/decisions/0076-task-scoped-review-pack-delivery.zh.md)
 
 ## Purpose
@@ -51,42 +51,48 @@ prefix, is the authority.
 
 ## Task surface and receipts
 
-Before the final host call, the Scout pre-renders opened, queued and blocked receipt outcomes from the manifest. Opened and queued
-rendering receive the exact artifact path and original output root and recheck direct-child containment, regular read-only file state, bytes, hashes, and
-visible-output conservation. It then asks the current task's host file
-preview to open the exact artifact. That host call is the last tool call.
+The default is `scout.py render-receipt not_requested --artifact-path <exact-file> --artifact-root <original-root>`.
+It verifies the same immutable artifact and emits its brief overview, first actionable recommendation, evidence link and compact
+receipt. Do not call file preview by default. The brief is rendered from existing Human Context and Owner/action fields inside
+one `<!-- scout:brief:start -->` / `<!-- scout:brief:end -->` section of the complete artifact. It participates in the existing
+body and file hashes; no manifest field or second persistence record is added. It also presents the current integration action/reason,
+qualifies challenged original advice and preserves failed terminal states. Advice consumes the same bytes verified against the manifest.
+It does not duplicate rule commands or card headings.
+Covered/no-change items are grouped, not decisions; zero actual deltas produce no invented first item or confirmation invitation.
 
-- an explicit terminal opened/success result: return the exact compact receipt with the absolute local artifact link and
-  `surface_observation=open_succeeded; confirmation_eligible=true`.
-- an exact `queued` result: return the exact content-bound receipt with the same absolute artifact link and
-  `surface_observation=open_queued; confirmation_eligible=false`; external verification maps it to `surface_pending`.
-- `pending`, missing, failed, unobservable, or any other host outcome: return only `interactive_host_blocked` with
-  `surface_observation=open_failed; confirmation_eligible=false`.
+Only an explicit user request opens the file. Pre-render the outcomes, then call native preview once and emit the matching receipt.
+All new receipts retain the verified brief and artifact link, including preview failure. No polling or foreground request is needed.
 
-The full Review Pack is never copied into the final. Technical delivery requires the verified artifact and its link in the
-original task. `surface_pending` does not prove display, comprehension or authorization; do not poll opening or require a foreground
-switch. The new queued copy explains recovery; historical exact queued receipts remain valid as historical pending evidence.
-`confirmation_eligible=false` prevents interpreting the queued outcome as approval/readiness by itself. A subsequent real user
-selection of exact content-bound pairs may resume artifact checks and the existing Fresh Core authorization flow; it does not
-change the old surface observation or authorize other cards.
+| Outcome | `verify-final` status | Meaning |
+| --- | --- | --- |
+| `not_requested` | `artifact_verified` | File verified, no open attempted; display unknown |
+| `open_succeeded` | `surface_observed` | Recorded native open success; user understanding/adoption unknown |
+| `open_queued` | `surface_pending` | Open accepted and queued; display unknown |
+| `open_failed` | `surface_unavailable` | Preview unavailable; verified advice remains usable |
+
+`confirmation_eligible` is false except an opened receipt with an actual recovered confirmable bundle. It never grants approval.
+Later exact human selections may resume existing Fresh Owner/Core authorization even when the historical surface was unobserved;
+this does not rewrite that observation. Native question responses or tool-relayed messages are not assumed to meet Core event binding.
+The legacy manifest-only blocked renderer remains a failure receipt and cannot invent a missing artifact path.
 
 ## Readback and recovery
 
-Use the actual previous final as stdin to `verify-final --artifact-root <original-host-output-root>` in the same continuation,
-or an already authorized controller. The helper validates the exact receipt, direct-child immutable file, reconstructed manifest,
-body and per-card action conservation. It returns the reconstructed `manifest` for reuse with the existing receipt commands;
-new reports also return `recovery_bundle`, the existing `rule_revision_bundle_v2` payload saved in one collapsed technical block
-inside the same artifact. Its bytes participate in the visible-body and Delivery hashes. It contains only cards whose content-bound
-selection was actually offered, and is input to a fresh Core preview, never approval. Scheduled inline verification returns the
-same payload without requiring a file. Historical artifacts without that block return `recovery_bundle=null`: their file integrity
-can recover, but missing original proposal bindings must not be guessed. If the original exact bundle is unavailable, refresh only
-the affected preview and request authorization for the new binding; do not claim old-token recovery.
-No discovery rerun, new file, queue, database or cross-task bridge is required. It accepts CRLF/CR and zero to two terminal LF
-characters, rejecting other semantic/trailing edits. It can read a historical renderer artifact without migrating its contents.
+Locate the original delivery receipt for the report referenced in the current discussion, using native chat history across
+intervening ordinary replies. Do not assume the latest assistant message is a receipt or silently switch to a newer report.
+Feed that exact final to `verify-final --artifact-root <original-host-output-root>`. It validates direct-child containment,
+immutable file identity, reconstructed manifest, body and action conservation. New advice receipts must match the exact brief
+read from that artifact; edits to the advice, link, status or binding fail closed.
 
-The status describes the recorded receipt and byte integrity. `surface_observed` names a parsed opened receipt; it does not independently prove UI
-visibility; `queued` remains unobserved. Source implementation, installed identity, technical delivery, actual UI experience and
-later rule adoption are reported separately. No mandatory new controller task or manufactured canary is needed for technical delivery.
+Historical opened/queued receipts, including the legacy queued wording, remain readable without migrating the artifact. An old
+artifact without a brief may be linked and discussed after verification; never invent an original summary. Recovery returns the
+same `manifest` and the existing `recovery_bundle` when present. Missing historical bundle bindings remain null and are not guessed;
+refresh only the affected rule preview before new authorization. Accept CRLF/CR and zero to two terminal LF characters; reject
+other receipt edits. No new discovery, file, queue, database or controller is needed.
+
+Follow-up is ordinary conversation, not another Delivery receipt. Explain each real delta, recommendation, maintenance Owner,
+scope, exception and evidence; support switching items, edits, batch requests and deferral. Reuse current-chat progress. Authorized
+project/method work follows existing maintenance and readback; global rule changes retain the existing exact approval flow.
+A valid file or concise recommendation is not proof of user comprehension, natural adoption, or revocation experience.
 
 ## Acceptance criteria
 
@@ -132,7 +138,8 @@ render_integrity_failed -> render_integrity_failed / delivery / unchanged|unveri
 output_budget_exceeded -> output_budget_exceeded / project_review / unchanged|unverified
 ```
 
-A host-open failure occurs after manifest creation and uses the manifest-bound blocked receipt. It is not a Terminal v1 reason.
+A host-open failure occurs after manifest creation and retains the verified advice and link with `surface_unavailable`.
+The manifest-only blocked receipt is a legacy compatibility path. Neither is a Terminal v1 reason.
 
 The active Skill calls validators, Owner resolution, rendering, visible verification, delivery, receipts, terminal rendering, and
 controller verification only through `scripts/scout.py`. Frozen v4 helpers remain historical compatibility inputs, not competing

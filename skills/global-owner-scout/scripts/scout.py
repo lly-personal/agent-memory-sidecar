@@ -17,8 +17,8 @@ from typing import Any
 from prepare_delivery import (
     prepare_delivery,
     render_blocked_receipt,
-    render_opened_receipt,
-    render_queued_receipt,
+    render_delivery_receipt,
+    SURFACE_COPY,
     render_terminal_receipt,
     validate_delivery_manifest,
     validate_output_root,
@@ -141,7 +141,7 @@ def main() -> int:
     prepare.add_argument("--artifact-dir", type=Path, required=True)
     prepare.add_argument("--protected-root", action="append", type=Path, required=True)
     receipt = commands.add_parser("render-receipt")
-    receipt.add_argument("outcome", choices=("open_succeeded", "open_queued", "open_failed"))
+    receipt.add_argument("outcome", choices=tuple(SURFACE_COPY))
     receipt.add_argument("--artifact-path", type=Path)
     receipt.add_argument("--artifact-root", type=Path)
     commands.add_parser("render-terminal")
@@ -180,13 +180,13 @@ def main() -> int:
             print(json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
         elif args.command == "render-receipt":
             manifest = validate_delivery_manifest(load_stdin_json())
-            if args.outcome == "open_failed":
+            if args.outcome == "open_failed" and args.artifact_path is None and args.artifact_root is None:
                 print(render_blocked_receipt(manifest), end="")
             else:
                 require(args.artifact_path is not None, "--artifact-path is required")
                 require(args.artifact_root is not None, "--artifact-root is required")
-                renderer = render_opened_receipt if args.outcome == "open_succeeded" else render_queued_receipt
-                print(renderer(manifest, artifact_path=args.artifact_path, artifact_root=args.artifact_root), end="")
+                print(render_delivery_receipt(manifest, artifact_path=args.artifact_path, artifact_root=args.artifact_root,
+                                              outcome=args.outcome), end="")
         elif args.command == "render-terminal":
             print(render_terminal_receipt(load_stdin_json()), end="")
         else:
