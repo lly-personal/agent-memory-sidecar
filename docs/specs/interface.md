@@ -476,6 +476,9 @@ $global-owner-scout 复盘当前项目
 ```
 
 新复盘禁止隐式触发；可识别的已交付报告按下文续接契约继续讨论，不重新普查。当前任务在深挖前解析原生项目绑定、实际安装 Skill、可用 Python 3 和明确的宿主输出授权。
+原生任务的 `projectId` 可缺失或为 null；同主机原生任务 `cwd` 与项目清单中的唯一 Git 根一致，或有已证 worktree
+归属时，仍可确定目标。非空编号与目录冲突、多重匹配或原生上下文缺失才阻断；单独 shell cwd、名称或提示词路径不构成绑定。
+会话普查使用相同关联规则，不能因可选成员编号为空而漏掉自然任务。
 通过已安装 Skill 的绝对 `scripts/scout.py` 路径执行 `inspect-context --project-root <bound-project-root>`；`-B` 禁止字节码写入。
 Local 或已有 worktree 均原地完成只读复盘，不强制新建聊天或执行快照。用户不用重复调用或处理内部调度。
 先检查 `environment_context.filesystem.workspace_roots` 和明确的宿主输出元数据，再运行 `inspect-output`；
@@ -694,6 +697,8 @@ wrapper 数量、恢复块之外无原始 JSON 和无手工尾注；它不证明
 `queued` 返回原链接与 `confirmation_eligible=false`，保留展示未证；不得轮询打开或要求用户保持前台。
 `verify-final` 输入所讨论报告的实际原交付回执，约束原输出目录并从同一文件重建 `manifest`，不写入、不重做发现。
 原生聊天历史可以跨过普通讨论找回原回执，不要求最新助手消息是回执。新回执的建议须与文件内摘要逐字相符。
+实际最终回复可以包含收口说明与宿主尾注；恢复入口只提取其中唯一、完整的回执块，逐字校验块内内容与原文件。
+块外文字不成为已验证建议或授权；多个回执、缺失边界或图谱指针歧义拒绝恢复，不靠模型手工删改正文绕过。
 `not_requested` 对应 `artifact_verified`；带已验证文件的 `open_failed` 对应 `surface_unavailable`，均保留链接及讨论入口，
 不授予确认或证明展示。旧 opened/queued 回执兼容读回，不迁移旧文件。自然续问沿当前对话展开、修改、暂缓或批量推进；
 已授权项目/方法维护沿既有工程链执行，实际变化分别读回，不增加候选库或逐项强制确认。

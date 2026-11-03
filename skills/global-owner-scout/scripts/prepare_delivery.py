@@ -475,15 +475,24 @@ def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
     text = value.replace("\r\n", "\n").replace("\r", "\n")
     if not text.endswith("\n"):
         text += "\n"
-    if text.endswith("\n\n") and not text.endswith("\n\n\n"):
-        text = text[:-1]
-    directive = VISUAL_DIRECTIVE_RE.search(text)
-    if directive:
+    # A real final may include engineering closeout and host annotations. Only the
+    # unique receipt is evidence; never choose between reports or trim its advice.
+    starts = list(re.finditer(r"(?m)^# Global Owner Scout · (?:完整审阅包|复盘结论与建议)\n", text))
+    ends = list(re.finditer(r"(?m)^交付回执：`delivery_manifest_sha256=[^\n]*\n", text))
+    require(len(starts) == len(ends) == 1 and starts[0].start() < ends[0].start(),
+            "actual task final must contain exactly one complete Delivery receipt")
+    # Only the immediately following visual belongs to this receipt. Other task
+    # visuals and other products' receipts are outside Scout's evidence boundary.
+    following_line = text[ends[0].end():].lstrip().split("\n", 1)[0].rstrip()
+    directive = None
+    if following_line.startswith('visualize'):
+        directive = VISUAL_DIRECTIVE_RE.fullmatch("\n" + following_line + "\n")
+        require(directive is not None, "invalid native visual pointer")
         try:
             visual_pointer = json.loads(directive.group("payload"))
         except ValueError as exc:
             raise ContractError("invalid native visual pointer") from exc
-        text = text[:directive.start()]
+    text = text[starts[0].start():ends[0].end()]
     match = FINAL_OPENED_RECEIPT_RE.fullmatch(text)
     surface_status = "surface_observed"
     confirmation_eligible = True

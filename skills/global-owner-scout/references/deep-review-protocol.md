@@ -20,6 +20,9 @@ Scheduled retains its verified inline/Inbox surface and has no artifact-root or 
 ## Phase 1: identity and task census
 
 1. Derive identity and freeze the 30-day start/end from the current Desktop binding; never a prompt-supplied path or allowlist.
+   Native task cwd plus one matching same-host inventory Git root is sufficient when projectId is absent/null. A conflicting
+   non-null ID, ambiguous root or unproved worktree relation is not. Use this same evidence rule for task association below;
+   missing optional project membership metadata does not discard natural project work.
 2. Use native history with source `codex`, current host, limit 50; enumerate active and archived partitions separately. Follow
    the returned `nextCursor` with unchanged host/source/archive selection until EOF or a proved window boundary. Stop at a
    window boundary only when the history's ordering and all relevant entries on the page are older than the frozen start;

@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.12 (2026-11-03)
+
+- Recover the exact Scout receipt from real delivery replies that also contain closeout prose or host annotations; keep content, selection and visual bindings strict, and reject ambiguous receipts.
+- Resolve native project context without requiring optional project membership metadata: a unique same-host task directory and Git project match is sufficient, while conflicting identities remain blocked.
+- Preserve the accepted visual template and generic project topology. Add real failure shapes to existing recovery regression and discovery evaluation; distinguish engineering replay from natural use.
+- Components: Core 0.5.12, Plugin 1.7.12, Bootstrap 2.4.5 and Scout 5.13.1; Project v6, Review Pack v7 and Delivery v2 are unchanged.
+
 ## 0.5.11 (2026-11-03)
 
 - Integrate the accepted overview and focused-path design with frozen project evidence, contextual matrices and same-chat continuation; derive topology from each target project instead of hardcoding Sidecar workflows.

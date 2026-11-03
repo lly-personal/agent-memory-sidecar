@@ -7,7 +7,7 @@ description: Show a project overview or deeply review it when explicitly request
 
 ## Contract
 
-- Skill version: `5.13.0`
+- Skill version: `5.13.1`
 - Project result: `global_owner_scout_project_v6`
 - User review: `global_owner_scout_review_pack_v7`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -52,7 +52,11 @@ worktree. Keep a worktree the user already selected; never create a user-facing 
 owns completion, including recovery and the final result. Do not return after dispatching internal work.
 
 1. Before deep reads, resolve the actual installed Skill, native Desktop project binding and current project root. Resolve an
-   available Python 3 interpreter once (`python3`, `python`, or the host runtime); use it with `-B` and the absolute installed
+   optional `projectId` against the same-host project inventory, and cross-check the native task's `cwd` and Git root. A null or
+   omitted `projectId` is not itself unbound: a native task cwd matching exactly one same-host inventory root (or its proved
+   Git worktree origin) also establishes the target. Reject conflicting identities, ambiguous matches or missing native context;
+   a shell cwd, display label or prompt path alone is not binding. Apply the same rule when associating natural history tasks.
+   Resolve an available Python 3 interpreter once (`python3`, `python`, or the host runtime); use it with `-B` and the absolute installed
    `scripts/scout.py` path for every helper. Run `inspect-context --project-root <bound-project-root>` independently of shell cwd.
    Save the complete preflight fingerprint, including untracked content. Ordinary Local and existing worktree are both eligible;
    a non-Git or unbound project returns the deterministic preflight Terminal. No model/thinking override or user setup is needed.
@@ -105,7 +109,9 @@ For “解释这里”, “看这条路径”, native report/object follow-ups, 
 Find the original delivery receipt for the referenced report in native chat history, including across intervening ordinary replies.
 Use the report explicitly selected by the user or the unambiguous current discussion; never substitute another report just because it is newer.
 Only unresolved ambiguity between reports needs a question. Run `verify-final --artifact-root <original-host-output-root>` with that original final
-on stdin; pass `--project-root <current-native-bound-root>` to check the full current snapshot, including dirty and untracked sources. Compare the returned `project_identity` with the native binding before treating the map as this project. `source_status=changed` needs relevant source review and a new snapshot; HEAD equality alone is insufficient. It reconstructs and returns the manifest from the original file, verifies direct-child containment, read-only bytes and
+on stdin, including surrounding delivery prose; do not manually recompose or trim the verified advice. The helper accepts one
+complete exact receipt and rejects missing/ambiguous boundaries or changed content. Surrounding prose is not verified evidence or
+authorization. Pass `--project-root <current-native-bound-root>` to check the full current snapshot, including dirty and untracked sources. Compare the returned `project_identity` with the native binding before treating the map as this project. `source_status=changed` needs relevant source review and a new snapshot; HEAD equality alone is insufficient. It reconstructs and returns the manifest from the original file, verifies direct-child containment, read-only bytes and
 all card/action hashes. Use `project_map_bundle.context` to resolve the exact selected object and source references. Never infer an object from another report or from widget state alone. Validate the map source revision against the current project before claiming currentness; inspect relevant changes and create a new snapshot for affected facts, preserving history. A stale map remains historical evidence, not current maintenance authority. Missing/tampered HTML sets `visual_status=unavailable` while verified Markdown remains usable. Old files without a map remain readable without fabricating one.
 Use the returned `recovery_bundle` for exact Core input. Historical files may return null; if the original
 exact bundle is no longer available, refresh only the affected preview for new authorization and never invent old bindings. Keep the same artifact; do not rerun discovery or recompose a large payload. An explicit later request to
