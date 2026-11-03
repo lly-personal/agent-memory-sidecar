@@ -109,6 +109,8 @@ def verify_visible_output(value: str, *, surface: str) -> dict[str, Any]:
 
     expected_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()
     require(receipt.group("body") == expected_hash, "visible body SHA-256 mismatch")
+    from project_map import recover_map
+    project_map_bundle = recover_map(body)
     project_cards = int(receipt.group("project"))
     visible_cards = int(receipt.group("visible"))
     visible_actions = int(receipt.group("actions"))
@@ -154,6 +156,7 @@ def verify_visible_output(value: str, *, surface: str) -> dict[str, Any]:
         "surface": surface,
         "wrapper_count": expected_wrapper_count,
         "recovery_bundle": recover_review_bundle(body),
+        "project_map_bundle": project_map_bundle,
     }
 
 

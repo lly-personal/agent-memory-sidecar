@@ -521,7 +521,14 @@ before/after 与作用域的确认。用户已明确延后真实使用时，Agen
 使用观察或用户反馈校准；模型自评和“30 秒判断”等界面文案均不构成体验证据。控制证据只保存为该次验收产物，
 不新增长期用户行为库或第二状态 Owner。
 
-### Project Scout：`global_owner_scout_project_v5`
+### Project Scout：`global_owner_scout_project_v6`
+
+v6 继承 v5 证据字段，增加 `purpose=inspect|review` 和 `project_map`，精确字段由 Scout contracts 维护。
+图谱从用户结果重建实体、交接、关键路径、来源、覆盖缺口和关联建议；区分设计、实现、运行、推断和未知。
+`inspect` 不运行会话普查、Owner 解析或 Core 预演；`session_coverage=null`、事件/观察/卡片为空，状态为 view_ready 或 degraded。
+`review` 保留完整发现流程。Pack v7 与 Project v6 配对，inspect 的 Owner parity 和 selection preview 为 null。
+同一冻结结果生成 Markdown 和原生交互视图。原生 tabs/details/theme/后续消息用于阅读与讨论，不增加写入权限。
+恢复保留项目身份和完整快照，核对 HEAD 及 dirty/untracked 变化；旧 v5/v6 报告只读恢复，不补造图谱。
 
 v5 保留主机身份与顶层字段，增加严格来源与发现关联；不接收旧 v4 载荷，不允许为旧结果补造来源后迁移。
 顶层必须包含 `display_locale=zh-CN`、`project_identity`、运行 identity、证据窗口、模型观测、项目 owner 快照、结构化
@@ -610,7 +617,7 @@ Project Card 是目标工程线程的语义结论。Human Context 与 Rule Proje
 `count, project_refs, basis, coverage_note`。E2 的 count 通常为 1；E3 至少为 2。refs 必须是隐私安全的 opaque
 identity，`basis` 与 `coverage_note` 必须说明独立证据与覆盖边界，不得再使用固定分母。
 
-### Project Review Pack：`global_owner_scout_review_pack_v6`
+### Project Review Pack：`global_owner_scout_review_pack_v7`
 
 Project Scout 固定全部 Project Card 后，读取同一时刻的 canonical global `AGENTS.md` source 与活动宿主的本机
 global `AGENTS.md` target，生成独立 `integration_preview`。每项 preview 只包含原卡 hash、global relation、一手调研、owner 对比、精确
@@ -656,9 +663,9 @@ Markdown 字节，不得改写内容或成为新的语义层。默认
 wrapper 数量、恢复块之外无原始 JSON 和无手工尾注；它不证明实际用户 final。`degraded` 仍显示有独立正式证据的卡；
 `failed` 显示可见失败终态，不制造空白结果。
 
-### Interactive Delivery：`global_owner_scout_delivery_v1`
+### Interactive Delivery：`global_owner_scout_delivery_v2`
 
-精确 manifest、不可变文件与回执仍由 [Delivery v1](../../specs/global-owner-scout-delivery-v1.md) 维护。
+精确 manifest、两份不可变投影与回执由 [Delivery v2](../../specs/global-owner-scout-delivery-v1.md) 维护。
 `prepare-delivery` 只写当前明确授予且位于项目之外的单一文件；逐字读回、完整性及动作守恒校验后，默认返回
 `render-receipt not_requested` 的总览、首项建议和文件链接。摘要由现有 Human Context、归属与当前集成动作/理由渲染并绑定原文件；
 失败终态先于零增量文案，质疑或待澄清时明确标注原建议与当前处理意见；摘要消费通过 manifest 核验的同一份字节。

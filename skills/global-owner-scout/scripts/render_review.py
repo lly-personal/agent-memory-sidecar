@@ -30,6 +30,7 @@ ACTION_LABELS = {
     "ignore": "忽略",
 }
 STATUS_LABELS = {
+    "view_ready": "当前工程全貌已整理，未执行近期协作复盘",
     "ok": "建议待审阅",
     "degraded": "部分资料未覆盖",
     "no_material_delta": "已核查范围暂无新建议",
@@ -62,6 +63,11 @@ def extract_conversation_brief(body: str) -> str | None:
 
 
 def render_conversation_brief(pack: dict[str, Any]) -> str:
+    project = pack['project_result']
+    if project.get('purpose') == 'inspect':
+        m = project['project_map']
+        return '\n\n'.join(['**工程全貌：' + m['title'] + '**', m['goal'], '范围：' + m['boundary'],
+            '本次只查看当前设计，未执行近期协作复盘或规则预演。可选择总览、路径或矩阵，围绕具体环节继续讨论。'])
     if pack["status"] in {"failed", "output_budget_exceeded"}:
         return f"本次复盘未完成：{STATUS_LABELS[pack['status']]}。这不表示没有增量；现有规则未改变，本次没有可推进建议。具体失败与未覆盖范围保留在完整依据中。"
     cards = {card["project_claim_hash"]: card for card in pack["project_result"]["project_cards"]}
@@ -329,8 +335,9 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
     model = project["model_observation"]
     window = project["evidence_window"]
     proof = project["read_only_proof"]
+    inspect = project.get('purpose') == 'inspect'
     if surface == "interactive":
-        if window["kind"] != "manual_30d":
+        if window["kind"] != ("current" if inspect else "manual_30d"):
             raise ContractError("interactive surface requires manual_30d")
         if proof["host_automation_memory_read"] or proof["host_automation_memory_updated"]:
             raise ContractError("interactive surface cannot use automation memory")
@@ -344,15 +351,20 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
     references = [(index, review) for index, review in enumerate(pack["review_cards"], 1) if not review["allowed_actions"]]
     result_label = "已核查范围无需新增规则" if pack["status"] == "ok" and not decisions else STATUS_LABELS[pack["status"]]
     lines = [
-        f"# 项目复盘 · {project['project_key']}",
+        f"# {'工程全貌' if inspect else '项目复盘'} · {project['project_key']}",
         "",
         f"**结果**：{result_label}。  ",
         f"**需决定**：{len(decisions)} 项；**参考记录**：{len(references)} 项。  ",
         "**本次规则变更**：无。建议经明确确认并成功写入后，才会改变相应作用域的后续任务。",
         "",
     ]
+    if inspect:
+        lines = lines[:4] + ["本次查看当前工程设计；近期协作、规则确认与实际采用不在本次结论内。", ""]
     if surface == "interactive":
         lines.extend([BRIEF_START + render_conversation_brief(pack) + BRIEF_END, ""])
+    if project.get('project_map') is not None:
+        from project_map import markdown_map
+        lines.extend(markdown_map(pack))
     if surface == "interactive" and any(review["selection_token"] for review in pack["review_cards"]):
         lines.extend([
             "> **确认条件**：本文件没有改变规则。审阅后可回复准确选择；Agent 会先恢复本文件的完整性校验，再核对当前规则并预演。打开请求排队不证明你已看到内容，也不代替你的授权；文件或预演校验失败时不写入。",
@@ -360,7 +372,7 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         ])
     if pack["status"] == "failed":
         pass
-    elif coverage["status"] == "degraded":
+    elif coverage and coverage["status"] == "degraded":
         warning = "> 近期任务读取不完整。下列建议仍有独立的工程规范、决策或验收依据；未覆盖范围见技术附录。"
         if surface == "scheduled":
             warning += "本次不计入 14 次有效运行。"
@@ -370,7 +382,7 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         if surface == "scheduled":
             warning += "本次不计入 14 次有效运行。"
         lines.extend(["> [!WARNING]", warning, ""])
-    if pack["owner_parity"]["status"] != "matched":
+    if pack["owner_parity"] and pack["owner_parity"]["status"] != "matched":
         lines.extend(
             [
                 "> [!CAUTION]",
@@ -378,7 +390,9 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
                 "",
             ]
         )
-    if pack["status"] == "no_material_delta":
+    if inspect:
+        pass
+    elif pack["status"] == "no_material_delta":
         lines.extend(["", "## 结果", "", "在本轮声明的已覆盖范围内未发现合格增量；未覆盖范围仍未知。来源、已检查信号与排除依据见下方发现与去向。"])
     elif pack["status"] == "failed":
         lines.extend(["", "## 失败", "", "本次运行未通过隐私、只读、完整性或来源门禁，没有输出可操作卡片。"])
@@ -446,13 +460,13 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
             "",
             "## 技术附录",
             "",
-            f"**协议状态**：`{pack['status']}`；**Owner parity**：`{pack['owner_parity']['status']}`。",
+            f"**协议状态**：`{pack['status']}`；**Owner parity**：`{pack['owner_parity']['status'] if pack['owner_parity'] else 'not_requested'}`。",
             "",
             f"**证据窗口**：`{window['kind']}` · {window['start']} → {window['end']}  ",
             f"**模型请求**：`{model['requested_model']} + {model['requested_reasoning']}`  ",
             f"**实际模型**：`{model['actual_model'] or model['runtime_metadata_status']} + {model['actual_reasoning'] or model['runtime_metadata_status']}`",
             "",
-            f"Session 覆盖：`{coverage['status']}`；发现 {coverage['discovered_task_count']}，窗口内 {coverage['window_task_count']}，选择 {coverage['selected_task_count']}，完整读取 {coverage['fully_read_task_count']}，读取 {coverage['turn_pages_read']} 页/轮；索引 {coverage['index_pages_read']} 页，每页至多 {coverage['task_index_limit']} 项；active `{coverage['index_terminals']['active']}`，archived `{coverage['index_terminals']['archived']}`；截断 `{str(coverage['truncated']).lower()}`。",
+            (f"Session 覆盖：`{coverage['status']}`；发现 {coverage['discovered_task_count']}，窗口内 {coverage['window_task_count']}，选择 {coverage['selected_task_count']}，完整读取 {coverage['fully_read_task_count']}，读取 {coverage['turn_pages_read']} 页/轮；索引 {coverage['index_pages_read']} 页，每页至多 {coverage['task_index_limit']} 项；active `{coverage['index_terminals']['active']}`，archived `{coverage['index_terminals']['archived']}`；截断 `{str(coverage['truncated']).lower()}`。" if coverage else 'Session 普查：本次未请求。'),
             "",
             "### 证据来源",
             "",

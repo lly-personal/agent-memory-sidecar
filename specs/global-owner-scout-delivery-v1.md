@@ -1,9 +1,31 @@
-# Global Owner Scout Delivery v1
+# Global Owner Scout Delivery v2
 
 - Status: Accepted
 - Owner: project_docs
 - Applies to: Scout 5.12 interactive delivery
 - Decision: [ADR 0076](../docs/decisions/0076-task-scoped-review-pack-delivery.zh.md)
+
+
+## Current projection and recovery
+
+Delivery v2 binds Project v6 / Review Pack v7 to immutable Markdown and a derived native interactive fragment. It retains all v1
+manifest fields and adds `visual_name`, `visual_sha256`, `visual_bytes`. The Markdown body freezes the map context and visual
+descriptor, so later template updates do not invalidate historical recovery. No old report is modified or given a synthetic map.
+The context reuses project identity, the full read-only context snapshot, source references and linked advice. `verify-final`
+can compare `--project-root` with that snapshot; source changes are distinct from corrupt delivery bytes. Native project binding
+must also match before applying current conclusions. A changed snapshot requires relevant source reassessment, not an automatic
+thirty-day census or rewriting the old report.
+
+The default receipt contains a short conclusion, complete-evidence link and a verified in-conversation visualization reference.
+The reference points only to the direct-child HTML named in the manifest. Rendering a receipt first checks the supplied manifest
+against the frozen Markdown descriptor. Recovery validates the HTML independently: missing/changed HTML gives
+`visual_status=unavailable`, preserving usable Markdown and exact rule recovery. UI availability never elevates confirmation.
+A native follow-up carries report hash and object kind/ID. Persisted widget selection is a convenience, not authority or approval.
+Default file opening remains zero; `surface_observation=not_requested` means no file preview was requested, not that inline UI was observed.
+
+Inspect delivers current design with null Owner parity/preview and zero cards; it does not claim a deep review. Review retains
+existing rule preview and actual user authorization. Overview, path and matrix projections share evidence layers and source refs.
+Historical v1 receipt parsing remains read-only. The following v1 field and safety descriptions apply unchanged where not extended above.
 
 ## Purpose
 

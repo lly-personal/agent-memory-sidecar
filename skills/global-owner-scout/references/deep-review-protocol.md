@@ -42,6 +42,25 @@ Scheduled retains its verified inline/Inbox surface and has no artifact-root or 
 
 ## Phase 2: project fact reconstruction
 
+Start from user outcomes, not a catalogue of normative clauses. Reconstruct the engineering map before choosing lessons:
+identify goals and boundaries, actors and real entry points, critical journeys, module/tool consumers, state ownership,
+environment differences, failure/recovery/revoke paths, and the maintenance/release/deployment chain. Follow the actual handoffs
+through code, interfaces and available runtime evidence. For each critical path, explain preconditions, input/output,
+authorization, state transitions and failure recovery. A module inventory or correct documentation does not prove this path works.
+
+Use `project_map.nodes/edges/journeys` and coverage dimensions suited to this project's goals and risks. A relation claim can
+record the handoff's prerequisites and input/output; journey recovery names the actual entry and authorization boundary.
+Compare intended and effective behavior across relevant environments; installation, enablement, execution and adoption remain
+separate claims. Label design, implementation, observation, inference and unknown explicitly. Keep counterevidence and missing
+links visible. Do not fabricate a complete graph or demand a fixed number of cells. Semantic coverage is checked against user
+outcomes and source material, not node counts. No new recommendations is compatible with a useful engineering map.
+
+For inspect, perform this current-design reconstruction only. Sessions are not applicable; still declare unavailable design,
+implementation or runtime evidence. Freeze the map without manufacturing events/cards or reading Global Owner. For review,
+continue the following source/causal phases and link real maintenance deltas to map objects. Project/Skill improvements survive
+existing global coverage; route repeatable methods to an existing Skill or Engineering Contract Review when appropriate.
+
+
 Read the project instruction chain, L1/L2/L3 or equivalent Owners, current-status Owner, relevant ADR/specs, windowed Git changes,
 tests, failures, acceptance, and bound project snapshot. Recheck Session leads against these sources. Record each source's availability.
 
@@ -173,6 +192,11 @@ all declared events conserve. It does not require a card for every paragraph.
 
 ## Phase 6: freeze project semantics
 
+Freeze map and recommendations together. Recheck each critical journey against original implementation and observed handoffs,
+including recovery and environment differences; the independent pass must challenge whole-path omissions as well as obligations.
+Map `source_revision` is the read-only snapshot HEAD, and `observed_at` is the frozen observation time. Preserve exact source
+references and advice links. Static and interactive views must derive from these same fields.
+
 Create all complete Project Cards, validate privacy/Chinese narrative/evidence refs, compute normalized evidence hash, then compute
 `project_claim_hash` over every semantic field. Validate the entire Project result before global comparison.
 Compute `normalized_evidence_hash` from the exact canonical `direct_evidence`
@@ -201,7 +225,7 @@ a dynamic import or an inline import that can create `__pycache__`.
 If the resolver returns `unavailable`, remove confirmation and report the limitation. Never search upward, inspect the project-root
 `AGENTS.md` as a substitute, or guess a canonical path from the current checkout.
 
-For delivery, use the single artifact and receipt sequence in SKILL.md and the [Delivery contract](https://github.com/lly-personal/agent-memory-sidecar/blob/main/specs/global-owner-scout-delivery-v1.md).
+For delivery, use the frozen projections and receipt sequence in SKILL.md and the [Delivery contract](https://github.com/lly-personal/agent-memory-sidecar/blob/main/specs/global-owner-scout-delivery-v1.md).
 The renderer provides a short overview and expands the first actionable recommendation in the same chat. Complete evidence is
 linked and opened only on request; absence of an open call is not an error. It puts actual decisions first and covered/no-change evidence in a reference index. No action is needed for covered
 cards; every source and card still conserves. A queued request is not proof of display. Technical completion and the result link

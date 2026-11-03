@@ -20,12 +20,15 @@ from validate_output import ContractError, valid_project, valid_review_pack
 from verify_visible_output import verify_visible_output
 
 
-DELIVERY_CONTRACT = "global_owner_scout_delivery_v1"
+DELIVERY_CONTRACT = "global_owner_scout_delivery_v2"
+LEGACY_DELIVERY_CONTRACT = "global_owner_scout_delivery_v1"
 TERMINAL_CONTRACT = "global_owner_scout_terminal_v1"
 DELIVERY_SURFACE = "task_artifact"
 DELIVERY_STATUS = "prepared"
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 ARTIFACT_NAME_RE = re.compile(r"^global-owner-scout-review-pack-(?P<prefix>[0-9a-f]{16})\.md$")
+VISUAL_FIELDS = {"visual_name", "visual_sha256", "visual_bytes"}
+VISUAL_DIRECTIVE_RE = re.compile(r'\nvisualize(?P<payload>[^\n]+)\n?$')
 OPENED_COPY = "完整建议已打开，现有规则未改变。仅可确认文件中已通过预演的准确选择；写入前仍会核对当前规则。"
 LEGACY_QUEUED_COPY = "完整建议已准备，打开请求仍在排队。可先审阅；文件中的确认命令暂不可执行，现有规则未改变。"
 QUEUED_COPY = "文件已校验并提供链接，打开请求仍在排队，尚未证明实际展示。审阅后回复准确选择即可恢复文件核验与规则预演，无需重复复盘。现有规则未改变。"
@@ -298,8 +301,9 @@ def validate_delivery_manifest(value: Any) -> dict[str, Any]:
         "wrapper_count",
         "delivery_manifest_sha256",
     }
-    require(set(value) == expected_keys, "delivery manifest fields are invalid")
-    require(value["contract_version"] == DELIVERY_CONTRACT, "delivery manifest contract is invalid")
+    mapped = value.get("contract_version") == DELIVERY_CONTRACT
+    require(set(value) == expected_keys | (VISUAL_FIELDS if mapped else set()), "delivery manifest fields are invalid")
+    require(value["contract_version"] in {DELIVERY_CONTRACT, LEGACY_DELIVERY_CONTRACT}, "delivery manifest contract is invalid")
     require(value["status"] == DELIVERY_STATUS, "delivery manifest status is invalid")
     require(value["delivery_surface"] == DELIVERY_SURFACE, "delivery manifest surface is invalid")
     name_match = ARTIFACT_NAME_RE.fullmatch(value["artifact_name"]) if isinstance(value["artifact_name"], str) else None
@@ -307,6 +311,10 @@ def validate_delivery_manifest(value: Any) -> dict[str, Any]:
     for field in ("artifact_sha256", "review_pack_hash", "visible_body_sha256", "delivery_manifest_sha256"):
         require(isinstance(value[field], str) and HASH_RE.fullmatch(value[field]) is not None, f"{field} is invalid")
     require(name_match.group("prefix") == value["review_pack_hash"][:16], "artifact name does not bind the Review Pack hash")
+    if mapped:
+        require(value["visual_name"] == f"scout-project-map-{value['review_pack_hash'][:16]}.html", "visual name does not bind the Review Pack")
+        require(isinstance(value["visual_sha256"], str) and HASH_RE.fullmatch(value["visual_sha256"]) is not None, "visual SHA-256 is invalid")
+        require(type(value["visual_bytes"]) is int and value["visual_bytes"] > 0, "visual bytes are invalid")
     for field in ("artifact_bytes", "project_cards", "visible_cards", "visible_actions"):
         require(isinstance(value[field], int) and not isinstance(value[field], bool) and value[field] >= 0, f"{field} is invalid")
     require(isinstance(value["visible_action_counts"], list), "visible_action_counts must be an array")
@@ -325,7 +333,7 @@ def validate_delivery_manifest(value: Any) -> dict[str, Any]:
 def artifact_manifest(data: bytes, artifact_name: str) -> dict[str, Any]:
     visible = verify_visible_output(data.decode("utf-8"), surface="interactive")
     manifest: dict[str, Any] = {
-        "contract_version": DELIVERY_CONTRACT,
+        "contract_version": DELIVERY_CONTRACT if visible["project_map_bundle"] else LEGACY_DELIVERY_CONTRACT,
         "status": DELIVERY_STATUS,
         "delivery_surface": DELIVERY_SURFACE,
         "artifact_name": artifact_name,
@@ -336,6 +344,8 @@ def artifact_manifest(data: bytes, artifact_name: str) -> dict[str, Any]:
             "visible_action_counts", "visible_actions", "bundle_action_count", "wrapper_count",
         )},
     }
+    if visible["project_map_bundle"]:
+        manifest.update(visible["project_map_bundle"]["visual"])
     manifest["delivery_manifest_sha256"] = delivery_manifest_sha256(manifest)
     return validate_delivery_manifest(manifest)
 
@@ -347,6 +357,12 @@ def prepare_delivery(pack: dict[str, Any], *, artifact_dir: Path, protected_root
     visible = verify_visible_output(rendered, surface="interactive")
     artifact_name = f"global-owner-scout-review-pack-{visible['review_pack_hash'][:16]}.md"
     artifact_path = output_root / artifact_name
+    if visible["project_map_bundle"]:
+        from project_map import render_visual
+        bundle = visible["project_map_bundle"]
+        visual = render_visual(bundle["context"], visible["review_pack_hash"]).encode("utf-8")
+        require(sha256_bytes(visual) == bundle["visual"]["visual_sha256"], "visual does not match frozen map")
+        write_immutable_artifact(output_root / bundle["visual"]["visual_name"], visual)
     write_immutable_artifact(artifact_path, rendered_bytes)
     require_artifact_read_only(artifact_path)
     readback = safe_artifact_bytes(artifact_path)
@@ -373,6 +389,10 @@ def validate_manifest_artifact(manifest: dict[str, Any], *, artifact_path: Path,
     require(len(data) == manifest["artifact_bytes"], "artifact byte count does not match manifest")
     require(sha256_bytes(data) == manifest["artifact_sha256"], "artifact SHA-256 does not match manifest")
     visible = verify_visible_output(data.decode("utf-8"), surface="interactive")
+    bundle = visible["project_map_bundle"]
+    require((bundle is not None) == (manifest["contract_version"] == DELIVERY_CONTRACT), "manifest generation does not match artifact")
+    if bundle:
+        require(bundle["visual"] == {field: manifest[field] for field in VISUAL_FIELDS}, "visual descriptor does not match artifact")
     for field in (
         "review_pack_hash",
         "visible_body_sha256",
@@ -385,6 +405,19 @@ def validate_manifest_artifact(manifest: dict[str, Any], *, artifact_path: Path,
     ):
         require(visible[field] == manifest[field], f"artifact {field} does not match manifest")
     return data
+
+
+def visual_result(manifest: dict[str, Any], root: Path) -> dict[str, Any]:
+    if manifest["contract_version"] == LEGACY_DELIVERY_CONTRACT:
+        return {"visual_status": "not_available_in_legacy_report"}
+    path = root.resolve(strict=True) / manifest["visual_name"]
+    try:
+        require_artifact_read_only(path)
+        data = safe_artifact_bytes(path)
+        require(len(data) == manifest["visual_bytes"] and sha256_bytes(data) == manifest["visual_sha256"], "visual bytes differ from frozen report")
+    except ContractError as exc:
+        return {"visual_status": "unavailable", "visual_reason": str(exc)}
+    return {"visual_status": "verified", "visual_path": markdown_path(path)}
 
 
 def render_delivery_receipt(manifest: dict[str, Any], *, artifact_path: Path, artifact_root: Path, outcome: str) -> str:
@@ -406,13 +439,17 @@ def render_delivery_receipt(manifest: dict[str, Any], *, artifact_path: Path, ar
     if brief is None:
         brief = "原报告已校验。此历史文件没有首项摘要，可在当前对话依据原文件继续讨论；现有规则未改变。"
     eligible = outcome == "open_succeeded" and bool(verify_visible_output(body, surface="interactive")["recovery_bundle"])
-    return (
+    receipt = (
         "# Global Owner Scout · 复盘结论与建议\n\n"
         f"{brief}\n\n[完整依据](<{markdown_path(artifact_path)}>)\n\n"
         f"{SURFACE_COPY[outcome]}\n\n交付回执："
         f"`delivery_manifest_sha256={manifest['delivery_manifest_sha256']}`；"
         f"`surface_observation={outcome}`；`confirmation_eligible={str(eligible).lower()}`。\n"
     )
+    visual = visual_result(manifest, artifact_root)
+    if visual["visual_status"] == "verified":
+        receipt += '\nvisualize' + json.dumps({"path": visual["visual_path"]}, ensure_ascii=False) + '\n'
+    return receipt
 
 
 def render_opened_receipt(manifest: dict[str, Any], *, artifact_path: Path, artifact_root: Path) -> str:
@@ -440,6 +477,13 @@ def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
         text += "\n"
     if text.endswith("\n\n") and not text.endswith("\n\n\n"):
         text = text[:-1]
+    directive = VISUAL_DIRECTIVE_RE.search(text)
+    if directive:
+        try:
+            visual_pointer = json.loads(directive.group("payload"))
+        except ValueError as exc:
+            raise ContractError("invalid native visual pointer") from exc
+        text = text[:directive.start()]
     match = FINAL_OPENED_RECEIPT_RE.fullmatch(text)
     surface_status = "surface_observed"
     confirmation_eligible = True
@@ -470,8 +514,11 @@ def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
     data = safe_artifact_bytes(artifact_path)
     manifest = artifact_manifest(data, artifact_path.name)
     require(manifest["delivery_manifest_sha256"] == match.group("manifest"), "actual task artifact does not match Delivery receipt")
+    if directive:
+        require(manifest["contract_version"] == DELIVERY_CONTRACT and visual_pointer == {"path": markdown_path(root / manifest["visual_name"])}, "native visual pointer does not bind the report")
     if advice:
         expected = render_delivery_receipt(manifest, artifact_path=artifact_path, artifact_root=root, outcome=advice.group("surface"))
+        expected = VISUAL_DIRECTIVE_RE.sub("", expected)
         require(text == expected, "actual task final is not an exact opened or queued Delivery receipt or verified advice receipt")
     return {
         "status": surface_status,
@@ -484,6 +531,8 @@ def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
         "visible_actions": manifest["visible_actions"],
         "confirmation_eligible": confirmation_eligible,
         "recovery_bundle": verify_visible_output(data.decode("utf-8"), surface="interactive")["recovery_bundle"],
+        "project_map_bundle": verify_visible_output(data.decode("utf-8"), surface="interactive")["project_map_bundle"],
+        **visual_result(manifest, root),
     }
 
 

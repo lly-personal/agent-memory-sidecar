@@ -1,6 +1,6 @@
 interface:
   display_name: "Global Owner Scout"
-  short_description: "项目复盘、具体建议与当前对话续接"
+  short_description: "工程全貌、深度复盘与当前对话续接"
   default_prompt: "$global-owner-scout 复盘当前项目"
 policy:
   allow_implicit_invocation: true

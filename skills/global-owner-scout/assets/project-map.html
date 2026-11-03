@@ -1,0 +1,152 @@
+<div id="__SCOUT_ROOT__" aria-label="工程全貌与复盘" class="scout-map">
+  <style>
+    #__SCOUT_ROOT__ { display: grid; gap: calc(var(--font-size-base) * 1); overflow-wrap: anywhere; }
+    #__SCOUT_ROOT__ .map-section { display: grid; gap: calc(var(--font-size-base) * .75); min-width: 0; }
+    #__SCOUT_ROOT__ .map-flow { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--font-size-base) * .5); }
+    #__SCOUT_ROOT__ .map-header { padding-inline-end: 90px; min-height: 50px; }
+    #__SCOUT_ROOT__ [hidden] { display: none; }
+    #__SCOUT_ROOT__ ol, #__SCOUT_ROOT__ ul { padding-inline-start: calc(var(--font-size-base) * 1.5); }
+  </style>
+  <div class="map-header map-section"><h2 data-title></h2><p data-goal></p></div>
+  <p class="text-small" data-snapshot></p>
+  <div class="nav nav-pills" role="tablist" aria-label="工程视角">
+    <button type="button" class="nav-link active" role="tab" id="__SCOUT_ROOT__-tab-overview" aria-controls="__SCOUT_ROOT__-overview" aria-selected="true" data-view="overview">总览</button>
+    <button type="button" class="nav-link" role="tab" id="__SCOUT_ROOT__-tab-paths" aria-controls="__SCOUT_ROOT__-paths" aria-selected="false" data-view="paths">路径</button>
+    <button type="button" class="nav-link" role="tab" id="__SCOUT_ROOT__-tab-matrix" aria-controls="__SCOUT_ROOT__-matrix" aria-selected="false" data-view="matrix">矩阵</button>
+  </div>
+  <section class="map-section" id="__SCOUT_ROOT__-overview" role="tabpanel" aria-labelledby="__SCOUT_ROOT__-tab-overview"></section>
+  <section class="map-section" id="__SCOUT_ROOT__-paths" role="tabpanel" aria-labelledby="__SCOUT_ROOT__-tab-paths" hidden></section>
+  <section class="map-section" id="__SCOUT_ROOT__-matrix" role="tabpanel" aria-labelledby="__SCOUT_ROOT__-tab-matrix" hidden></section>
+  <hr>
+  <section class="map-section" aria-label="选中环节" data-detail></section>
+  <p class="text-small" data-status role="status" aria-live="polite"></p>
+  <noscript>当前环境未启用交互。完整审阅文件保留同一工程全貌、路径、矩阵及来源，可在当前聊天继续讨论。</noscript>
+</div>
+<script>
+(() => {
+  const root = document.getElementById('__SCOUT_ROOT__');
+  const data = __SCOUT_DATA__;
+  const map = data.project_map;
+  const sources = new Map(data.evidence_sources.flatMap(s => s.refs).map(r => [r.ref, r]));
+  const objects = {node: new Map(map.nodes.map(n => [n.id, n])), edge: new Map(map.edges.map(e => [e.id, e])), journey: new Map(map.journeys.map(j => [j.id, j]))};
+  let selection = {kind: 'node', id: map.nodes[0].id};
+  let view = 'overview';
+  const status = root.querySelector('[data-status]');
+  const el = (tag, text, cls) => { const x = document.createElement(tag); if (text !== undefined) x.textContent = text; if (cls) x.className = cls; return x; };
+  const button = (kind, item, label) => {
+    const b = el('button', label || item.label, 'btn'); b.type = 'button';
+    b.dataset.kind = kind; b.dataset.id = item.id;
+    b.setAttribute('aria-pressed', String(selection.kind === kind && selection.id === item.id)); return b;
+  };
+  const evidence = refs => {
+    const details = el('details'); details.append(el('summary', '查看来源'));
+    const list = el('ul');
+    for (const ref of refs) list.append(el('li', ref + '：' + sources.get(ref).summary));
+    if (!refs.length) list.append(el('li', '尚无直接证据。'));
+    details.append(list); return details;
+  };
+  const flow = journey => {
+    const row = el('div', undefined, 'map-flow');
+    row.append(button('node', objects.node.get(journey.entry)));
+    for (const id of journey.edge_ids) {
+      const edge = objects.edge.get(id);
+      row.append(el('span', '→'), button('edge', edge), el('span', '→'), button('node', objects.node.get(edge.target)));
+    }
+    return row;
+  };
+  root.querySelector('[data-title]').textContent = map.title;
+  root.querySelector('[data-goal]').textContent = map.goal;
+  root.querySelector('[data-snapshot]').textContent = (data.purpose === 'inspect' ? '当前设计查看，未执行近期协作复盘。' : '工程复盘快照。') + '观察于 ' + map.observed_at + ' · 来源 ' + map.source_revision.slice(0, 12);
+  const overview = root.querySelector('#__SCOUT_ROOT__-overview');
+  overview.append(el('p', map.boundary));
+  for (const j of map.journeys) {
+    const section = el('div', undefined, 'map-section');
+    section.append(button('journey', j), flow(j)); overview.append(section);
+  }
+  overview.append(el('h3', '能力与参与者'));
+  const grid = el('div', undefined, 'viz-grid');
+  for (const n of map.nodes) { const b = button('node', n); b.classList.add('viz-tile'); grid.append(b); }
+  overview.append(grid);
+  const paths = root.querySelector('#__SCOUT_ROOT__-paths');
+  for (const j of map.journeys) {
+    const section = el('details'); section.append(el('summary', j.label));
+    const content = el('div', undefined, 'map-section');
+    content.append(flow(j), el('p', '结果：' + j.outcome), el('p', '恢复与例外：' + j.recovery), evidence(j.evidence_refs), button('journey', j, '查看这条路径'));
+    section.append(content); paths.append(section);
+  }
+  if (!map.journeys.length) paths.append(el('p', '当前证据尚未建立关键路径，见覆盖边界。'));
+  const matrix = root.querySelector('#__SCOUT_ROOT__-matrix');
+  const table = el('table', undefined, 'table'); const head = el('thead'); const tr = el('tr');
+  for (const label of ['对象', '证据层次 / 环境', '事实与未证范围']) { const th = el('th', label); th.scope = 'col'; tr.append(th); }
+  head.append(tr); table.append(head); const tbody = el('tbody');
+  for (const [kind, values] of [['node', map.nodes], ['edge', map.edges]]) for (const item of values) for (const c of item.claims) {
+    const row = el('tr'); const label = el('td'); label.append(button(kind, item));
+    row.append(label, el('td', data.layer_labels[c.layer] + ' · ' + c.environment), el('td', c.statement)); tbody.append(row);
+  }
+  table.append(tbody); matrix.append(table, el('h3', '覆盖边界'));
+  for (const c of map.coverage) matrix.append(el('p', c.dimension + ' · ' + data.coverage_labels[c.status] + '：' + c.explanation));
+
+  function save() {
+    if (!window.openai?.setWidgetState) return;
+    try { Promise.resolve(window.openai.setWidgetState({modelContent: {report_hash: data.report_hash, selection}, privateContent: {view}})).catch(() => {}); } catch (_) { /* presentation state only */ }
+  }
+  function detail() {
+    const item = objects[selection.kind].get(selection.id);
+    const target = root.querySelector('[data-detail]'); target.replaceChildren();
+    target.append(el('h3', item.label));
+    if (item.summary) target.append(el('p', item.summary));
+    if (item.owner) target.append(el('p', '维护归属：' + item.owner));
+    for (const c of item.claims || []) target.append(el('p', data.layer_labels[c.layer] + ' · ' + c.environment + '：' + c.statement));
+    if (item.recovery) target.append(el('p', '结果：' + item.outcome), el('p', '恢复与例外：' + item.recovery));
+    const refs = [...new Set([...item.evidence_refs, ...(item.claims || []).flatMap(c => c.evidence_refs)])];
+    target.append(evidence(refs));
+    if (selection.kind === 'node') {
+      const related = el('div', undefined, 'map-flow');
+      for (const edge of map.edges.filter(e => e.source === item.id || e.target === item.id)) related.append(button('edge', edge, objects.node.get(edge.source).label + ' → ' + edge.label + ' → ' + objects.node.get(edge.target).label));
+      target.append(related);
+    }
+    for (const id of item.card_ids) {
+      const advice = data.advice.find(c => c.card_id === id);
+      target.append(el('p', '关联建议：' + advice.title + '。' + advice.recommendation));
+    }
+    const discuss = el('button', '继续讨论此处', 'btn btn-primary'); discuss.type = 'button';
+    discuss.addEventListener('click', async () => {
+      if (!window.openai?.sendFollowUpMessage) { status.textContent = '当前环境没有会话续问接口，可在原聊天直接提及“' + item.label + '”。'; return; }
+      discuss.disabled = true; status.textContent = '正在请求继续讨论；本操作不批准任何写入。';
+      try {
+        const prompt = '继续讨论已交付的工程图谱。报告 ' + data.report_hash + '，对象 ' + selection.kind + ':' + item.id + '（' + item.label + '）。请恢复原报告，解释此处的依据、关系、例外和关联建议；不要重跑普查，也不要将本次讨论视为写入授权。';
+        await window.openai.sendFollowUpMessage({prompt, title: '继续讨论“' + item.label + '”'});
+        status.textContent = '续问请求已提交；是否完成发送以宿主反馈为准，现有规则未改变。';
+      } catch (_) { status.textContent = '续问未完成，图谱和原报告仍可阅读。'; }
+      finally { discuss.disabled = false; }
+    });
+    target.append(discuss);
+    for (const b of root.querySelectorAll('[data-kind]')) b.setAttribute('aria-pressed', String(b.dataset.kind === selection.kind && b.dataset.id === selection.id));
+  }
+  function restore(state) {
+    const content = state?.modelContent;
+    if (content?.report_hash !== data.report_hash) return;
+    const next = content.selection;
+    if (Object.hasOwn(objects, next?.kind) && objects[next.kind].has(next.id)) selection = {kind: next.kind, id: next.id};
+    const savedView = state.privateContent?.view;
+    if (['overview', 'paths', 'matrix'].includes(savedView)) {
+      view = savedView;
+      for (const b of root.querySelectorAll('[data-view]')) { const active = b.dataset.view === view; b.classList.toggle('active', active); b.setAttribute('aria-selected', String(active)); root.querySelector('#' + b.getAttribute('aria-controls')).hidden = !active; }
+    }
+    detail();
+  }
+  root.addEventListener('click', event => {
+    const selected = event.target.closest('[data-kind]');
+    if (selected && root.contains(selected)) { selection = {kind: selected.dataset.kind, id: selected.dataset.id}; detail(); save(); }
+    const tab = event.target.closest('[data-view]');
+    if (tab && root.contains(tab)) { view = tab.dataset.view; save(); }
+  });
+  root.addEventListener('keyup', event => {
+    if (!event.target.closest('[data-view]')) return;
+    const active = root.querySelector('[data-view][aria-selected="true"]');
+    if (active && view !== active.dataset.view) { view = active.dataset.view; save(); }
+  });
+  detail(); restore(window.openai?.widgetState);
+  window.addEventListener('openai:set_globals', event => restore(event.detail?.globals?.widgetState));
+})();
+</script>
