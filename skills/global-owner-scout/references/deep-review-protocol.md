@@ -63,6 +63,14 @@ environment/evidence comparisons. Do not force every relation into one graph or 
 path and matrix keep the same object/source identities and reading context. The main explanation remains readable without
 interaction; selection reveals relevant detail instead of requiring the reader to assemble the whole system across tabs.
 
+Before styling, prioritize the reader's questions and content/actions: what the project accomplishes, how its main journey
+works, how supporting capabilities connect, then the selected object's evidence, exceptions and maintenance. Use that priority
+to choose type hierarchy, alignment, proximity and visual emphasis in the existing template. Avoid equal-weight module grids
+or a permanent stack of overview, navigation, path and every detail. Progressive disclosure preserves context and return paths;
+it does not remove difficult relations from coverage. Public designer discussions and design systems can challenge this choice,
+but record the concrete transferred decision and its limits instead of copying a brand, adding a dependency or treating a source's
+reputation as acceptance. Keep source-backed design principles in the existing presentation contract, not a parallel style authority.
+
 Use the existing fixed renderer and current host's presentation contract. Upstream templates or guideline servers are research
 inputs, not proof of host compatibility or a reason to add a renderer, client or MCP. Verify a concrete missing capability at its
 consumer before reuse; omit interactions and decorative structure that add no observable value. Keep semantic coverage, layout
