@@ -34,8 +34,9 @@ Both purposes deliver a map even with zero recommendations. Ordinary authorized 
 acceptance through its existing workflow; it does not start a whole-project review. The user chooses model, reasoning and time
 investment; do not inject overrides or impose a fixed matrix size, advice count or review time limit.
 
-Use the fixed `assets/project-map.html` projection emitted by Delivery v2. It uses native in-conversation tabs, details, theme,
-keyboard controls, optional widget state and `sendFollowUpMessage`; do not generate another UI or add a server. Return the verified
+Use the fixed `assets/project-map.html` projection emitted by Delivery v2. Preserve the accepted overview, focused-path and return
+interaction, using in-conversation theme, native controls/details, keyboard access, optional widget state and `sendFollowUpMessage`;
+do not generate another UI or add a server. All graph content comes from the bound target project, not the Sidecar example. Return the verified
 native visualization reference in the current chat with the deterministic receipt. Do not automatically open a browser or file
 preview. Inspecting a node stays local; only “继续讨论此处” requests a follow-up with report/object identity. This request does not
 approve maintenance or rules. If inline rendering or follow-up is unavailable, use the same Markdown map and current conversation;
