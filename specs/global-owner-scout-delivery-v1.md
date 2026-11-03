@@ -106,15 +106,19 @@ The legacy manifest-only blocked renderer remains a failure receipt and cannot i
 
 Locate the original delivery receipt for the report referenced in the current discussion, using native chat history across
 intervening ordinary replies. Do not assume the latest assistant message is a receipt or silently switch to a newer report.
-Feed that exact final to `verify-final --artifact-root <original-host-output-root>`. It validates direct-child containment,
+Feed that actual final, including ordinary closeout prose and host annotations, to `verify-final --artifact-root <original-host-output-root>`.
+It locates exactly one complete receipt by its heading and binding line, without interpreting surrounding prose as verified advice
+or authorization. Missing/duplicate receipt boundaries and ambiguous or mismatched visual pointers fail closed; do not silently
+pick the newest or a convenient valid block. The receipt itself remains byte-exact after line-ending normalization.
+It validates direct-child containment,
 immutable file identity, reconstructed manifest, body and action conservation. New advice receipts must match the exact brief
 read from that artifact; edits to the advice, link, status or binding fail closed.
 
 Historical opened/queued receipts, including the legacy queued wording, remain readable without migrating the artifact. An old
 artifact without a brief may be linked and discussed after verification; never invent an original summary. Recovery returns the
 same `manifest` and the existing `recovery_bundle` when present. Missing historical bundle bindings remain null and are not guessed;
-refresh only the affected rule preview before new authorization. Accept CRLF/CR and zero to two terminal LF characters; reject
-other receipt edits. No new discovery, file, queue, database or controller is needed.
+refresh only the affected rule preview before new authorization. Accept CRLF/CR and surrounding whitespace/prose; reject
+edits inside the receipt. No new discovery, file, queue, database or controller is needed.
 
 Follow-up is ordinary conversation, not another Delivery receipt. Explain each real delta, recommendation, maintenance Owner,
 scope, exception and evidence; support switching items, edits, batch requests and deferral. Reuse current-chat progress. Authorized

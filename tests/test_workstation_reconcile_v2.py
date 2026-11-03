@@ -45,7 +45,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         self.fixture_root = Path(self.fixture.name).resolve()
         self.native_entries = []
         self.native_hashes = {}
-        for name, version in (("agent-memory-workstation-bootstrap", "2.4.4"), ("global-owner-scout", "5.13.0")):
+        for name, version in (("agent-memory-workstation-bootstrap", "2.4.5"), ("global-owner-scout", "5.13.1")):
             root = self.fixture_root / "codex" / "skills" / name
             root.mkdir(parents=True)
             (root / "SKILL.md").write_text(f"---\nname: {name}\ndescription: Fixture\n---\n# Fixture\n- Skill version: `{version}`\n")
@@ -84,9 +84,9 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "core_version": "0.3.10",
             "plugin_version": "1.5.1",
             "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.4.4",
+            "bootstrap_version": "2.4.5",
             "bootstrap_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
-            "scout_version": "5.13.0",
+            "scout_version": "5.13.1",
             "scout_sha256": self.native_hashes["global-owner-scout"],
         }
 
@@ -133,10 +133,10 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "unavailable",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.4.4", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
+                "status": "unchanged", "version": "2.4.5", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
             },
             "scout_skill": {
-                "status": "unchanged", "version": "5.13.0", "content_sha256": self.native_hashes["global-owner-scout"],
+                "status": "unchanged", "version": "5.13.1", "content_sha256": self.native_hashes["global-owner-scout"],
             },
         }
 
@@ -317,7 +317,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                     "name": "agent-memory-workstation-bootstrap", "version": "1.9.0",
                     "scope": "repo", "enabled": True, "content_sha256": "9" * 64, "relation": "drifted",
                 }, {
-                    "name": "global-owner-scout", "version": "5.13.0", "scope": "user", "enabled": True,
+                    "name": "global-owner-scout", "version": "5.13.1", "scope": "user", "enabled": True,
                     "content_sha256": self.native_hashes["global-owner-scout"], "relation": "exact",
                 }],
             }],
@@ -513,12 +513,12 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.4.4",
+                "version": "2.4.5",
                 "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.13.0",
+                "version": "5.13.1",
                 "content_sha256": self.native_hashes["global-owner-scout"],
             },
         }
@@ -557,10 +557,10 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "verified",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.4.4", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
+                "status": "unchanged", "version": "2.4.5", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
             },
             "scout_skill": {
-                "status": "unchanged", "version": "5.13.0", "content_sha256": self.native_hashes["global-owner-scout"],
+                "status": "unchanged", "version": "5.13.1", "content_sha256": self.native_hashes["global-owner-scout"],
             },
         }
         source_sync = {
@@ -625,10 +625,10 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             plugin_manifest.parent.mkdir()
             plugin_manifest.write_text(json.dumps({"version": "1.5.1"}), encoding="utf-8")
             (bootstrap / "SKILL.md").write_text(
-                "# Bootstrap\n\n- Skill version: `2.4.4`\n", encoding="utf-8",
+                "# Bootstrap\n\n- Skill version: `2.4.5`\n", encoding="utf-8",
             )
             (scout / "SKILL.md").write_text(
-                "# Scout\n\n- Skill version: `5.13.0`\n", encoding="utf-8",
+                "# Scout\n\n- Skill version: `5.13.1`\n", encoding="utf-8",
             )
             source_manifest = {
                 "contract_version": "agent_memory_source_manifest_v1",
@@ -654,7 +654,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 },
                 "versions": {
                     "core": "0.3.10", "plugin": "1.5.1",
-                    "bootstrap": "2.4.4", "scout": "5.13.0",
+                    "bootstrap": "2.4.5", "scout": "5.13.1",
                 },
                 "artifacts": [],
                 "verification": {},
@@ -687,7 +687,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
 
             self.assertEqual("v0.3.10", desired["release_ref"])
             self.assertEqual("1.5.1", desired["plugin_version"])
-            self.assertEqual("2.4.4", desired["bootstrap_version"])
+            self.assertEqual("2.4.5", desired["bootstrap_version"])
             self.assertEqual("a" * 40, sidecar.expected_commit)
             self.assertRegex(source_hash, r"^[0-9a-f]{64}$")
             self.assertRegex(desired["plugin_sha256"], r"^[0-9a-f]{64}$")
@@ -821,8 +821,8 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             codex_home = root / "codex-home"
             self.reconcile.sync_sources(codex_home, spec)
             for name, version in (
-                ("agent-memory-workstation-bootstrap", "2.4.4"),
-                ("global-owner-scout", "5.13.0"),
+                ("agent-memory-workstation-bootstrap", "2.4.5"),
+                ("global-owner-scout", "5.13.1"),
             ):
                 skill = codex_home / "skills" / name
                 skill.mkdir(parents=True)
@@ -852,7 +852,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             self.assertEqual("verified", observed["core"]["status"])
             self.assertEqual(commit, observed["core"]["source_commit"])
             self.assertEqual("verified", observed["doctor"])
-            self.assertEqual("2.4.4", observed["bootstrap_skill"]["version"])
+            self.assertEqual("2.4.5", observed["bootstrap_skill"]["version"])
             self.assertRegex(observed["scout_skill"]["content_sha256"], r"^[0-9a-f]{64}$")
 
     def test_distribution_participant_rolls_back_with_source_transaction(self) -> None:

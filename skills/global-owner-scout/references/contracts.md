@@ -34,7 +34,12 @@ Older contexts without these fields stay readable from their original artifacts 
 
 ## Common rules
 
-- Skill `5.13.0`; Project result `global_owner_scout_project_v6`; Review Pack
+Native binding is established by same-host task metadata and project inventory, not a mandatory opaque membership ID.
+When task projectId is null/absent, its native cwd may uniquely match an inventory Git root or a verified worktree origin.
+Conflicting non-null IDs/roots, ambiguous inventory matches and missing native context remain blocked. Shell cwd, labels and
+prompt paths alone are insufficient. Use the same rule for history association; keep raw host IDs/paths out of results.
+
+- Skill `5.13.1`; Project result `global_owner_scout_project_v6`; Review Pack
   `global_owner_scout_review_pack_v7`; Delivery `global_owner_scout_delivery_v2`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
