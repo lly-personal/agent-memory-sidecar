@@ -7,7 +7,7 @@ description: Review a project when explicitly invoked, or continue discussing a 
 
 ## Contract
 
-- Skill version: `5.12.0`
+- Skill version: `5.12.1`
 - Project result: `global_owner_scout_project_v5`
 - User review: `global_owner_scout_review_pack_v6`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`

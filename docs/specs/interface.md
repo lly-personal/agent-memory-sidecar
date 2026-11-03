@@ -475,7 +475,7 @@ Owner 内容或跨主机租约。自动化调和全部成功后才原子替换 P
 $global-owner-scout 复盘当前项目
 ```
 
-Skill 禁止隐式触发。当前任务在深挖前解析原生项目绑定、实际安装 Skill、可用 Python 3 和明确的宿主输出授权。
+新复盘禁止隐式触发；可识别的已交付报告按下文续接契约继续讨论，不重新普查。当前任务在深挖前解析原生项目绑定、实际安装 Skill、可用 Python 3 和明确的宿主输出授权。
 通过已安装 Skill 的绝对 `scripts/scout.py` 路径执行 `inspect-context --project-root <bound-project-root>`；`-B` 禁止字节码写入。
 Local 或已有 worktree 均原地完成只读复盘，不强制新建聊天或执行快照。用户不用重复调用或处理内部调度。
 先检查 `environment_context.filesystem.workspace_roots` 和明确的宿主输出元数据，再运行 `inspect-output`；
@@ -769,8 +769,8 @@ Store、常驻规则或独立更新器。正常工程任务按需选择方法，
   校验回执仍是完整人工审阅内容，单个 Inbox directive 仅负责让该任务在 Scheduled 中可见。普通 worktree 前向
   测试不读写 automation memory；`host_automation_memory_read/updated` 必须同为 true 或同为 false，且始终不得作为证据。
 - 若更高层运行时要求执行后置 Agent Memory 审计，该审计保持静默并复用已渲染的卡片与校验回执作为终态；不得
-  调用独立 `agent-memory` Skill、追加第二条 memory 状态、proposal 或治理回执。interactive 的宿主 artifact open
-  必须是最后一个工具调用；scheduled 继续使用可见输出 verifier 和唯一末尾 Inbox wrapper。
+  调用独立 `agent-memory` Skill、追加第二条 memory 状态、proposal 或治理回执。interactive 默认不打开文件；仅在用户要求打开时，
+  预先准备各结果回执，再调用一次宿主预览并返回对应结果。scheduled 继续使用可见输出 verifier 和唯一末尾 Inbox wrapper。
 - 活跃原工作区的并发变化只记录为当前隔离快照之外的限制；稳定隔离快照中的卡不得因此整体失效。
 - 2026-08-11 的三个真实 v5.1 Scheduled 运行及最小 automation-source probe 证明本主机原生任务索引未取得终态。
   每个 Host Enrollment 保持 `0/14`，自动化保持 `PAUSED`；普通 worktree 前向测试不再拥有恢复权。只有新的真实

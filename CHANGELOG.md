@@ -3,6 +3,12 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.10 (2026-11-03)
+
+- Align active Scout guidance with conversational delivery: verified advice remains usable without opening the report or after a failed preview, and factual discussion of other modes is allowed.
+- Clarify that fresh reviews require explicit invocation while existing reports support natural follow-up; preserve integrity and authorization checks.
+- Components: Core 0.5.10, Plugin 1.7.10, Bootstrap 2.4.3 and Scout 5.12.1; runtime behavior and report schemas are unchanged.
+
 ## 0.5.9 (2026-11-03)
 
 - Show a brief review overview and the first concrete recommendation in the current chat; keep complete evidence available by link and open it only on request.
