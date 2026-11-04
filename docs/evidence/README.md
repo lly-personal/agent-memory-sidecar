@@ -18,6 +18,8 @@ Ambient discovery 继续是 experimental。旧 release harness、trace、action 
 
 ## 历史记录
 
+- [2026-11-04 Scout 工程重建与分层建议验收](2026-11-04-scout-system-reconstruction.md)：契约、消融、浏览器行为及宿主未证边界。
+
 本目录中的 dated records 与旧 release 说明保留用于 provenance。它们只能描述当时的 commit、运行时和宿主环境，
 不能满足 Core v1 gate，也不能证明当前 Desktop 行为。不可变 `v0.2.0` Release 仍是旧可执行系统的回滚证据。
 

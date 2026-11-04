@@ -289,6 +289,11 @@ deploy、edit、consolidate 或 revoke 在提交前失败使用“未部署”�
 
 ## Global Owner Scout 实验契约
 
+新结果使用 Project v7 / Review Pack v8 / Delivery v2；旧报告只读恢复，不补造原本不存在的层级或演进。
+固定模板沿用已认可的视觉语言，提供整体结构、逐层深入、路径、横向关联、演进、依据及分层建议。
+普通浏览只改变本地图谱状态；相同宿主状态回写不重绘、不重新聚焦。程序聚焦使用 `preventScroll`，不操作父聊天滚动。
+续问携带同一报告、对象与建议身份，但不产生授权。平台参数必须核对当前消费者支持，不能把其他宿主的同名 API 当成支持。
+
 Global Owner Scout 的交互或 Scheduled 输出都是只读 `review draft`，不是 Core proposal。内部 Project Card 和用户可见
 Review Pack 只存在于当前任务结果；interactive 可以写入当前任务宿主显式提供、位于项目外的不可变
 generated-output artifact，但不得写入 Store、文件 Inbox、项目文件或 `AGENTS.md`。
@@ -524,14 +529,14 @@ before/after 与作用域的确认。用户已明确延后真实使用时，Agen
 使用观察或用户反馈校准；模型自评和“30 秒判断”等界面文案均不构成体验证据。控制证据只保存为该次验收产物，
 不新增长期用户行为库或第二状态 Owner。
 
-### Project Scout：`global_owner_scout_project_v6`
+### Project Scout：`global_owner_scout_project_v7`
 
-v6 继承 v5 证据字段，增加 `purpose=inspect|review` 和 `project_map`，精确字段由 Scout contracts 维护。
+v7 继承 v6 的用途和图谱字段，并增加关系类型与分层工程建议；v6 在 v5 基础上增加 `purpose=inspect|review` 和 `project_map`，精确字段由 Scout contracts 维护。
 图谱从用户结果重建实体、交接、关键路径、来源、覆盖缺口和关联建议；区分设计、实现、运行、推断和未知。
 `inspect` 不运行会话普查、Owner 解析或 Core 预演；`session_coverage=null`、事件/观察/卡片为空，状态为 view_ready 或 degraded。
-`review` 保留完整发现流程。Pack v7 与 Project v6 配对，inspect 的 Owner parity 和 selection preview 为 null。
+`review` 保留完整发现流程。Pack v8 与 Project v7 配对；历史 Pack v7/v6 与 Project v6/v5 保持只读兼容。inspect 的 Owner parity 和 selection preview 为 null。
 同一冻结结果生成 Markdown 和原生交互视图。原生 tabs/details/theme/后续消息用于阅读与讨论，不增加写入权限。
-该能力服务多个目标工程与环境，Sidecar 只负责实现和维护。首条有据用户路径作为总览主线，其余路径按关系展开；
+该能力服务多个目标工程与环境，Sidecar 只负责实现和维护。总览先展示整体分工，逐层深入内部职责，并横向连接具体执行路径、约束与演进；
 名称、数量、步骤、维护者和环境从目标工程取证，不将本仓库的记忆或发布流程固化为通用模板。
 呈现先让用户理解目标、边界、主要分工和关键路径，再按需展开交接、环境、依据及维护归属；模块清单或视图数量
 不能证明全貌已可理解。结构归属、执行顺序与状态权威须表达清楚，不把不同语义画成无区别的连线。路径和矩阵
@@ -641,9 +646,11 @@ Project Card 是目标工程线程的语义结论。Human Context 与 Rule Proje
 `count, project_refs, basis, coverage_note`。E2 的 count 通常为 1；E3 至少为 2。refs 必须是隐私安全的 opaque
 identity，`basis` 与 `coverage_note` 必须说明独立证据与覆盖边界，不得再使用固定分母。
 
-### Project Review Pack：`global_owner_scout_review_pack_v7`
+### Project Review Pack：`global_owner_scout_review_pack_v8`
 
-Project Scout 固定全部 Project Card 后，读取同一时刻的 canonical global `AGENTS.md` source 与活动宿主的本机
+工程建议按源证据和父子关系讨论，不要求已接受变更、规则正文或无关的 Core 预演；只有规则候选需要下述集成。
+
+Project Scout 固定全部 Project Card 后，对规则候选读取同一时刻的 canonical global `AGENTS.md` source 与活动宿主的本机
 global `AGENTS.md` target，生成独立 `integration_preview`。每项 preview 只包含原卡 hash、global relation、一手调研、owner 对比、精确
 before/after/unchanged、风险、重复状态和动作资格；它不得回写 Project Card。
 
@@ -658,7 +665,7 @@ hash，避免“hash 合法但比较对象错误”。
 
 Review Pack 顶层包含 `display_locale=zh-CN`，原样包含完整 `project_result`，并追加 owner parity、全部 review cards、`selection_preview`、限制和
 `review_pack_hash`。每个 review card 按原始顺序引用一个不可改写的 `project_claim_hash`，附带对应 integration
-preview、`recommended_action`、中文 `recommended_action_reason`、未来行为变化以及 `allowed_actions`。内部 E2/E3
+preview、`recommended_action`、中文 `recommended_action_reason`、未来行为变化以及 `allowed_actions`。内部全部
 Project Card 数必须等于 Review Pack 卡数。每个可确认卡还必须包含由当前 canonical source hash 派生的
 `selection_token`；仅组合可确认的卡保留组合标识但不显示单项确认，其余卡该字段为 `null`。
 

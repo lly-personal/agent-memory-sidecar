@@ -15,9 +15,11 @@ from typing import Any, Callable, Iterable
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.13.1"
-PROJECT_CONTRACT = "global_owner_scout_project_v6"
-REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v7"
+SKILL_VERSION = "5.14.0"
+PROJECT_CONTRACT = "global_owner_scout_project_v7"
+MAP_PROJECT_CONTRACT = "global_owner_scout_project_v6"
+REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v8"
+MAP_REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v7"
 LEGACY_PROJECT_CONTRACT = "global_owner_scout_project_v5"
 LEGACY_REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v6"
 DISPLAY_LOCALE = "zh-CN"
@@ -75,6 +77,12 @@ PROJECT_CLAIM_FIELDS = (
     "rule_payload",
 )
 
+ENGINEERING_CLAIM_FIELDS = (
+    "kind", "parent_card_id", "card_id", "human_context", "evidence_level", "normalized_evidence_hash",
+    "owner_recommendation", "direct_evidence", "owner_rationale", "anti_examples", "privacy_check", "unproven",
+    "benefit_hypothesis", "implementation_cost", "validation_conditions", "alternatives",
+)
+
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 GIT_ID_RE = re.compile(r"^[0-9a-f]{40,64}$")
 WINDOWS_ABS_RE = re.compile(r"(?i)(?:^|[\s\"'(])(?:[a-z]:[\\/])")
@@ -91,6 +99,8 @@ HAN_RE = re.compile(r"[\u3400-\u9fff]")
 LONG_SENTENCE_SPLIT_RE = re.compile(r"(?:[。！？!?]\s*|\.\s+|\n+)")
 LANGUAGE_EXEMPT_PATH_PARTS = (
     ".selection_preview.",
+    ".kind",
+    ".parent_card_id",
     ".rule_payload.",
     ".before_after.before",
     ".before_after.after",
@@ -227,7 +237,8 @@ def hash_without_field(value: dict[str, Any], field: str) -> str:
 
 
 def project_claim_hash(card: dict[str, Any]) -> str:
-    return canonical_hash({field: card[field] for field in PROJECT_CLAIM_FIELDS})
+    fields = ENGINEERING_CLAIM_FIELDS if card.get("kind") == "engineering" else PROJECT_CLAIM_FIELDS
+    return canonical_hash({field: card[field] for field in fields})
 
 
 def owner_snapshot_id(parity: dict[str, Any]) -> str:
@@ -500,8 +511,46 @@ def validate_human_context(value: Any, path: str, direct_evidence: list[dict[str
     require(len(refs) == len(set(refs)), f"{path}.evidence_refs must be unique")
 
 
+def validate_engineering_card(obj: dict[str, Any], path: str) -> dict[str, Any]:
+    require_exact_keys(obj, set(ENGINEERING_CLAIM_FIELDS) | {"project_claim_hash"}, path)
+    require_string(obj["card_id"], f"{path}.card_id")
+    if obj["parent_card_id"] is not None:
+        require_string(obj["parent_card_id"], f"{path}.parent_card_id")
+    require(obj["evidence_level"] in {"E1", "E2", "E3"}, f"{path}.evidence_level invalid")
+    require(obj["owner_recommendation"] in {"project_owner", "skill"}, f"{path}: engineering advice has no global authority")
+    validate_evidence_refs(obj["direct_evidence"], f"{path}.direct_evidence")
+    require(obj["normalized_evidence_hash"] == canonical_hash(obj["direct_evidence"]), f"{path}.normalized_evidence_hash mismatch")
+    validate_human_context(obj["human_context"], f"{path}.human_context", obj["direct_evidence"])
+    for field in ("owner_rationale", "benefit_hypothesis", "implementation_cost"):
+        require_string(obj[field], f"{path}.{field}")
+    for field in ("anti_examples", "unproven", "validation_conditions"):
+        for item in require_list(obj[field], f"{path}.{field}", nonempty=field != "unproven"):
+            require_string(item, f"{path}.{field}")
+    for option in require_list(obj["alternatives"], f"{path}.alternatives", nonempty=True):
+        require_exact_keys(require_object(option, "alternative"), {"approach", "tradeoff"}, "alternative")
+        for field in ("approach", "tradeoff"): require_string(option[field], field)
+    privacy = require_object(obj["privacy_check"], f"{path}.privacy_check")
+    require_exact_keys(privacy, {"status", "removed"}, f"{path}.privacy_check")
+    require(privacy["status"] == "passed", f"{path}.privacy_check.status must be passed")
+    for item in require_list(privacy["removed"], f"{path}.privacy_check.removed"):
+        require_string(item, "removed")
+    require(obj["project_claim_hash"] == project_claim_hash(obj), f"{path}.project_claim_hash mismatch")
+    return obj
+
+
+def validate_card_hierarchy(cards):
+    engineering = {c["card_id"]: c for c in cards if c.get("kind") == "engineering"}
+    for card in engineering.values():
+        seen = {card["card_id"]}
+        parent = card["parent_card_id"]
+        while parent is not None:
+            require(parent in engineering and parent not in seen, "invalid engineering advice parent or cycle")
+            seen.add(parent); parent = engineering[parent]["parent_card_id"]
+
+
 def validate_project_card(value: Any, path: str) -> dict[str, Any]:
     obj = require_object(value, path)
+    if obj.get("kind") == "engineering": return validate_engineering_card(obj, path)
     require_exact_keys(obj, set(PROJECT_CLAIM_FIELDS) | {"project_claim_hash"}, path)
     require_string(obj["card_id"], f"{path}.card_id")
     require(obj["classification"] in CLASSIFICATIONS, f"{path}.classification invalid")
@@ -702,8 +751,10 @@ def validate_discovery_trace(obj: dict[str, Any]) -> None:
             require(ref in owner_refs and ref in refs, f"{path}: owner exclusion must cite declared Owner evidence")
         linked_cards = require_list(disposition["card_ids"], f"{path}.card_ids")
         if disposition["kind"] == "candidate":
-            require(observation["evidence_level"] in {"E2", "E3"} and bool(linked_cards), f"{path}: candidate requires qualified cards")
-            require(bool(linked_events), f"{path}: candidate requires linked events")
+            require(bool(linked_cards), f"{path}: candidate requires cards")
+            if any(cards.get(c, {}).get("kind") != "engineering" for c in linked_cards):
+                require(observation["evidence_level"] in {"E2", "E3"}, f"{path}: rule candidate requires qualified cards")
+                require(bool(linked_events), f"{path}: rule candidate requires linked events")
         else:
             require(not linked_cards, f"{path}: exclusion cannot contain cards")
         if disposition["kind"] in {"already_covered", "project_only", "skill_only"}:
@@ -713,7 +764,8 @@ def validate_discovery_trace(obj: dict[str, Any]) -> None:
             require(card_id in cards and card_id not in seen_cards, f"{path}: unknown or multiply routed card")
             require(cards[card_id]["evidence_level"] == observation["evidence_level"], f"{path}: evidence level mismatch")
             require(card_refs[card_id] <= refs, f"{path}: missing card evidence")
-            require(card_refs[card_id] <= set().union(*(events[event_id] for event_id in linked_events)), f"{path}: card evidence bypasses linked events")
+            if cards[card_id].get("kind") != "engineering":
+                require(card_refs[card_id] <= set().union(*(events[event_id] for event_id in linked_events)), f"{path}: card evidence bypasses linked events")
             seen_cards.add(card_id)
     require(seen_events == events.keys(), "every event needs a disposition")
     require(seen_cards == cards.keys(), "every card needs exactly one disposition")
@@ -723,7 +775,7 @@ def validate_discovery_trace(obj: dict[str, Any]) -> None:
 
 def validate_project(value: Any) -> dict[str, Any]:
     obj = require_object(value, "$")
-    mapped = obj.get('contract_version') == PROJECT_CONTRACT
+    mapped = obj.get('contract_version') in {PROJECT_CONTRACT, MAP_PROJECT_CONTRACT}
     inspect = mapped and obj.get('purpose') == 'inspect'
     require_exact_keys(
         obj,
@@ -734,7 +786,7 @@ def validate_project(value: Any) -> dict[str, Any]:
         } | ({'purpose', 'project_map'} if mapped else set()),
         "$",
     )
-    require(obj["contract_version"] in {PROJECT_CONTRACT, LEGACY_PROJECT_CONTRACT}, "$.contract_version invalid")
+    require(obj["contract_version"] in {PROJECT_CONTRACT, MAP_PROJECT_CONTRACT, LEGACY_PROJECT_CONTRACT}, "$.contract_version invalid")
     if mapped:
         require(obj['purpose'] in {'inspect', 'review'}, 'invalid project purpose')
     require(obj['status'] != 'view_ready' or inspect, 'view_ready is only for inspection')
@@ -808,6 +860,8 @@ def validate_project(value: Any) -> dict[str, Any]:
         require_string(item["summary"], f"{path}.summary")
         validate_evidence_refs(item["direct_evidence"], f"{path}.direct_evidence")
     cards = require_list(obj["project_cards"], "$.project_cards")
+    require(obj["contract_version"] == PROJECT_CONTRACT or all("kind" not in c for c in cards), "engineering cards require Project v7")
+    validate_card_hierarchy(cards)
     hashes = [validate_project_card(card, f"$.project_cards[{index}]")["project_claim_hash"] for index, card in enumerate(cards)]
     require(len(hashes) == len(set(hashes)), "$.project_cards contains duplicate claim hashes")
     validate_discovery_trace(obj)
@@ -936,6 +990,7 @@ def global_mutation_candidate(card: dict[str, Any], relation: str, parity_status
 def review_bundle(pack: dict[str, Any]) -> dict[str, Any] | None:
     items = []
     for card, review in zip(pack["project_result"]["project_cards"], pack["review_cards"]):
+        if card.get("kind") == "engineering": continue
         preview = review["integration_preview"]
         if not global_mutation_candidate(card, preview["global_relation"], pack["owner_parity"]["status"]):
             continue
@@ -1061,15 +1116,18 @@ def validate_review_pack(value: Any, *, require_preview: bool = True) -> dict[st
         {"contract_version", "mode", "status", "display_locale", "skill_version", "project_result", "owner_parity", "review_cards", "selection_preview", "limitations", "review_pack_hash"},
         "$",
     )
-    require(obj["contract_version"] in {REVIEW_PACK_CONTRACT, LEGACY_REVIEW_PACK_CONTRACT}, "$.contract_version invalid")
+    require(obj["contract_version"] in {REVIEW_PACK_CONTRACT, MAP_REVIEW_PACK_CONTRACT, LEGACY_REVIEW_PACK_CONTRACT}, "$.contract_version invalid")
     require(obj["mode"] == "review_pack", "$.mode invalid")
     require(obj["display_locale"] == DISPLAY_LOCALE, f"$.display_locale must be {DISPLAY_LOCALE}")
     require(obj["skill_version"] == SKILL_VERSION, "$.skill_version invalid")
     project = validate_project(obj["project_result"])
-    require((obj['contract_version'] == REVIEW_PACK_CONTRACT) == (project['contract_version'] == PROJECT_CONTRACT), 'pack and project generations differ')
+    require({REVIEW_PACK_CONTRACT: PROJECT_CONTRACT, MAP_REVIEW_PACK_CONTRACT: MAP_PROJECT_CONTRACT, LEGACY_REVIEW_PACK_CONTRACT: LEGACY_PROJECT_CONTRACT}[obj['contract_version']] == project['contract_version'], 'pack and project generations differ')
     require(obj["status"] == project["status"], "$.status must match project_result.status")
     if project.get('purpose') == 'inspect':
         require(obj['owner_parity'] is None and not obj['review_cards'] and obj['selection_preview'] is None, 'inspection cannot use Owner integration or approval')
+        parity = None
+    elif project["contract_version"] == PROJECT_CONTRACT and all(c.get("kind") == "engineering" for c in project["project_cards"]):
+        require(obj["owner_parity"] is None, "engineering advice does not require Global Owner")
         parity = None
     else:
         parity = validate_owner_parity(obj["owner_parity"], "$.owner_parity")
@@ -1077,7 +1135,8 @@ def validate_review_pack(value: Any, *, require_preview: bool = True) -> dict[st
     project_cards = project["project_cards"]
     require(len(cards) == len(project_cards), "$.review_cards must conserve every Project Card")
     for index, raw in enumerate(cards):
-        validate_integration_preview(require_object(raw, "review card").get("integration_preview"), f"$.review_cards[{index}].integration_preview")
+        if project_cards[index].get("kind") != "engineering":
+            validate_integration_preview(require_object(raw, "review card").get("integration_preview"), f"$.review_cards[{index}].integration_preview")
     result = validate_selection_preview(obj, required=require_preview)
     individual = {item["card_id"]: item for item in result["items"]} if result else {}
     combined_ready = bool(result and result["combined"]["status"] == "ready")
@@ -1100,6 +1159,11 @@ def validate_review_pack(value: Any, *, require_preview: bool = True) -> dict[st
         )
         require(item["project_claim_hash"] == project_cards[index]["project_claim_hash"], f"{path} Project Card order or identity changed")
         card = project_cards[index]
+        if card.get("kind") == "engineering":
+            require(item["recommended_action"] == "discuss" and item["allowed_actions"] == [] and item["integration_preview"] is None and item["selection_token"] is None, f"{path}: engineering advice cannot grant rule actions")
+            validate_zh_cn_text(item["recommended_action_reason"], f"{path}.recommended_action_reason", max_chars=240)
+            require_string(item["expected_behavior_change"], f"{path}.expected_behavior_change")
+            continue
         relation = item["integration_preview"]["global_relation"]
         ready = (individual.get(card["card_id"], {}).get("status") == "ready"
                  if require_preview or obj["selection_preview"] is not None else True)
@@ -1446,7 +1510,7 @@ def valid_review_pack(project: dict[str, Any] | None = None, *, parity_status: s
                 target_before_sha256=parity["canonical_source_hash"],
             )
     pack = {
-        "contract_version": REVIEW_PACK_CONTRACT if project['contract_version'] == PROJECT_CONTRACT else LEGACY_REVIEW_PACK_CONTRACT,
+        "contract_version": {PROJECT_CONTRACT: REVIEW_PACK_CONTRACT, MAP_PROJECT_CONTRACT: MAP_REVIEW_PACK_CONTRACT, LEGACY_PROJECT_CONTRACT: LEGACY_REVIEW_PACK_CONTRACT}[project['contract_version']],
         "mode": "review_pack",
         "status": project["status"],
         "display_locale": DISPLAY_LOCALE,

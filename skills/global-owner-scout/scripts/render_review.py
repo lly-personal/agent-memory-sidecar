@@ -23,6 +23,7 @@ from validate_output import (
 
 
 ACTION_LABELS = {
+    "discuss": "讨论工程方案",
     "confirm": "确认",
     "edit": "修改",
     "keep_project": "留在项目",
@@ -71,7 +72,7 @@ def render_conversation_brief(pack: dict[str, Any]) -> str:
     if pack["status"] in {"failed", "output_budget_exceeded"}:
         return f"本次复盘未完成：{STATUS_LABELS[pack['status']]}。这不表示没有增量；现有规则未改变，本次没有可推进建议。具体失败与未覆盖范围保留在完整依据中。"
     cards = {card["project_claim_hash"]: card for card in pack["project_result"]["project_cards"]}
-    actionable = [review for review in pack["review_cards"] if review["allowed_actions"]]
+    actionable = [review for review in pack["review_cards"] if review["allowed_actions"] or review["recommended_action"] == "discuss"]
     references = len(pack["review_cards"]) - len(actionable)
     unproven = sum(item["disposition"]["kind"] == "insufficient_evidence" for item in pack["project_result"]["observations"])
     lines = [f"本次有 {len(actionable)} 项建议可继续讨论；{references} 项已有覆盖或无需变更，{unproven} 项证据不足。现有规则未改变。"]
@@ -83,13 +84,16 @@ def render_conversation_brief(pack: dict[str, Any]) -> str:
     counts = {owner: sum(cards[item["project_claim_hash"]]["owner_recommendation"] == owner for item in actionable)
               for owner in ("project_owner", "skill", "global_agents")}
     lines.extend([f"去向：项目维护 {counts['project_owner']} 项，方法维护 {counts['skill']} 项，全局行为讨论 {counts['global_agents']} 项。", ""])
-    if len(actionable) > 1:
+    entry_points = [review for review in actionable if not cards[review['project_claim_hash']].get('parent_card_id')]
+    if len(actionable) != len(entry_points):
+        lines.extend([f"按 {len(entry_points)} 项主建议展开；其余为关联的逐层建议，可按需审阅。", ""])
+    if len(entry_points) > 1:
         lines.extend(["建议索引：", ""])
-        for number, review in enumerate(actionable, 1):
+        for number, review in enumerate(entry_points, 1):
             card = cards[review["project_claim_hash"]]
             lines.append(f"{number}. {card['human_context']['decision_title']}（{ACTION_LABELS[review['recommended_action']]}）")
         lines.append("")
-    first_review = actionable[0]
+    first_review = entry_points[0]
     first = cards[first_review["project_claim_hash"]]
     human = first["human_context"]
     qualified = first_review["recommended_action"] == "edit"
@@ -174,6 +178,24 @@ def table_cell(value: Any) -> str:
 
 def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> list[str]:
     human = card["human_context"]
+    if card.get("kind") == "engineering":
+        lines = [f"## 决策卡 {ordinal}：{human['decision_title']}", "",
+            f"工程建议 `{card['card_id']}`；归属：{SCOPE_LABELS[card['owner_recommendation']]}。讨论不代表实施或规则授权。", ""]
+        if card['parent_card_id']:
+            lines += [f"上层建议：`{card['parent_card_id']}`。", ""]
+        for label, value in (("背景", human['project_story']), ("用户成本", human['user_cost']),
+            ("当前", human['concrete_before']), ("推荐", human['recommended_outcome']),
+            ("调整后", human['concrete_after']), ("收益假设", card['benefit_hypothesis']),
+            ("实施代价", card['implementation_cost']), ("主要反例", human['strongest_counterpoint']),
+            ("维护归属", card['owner_rationale'])):
+            lines += [f"**{label}**：{value}", ""]
+        lines += ["### 方案比较", ""]
+        for option in card['alternatives']:
+            lines += [f"- {option['approach']}：{option['tradeoff']}"]
+        lines += ["", "### 验证条件", "", *bullet_lines(card['validation_conditions']), "",
+            "### 依据与边界", "", *render_evidence(card['direct_evidence']), "",
+            *bullet_lines(card['anti_examples']), *bullet_lines(card['unproven']), ""]
+        return lines
     preview = review["integration_preview"]
     support = card["project_support"]
     causal = card["causal_chain"]
@@ -347,8 +369,8 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         if not proof["host_automation_memory_read"] or not proof["host_automation_memory_updated"]:
             raise ContractError("scheduled surface requires its bounded automation memory wrapper")
     cards_by_hash = {card["project_claim_hash"]: card for card in project["project_cards"]}
-    decisions = [(index, review) for index, review in enumerate(pack["review_cards"], 1) if review["allowed_actions"]]
-    references = [(index, review) for index, review in enumerate(pack["review_cards"], 1) if not review["allowed_actions"]]
+    decisions = [(index, review) for index, review in enumerate(pack["review_cards"], 1) if review["allowed_actions"] or review["recommended_action"] == "discuss"]
+    references = [(index, review) for index, review in enumerate(pack["review_cards"], 1) if not review["allowed_actions"] and review["recommended_action"] != "discuss"]
     result_label = "已核查范围无需新增规则" if pack["status"] == "ok" and not decisions else STATUS_LABELS[pack["status"]]
     lines = [
         f"# {'工程全貌' if inspect else '项目复盘'} · {project['project_key']}",
@@ -404,11 +426,12 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         lines.extend(["| # | 决策 | 推荐动作 | 证据 |", "| --- | --- | --- | --- |"])
         for index, review in decisions:
             card = cards_by_hash[review["project_claim_hash"]]
-            support = card["project_support"]
+            support = card.get("project_support")
             recommendation = "仅组合可确认" if review["selection_token"] and "confirm" not in review["allowed_actions"] else ACTION_LABELS[review["recommended_action"]]
+            evidence = f"{support['count']} 个项目" if support else "工程依据；收益待验"
             lines.append(
                 f"| {index} | {table_cell(card['human_context']['decision_title'])} | "
-                f"{recommendation} | {card['evidence_level']} · {support['count']} 个项目 |"
+                f"{recommendation} | {card['evidence_level']} · {evidence} |"
             )
         if not decisions:
             lines.append("无需确认或逐项忽略；当前规则保持不变。")

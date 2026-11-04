@@ -69,7 +69,10 @@ Global Owner Scout 位于 Core 拓扑之外：
 默认在当前会话呈现，按需展开来源与讨论；没有建议仍可理解工程。原生交互不可用时保留 Markdown 同源内容。
 图谱只是冻结证据的投影，不成为第二 Owner、长期状态或授权来源。完整快照变化先定位受影响来源并形成新快照。
 
-Project v6 在现有结果中保留六类来源覆盖、事件与结构化观察去向；事件与卡片分别守恒，所有引用回到本轮声明的
+Project v7 在同一节点和关系中区分结构归属、依赖、约束、实现、交接与演进；总览先呈现整体分工，
+选中对象后逐层深入，横向关系与演进沿同一身份展开。工程建议可按父子关系审阅，不另建工程模型或建议库。
+Review Pack v8 将工程建议与规则候选分开消费；前者不经过无关的 Global Owner 和 Core 预演，后者保持准确授权链。
+Project v7 在现有结果中保留六类来源覆盖、事件与结构化观察去向；事件与卡片分别守恒，所有引用回到本轮声明的
 来源。Agent 负责语义发现及反证，validator 负责引用、去向和卡片完整性；盲测样本负责发现能力评估。没有新增
 长期候选库、后台任务或规则 authority。活动工程知识与近期 Session 是并列输入，不以会话覆盖替代工程覆盖。
 
@@ -88,14 +91,16 @@ flowchart LR
     EX --> NI["原生任务索引：yield / wait / terminal"]
     NI --> TP["相关自然任务分页到窗口边界或 EOF"]
     TP --> SS["Global Owner Scout Skill：project_scout"]
-    SS --> PC["Immutable project_v6：工程图谱与 Project Cards"]
+    SS --> PC["Immutable project_v7：工程图谱与 Project Cards"]
     PC --> HC["Human Context：zh-CN 项目语境"]
-    PC --> RPJ["Rule Projection：When / Do / Skip"]
+    PC --> RPJ["仅规则候选：When / Do / Skip"]
+    PC --> EA["工程建议：层级、方案、代价与验证条件"]
+    EA --> RP
     GB["Core global_instruction_binding"] --> OR["Deterministic Owner resolver"]
     GO["Canonical source 与本机 global target"] --> OR
     OR --> IP["Integration preview"]
     RPJ --> IP
-    HC --> RP["Validated review_pack_v7"]
+    HC --> RP["Validated review_pack_v8"]
     IP --> RP
     RP --> DR["Deterministic renderer：interactive surface + 精确多选动作"]
     DR --> VO["Visible-output verifier：交付前字节守恒"]
