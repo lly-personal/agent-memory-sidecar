@@ -121,9 +121,63 @@ def render_visual(context, pack_hash):
     return template.replace('__SCOUT_ROOT__', 'scout-map-' + pack_hash[:16]).replace('__SCOUT_DATA__', encoded)
 
 
-def map_bundle(pack):
+def resolve_selection(context, selection, *, journey_id=None):
+    """Resolve discussion context only after the caller has verified the frozen artifact."""
+    m = context['project_map']
+    kind, _, id_ = selection.partition(':')
+    collections = {'node': m['nodes'], 'edge': m['edges'], 'journey': m['journeys'], 'advice': context['advice']}
+    if kind == 'project':
+        require(id_ == context['project_key'], 'unknown selected project')
+        obj = {'id': id_, 'label': m['title'], 'goal': m['goal'], 'boundary': m['boundary']}
+    else:
+        require(kind in collections, 'unknown selected object kind')
+        obj = next((x for x in collections[kind] if x.get('id', x.get('card_id')) == id_), None)
+        require(obj is not None, 'unknown selected object')
+    if kind == 'journey':
+        require(journey_id in (None, id_), 'conflicting selected journey')
+        journey_id = id_
+    journey = next((j for j in m['journeys'] if j['id'] == journey_id), None)
+    require(journey_id is None or journey is not None, 'unknown selected journey')
+    if journey is not None and kind in {'node', 'edge', 'advice'}:
+        path_edges = [e for e in m['edges'] if e['id'] in journey['edge_ids']]
+        path_nodes = {journey['entry'], *(e['target'] for e in path_edges)}
+        ancestors = set(path_nodes)
+        while True:
+            parents = {e['source'] for e in m['edges'] if e.get('kind') == 'contains' and e['target'] in ancestors}
+            if parents <= ancestors:
+                break
+            ancestors.update(parents)
+        related = (id_ in ancestors if kind == 'node' else id_ in journey['edge_ids'] if kind == 'edge' else
+                   id_ in journey['card_ids'] or any(id_ in x['card_ids'] for x in
+                       [*path_edges, *(n for n in m['nodes'] if n['id'] in ancestors)]))
+        require(related, 'selected journey does not contain selected object')
+    journeys = [j for j in m['journeys'] if j == journey or (kind == 'advice' and id_ in j['card_ids'])]
+    journey_edges = {e for j in journeys for e in j['edge_ids']}
+    node_ids = {id_} if kind == 'node' else set()
+    node_ids.update(j['entry'] for j in journeys)
+    edges = [e for e in m['edges'] if kind == 'project' or
+             (kind == 'edge' and e['id'] == id_) or
+             (kind == 'node' and id_ in (e['source'], e['target'])) or
+             (kind == 'advice' and id_ in e['card_ids']) or
+             e['id'] in journey_edges]
+    node_ids.update(i for e in edges for i in (e['source'], e['target']))
+    nodes = [n for n in m['nodes'] if kind == 'project' or n['id'] in node_ids or
+             (kind == 'advice' and id_ in n['card_ids'])]
+    evidence_refs = set()
+    for item in [obj, *nodes, *edges, *journeys]:
+        evidence_refs.update(item.get('evidence_refs', []))
+        evidence_refs.update(r for c in item.get('claims', []) for r in c['evidence_refs'])
+    if kind == 'advice':
+        evidence_refs.update(obj['human_context']['evidence_refs'])
+    sources = [dict(s, refs=[r for r in s['refs'] if r['ref'] in evidence_refs])
+               for s in context['evidence_sources'] if any(r['ref'] in evidence_refs for r in s['refs'])]
+    return dict(object_kind=kind, object_id=id_, object=obj, journey=journey, journeys=journeys,
+                nodes=nodes, edges=edges, evidence_sources=sources)
+
+
+def map_bundle(pack, *, visual=None):
     context = map_context(pack)
-    visual = render_visual(context, pack['review_pack_hash']).encode('utf-8')
+    visual = (render_visual(context, pack['review_pack_hash']) if visual is None else visual).encode('utf-8')
     return {'context': context, 'visual': {'visual_name': 'scout-project-map-' + pack['review_pack_hash'][:16] + '.html',
             'visual_sha256': hashlib.sha256(visual).hexdigest(), 'visual_bytes': len(visual)}}
 
@@ -149,7 +203,7 @@ def recover_map(body):
     return value
 
 
-def markdown_map(pack):
+def markdown_map(pack, *, visual=None):
     m = pack['project_result']['project_map']
     def text(value): return html.escape(value, quote=False).replace('|', '&#124;').replace('\n', '<br>')
     lines = ['## 工程全貌', '', text(m['goal']), '', '范围：' + text(m['boundary']), '',
@@ -174,5 +228,5 @@ def markdown_map(pack):
             lines.append('| ' + ' | '.join(text(x) for x in (obj['label'], LAYERS[c['layer']], c['environment'], c['statement'], '、'.join(c['evidence_refs']))) + ' |')
     lines += ['', '### 覆盖边界', '']
     for c in m['coverage']: lines.append('- ' + text(c['dimension']) + '：' + COVERAGE[c['status']] + '。' + text(c['explanation']))
-    lines += ['', MAP_START + canonical_json(map_bundle(pack)).decode('utf-8') + MAP_END, '']
+    lines += ['', MAP_START + canonical_json(map_bundle(pack, visual=visual)).decode('utf-8') + MAP_END, '']
     return lines

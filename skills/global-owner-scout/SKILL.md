@@ -7,7 +7,7 @@ description: Show a project overview or deeply review it when explicitly request
 
 ## Contract
 
-- Skill version: `5.14.0`
+- Skill version: `5.15.0`
 - Project result: `global_owner_scout_project_v7`
 - User review: `global_owner_scout_review_pack_v8`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -30,17 +30,23 @@ map if identifiable, check its source revision and relevant source changes, and 
 reconstruct current design with the project-map method in Phase 2; skip the task census, candidate search, Global Owner resolver
 and Core preview. Freeze `view_ready` or `degraded` with the uncovered scope. Do not label this a deep review.
 “复盘当前工程” uses `purpose=review` and the complete protocol, including whole-system reconstruction before candidate selection.
-Both purposes deliver a map even with zero recommendations. Ordinary authorized development maintains the affected Owner and
+Both purposes explain the whole system even with zero recommendations; the evidence model does not prescribe a visible diagram. Ordinary authorized development maintains the affected Owner and
 acceptance through its existing workflow; it does not start a whole-project review. The user chooses model, reasoning and time
 investment; do not inject overrides or impose a fixed matrix size, advice count or review time limit.
 
-Use the fixed `assets/project-map.html` projection emitted by Delivery v2. Preserve the accepted typography and visual language, whole-system overview, layered structure, paths,
-cross-links, decision evolution, evidence and hierarchical advice, with context and return paths, using in-conversation theme, native controls/details, keyboard access, optional widget state and `sendFollowUpMessage`;
-do not generate another UI or add a server. All graph content comes from the bound target project, not the Sidecar example. Return the verified
-native visualization reference in the current chat with the deterministic receipt. Do not automatically open a browser or file
-preview. Inspecting a node stays local; only “继续讨论此处” requests a follow-up with report/object identity. This request does not
-approve maintenance or rules. If inline rendering or follow-up is unavailable, use the same Markdown map and current conversation;
-report that interaction is unverified. File verification never proves rendering, comprehension or adoption.
+Choose presentation from the user's question and the target project's actual architecture. Plain prose or a table can be sufficient;
+a static relation can use Mermaid; an explorable process, state comparison or spatial relation can use the installed `visualize` Skill.
+Neither this capability nor a particular diagram, tab set, role/scenario grouping or component is mandatory for every project.
+The existing `assets/project-map.html` is a reusable overview option when it fits. When another native composition fits better,
+author it from the frozen evidence under the granted task output root and pass its exact path to `prepare-delivery --visual-input`.
+Use native controls, typography and theme, while choosing content and interactions independently. A custom view need not copy the
+overview template's DOM or layout. If it offers follow-up, carry the same report/object identity and optional journey; local inspection
+does not approve maintenance or rules. Semantic fidelity and real interaction require review; freezing bytes alone proves neither.
+For text or a simple static answer, use `render-receipt --text-only`; the companion stays available without forcing an inline UI.
+Include the complete generated receipt in the actual final reply. A link to a separately saved receipt cannot replace it. Verify the
+composed final before sending, then read the delivered text from native history on continuation. Never rewrite an old frozen report
+to change its presentation. Do not automatically open a browser or file preview or add a service. When native interaction is absent,
+continue from the same Markdown and chat, reporting the unverified interaction. File integrity does not prove comprehension or adoption.
 
 ## Mode: `project_scout`
 
@@ -115,6 +121,10 @@ on stdin, including surrounding delivery prose; do not manually recompose or tri
 complete exact receipt and rejects missing/ambiguous boundaries or changed content. Surrounding prose is not verified evidence or
 authorization. Pass `--project-root <current-native-bound-root>` to check the full current snapshot, including dirty and untracked sources. Compare the returned `project_identity` with the native binding before treating the map as this project. `source_status=changed` needs relevant source review and a new snapshot; HEAD equality alone is insufficient. It reconstructs and returns the manifest from the original file, verifies direct-child containment, read-only bytes and
 all card/action hashes. Use `project_map_bundle.context` to resolve the exact selected object and source references. Never infer an object from another report or from widget state alone. Validate the map source revision against the current project before claiming currentness; inspect relevant changes and create a new snapshot for affected facts, preserving history. A stale map remains historical evidence, not current maintenance authority. Missing/tampered HTML sets `visual_status=unavailable` while verified Markdown remains usable. Old files without a map remain readable without fabricating one.
+When an object or visible journey is selected, pass it as data to `verify-final --object <kind:id> [--journey <id>]` and use
+`selected_context`; do not assemble shell code from the follow-up text. The project overview is `project:<project_key>`, not
+a synthetic node. A widget selection is only a locator. Recover the original receipt before resolving it, and keep changed
+source facts historical until their relevant current sources are checked.
 Use the returned `recovery_bundle` for exact Core input. Historical files may return null; if the original
 exact bundle is no longer available, refresh only the affected preview for new authorization and never invent old bindings. Keep the same artifact; do not rerun discovery or recompose a large payload. An explicit later request to
 open it may reuse the returned manifest and existing `render-receipt`; repeated `queued` remains pending.

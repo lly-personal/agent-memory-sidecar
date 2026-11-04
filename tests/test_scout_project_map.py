@@ -137,7 +137,73 @@ def layered_browser_pack():
     return pack
 
 
+def nested_journey_pack():
+    """Sanitized real failure shape: handoffs exist only below collapsed groups."""
+    pack = layered_browser_pack(); m = pack['project_result']['project_map']
+    template = m['nodes'][0]
+    m['nodes'] += [dict(copy.deepcopy(template), id=id_, label=label, summary=summary, card_ids=[])
+                   for id_, label, summary in [('authoring', '准备内容', '整理输入并交给下游。'),
+                       ('delivery', '消费结果', '使用准确的输入并读回结果。'),
+                       ('draft', '草稿', '在同一职责内校对草稿。')]]
+    edge = m['edges'][0]
+    m['edges'] += [dict(copy.deepcopy(edge), id=id_, source=source, target=target, kind=kind, card_ids=[])
+                  for id_, source, target, kind in [('owns-entry', 'authoring', 'entry', 'contains'),
+                      ('owns-draft', 'authoring', 'draft', 'contains'),
+                      ('owns-consumer', 'delivery', 'consumer', 'contains'),
+                      ('internal', 'draft', 'entry', 'handoff')]]
+    pack['review_pack_hash'] = v.review_pack_hash(pack)
+    v.validate_review_pack(pack)
+    return pack
+
+
+def shared_parent_pack(reverse=False):
+    pack = nested_journey_pack(); m = pack['project_result']['project_map']
+    m['edges'].append(dict(copy.deepcopy(m['edges'][1]), id='shared-entry', source='delivery', target='entry'))
+    if reverse:
+        m['edges'].reverse()
+    pack['review_pack_hash'] = v.review_pack_hash(pack)
+    v.validate_review_pack(pack)
+    return pack
+
+
 class ScoutProjectMapTests(unittest.TestCase):
+    def test_review_brief_explains_the_system_before_recommendations(self):
+        from render_review import render_conversation_brief
+        pack = layered_pack()
+        brief = render_conversation_brief(pack)
+        self.assertLess(brief.index(pack['project_result']['project_map']['goal']), brief.index('项建议'))
+        self.assertIn('用户入口 → 实际消费者', brief)
+        self.assertIn('消费者取得结果。', brief)
+
+    def test_continuation_resolves_frozen_objects_and_visible_journey(self):
+        from project_map import map_context, resolve_selection
+        context = map_context(layered_browser_pack())
+        result = resolve_selection(context, 'project:' + context['project_key'], journey_id='ordinary')
+        self.assertEqual('project', result['object_kind'])
+        self.assertEqual('ordinary', result['journey']['id'])
+        self.assertEqual(['entry', 'consumer'], [n['id'] for n in result['nodes']])
+        self.assertTrue(result['evidence_sources'])
+        for selection in ('node:entry', 'edge:handoff', 'advice:child-advice', 'journey:ordinary'):
+            self.assertTrue(resolve_selection(context, selection)['evidence_sources'])
+        for selection in ('node:overview', 'node:missing', 'project:another', 'edge:missing'):
+            with self.subTest(selection=selection), self.assertRaises(v.ContractError):
+                resolve_selection(context, selection)
+        with self.assertRaises(v.ContractError):
+            resolve_selection(context, 'node:entry', journey_id='missing')
+        for n in context['project_map']['nodes']:
+            n['card_ids'] = []
+        context['project_map']['journeys'][0]['card_ids'] = ['child-advice']
+        result = resolve_selection(context, 'advice:child-advice')
+        self.assertEqual(['entry', 'consumer'], [n['id'] for n in result['nodes']])
+        self.assertEqual('ordinary', result['journeys'][0]['id'])
+        nested = map_context(nested_journey_pack())
+        legacy = map_context(map_pack())
+        self.assertEqual('entry', resolve_selection(legacy, 'node:entry', journey_id=legacy['project_map']['journeys'][0]['id'])['object_id'])
+        self.assertEqual('authoring', resolve_selection(nested, 'node:authoring', journey_id='ordinary')['object_id'])
+        for selection in ('node:draft', 'edge:internal'):
+            with self.subTest(selection=selection), self.assertRaises(v.ContractError):
+                resolve_selection(nested, selection, journey_id='ordinary')
+
     def test_system_recommendation_does_not_invent_a_rule_or_accepted_change(self):
         import prepare_review
         import prepare_delivery as d
@@ -213,6 +279,10 @@ class ScoutProjectMapTests(unittest.TestCase):
             root = Path(tmp)
             manifest, artifact = d.prepare_delivery(map_pack(), artifact_dir=root, protected_roots=[SCRIPTS])
             original = artifact.read_bytes()
+            linked_receipt = ('修复已完成。完整依据与回执见 [回执](receipt.md)。\n\n'
+                              'visualize{"path":"' + str(root / manifest['visual_name']) + '"}\n')
+            with self.assertRaises(v.ContractError):
+                d.verify_final_receipt(linked_receipt, artifact_root=root)
             for outcome in d.SURFACE_COPY:
                 receipt = d.render_delivery_receipt(manifest, artifact_path=artifact, artifact_root=root, outcome=outcome)
                 # Actual delivery shape: source/release closeout, exact receipt, inline map, host footer.
@@ -230,6 +300,31 @@ class ScoutProjectMapTests(unittest.TestCase):
                                 final.replace(manifest['visual_name'], 'another.html')]:
                     with self.subTest(invalid=invalid[-100:]), self.assertRaises(v.ContractError):
                         d.verify_final_receipt(invalid, artifact_root=root)
+
+    def test_native_presentation_can_vary_without_changing_evidence_or_recovery(self):
+        import prepare_delivery as d
+        from project_map import resolve_selection
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fragment = '<section id="state-comparison"><h2>运行状态对照</h2><p>当前仅有设计依据。</p></section>'
+            visual = root / 'state-comparison.html'
+            visual.write_text(fragment, encoding='utf-8')
+            manifest, artifact = d.prepare_delivery(map_pack(), artifact_dir=root, protected_roots=[SCRIPTS], visual_input=visual)
+            self.assertEqual(fragment, (root / manifest['visual_name']).read_text(encoding='utf-8'))
+            for text_only in (False, True):
+                receipt = d.render_delivery_receipt(manifest, artifact_path=artifact, artifact_root=root,
+                                                    outcome='not_requested', text_only=text_only)
+                self.assertEqual(not text_only, 'visualize' in receipt)
+                recovered = d.verify_final_receipt(receipt, artifact_root=root)
+                self.assertEqual('verified', recovered['visual_status'])
+                context = recovered['project_map_bundle']['context']
+                self.assertEqual('entry', resolve_selection(context, 'node:entry')['object']['id'])
+                self.assertFalse(recovered['confirmation_eligible'])
+            visual.write_text('<p>Changed presentation</p>', encoding='utf-8')
+            with self.assertRaises(v.ContractError):
+                d.prepare_delivery(map_pack(), artifact_dir=root, protected_roots=[SCRIPTS], visual_input=visual)
+            with self.assertRaises(v.ContractError):
+                d.prepare_delivery(map_pack(), artifact_dir=root, protected_roots=[SCRIPTS], visual_input=Path(__file__).resolve())
 
     def test_cross_project_and_partial_topologies_are_valid(self):
         packs = browser_packs()

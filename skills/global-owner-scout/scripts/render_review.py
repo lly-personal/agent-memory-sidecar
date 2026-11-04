@@ -65,9 +65,18 @@ def extract_conversation_brief(body: str) -> str | None:
 
 def render_conversation_brief(pack: dict[str, Any]) -> str:
     project = pack['project_result']
+    overview = []
+    if m := project.get('project_map'):
+        overview = ['**工程全貌：' + m['title'] + '**', m['goal'], '范围：' + m['boundary']]
+        if m['journeys']:
+            j = m['journeys'][0]
+            nodes = {n['id']: n['label'] for n in m['nodes']}
+            edges = {e['id']: e for e in m['edges']}
+            steps = [nodes[j['entry']], *(nodes[edges[e]['target']] for e in j['edge_ids'])]
+            overview.extend([j['label'] + '：' + ' → '.join(steps) + '。' + j['outcome'],
+                             '异常与恢复：' + j['recovery']])
     if project.get('purpose') == 'inspect':
-        m = project['project_map']
-        return '\n\n'.join(['**工程全貌：' + m['title'] + '**', m['goal'], '范围：' + m['boundary'],
+        return '\n\n'.join([*overview,
             '本次只查看当前设计，未执行近期协作复盘或规则预演。可选择总览、路径或矩阵，围绕具体环节继续讨论。'])
     if pack["status"] in {"failed", "output_budget_exceeded"}:
         return f"本次复盘未完成：{STATUS_LABELS[pack['status']]}。这不表示没有增量；现有规则未改变，本次没有可推进建议。具体失败与未覆盖范围保留在完整依据中。"
@@ -75,7 +84,7 @@ def render_conversation_brief(pack: dict[str, Any]) -> str:
     actionable = [review for review in pack["review_cards"] if review["allowed_actions"] or review["recommended_action"] == "discuss"]
     references = len(pack["review_cards"]) - len(actionable)
     unproven = sum(item["disposition"]["kind"] == "insufficient_evidence" for item in pack["project_result"]["observations"])
-    lines = [f"本次有 {len(actionable)} 项建议可继续讨论；{references} 项已有覆盖或无需变更，{unproven} 项证据不足。现有规则未改变。"]
+    lines = [*(['\n\n'.join(overview), ''] if overview else []), f"本次有 {len(actionable)} 项建议可继续讨论；{references} 项已有覆盖或无需变更，{unproven} 项证据不足。现有规则未改变。"]
     if pack["status"] == "degraded":
         lines.append("部分资料未覆盖；以下建议只适用于已取得的证据，完整缺口见原报告。")
     if not actionable:
@@ -348,7 +357,7 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
     return lines
 
 
-def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
+def render_review_pack(pack: dict[str, Any], *, surface: str, visual: str | None = None) -> str:
     if surface not in SURFACES:
         raise ContractError(f"surface must be one of {sorted(SURFACES)}")
     pack = validate_review_pack(pack)
@@ -386,7 +395,7 @@ def render_review_pack(pack: dict[str, Any], *, surface: str) -> str:
         lines.extend([BRIEF_START + render_conversation_brief(pack) + BRIEF_END, ""])
     if project.get('project_map') is not None:
         from project_map import markdown_map
-        lines.extend(markdown_map(pack))
+        lines.extend(markdown_map(pack, visual=visual))
     if surface == "interactive" and any(review["selection_token"] for review in pack["review_cards"]):
         lines.extend([
             "> **确认条件**：本文件没有改变规则。审阅后可回复准确选择；Agent 会先恢复本文件的完整性校验，再核对当前规则并预演。打开请求排队不证明你已看到内容，也不代替你的授权；文件或预演校验失败时不写入。",

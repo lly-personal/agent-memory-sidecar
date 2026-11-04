@@ -25,6 +25,7 @@ from prepare_delivery import (
     verify_final_receipt,
 )
 from render_review import render_review_pack
+from project_map import resolve_selection
 from prepare_review import prepare_review
 from resolve_owner_parity import resolve
 from utf8_stdio import configure_utf8_stdio
@@ -140,14 +141,18 @@ def main() -> int:
     prepare = commands.add_parser("prepare-delivery")
     prepare.add_argument("--artifact-dir", type=Path, required=True)
     prepare.add_argument("--protected-root", action="append", type=Path, required=True)
+    prepare.add_argument("--visual-input", type=Path)
     receipt = commands.add_parser("render-receipt")
     receipt.add_argument("outcome", choices=tuple(SURFACE_COPY))
     receipt.add_argument("--artifact-path", type=Path)
     receipt.add_argument("--artifact-root", type=Path)
+    receipt.add_argument("--text-only", action="store_true")
     commands.add_parser("render-terminal")
     verify_final = commands.add_parser("verify-final")
     verify_final.add_argument("--artifact-root", type=Path, required=True)
     verify_final.add_argument("--project-root", type=Path)
+    verify_final.add_argument("--object", dest="selected_object")
+    verify_final.add_argument("--journey")
     args = parser.parse_args()
 
     try:
@@ -177,7 +182,8 @@ def main() -> int:
         elif args.command == "verify-visible":
             print(json.dumps(verify_visible_output(sys.stdin.read(), surface=args.surface), ensure_ascii=False, separators=(",", ":")))
         elif args.command == "prepare-delivery":
-            manifest, _ = prepare_delivery(load_stdin_json(), artifact_dir=args.artifact_dir, protected_roots=args.protected_root)
+            manifest, _ = prepare_delivery(load_stdin_json(), artifact_dir=args.artifact_dir, protected_roots=args.protected_root,
+                                           visual_input=args.visual_input)
             print(json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
         elif args.command == "render-receipt":
             manifest = validate_delivery_manifest(load_stdin_json())
@@ -187,12 +193,17 @@ def main() -> int:
                 require(args.artifact_path is not None, "--artifact-path is required")
                 require(args.artifact_root is not None, "--artifact-root is required")
                 print(render_delivery_receipt(manifest, artifact_path=args.artifact_path, artifact_root=args.artifact_root,
-                                              outcome=args.outcome), end="")
+                                              outcome=args.outcome, text_only=args.text_only), end="")
         elif args.command == "render-terminal":
             print(render_terminal_receipt(load_stdin_json()), end="")
         else:
             result = verify_final_receipt(sys.stdin.read(), artifact_root=args.artifact_root)
             result["source_status"] = "not_checked"
+            if args.selected_object or args.journey:
+                require(result['project_map_bundle'] is not None, 'original report has no map')
+                context = result['project_map_bundle']['context']
+                result['selected_context'] = resolve_selection(context,
+                    args.selected_object or 'project:' + context['project_key'], journey_id=args.journey)
             if args.project_root and result["project_map_bundle"]:
                 try:
                     snapshot = inspect_git_context(args.project_root)

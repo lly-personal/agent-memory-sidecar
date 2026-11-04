@@ -3,6 +3,14 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.14 (2026-11-04)
+
+- Explain project goals and real action consequences before recommendations; preserve descendant relationships, shared ownership and the visible journey during discussion.
+- Use native presentation controls and theme. Choose expression by project and question: retain the overview as one reusable option, accept another evidence-bound native composition, or deliver text without forcing an interactive view.
+- Recover selected projects, nodes, relationships, journeys and advice from the verified original report. Validate complete actual replies rather than links to separately saved receipts; retain immutable historical evidence.
+- Regress the real failed journey alongside cross-project, partial-knowledge, native-layout and alternative-presentation cases. Technical qualification does not establish natural adoption or user comprehension.
+- Components: Core 0.5.14, Plugin 1.7.14, Bootstrap 2.4.7 and Scout 5.15.0; Project v7, Review Pack v8 and Delivery v2 remain compatible.
+
 ## 0.5.13 (2026-11-04)
 
 - Reconstruct whole-system responsibilities, typed relationships and decision evolution, then explore structure, paths, evidence and layered recommendations using the accepted visual design.

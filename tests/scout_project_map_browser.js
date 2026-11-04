@@ -7,6 +7,45 @@ async (win) => {
  const teaser=root.querySelector('.at-advice-teaser [data-advice]');
  if(teaser){ok('teaser retains exact advice identity',source.advice.some(a=>a.card_id===teaser.dataset.advice));teaser.click();ok('teaser opens exact advice',saves.at(-1).privateContent.state.advice===teaser.dataset.advice);click('[data-action="back"]');}
  ok('overview names target goal',root.querySelector('h1').textContent===source.project_map.title&&root.textContent.includes(source.project_map.goal));
+ const relations=source.project_map.edges.filter(e=>e.kind!=='contains');
+ ok('collapsed overview preserves descendant relations',relations.every(e=>[...root.querySelectorAll('.at-crosslinks [data-edge]')].some(b=>b.dataset.edge===e.id)));
+ click('[data-action="discuss"]');await frame();
+ ok('overview resolves project rather than synthetic node',messages.at(-1).prompt.includes('project:'+source.project_key));
+ if(source.project_map.journeys.length){
+  const visible=root.querySelector('[data-visible-journey]').dataset.visibleJourney;
+  ok('default displayed journey enters continuation',messages.at(-1).prompt.includes('路径 '+visible));
+  click('[data-view="path"]');
+  ok('default displayed journey enters model state',saves.at(-1).modelContent.journey_id===root.querySelector('#atlas-journey').value);
+  const journey=source.project_map.journeys.find(j=>j.id===root.querySelector('#atlas-journey').value);
+  ok('entry behavior is visible before the first handoff',source.project_map.nodes.find(n=>n.id===journey.entry).claims.every(c=>[...root.querySelectorAll('[data-step-claim]')].some(p=>p.textContent.includes(c.statement))));
+  ok('normal path explains source-backed consequences',journey.edge_ids.every(id=>source.project_map.edges.find(e=>e.id===id).claims.every(c=>[...root.querySelectorAll('[data-step-claim]')].some(p=>p.textContent.includes(c.statement)))));
+  click('[data-action="back"]');
+ }
+ click('[data-view="graph"]');await frame();
+ const type=root.querySelector('#atlas-relation')?.value;
+ const shared=source.project_map.nodes.filter(n=>source.project_map.edges.filter(e=>e.kind==='contains'&&e.target===n.id).length>1&&relations.some(e=>(e.kind||'handoff')===type&&(e.source===n.id||e.target===n.id)));
+ ok('shared ownership does not choose an arbitrary parent',shared.every(n=>[...root.querySelectorAll('[data-graph-node]')].some(el=>el.dataset.graphNode===n.id)));
+ ok('graph retains exact selected-type relations',relations.filter(e=>(e.kind||'handoff')===type).every(e=>[...root.querySelectorAll('.at-network-summary [data-edge]')].some(b=>b.dataset.edge===e.id)));
+ if(root.querySelector('[data-expand]')){const count=root.querySelectorAll('[data-graph-node]').length;click('[data-expand]');ok('expansion retains overview scope',saves.at(-1).privateContent.state.node===saves.at(-2).privateContent.state.node);click('[data-action="back"]');ok('return restores graph frontier',root.querySelectorAll('[data-graph-node]').length===count);}
+ click('[data-action="back"]');
+ messages.length=0;
+ click('[data-view="evidence"]');
+ const relationEntry=root.querySelector('.at-table [data-edge]');
+ if(relationEntry){const expected=relationEntry.dataset.edge;relationEntry.click();ok('evidence preserves relationship identity',saves.at(-1).modelContent.object_kind==='edge'&&saves.at(-1).modelContent.object_id===expected);click('[data-action="back"]');}
+ click('[data-action="back"]');
+ const initialJourney=source.project_map.journeys[0];
+ if(initialJourney){
+  const outside=source.project_map.edges.find(e=>e.kind!=='contains'&&!initialJourney.edge_ids.includes(e.id));
+  if(outside){click('[data-view="evidence"]');click('.at-table [data-edge="'+outside.id+'"]');ok('unrelated relation clears previous journey',saves.at(-1).modelContent.journey_id===null);click('[data-action="back"]');click('[data-action="back"]');}
+ }
+ const sharedNode=source.project_map.nodes.find(n=>source.project_map.edges.filter(e=>e.kind==='contains'&&e.target===n.id).length>1);
+ if(sharedNode){
+  const parents=source.project_map.edges.filter(e=>e.kind==='contains'&&e.target===sharedNode.id).map(e=>e.source);
+  const entered=parents.at(-1),parent=source.project_map.nodes.find(n=>n.id===entered);
+  click('.at-branches [data-node="'+entered+'"]');click('.at-node-list [data-node="'+sharedNode.id+'"]');
+  ok('shared breadcrumb preserves entered parent',root.querySelector('.at-breadcrumb').textContent.includes(parent.label));
+  click('[data-action="back"]');click('[data-action="back"]');
+ }
  click('.at-branches [data-node]');
  const selected=saves.at(-1);ok('navigation binds same report',selected.modelContent.report_hash===source.report_hash);
  click('[data-view="evidence"]');
@@ -32,7 +71,7 @@ async (win) => {
   click('[data-view="advice"]');const entry=root.querySelector('[data-advice]:not([data-advice=""])');
   if(entry){entry.click();ok('advice retains cost and counterexample',root.textContent.includes('代价：')&&root.textContent.includes('保留或删除的条件：'));
    const child=root.querySelector('.at-reading [data-advice]');if(child){child.click();ok('layered advice retains parent',root.querySelectorAll('.at-advice-path [data-advice]').length>=3);}
-   click('[data-action="back"]');ok('return retains object',saves.at(-1).modelContent.object_id===savedNode);}
+   click('[data-action="back"]');ok('return retains originating object',saves.at(-1).privateContent.state.node===savedNode);}
  }
  // This tests our code inside a local browser fixture, not the Desktop chat's scroll controller.
  const bound=win.document.documentElement;ok('content fits viewport',bound.scrollWidth<=win.innerWidth+1);
