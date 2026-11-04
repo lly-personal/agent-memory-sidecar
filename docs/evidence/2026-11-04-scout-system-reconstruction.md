@@ -23,6 +23,9 @@ the existing discovery examples; private transcripts and project identities are 
 ## Mechanism and presentation evidence
 
 - Full local suite: 322 tests, six environment-dependent skips; affected project-map suite: 16 tests.
+- Initial Windows CI reached the new report-content assertion but failed because the test used the platform default encoding
+  to read a UTF-8 report. The test now reads UTF-8 explicitly; production report I/O already specified UTF-8. The failed CI log
+  is retained separately from later matching-commit CI results.
 - Legacy reports remain readable. A mixed pack keeps engineering discussion out of rule selection and Core preview.
 - In a Chromium wrapper, the same restored snapshot previously caused 18 DOM mutations; the candidate caused zero and kept
   focus. Programmatic navigation uses `preventScroll`. Repeated selection does not save or redraw identical state.

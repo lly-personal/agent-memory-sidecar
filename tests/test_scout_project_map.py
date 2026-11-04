@@ -151,8 +151,9 @@ class ScoutProjectMapTests(unittest.TestCase):
             recovered = d.verify_final_receipt(receipt, artifact_root=root)
             self.assertEqual([0], manifest['visible_action_counts'])
             self.assertIn('首项建议', receipt)
-            self.assertIn('收益假设', artifact.read_text())
-            self.assertNotIn('接受后的准确规则', artifact.read_text())
+            body = artifact.read_text(encoding='utf-8')
+            self.assertIn('收益假设', body)
+            self.assertNotIn('接受后的准确规则', body)
             self.assertIsNone(recovered['recovery_bundle'])
             self.assertEqual('engineering', recovered['project_map_bundle']['context']['advice'][0]['kind'])
 
