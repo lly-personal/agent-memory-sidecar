@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Owner: project_docs
-- Applies to: Scout 5.14 interactive delivery; legacy receipts remain readable
+- Applies to: Scout 5.15 interactive delivery; legacy receipts remain readable
 - Decision: [ADR 0076](../docs/decisions/0076-task-scoped-review-pack-delivery.zh.md)
 
 
@@ -16,17 +16,28 @@ can compare `--project-root` with that snapshot; source changes are distinct fro
 must also match before applying current conclusions. A changed snapshot requires relevant source reassessment, not an automatic
 thirty-day census or rewriting the old report.
 
-The default receipt contains a short conclusion, complete-evidence link and a verified in-conversation visualization reference.
+The receipt contains a short conclusion and complete-evidence link. `render-receipt --text-only` omits the native visual reference
+without changing evidence, recovery or authorization. The default companion remains available for compatible callers; generating
+it does not require showing it for every question. `prepare-delivery --visual-input <absolute-fragment-path>` freezes a different
+native composition supplied in the same granted output directory. Its exact UTF-8 bytes replace the default projection in the
+existing descriptor and immutable delivery. It need not copy the default template or DOM. Content fidelity is evaluated against
+the frozen evidence; a matching digest only proves byte identity. Presentation changes create a new delivery generation, preserving
+old files. No new schema, renderer registry or state store is added. When showing a companion, include its verified reference.
 The reference points only to the direct-child HTML named in the manifest. Rendering a receipt first checks the supplied manifest
 against the frozen Markdown descriptor. Recovery validates the HTML independently: missing/changed HTML gives
 `visual_status=unavailable`, preserving usable Markdown and exact rule recovery. UI availability never elevates confirmation.
 A native follow-up carries report hash and object kind/ID. Persisted widget selection is a convenience, not authority or approval.
+`verify-final --object <kind:id> [--journey <id>]` resolves project/node/edge/advice/journey against the verified map and returns
+`selected_context` with the selected object, related nodes/edges, visible journey and source references. An unknown selection
+fails instead of switching reports. The overview uses the project key, never a fabricated node. An implicitly displayed first
+journey is a real selection and travels in both the follow-up prompt and optional widget state. Without these options historical
+receipt verification is unchanged. The old map and its descriptor are never rerendered in place.
 Default file opening remains zero; `surface_observation=not_requested` means no file preview was requested, not that inline UI was observed.
 
 Inspect delivers current design with null Owner parity/preview and zero cards; it does not claim a deep review. Review preserves rule preview and actual user authorization only for rule candidates; engineering advice has no rule actions. Structure, path, cross-link, evolution, evidence and layered-advice projections share evidence layers and source refs.
 Historical v1 receipt parsing remains read-only. The following v1 field and safety descriptions apply unchanged where not extended above.
 
-The fixed presentation follows the accepted visual language and overview/drill-down/cross-link/return interaction. Identical native state echoes do not rerender or refocus; programmatic focus prevents scrolling. Optional persistence failure does not block local reading. Host conversation scrolling remains a separate observation. Shared objects retain their selected journey;
+The reusable overview presentation follows native visual language and overview/drill-down/cross-link/return interaction. Identical native state echoes do not rerender or refocus; programmatic focus prevents scrolling. Optional persistence failure does not block local reading. Host conversation scrolling remains a separate observation. Shared objects retain their selected journey;
 opening related advice retains the originating object in best-effort local widget state and offers a return to it. This does not
 track maintenance progress or confer approval. Derived advice carries its verified Human Context, ownership and current disposition,
 without reproducing confirmation commands. Target-project content is independent of the repository maintaining the renderer.

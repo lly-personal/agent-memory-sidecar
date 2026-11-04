@@ -43,6 +43,11 @@ Scheduled retains its verified inline/Inbox surface and has no artifact-root or 
    updates are outside the frozen observation, not a reason to wait for the task to finish.
 6. No transcript parser, database, background queue, task polling service or automation memory substitutes for native evidence.
 
+Acquisition and comprehension are different. A tool batch that fetches pages and prints only counts has not exposed their
+meaning to the analysis pass. Read or surface the selected bounded passages, including the user's correction, actual action
+and result; retain exact source references in the existing evidence inventory. Mark unread or only summarized content as
+such. Full pagination is a transport result, not proof of whole-project analytical depth.
+
 ## Phase 2: project fact reconstruction
 
 Start from user outcomes, not a catalogue of normative clauses. Reconstruct the engineering map before choosing lessons:
@@ -70,6 +75,22 @@ environment/evidence comparisons. Do not force every relation into one graph or 
 path and matrix keep the same object/source identities and reading context. The main explanation remains readable without
 interaction; selection reveals relevant detail instead of requiring the reader to assemble the whole system across tabs.
 
+The mental model is goal -> actor and task -> action -> system effect -> downstream feedback -> recovery. For user-facing
+fields and controls, explain what to enter, what the action changes, when it takes effect, what other entries observe, and
+what remains unchanged where that distinction resolves a real confusion. Reuse node summaries, typed edge claims and journey
+outcome/recovery; do not add a parallel scenario store. A path that only names modules is insufficient even if every link works.
+Show the consequence claims on the normal path, not only in an expert relationship tab. Distinguish promised behavior from
+observed behavior and unknowns in place. Legitimate architectural choices explain why to retain or change a boundary;
+prohibited shortcuts are counterexamples, not alternative solutions used to make the preferred option look inevitable.
+
+Use the current installed `visualize` contract when an inline explorable explanation helps the user. It owns transport and
+host interactions, while this Skill owns source interpretation. Choose an appropriate presentation; the existing overview renderer is one reusable option, not a universal format.
+Learn from the visual language and interaction of actual user-accepted presentations without assuming that the user approved
+their content structure. Compare hierarchy, spacing, control clarity, selection feedback and continuity in the current host.
+Choose the content structure separately from the actual reader question. The diagram is an optional view of the same facts. Keep the initial content coherent,
+progressively expose relationships, and preserve location and return. Do not require another tool or installation when the
+native surface is absent; use the same Markdown and current chat. Positive presentation feedback does not pass content depth.
+
 Before styling, prioritize the reader's questions and content/actions: what the project accomplishes, how its main journey
 works, how supporting capabilities connect, then the selected object's evidence, exceptions and maintenance. Use that priority
 to choose type hierarchy, alignment, proximity and visual emphasis in the existing template. Avoid equal-weight module grids
@@ -78,7 +99,7 @@ it does not remove difficult relations from coverage. Public designer discussion
 but record the concrete transferred decision and its limits instead of copying a brand, adding a dependency or treating a source's
 reputation as acceptance. Keep source-backed design principles in the existing presentation contract, not a parallel style authority.
 
-Use the existing fixed renderer and current host's presentation contract. Upstream templates or guideline servers are research
+Use the current host's presentation contract and choose capabilities by explanatory value. The existing renderer may be reused when it fits; a native alternative may be frozen through Delivery's visual-input. Text and static comparisons do not require interactive UI. Upstream templates or guideline servers are research
 inputs, not proof of host compatibility or a reason to add a renderer, client or MCP. Verify a concrete missing capability at its
 consumer before reuse; omit interactions and decorative structure that add no observable value. Keep semantic coverage, layout
 checks and user comprehension separate. Explicit design rejection remains a failed review, even when technical checks pass;

@@ -350,9 +350,16 @@ def artifact_manifest(data: bytes, artifact_name: str) -> dict[str, Any]:
     return validate_delivery_manifest(manifest)
 
 
-def prepare_delivery(pack: dict[str, Any], *, artifact_dir: Path, protected_roots: Iterable[Path]) -> tuple[dict[str, Any], Path]:
+def prepare_delivery(pack: dict[str, Any], *, artifact_dir: Path, protected_roots: Iterable[Path], visual_input: Path | None = None) -> tuple[dict[str, Any], Path]:
     output_root = validate_output_root(artifact_dir, protected_roots)
-    rendered = render_review_pack(pack, surface="interactive")
+    visual_text = None
+    if visual_input is not None:
+        require(visual_input.is_absolute() and visual_input.parent.resolve(strict=True) == output_root,
+                "visual-input must be a direct child of artifact-dir")
+        visual_text = safe_artifact_bytes(visual_input).decode('utf-8')
+        require(bool(visual_text.strip()), "visual-input must not be empty")
+        require(pack['project_result'].get('project_map') is not None, "visual-input requires bound project context")
+    rendered = render_review_pack(pack, surface="interactive", visual=visual_text)
     rendered_bytes = rendered.encode("utf-8")
     visible = verify_visible_output(rendered, surface="interactive")
     artifact_name = f"global-owner-scout-review-pack-{visible['review_pack_hash'][:16]}.md"
@@ -360,7 +367,7 @@ def prepare_delivery(pack: dict[str, Any], *, artifact_dir: Path, protected_root
     if visible["project_map_bundle"]:
         from project_map import render_visual
         bundle = visible["project_map_bundle"]
-        visual = render_visual(bundle["context"], visible["review_pack_hash"]).encode("utf-8")
+        visual = (render_visual(bundle["context"], visible["review_pack_hash"]) if visual_text is None else visual_text).encode("utf-8")
         require(sha256_bytes(visual) == bundle["visual"]["visual_sha256"], "visual does not match frozen map")
         write_immutable_artifact(output_root / bundle["visual"]["visual_name"], visual)
     write_immutable_artifact(artifact_path, rendered_bytes)
@@ -420,7 +427,7 @@ def visual_result(manifest: dict[str, Any], root: Path) -> dict[str, Any]:
     return {"visual_status": "verified", "visual_path": markdown_path(path)}
 
 
-def render_delivery_receipt(manifest: dict[str, Any], *, artifact_path: Path, artifact_root: Path, outcome: str) -> str:
+def render_delivery_receipt(manifest: dict[str, Any], *, artifact_path: Path, artifact_root: Path, outcome: str, text_only: bool = False) -> str:
     manifest = validate_delivery_manifest(manifest)
     data = validate_manifest_artifact(manifest, artifact_path=artifact_path, artifact_root=artifact_root)
     require(outcome in SURFACE_COPY, "unknown file surface outcome")
@@ -447,7 +454,7 @@ def render_delivery_receipt(manifest: dict[str, Any], *, artifact_path: Path, ar
         f"`surface_observation={outcome}`；`confirmation_eligible={str(eligible).lower()}`。\n"
     )
     visual = visual_result(manifest, artifact_root)
-    if visual["visual_status"] == "verified":
+    if visual["visual_status"] == "verified" and not text_only:
         receipt += '\nvisualize' + json.dumps({"path": visual["visual_path"]}, ensure_ascii=False) + '\n'
     return receipt
 

@@ -38,7 +38,7 @@ Events, observations and cards are empty. Session sources are not applicable. Re
 census, discovery dispositions, Owner comparison and exact confirmation boundaries.
 
 The renderer freezes the map and its declared source/linked-advice context in the same Markdown body hash. Delivery v2 adds
-`visual_name, visual_sha256, visual_bytes` for its fixed-template HTML projection. The projection is presentation, not another
+`visual_name, visual_sha256, visual_bytes` for its evidence-bound native HTML projection. The reusable overview template is optional; another composition may be supplied through prepare-delivery --visual-input. No particular diagram, interaction or content grouping is required by these byte bindings. The projection is presentation, not another
 state store. Missing or changed HTML is reported separately and cannot block verified Markdown discussion or grant approval.
 The initial preparation verifies both files; recovery never repairs an old artifact silently. Native follow-up messages carry
 the report hash, object kind and ID; widget state is best effort and cannot replace this binding or Core authorization.
@@ -55,7 +55,7 @@ When task projectId is null/absent, its native cwd may uniquely match an invento
 Conflicting non-null IDs/roots, ambiguous inventory matches and missing native context remain blocked. Shell cwd, labels and
 prompt paths alone are insufficient. Use the same rule for history association; keep raw host IDs/paths out of results.
 
-- Skill `5.14.0`; Project result `global_owner_scout_project_v7`; Review Pack
+- Skill `5.15.0`; Project result `global_owner_scout_project_v7`; Review Pack
   `global_owner_scout_review_pack_v8`; Delivery `global_owner_scout_delivery_v2`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.

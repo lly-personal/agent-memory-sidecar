@@ -7,7 +7,7 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `2.4.6`
+- Skill version: `2.4.7`
 - Modes: `inspect`, `verify_consumer`, `apply_enrollment`
 - Deployment pack: `agent_memory_workstation_deployment_pack_v4`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
@@ -55,7 +55,7 @@ migration continue through `inspect` below.
      root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
 3. Run exact-hash `workstation-reconcile --apply`. Marketplace/Plugin mutation participates in the source-cutover rollback
    transaction. The transaction then runs Core setup, binds the explicit or preserved canonical Owner, verifies Doctor, installs
-   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.4.6`, Scout `5.14.0`,
+   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.4.7`, Scout `5.15.0`,
    and every desired identity. The result is `reload_required`; it proves host materialization, not model adoption or project-level
    same-name Skill parity.
 4. If the user also requested verification, continue through `verify_consumer` in this same task after exact readback; that request
