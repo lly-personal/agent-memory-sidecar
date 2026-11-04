@@ -1,5 +1,40 @@
 # Scout user journey repair
 
+## Current handoff — 2026-11-04
+
+The user requested stopping observation and handing off the work. Observation of the original project's existing chat has
+stopped. Its last observed turn was still running; no new Scout request, substitute chat or observation automation was created.
+This is a handoff with open experience acceptance, not a completed experience repair.
+
+| Layer | Verified result | Remaining boundary |
+| --- | --- | --- |
+| Source and publication | Repair PR #60 merged; immutable v0.5.14 published | Release identity remains unchanged |
+| Windows installation | Core 0.5.14, Plugin 1.7.14, Bootstrap 2.4.7, Scout 5.15.0; six project scopes exact | Installation does not establish natural adoption |
+| Follow-through records | [PR #61](https://github.com/lly-personal/agent-memory-sidecar/pull/61) merged as `8eac973eacf6c7c208a753b39cca8c48822d3284`; all 25 checks passed after updating its base | Earlier merge timeouts are historical, not the current PR state |
+| Presentation contract | [PR #62](https://github.com/lly-personal/agent-memory-sidecar/pull/62) merged as `875e162c524a65429e178567f271feb3b5cf690d`; all 25 checks passed | Removes remaining fixed-template wording; no runtime or release change |
+| Actual delivered reply | Native history readback passed installed `verify-final`, recovering the exact report, selected object and journey | Its content is the historical reconstruction; `source_status=changed` correctly prevents a current-source claim |
+| Natural review and experience | Not started; observation stopped at the user's request | Installed-version review, real native follow-up reception/answering and human comprehension remain unverified |
+
+The original failed experience remains failed. Historical reconstruction, browser substitutes, layout checks and the verified
+reply above do not replace a new natural review. The received widget state was only a locator, not evidence of a sent message,
+authorization or human acceptance.
+
+Resume only after a subsequent user instruction. Reuse the original existing chat when idle and submit the plain review request
+without project hints, candidate answers or model overrides. Bind the observed installed Skill and actual execution, inspect the
+newly delivered reply from native history, and recover its exact report/object/journey before assessing continuation. Compare
+analysis against current source and real user outcomes; do not rerender the historical sample as the acceptance run. Preserve
+user feedback and any new failure, repair the affected source path, and use a new release if installed bytes must change.
+
+Native button sending and reading experience require actual user operation. The available Computer Use runtime explicitly
+prohibits automating the ChatGPT desktop UI; other message APIs and browser bridge substitutes cannot qualify those actions.
+The user need only view, select and ask; the agent owns evidence collection and subsequent verification.
+
+Private native-message readback, installer receipts, failed/repaired samples and the exact resume locator remain in the existing
+task output, outside this public repository. The owned isolated validation worktree and temporary consumer inventory were already
+removed and verified; unrelated worktrees and historical bytecode remain protected. No observer or UI-input operation is left running.
+The completed browser regression's 28 helper/preview files were archived, read back byte-for-byte and removed by exact path;
+the archive, regression results, actual delivered report/visual and installation receipts remain intact.
+
 ## Intent and delivery target
 
 The user needs to understand what a project achieves, how its capabilities cooperate, why its current boundaries exist,
@@ -154,6 +189,7 @@ Observed on 2026-11-04 after the candidate checks above:
   installed-version `review` was therefore not inserted into that active turn. No substitute chat was created. The frozen
   source reassessment remains historical and cannot stand in for that pending run on the changing checkout.
 
-Source delivery, immutable publication and this Windows installation are complete. The original failed experience remains
-failed; complete natural review, actual delivered-reply recovery, native follow-up reception/answering and human comprehension
-remain open until observed through their real entrypoints. These limits supersede no unrelated successful technical evidence.
+Source delivery, immutable publication and this Windows installation are complete. At this observation, natural review,
+actual delivered-reply recovery, native follow-up reception/answering and human comprehension were still open. The current
+handoff above records the subsequent actual-reply verification and the user's instruction to stop observation; it does not
+upgrade historical content or qualify the remaining experience checks.
