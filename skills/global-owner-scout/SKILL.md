@@ -7,9 +7,9 @@ description: Show a project overview or deeply review it when explicitly request
 
 ## Contract
 
-- Skill version: `5.13.1`
-- Project result: `global_owner_scout_project_v6`
-- User review: `global_owner_scout_review_pack_v7`
+- Skill version: `5.14.0`
+- Project result: `global_owner_scout_project_v7`
+- User review: `global_owner_scout_review_pack_v8`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
 - Preflight snapshot: `global_owner_scout_preflight_v1`
 - Mode: `project_scout`; interactive-only `central_review` remains optional.
@@ -34,8 +34,8 @@ Both purposes deliver a map even with zero recommendations. Ordinary authorized 
 acceptance through its existing workflow; it does not start a whole-project review. The user chooses model, reasoning and time
 investment; do not inject overrides or impose a fixed matrix size, advice count or review time limit.
 
-Use the fixed `assets/project-map.html` projection emitted by Delivery v2. Preserve the accepted overview, focused-path and return
-interaction, using in-conversation theme, native controls/details, keyboard access, optional widget state and `sendFollowUpMessage`;
+Use the fixed `assets/project-map.html` projection emitted by Delivery v2. Preserve the accepted typography and visual language, whole-system overview, layered structure, paths,
+cross-links, decision evolution, evidence and hierarchical advice, with context and return paths, using in-conversation theme, native controls/details, keyboard access, optional widget state and `sendFollowUpMessage`;
 do not generate another UI or add a server. All graph content comes from the bound target project, not the Sidecar example. Return the verified
 native visualization reference in the current chat with the deterministic receipt. Do not automatically open a browser or file
 preview. Inspecting a node stays local; only “继续讨论此处” requests a follow-up with report/object identity. This request does not
@@ -78,13 +78,15 @@ owns completion, including recovery and the final result. Do not return after di
    new rule. Name the specific uncovered behavior and a concrete future failure before recommending an addition. Keep method
    details in their existing Skill and project facts in their existing project owner. Uncertainty is not a new user decision.
    Compare coverage and actual implementation separately: an existing global rule does not erase a concrete project or method
-   repair. Give an evidenced maintenance delta an existing `route_to_owner` card and exact source Owner; use `project_only` or
+   repair. Give an evidenced maintenance delta an engineering card and exact source Owner; use `project_only` or
    `skill_only` exclusions only when no actionable delta remains. Never turn every observation into a task.
-5. Freeze and validate Project v6 with its map. For `review`, resolve Owner parity through `resolve-owner-parity`, then read only the returned host-local
-   Owner and verify its hash. Never guess or search for the canonical Owner. Build Review Pack v7 and call `prepare-review` to
+5. Freeze and validate Project v7 with its map. Engineering advice can include source-backed hypotheses and multi-level refactoring; compare
+   benefits, migration cost, counterexamples and validation conditions without inventing accepted changes or rules.
+   Only for rule candidates, resolve Owner parity through `resolve-owner-parity`, then read only the returned host-local
+   Owner and verify its hash. Never guess or search for the canonical Owner. Build Review Pack v8 and call `prepare-review` to
    bind actual installed Core single/combined previews. Validate the returned pack unchanged. Covered/no-persistence cards have
    no required action; preserve their evidence without asking the user to confirm or ignore them. No fixed candidate cap.
-   For `inspect`, keep Owner parity and selection preview null and skip all rule integration; `prepare-review` returns without resolving an Owner.
+   For inspect or an engineering-only review, keep Owner parity and selection preview null and skip all rule integration; `prepare-review` returns without resolving an Owner. A mixed review integrates only its rule candidates.
 6. Re-run `inspect-context --project-root <bound-project-root>` and compare the full snapshot. Changed evidence invalidates a
    stable-review claim; do not blame Scout for a concurrent change without attribution. Check Skill/cache and external-write
    boundaries. On privacy, integrity or read-only failure, use Terminal v1 and no actionable partial pack.

@@ -12,6 +12,7 @@ from validate_output import (ContractError, canonical_json, require, require_exa
 
 LAYERS = {'design': '设计规定', 'implementation': '实现事实', 'observed': '运行观察',
           'inference': '推断', 'unknown': '未知'}
+RELATIONS = {'contains': '结构归属', 'depends_on': '依赖', 'constrains': '约束', 'implements': '实现', 'handoff': '执行交接', 'evolves': '演进'}
 COVERAGE = {'covered': '已覆盖', 'partial': '部分覆盖', 'unknown': '未知', 'not_applicable': '不适用'}
 MAP_START = '<!-- scout:map:start -->\n<details>\n<summary>图谱恢复数据</summary>\n\n```text\n'
 MAP_END = '\n```\n\n</details>\n<!-- scout:map:end -->'
@@ -49,11 +50,26 @@ def validate_map(project):
         return result
 
     nodes = entities('nodes', {'id', 'label', 'kind', 'summary', 'owner', 'evidence_refs', 'claims', 'card_ids'})
-    edges = entities('edges', {'id', 'source', 'target', 'label', 'evidence_refs', 'claims', 'card_ids'})
+    layered = project.get('contract_version') == 'global_owner_scout_project_v7'
+    edges = entities('edges', {'id', 'source', 'target', 'label', 'evidence_refs', 'claims', 'card_ids'} | ({'kind'} if layered else set()))
     for node in nodes.values():
         for key in ('kind', 'summary', 'owner'): require_string(node[key], key)
     for edge in edges.values():
         require(edge['source'] in nodes and edge['target'] in nodes, 'map edge has unknown endpoint')
+    if layered:
+        children = {n: [] for n in nodes}
+        for edge in edges.values():
+            require(edge['kind'] in RELATIONS, 'invalid relation kind')
+            if edge['kind'] == 'contains': children[edge['source']].append(edge['target'])
+        # Only containment is acyclic; dependencies and execution may contain feedback loops.
+        pending = {n: sum(n in values for values in children.values()) for n in nodes}
+        ready = [n for n, count in pending.items() if count == 0]; visited = 0
+        while ready:
+            node = ready.pop(); visited += 1
+            for child in set(children[node]):
+                pending[child] -= 1
+                if pending[child] == 0: ready.append(child)
+        require(visited == len(nodes), 'containment cycle')
     for obj in [*nodes.values(), *edges.values()]:
         for claim in require_list(obj['claims'], 'claims', nonempty=True):
             require_exact_keys(require_object(claim, 'claim'), {'layer', 'environment', 'statement', 'evidence_refs'}, 'claim')
@@ -79,7 +95,7 @@ def validate_map(project):
 def map_context(pack):
     p = pack['project_result']
     reviews = {r['project_claim_hash']: r for r in pack['review_cards']}
-    return {'purpose': p['purpose'], 'project_key': p['project_key'], 'project_map': p['project_map'],
+    context = {'purpose': p['purpose'], 'project_key': p['project_key'], 'project_map': p['project_map'],
             'project_identity': p['project_identity'], 'context_snapshot_hash': p['read_only_proof']['after_context_snapshot_hash'],
             'evidence_sources': p['evidence_sources'],
             'advice': [{'card_id': c['card_id'], 'title': c['human_context']['decision_title'],
@@ -89,10 +105,17 @@ def map_context(pack):
                         'recommended_action': reviews[c['project_claim_hash']]['recommended_action'],
                         'recommended_action_reason': reviews[c['project_claim_hash']]['recommended_action_reason']}
                        for c in p['project_cards']]}
+    if p.get('contract_version') == 'global_owner_scout_project_v7':
+        context['project_contract'] = p['contract_version']
+        for advice, card in zip(context['advice'], p['project_cards']):
+            if card.get('kind') == 'engineering':
+                advice.update({k: card[k] for k in ('kind', 'parent_card_id', 'alternatives', 'benefit_hypothesis',
+                    'implementation_cost', 'validation_conditions', 'anti_examples', 'direct_evidence')})
+    return context
 
 
 def render_visual(context, pack_hash):
-    payload = dict(context, report_hash=pack_hash, layer_labels=LAYERS, coverage_labels=COVERAGE)
+    payload = dict(context, report_hash=pack_hash, layer_labels=LAYERS, coverage_labels=COVERAGE, relation_labels=RELATIONS)
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':')).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
     template = (Path(__file__).resolve().parent.parent / 'assets/project-map.html').read_text(encoding='utf-8')
     return template.replace('__SCOUT_ROOT__', 'scout-map-' + pack_hash[:16]).replace('__SCOUT_DATA__', encoded)
@@ -115,9 +138,10 @@ def recover_map(body):
         require(canonical_json(value).decode('utf-8') == data, 'map recovery is not canonical')
         require_exact_keys(value, {'context', 'visual'}, 'map recovery')
         c = value['context']
-        require_exact_keys(c, {'purpose', 'project_key', 'project_identity', 'context_snapshot_hash', 'project_map', 'evidence_sources', 'advice'}, 'map context')
+        require_exact_keys(c, {'purpose', 'project_key', 'project_identity', 'context_snapshot_hash', 'project_map', 'evidence_sources', 'advice'} | ({'project_contract'} if 'project_contract' in c else set()), 'map context')
         require(c['purpose'] in {'inspect', 'review'}, 'invalid map purpose')
-        validate_map(dict(project_map=c['project_map'], evidence_sources=c['evidence_sources'], project_cards=c['advice'],
+        require(c.get('project_contract') in {None, 'global_owner_scout_project_v7'}, 'invalid map generation')
+        validate_map(dict(contract_version=c.get('project_contract'), project_map=c['project_map'], evidence_sources=c['evidence_sources'], project_cards=c['advice'],
                           read_only_proof={'after_head': c['project_map']['source_revision']}))
         require_exact_keys(value['visual'], {'visual_name', 'visual_sha256', 'visual_bytes'}, 'visual descriptor')
     except (KeyError, TypeError, ValueError) as exc:
@@ -134,6 +158,10 @@ def markdown_map(pack):
     for n in m['nodes']:
         lines.append('| ' + ' | '.join(text(x) for x in (n['label'], n['summary'], n['owner'], '、'.join(n['evidence_refs']))) + ' |')
     nodes = {n['id']: n for n in m['nodes']}; edges = {e['id']: e for e in m['edges']}
+    if pack['project_result'].get('contract_version') == 'global_owner_scout_project_v7':
+        lines += ['', '### 结构、依赖与演进', '', '| 起点 | 关系 | 终点 | 说明 | 依据 |', '| --- | --- | --- | --- | --- |']
+        for edge in m['edges']:
+            lines.append('| ' + ' | '.join(text(x) for x in (nodes[edge['source']]['label'], RELATIONS[edge['kind']], nodes[edge['target']]['label'], edge['label'], '、'.join(edge['evidence_refs']))) + ' |')
     lines += ['', '### 关键路径', '']
     for j in m['journeys']:
         lines += ['**' + text(j['label']) + '**', '', text(nodes[j['entry']]['label'])]

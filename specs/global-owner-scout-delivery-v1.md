@@ -2,13 +2,13 @@
 
 - Status: Accepted
 - Owner: project_docs
-- Applies to: Scout 5.13 interactive delivery; legacy receipts remain readable
+- Applies to: Scout 5.14 interactive delivery; legacy receipts remain readable
 - Decision: [ADR 0076](../docs/decisions/0076-task-scoped-review-pack-delivery.zh.md)
 
 
 ## Current projection and recovery
 
-Delivery v2 binds Project v6 / Review Pack v7 to immutable Markdown and a derived native interactive fragment. It retains all v1
+Delivery v2 binds Project v7 / Review Pack v8 (also reads Project v6 / Review Pack v7) to immutable Markdown and a derived native interactive fragment. It retains all v1
 manifest fields and adds `visual_name`, `visual_sha256`, `visual_bytes`. The Markdown body freezes the map context and visual
 descriptor, so later template updates do not invalidate historical recovery. No old report is modified or given a synthetic map.
 The context reuses project identity, the full read-only context snapshot, source references and linked advice. `verify-final`
@@ -23,11 +23,10 @@ against the frozen Markdown descriptor. Recovery validates the HTML independentl
 A native follow-up carries report hash and object kind/ID. Persisted widget selection is a convenience, not authority or approval.
 Default file opening remains zero; `surface_observation=not_requested` means no file preview was requested, not that inline UI was observed.
 
-Inspect delivers current design with null Owner parity/preview and zero cards; it does not claim a deep review. Review retains
-existing rule preview and actual user authorization. Overview, path and matrix projections share evidence layers and source refs.
+Inspect delivers current design with null Owner parity/preview and zero cards; it does not claim a deep review. Review preserves rule preview and actual user authorization only for rule candidates; engineering advice has no rule actions. Structure, path, cross-link, evolution, evidence and layered-advice projections share evidence layers and source refs.
 Historical v1 receipt parsing remains read-only. The following v1 field and safety descriptions apply unchanged where not extended above.
 
-The fixed presentation follows the accepted overview/focus/return interaction. Shared objects retain their selected journey;
+The fixed presentation follows the accepted visual language and overview/drill-down/cross-link/return interaction. Identical native state echoes do not rerender or refocus; programmatic focus prevents scrolling. Optional persistence failure does not block local reading. Host conversation scrolling remains a separate observation. Shared objects retain their selected journey;
 opening related advice retains the originating object in best-effort local widget state and offers a return to it. This does not
 track maintenance progress or confer approval. Derived advice carries its verified Human Context, ownership and current disposition,
 without reproducing confirmation commands. Target-project content is independent of the repository maintaining the renderer.

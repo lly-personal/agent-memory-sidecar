@@ -38,7 +38,7 @@ def installed_core(codex_home: Path) -> tuple[Path, str]:
 
 def prepare_review(value: Any, *, codex_home: Path, selected_card_ids: list[str] | None = None) -> dict[str, Any]:
     pack = copy.deepcopy(validate_review_pack(value, require_preview=False))
-    if pack['project_result'].get('purpose') == 'inspect':
+    if pack['project_result'].get('purpose') == 'inspect' or pack['owner_parity'] is None:
         return pack
     if resolve(codex_home) != pack["owner_parity"]:
         raise ContractError("owner_parity_changed_before_preview")
@@ -74,6 +74,7 @@ def prepare_review(value: Any, *, codex_home: Path, selected_card_ids: list[str]
     combined_ids = set(result["combined"]["card_ids"]) if combined_ready else set()
     selected = {item["card_id"]: item for item in bundle["items"]} if bundle else {}
     for card, review in zip(pack["project_result"]["project_cards"], pack["review_cards"]):
+        if card.get("kind") == "engineering": continue
         ready = individual.get(card["card_id"], {}).get("status") == "ready"
         recommendation, actions = expected_action_policy(
             card, pack["owner_parity"]["status"], review["integration_preview"]["global_relation"], ready,

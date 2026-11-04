@@ -59,8 +59,7 @@ links visible. Do not fabricate a complete graph or demand a fixed number of cel
 outcomes and source material, not node counts. No new recommendations is compatible with a useful engineering map.
 
 This is a reusable capability across target projects and environments. The Sidecar repository owns its implementation, not
-the reviewed project's topology. Order journeys by the reader's main outcome, then supporting/recovery paths; the first journey
-anchors the overview. Derive every label, step, owner and environment from the target evidence. Do not copy the example project's
+the reviewed project's topology. Order journeys by the reader's main outcome, then supporting/recovery paths; the overview first explains overall responsibilities and key relationships, not merely the first journey. Derive every label, step, owner and environment from the target evidence. Do not copy the example project's
 memory lifecycle, release mechanism or path counts into other projects, or draw a sequence between unrelated journeys.
 
 Before arranging the view, outline how a reader can connect the goal and boundary to the main responsibilities, a concrete
@@ -83,7 +82,7 @@ Use the existing fixed renderer and current host's presentation contract. Upstre
 inputs, not proof of host compatibility or a reason to add a renderer, client or MCP. Verify a concrete missing capability at its
 consumer before reuse; omit interactions and decorative structure that add no observable value. Keep semantic coverage, layout
 checks and user comprehension separate. Explicit design rejection remains a failed review, even when technical checks pass;
-preserve the unaffected evidence. The current [presentation contract](https://github.com/lly-personal/agent-memory-sidecar/blob/main/docs/specs/interface.md#project-scout-global_owner_scout_project_v6)
+preserve the unaffected evidence. The current [presentation contract](https://github.com/lly-personal/agent-memory-sidecar/blob/main/docs/specs/interface.md#project-scout-global_owner_scout_project_v7)
 and M1 evaluation own these requirements; do not create another design checklist or regenerate an immutable report to conceal a failure.
 
 For inspect, perform this current-design reconstruction only. Sessions are not applicable; still declare unavailable design,
@@ -121,6 +120,20 @@ but report bounded discovery and keep the whole-project depth claim open.
 
 ## Phase 3: contrastive causal review
 
+Before selecting recommendations, trace goals and quality requirements through responsibility boundaries, constraints,
+implementation, consumers, recovery and historical decisions. Examine effective designs as well as failures: what premise
+justified a boundary, what changed, which stable mechanism repeats, whether native capabilities can replace glue, and what can
+be removed while preserving the user outcome. Use typed relationships in the existing map, not a second inventory.
+
+Engineering advice is distinct from a rule candidate. Current source facts may support an E1 discussion hypothesis without a
+recent failure or accepted change. Present relevant retention, integration, abstraction, replacement and removal alternatives;
+substantial refactoring is a legitimate alternative, not a last resort admitted only after smaller options fail. Link parent and
+child advice when it helps separate decisions. Each layer explains affected and unaffected responsibilities, evidence,
+benefit hypothesis, migration cost, counterexamples, owner and validation conditions. Do not cap depth or manufacture layers.
+An opinion, a map click or a hypothesis never grants implementation authority. Reuse existing authorization when it already
+covers the maintenance; do not ask again merely because a proposal spans layers.
+
+
 For each high-signal event answer:
 
 - 用户反复纠正或解释了什么？
@@ -138,12 +151,12 @@ or task summaries alone.
 
 Search independently for repeated correction, failed recovery, premature success, Owner drift, acceptance-boundary mistakes,
 durable design decisions, and reusable analysis methods. Do not read global-owner wording until this inventory is complete. Do not
-cap candidates or manufacture cards. E2 requires repetition, formal acceptance, or real acceptance; E3 requires independent
+cap candidates or manufacture cards. For rule candidates, E2 requires repetition, formal acceptance, or real acceptance; E3 requires independent
 evidence from at least two projects and names only opaque project refs.
 
 ## Phase 5: counterevidence and two projections
 
-For every E2/E3 candidate find conflict, legitimate exception, project-only constraint, stronger existing Owner, and harmful
+For every rule candidate find conflict, legitimate exception, project-only constraint, stronger existing Owner, and harmful
 global interpretation. Require meaningful counterevidence and a concrete Skip boundary.
 
 Challenge each projected obligation with a legitimate successful path under
@@ -228,7 +241,7 @@ including recovery and environment differences; the independent pass must challe
 Map `source_revision` is the read-only snapshot HEAD, and `observed_at` is the frozen observation time. Preserve exact source
 references and advice links. Static and interactive views must derive from these same fields.
 
-Create all complete Project Cards, validate privacy/Chinese narrative/evidence refs, compute normalized evidence hash, then compute
+Create engineering or rule-candidate Project Cards with their appropriate fields, validate privacy/Chinese narrative/evidence refs, compute normalized evidence hash, then compute
 `project_claim_hash` over every semantic field. Validate the entire Project result before global comparison.
 Compute `normalized_evidence_hash` from the exact canonical `direct_evidence`
 array. Preserve the validated project object; integration adds previews only.
@@ -237,16 +250,16 @@ with an empty inventory or claim exhaustive knowledge beyond the declared scope.
 
 ## Phase 7: integration and task-scoped delivery
 
-Run `python -B scripts/scout.py resolve-owner-parity`. With matched parity, read the active host-local global Owner and verify its bytes
+For rule candidates only, run `python -B scripts/scout.py resolve-owner-parity`. Engineering-only reviews skip this phase of rule integration and retain null Owner/preview fields. With matched parity, read the active host-local global Owner and verify its bytes
 against the returned hash; the equal canonical hash proves identical canonical content without revealing its physical path. With
 drift or unavailable parity, mark Owner comparison incomplete and remove confirmation. Compare semantics when proved. Map each proposed trigger, obligation and exception to the complete Owner, including unmanaged
 principles. A differently worded conjunction of existing clauses is still covered. For `add`, identify the residual obligation
 and one concrete permitted failure that existing clauses would not prevent. If none exists, use `already_covered_exact`;
 uncertainty stays unproven rather than becoming an extra user choice. Do not copy an existing Skill procedure into global rules.
-Use official/first-party research only to support or challenge existing candidates. Add one integration preview per frozen card. Recheck count/order conservation,
+Use official/first-party research only to support or challenge existing candidates. Add one integration preview per frozen rule candidate; engineering Review Cards use discuss with no rule actions or token. Recheck count/order conservation,
 privacy, and project read-only fingerprints. Prepare the draft Review Pack through `scripts/scout.py prepare-review` before validating
-or rendering it. This binds single and combined confirmation actions to the actual installed Core planner; absence or failure of that
-receipt cannot be replaced with manually calculated capacity. Preserve candidates and revise exact consolidation/replacement/routing
+or rendering it. For rule candidates, this binds single and combined confirmation actions to the actual installed Core planner; absence or failure of that
+receipt cannot be replaced with manually calculated capacity. Engineering-only prepare-review does not resolve Owner or call Core. Preserve candidates and revise exact consolidation/replacement/routing
 when needed, then repeat planning before confirmation. If that requires different Rule Projections or merged source observations,
 return to Phases 5–6 and create a new content-bound revision with every source obligation accounted for. Preserve the original
 facts, evidence and frozen artifacts; do not overwrite them or repeat an unchanged task census. Integration does not silently edit
@@ -278,7 +291,7 @@ Terminal meanings:
   no deep review ran and no authorization is inferred.
 - `ok`: at least one card plus complete/bounded coverage.
 - `degraded`: material coverage gap; supported cards remain visible and the run does not count.
-- `no_material_delta`: complete/bounded census and all search lenses produced no E2/E3 delta.
+- `no_material_delta`: complete/bounded census and no evidenced engineering or qualified rule-candidate delta.
 - `failed`: execution protocol, privacy, integrity, mutation, required-source, render, or read-only failure; no cards.
 - `output_budget_exceeded`: not every card fits; no partial cards.
 - `surface_pending`: the exact artifact and final link are externally verified after a host `queued` result; content is discoverable, but the user surface remains unproved and no authorization is inferred.

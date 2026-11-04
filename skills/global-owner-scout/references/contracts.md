@@ -2,13 +2,29 @@
 
 ## Current project-map contracts
 
-New results use Project v6, Review Pack v7 and Delivery v2. Historical Project v5/Review Pack v6/Delivery v1
+New results use Project v7, Review Pack v8 and Delivery v2. Historical Project v5/v6 and Review Pack v6/v7
 remain readable; do not rewrite old artifacts or infer a missing map. The definitions below remain the review lane's shared
 fields. Project v6 additionally requires `purpose` (`inspect` or `review`) and `project_map`.
 
+Project v7 retains those fields. Each edge adds `kind`: `contains`, `depends_on`, `constrains`, `implements`, `handoff`, or `evolves`.
+Containment is acyclic; shared ownership may have multiple parents. Other relations may be cyclic. Unknown hierarchy does not
+block independent nodes or journeys. Claims carry the reasons, conditions and evidence of decisions; do not invent dates or edges.
+
+V7 engineering cards have `kind=engineering`, nullable `parent_card_id`, `card_id`, `human_context`, `evidence_level`,
+`normalized_evidence_hash`, `owner_recommendation`, `direct_evidence`, `owner_rationale`, `anti_examples`, `privacy_check`,
+`unproven`, `benefit_hypothesis`, `implementation_cost`, `validation_conditions`, `alternatives`, `project_claim_hash`.
+Each alternative has `approach` and `tradeoff`. Evidence may be E1/E2/E3; E1 is a discussion hypothesis, never implementation
+authority. No accepted change, rule body, project-support count or invented failure is required. Parent links must identify
+another engineering card and remain acyclic; no depth or size ceiling. Compare the relevant alternatives, including substantial
+refactoring when supported; do not require proof that every smaller option failed. Uncertainty and migration costs remain visible.
+Legacy-shaped rule candidates retain their existing eligibility and exact authorization requirements. Engineering cards only
+route to project or Skill owners. Their Review Card uses `recommended_action=discuss`, `allowed_actions=[]`,
+`integration_preview=null`, `selection_token=null`; `owner_parity=null` is valid when there are no rule candidates.
+The new map recovery context includes `project_contract`; legacy context stays readable without regeneration.
+
 `project_map` has exact fields `title, goal, boundary, observed_at, source_revision, nodes, edges, journeys, coverage`.
 Each node has `id, label, kind, summary, owner, evidence_refs, claims, card_ids`.
-Each edge has `id, source, target, label, evidence_refs, claims, card_ids`.
+Each v7 edge has `id, source, target, kind, label, evidence_refs, claims, card_ids`; v6 omits kind.
 Each claim has `layer, environment, statement, evidence_refs`; layers are `design, implementation, observed, inference, unknown`.
 Each journey has `id, label, entry, edge_ids, outcome, recovery, evidence_refs, card_ids`.
 Each coverage item has `dimension, status, explanation, evidence_refs`; status is `covered, partial, unknown, not_applicable`.
@@ -26,7 +42,7 @@ The renderer freezes the map and its declared source/linked-advice context in th
 state store. Missing or changed HTML is reported separately and cannot block verified Markdown discussion or grant approval.
 The initial preparation verifies both files; recovery never repairs an old artifact silently. Native follow-up messages carry
 the report hash, object kind and ID; widget state is best effort and cannot replace this binding or Core authorization.
-The target project's journeys are ordered by user outcomes; the first anchors the overview. Names, counts, tools, owners and
+The target project's journeys are ordered by user outcomes; the overview explains overall responsibilities; the first journey is not the whole architecture. Names, counts, tools, owners and
 environments are evidence-derived, never a fixed Sidecar topology. Derived advice preserves Human Context, owner recommendation
 and rationale, current recommended action/reason and unproven scope. It contains no confirmation token or duplicate rule text.
 Covered advice remains in the frozen report but creates no UI task; challenged advice retains its current clarification status.
@@ -39,14 +55,14 @@ When task projectId is null/absent, its native cwd may uniquely match an invento
 Conflicting non-null IDs/roots, ambiguous inventory matches and missing native context remain blocked. Shell cwd, labels and
 prompt paths alone are insufficient. Use the same rule for history association; keep raw host IDs/paths out of results.
 
-- Skill `5.13.1`; Project result `global_owner_scout_project_v6`; Review Pack
-  `global_owner_scout_review_pack_v7`; Delivery `global_owner_scout_delivery_v2`; manifest-free terminal
+- Skill `5.14.0`; Project result `global_owner_scout_project_v7`; Review Pack
+  `global_owner_scout_review_pack_v8`; Delivery `global_owner_scout_delivery_v2`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.
 - `project_claim_hash` covers every Project Card field except itself. `review_pack_hash` covers the pack except itself.
 - Evidence references may identify owner sections, ADRs, tests, commits, or event classes. They may not contain absolute paths,
   raw dialogue, complete commands, accounts, tokens, raw remotes, project IDs, automation IDs, or diagnostic bodies.
-- E1 remains an observation. Every E2/E3 card is shown; no fixed project denominator, count cap, rank-based exclusion, or silent truncation. Order actionable advice by evidenced impact and dependencies before freezing.
+- E1 cannot become a rule candidate; it may support a clearly labelled engineering hypothesis. Every E2/E3 card is shown; no fixed project denominator, count cap, rank-based exclusion, or silent truncation. Order actionable advice by evidenced impact and dependencies before freezing.
 - Human Context is Simplified Chinese and project-specific; Rule Projection is abstract and Owner-ready.
 
 `global_owner_scout_preflight_v1` has exact fields
@@ -81,8 +97,9 @@ are exact and required:
   implementation and portable behavior are compared explicitly, including why
   no distinct portable delta exists. Existing-owner exclusions cite exact
   declared Owner refs; weak exclusions name missing evidence in reason. E1 cannot
-  produce a card. A candidate disposition links at least one event and one or more matching-level
-  cards; all card evidence is contained in the linked events and the observation. All cards are linked
+  produce a rule-candidate card. A rule candidate links at least one event and matching-level cards; its evidence
+  is contained in the linked events and observation. An engineering candidate may be E1 and have no events;
+  its direct source evidence must still be contained in its observation. All cards are linked
   exactly once. Other dispositions have no cards. Routing a project-owned fact
   does not by itself exclude a different portable behavior candidate.
 - The same ref has identical `type/ref/summary` in every source, event, observation
@@ -104,7 +121,7 @@ separate blind source exercise with an independently held rubric checks importan
 learning recall, correct exclusions and useful abstraction; it never imposes a
 card quota. Future-task adoption and revocation remain separate acceptance.
 
-`global_owner_scout_project_v6` has these exact top-level fields (legacy v5 omits purpose and project_map):
+`global_owner_scout_project_v7` has these exact top-level fields (v6 shares these fields; legacy v5 omits purpose and project_map):
 
 ```text
 contract_version, mode, status, display_locale, project_key, project_identity,
@@ -156,7 +173,7 @@ case, cards independently supported by formal project evidence remain. `executio
 `failed`; it may preserve one previously proved index terminal result, but never thread-pages completed and never cards.
 `no_material_delta` requires complete/bounded coverage and evidenced dispositions within the declared covered scope.
 
-Each Project Card has exact fields:
+Each rule-candidate Project Card has exact fields (engineering fields are defined above):
 
 ```text
 card_id, project_claim_hash, human_context, classification, evidence_level,
@@ -187,7 +204,7 @@ not. `rule_payload` is exactly `trigger, action, skip_boundary, scope, why, evid
 
 ## Review Pack
 
-`global_owner_scout_review_pack_v7` exact top-level fields (Project result v6; legacy Pack v6 pairs with Project v5):
+`global_owner_scout_review_pack_v8` exact top-level fields (Project result v7; Pack v7/v6 pair with Project v6/v5):
 
 ```text
 contract_version, mode, status, display_locale, skill_version, project_result,

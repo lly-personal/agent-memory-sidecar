@@ -49,6 +49,41 @@ def map_pack(purpose='inspect'):
     return pack
 
 
+def layered_pack():
+    """A source-backed architectural hypothesis, without a fabricated acceptance event."""
+    pack = map_pack('review'); p = pack['project_result']
+    p.update(contract_version='global_owner_scout_project_v7', status='ok')
+    original = v.build_card()
+    card = {k: copy.deepcopy(original[k]) for k in (
+        'card_id', 'human_context', 'evidence_level', 'normalized_evidence_hash',
+        'owner_recommendation', 'direct_evidence', 'owner_rationale', 'anti_examples',
+        'privacy_check', 'unproven')}
+    card.update(kind='engineering', parent_card_id=None, evidence_level='E1', owner_recommendation='project_owner',
+                direct_evidence=[dict(type='owner', ref='owner:current', summary='执行入口与消费者之间存在可核对的重复职责。')],
+                benefit_hypothesis='共享稳定机制可能减少跨入口漂移，收益尚待验证。',
+                implementation_cost='需要调整执行边界并保留既有消费者的兼容路径。',
+                validation_conditions=['比较当前入口与候选执行边界的结果和恢复成本。'],
+                alternatives=[dict(approach='保留当前分工', tradeoff='变更成本较低，但跨入口维护仍然分散。'),
+                              dict(approach='重构共享执行边界', tradeoff='统一稳定语义，但迁移和失败隔离需要验证。')])
+    card['direct_evidence'] = copy.deepcopy(p['evidence_sources'][1]['refs'])
+    card['human_context'].update(decision_title='是否重构共享执行边界？', evidence_refs=['owner:current'],
+                                 recommended_outcome='比较保留现状与共享执行边界，先验证跨入口的实际差异。')
+    card['normalized_evidence_hash'] = v.canonical_hash(card['direct_evidence'])
+    card['project_claim_hash'] = v.canonical_hash(card)
+    p.update(events=[], project_cards=[card], observations=[dict(observation_id='architecture', evidence_level='E1',
+        summary='从源码与目标之间的关系提出工程假设，无已接受变更。', direct_evidence=card['direct_evidence'], event_ids=[],
+        disposition=dict(kind='candidate', reason='交接边界可比较，尚无实施授权。', card_ids=[card['card_id']],
+                         owner_refs=['owner:current'], local_scope='本工程执行边界。', portable_delta='暂无新增全局行为义务。'))])
+    p['project_map']['edges'][0]['kind'] = 'contains'
+    p['project_map']['nodes'][0]['card_ids'] = [card['card_id']]
+    pack.update(contract_version='global_owner_scout_review_pack_v8', status='ok', owner_parity=None,
+                review_cards=[dict(project_claim_hash=card['project_claim_hash'], selection_token=None,
+                    recommended_action='discuss', recommended_action_reason='按项目维护归属讨论，收益仍需验证。',
+                    integration_preview=None, expected_behavior_change='可比较共享机制和保留现状。', allowed_actions=[])])
+    pack['review_pack_hash'] = v.review_pack_hash(pack)
+    return pack
+
+
 def browser_packs():
     """Public, synthetic cross-project inputs for the native-preview browser check."""
     real = map_pack(); m = real['project_result']['project_map']
@@ -81,7 +116,96 @@ def browser_packs():
     return result
 
 
+def layered_browser_pack():
+    pack = layered_pack(); p = pack['project_result']; card = p['project_cards'][0]
+    card['card_id'] = 'candidate\"quote'
+    card['project_claim_hash'] = v.project_claim_hash(card)
+    p['project_map']['nodes'][0]['card_ids'] = [card['card_id']]
+    p['observations'][0]['disposition']['card_ids'] = [card['card_id']]
+    pack['review_cards'][0]['project_claim_hash'] = card['project_claim_hash']
+    p['project_map']['edges'][0]['kind'] = 'handoff'
+    child = copy.deepcopy(card); child.update(card_id='child-advice', parent_card_id=card['card_id'])
+    child['human_context']['decision_title'] = '执行消费者如何分阶段迁移？'
+    child['anti_examples'].append('只读消费者没有执行状态时无需搬迁。')
+    child['project_claim_hash'] = v.project_claim_hash(child)
+    p['project_cards'].append(child)
+    observation = copy.deepcopy(p['observations'][0]); observation['observation_id'] = 'child'
+    observation['disposition']['card_ids'] = [child['card_id']]; p['observations'].append(observation)
+    review = copy.deepcopy(pack['review_cards'][0]); review['project_claim_hash'] = child['project_claim_hash']; pack['review_cards'].append(review)
+    p['project_map']['nodes'][1]['card_ids'] = [child['card_id']]
+    pack['review_pack_hash'] = v.review_pack_hash(pack)
+    return pack
+
+
 class ScoutProjectMapTests(unittest.TestCase):
+    def test_system_recommendation_does_not_invent_a_rule_or_accepted_change(self):
+        import prepare_review
+        import prepare_delivery as d
+        pack = layered_pack()
+        with mock.patch.object(prepare_review, 'resolve', side_effect=AssertionError('unrelated Owner')):
+            self.assertEqual(pack, prepare_review.prepare_review(pack, codex_home=Path('unused')))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest, artifact = d.prepare_delivery(pack, artifact_dir=root, protected_roots=[SCRIPTS])
+            receipt = d.render_delivery_receipt(manifest, artifact_path=artifact, artifact_root=root, outcome='not_requested')
+            recovered = d.verify_final_receipt(receipt, artifact_root=root)
+            self.assertEqual([0], manifest['visible_action_counts'])
+            self.assertIn('首项建议', receipt)
+            self.assertIn('收益假设', artifact.read_text())
+            self.assertNotIn('接受后的准确规则', artifact.read_text())
+            self.assertIsNone(recovered['recovery_bundle'])
+            self.assertEqual('engineering', recovered['project_map_bundle']['context']['advice'][0]['kind'])
+
+    def test_hierarchy_and_typed_relations_preserve_unknowns_without_invented_depth(self):
+        p = layered_pack()['project_result']
+        v.validate_project(p)
+        p['project_map']['journeys'] = []
+        v.validate_project(p)
+        p['project_map']['edges'][0]['target'] = 'entry'
+        with self.assertRaises(v.ContractError): v.validate_project(p)
+
+    def test_engineering_subtree_and_full_counterevidence_survive_projection(self):
+        from project_map import map_context
+        from render_review import render_conversation_brief
+        pack = layered_browser_pack(); v.validate_review_pack(pack)
+        brief = render_conversation_brief(pack)
+        self.assertIn('按 1 项主建议展开', brief)
+        self.assertNotIn('执行消费者如何分阶段迁移？', brief)
+        projected = map_context(pack)['advice'][1]
+        self.assertEqual(pack['project_result']['project_cards'][0]['card_id'], projected['parent_card_id'])
+        self.assertIn('只读消费者没有执行状态时无需搬迁。', projected['anti_examples'])
+        self.assertEqual(pack['project_result']['project_cards'][1]['direct_evidence'], projected['direct_evidence'])
+        broken = copy.deepcopy(pack); broken['project_result']['project_cards'][0]['parent_card_id'] = 'child-advice'
+        with self.assertRaises(v.ContractError): v.validate_review_pack(broken)
+
+    def test_engineering_advice_cannot_create_global_authority(self):
+        for field, value in [('owner_recommendation', 'global_agents'), ('rule_payload', v.build_card()['rule_payload'])]:
+            pack = layered_pack(); card = pack['project_result']['project_cards'][0]; card[field] = value
+            card['project_claim_hash'] = v.project_claim_hash(card)
+            with self.subTest(field=field), self.assertRaises(v.ContractError): v.validate_project(pack['project_result'])
+        pack = layered_pack(); pack['review_cards'][0]['allowed_actions'] = ['confirm']
+        with self.assertRaises(v.ContractError): v.validate_review_pack(pack)
+
+    def test_mixed_pack_plans_only_rule_candidates(self):
+        pack = v.valid_review_pack(); engineering = layered_pack()
+        p = pack['project_result']
+        p.update(contract_version='global_owner_scout_project_v7', purpose='review',
+                 project_map=copy.deepcopy(engineering['project_result']['project_map']))
+        card = engineering['project_result']['project_cards'][0]
+        card['card_id'] = 'engineering-only'; card['project_claim_hash'] = v.project_claim_hash(card)
+        p['project_map']['nodes'][0]['card_ids'] = [card['card_id']]
+        p['project_cards'].append(card)
+        observation = engineering['project_result']['observations'][0]
+        observation['disposition']['card_ids'] = [card['card_id']]; p['observations'].append(observation)
+        review = engineering['review_cards'][0]; review['project_claim_hash'] = card['project_claim_hash']
+        pack['review_cards'].append(review); pack['contract_version'] = 'global_owner_scout_review_pack_v8'
+        pack['review_pack_hash'] = v.review_pack_hash(pack)
+        v.validate_review_pack(pack)
+        self.assertEqual([c['card_id'] for c in p['project_cards'][:-1]], [c['card_id'] for c in v.review_bundle(pack)['items']])
+        from render_review import render_review_pack
+        from verify_visible_output import verify_visible_output
+        self.assertEqual([5, 5, 0], verify_visible_output(render_review_pack(pack, surface='interactive'), surface='interactive')['visible_action_counts'])
+
     def test_actual_delivery_reply_recovers_without_manual_receipt_extraction(self):
         import prepare_delivery as d
         with tempfile.TemporaryDirectory() as tmp:
@@ -145,7 +269,7 @@ class ScoutProjectMapTests(unittest.TestCase):
         import prepare_delivery as d
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            for pack in [v.valid_review_pack(), map_pack(), map_pack('review')]:
+            for pack in [v.valid_review_pack(), map_pack(), map_pack('review'), layered_pack()]:
                 manifest, artifact = d.prepare_delivery(pack, artifact_dir=root, protected_roots=[SCRIPTS])
                 original = artifact.read_bytes()
                 receipt = d.render_delivery_receipt(manifest, artifact_path=artifact, artifact_root=root, outcome='not_requested')
@@ -246,7 +370,7 @@ if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == '--browser-fixtures':
         from project_map import map_context, render_visual
         output = Path(sys.argv[2]); output.mkdir(parents=True, exist_ok=True)
-        for name, pack in browser_packs().items():
+        for name, pack in dict(browser_packs(), layered=layered_browser_pack()).items():
             (output / (name + '-map.html')).write_text(render_visual(map_context(pack), pack['review_pack_hash']), encoding='utf-8')
     else:
         unittest.main()

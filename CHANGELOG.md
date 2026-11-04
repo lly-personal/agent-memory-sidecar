@@ -3,6 +3,14 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.13 (2026-11-04)
+
+- Reconstruct whole-system responsibilities, typed relationships and decision evolution, then explore structure, paths, evidence and layered recommendations using the accepted visual design.
+- Separate engineering hypotheses and multi-level refactoring advice from rule candidates. Keep evidence, alternatives, benefit assumptions, migration cost and validation conditions without inventing an accepted change or running unrelated rule preflight.
+- Preserve same-report navigation and discussion identities; ignore identical widget-state echoes and prevent programmatic focus scrolling. These local fixes do not prove the Desktop parent conversation's scroll behavior.
+- Retain legacy reports read-only, existing rule authorization and cross-project semantics. Add regression and ablation cases for child-advice discovery, complete counterevidence, relation environments and unaffected reading with partial knowledge.
+- Components: Core 0.5.13, Plugin 1.7.13, Bootstrap 2.4.6 and Scout 5.14.0; Project v7, Review Pack v8 and Delivery v2.
+
 ## 0.5.12 (2026-11-03)
 
 - Recover the exact Scout receipt from real delivery replies that also contain closeout prose or host annotations; keep content, selection and visual bindings strict, and reject ambiguous receipts.
