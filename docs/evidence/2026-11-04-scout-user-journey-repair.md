@@ -65,7 +65,7 @@ content gap. This correction supersedes the initial interpretation that the exam
    technical results, source/deployment state, and remaining human/host checks explicitly. Do not mark user experience passed
    solely because tests or screenshots succeed.
 
-## Results
+## Initial local candidate results
 
 The existing pipeline now renders an engineering explanation before recommendations, preserves causal claims in normal
 journey reading, exposes descendant relationships through collapsed groups, and resolves exact selected objects and journeys
@@ -130,3 +130,30 @@ failure and evaluate repaired frozen input, a source-first interpretation, other
 Screenshots remain unavailable when the browser window is minimized; DOM/layout and stubbed message checks cannot qualify native
 message transmission, parent-chat scrolling or human acceptance. Release, installation and natural-use results require their
 own subsequent receipts. The public evidence contains no private task identity or original transcript.
+
+## Release and installation observations
+
+Observed on 2026-11-04 after the candidate checks above:
+
+- [PR #60](https://github.com/lly-personal/agent-memory-sidecar/pull/60) passed all 24 required checks and the additional
+  CodeQL check, including the full contract matrices on the final code, then merged as
+  `e3c47b664f41d5124ac5cac8850359f12a422a83`.
+- [v0.5.14](https://github.com/lly-personal/agent-memory-sidecar/releases/tag/v0.5.14) was built from that merged commit.
+  Local artifact verification passed before the annotated tag's first push. Release CI completed; draft inspection and
+  exact-plan promotion verified asset digests, the signed release statement and immutable publication. The tag was not moved.
+- The bundle contains Core `0.5.14`, Plugin `1.7.14`, Bootstrap `2.4.7` and Scout `5.15.0`. The existing installed Anchor
+  resolved the official release; its verified portable Bootstrap performed an exact-plan Workstation Reconcile application.
+  The Global Owner remained unchanged. Private resolver, application and readback receipts are retained locally.
+- At 09:36 UTC, a fresh native Desktop inventory and read-only consumer verification returned `ready`: all six visible
+  local projects had exactly one enabled matching entry for each of Bootstrap and Scout. Core entry, Doctor, source identity,
+  distribution bytes and Owner parity passed. This establishes installation and project scope, not session loading or adoption.
+- The final candidate browser regression passed ten cases and 28 combinations at 320/736 pixels in light/dark themes.
+  The unchanged failed sample still reproduces its missing relationship controls. Real parent-chat scrolling and native
+  follow-up transmission remain unverified; simulated bridge responses do not qualify either result.
+- The original project's existing chat was still executing a separate user task when installation finished. A natural
+  installed-version `review` was therefore not inserted into that active turn. No substitute chat was created. The frozen
+  source reassessment remains historical and cannot stand in for that pending run on the changing checkout.
+
+Source delivery, immutable publication and this Windows installation are complete. The original failed experience remains
+failed; complete natural review, actual delivered-reply recovery, native follow-up reception/answering and human comprehension
+remain open until observed through their real entrypoints. These limits supersede no unrelated successful technical evidence.
