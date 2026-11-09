@@ -47,15 +47,15 @@
   用于跨设备识别同一内容工程，不包含本机路径或 Codex `projectId`。
 - `host_project_id`：当前 Codex Desktop 对本机项目的执行标识；只用于当前主机绑定，不进入 Git 或跨设备 identity。
 - `host_enrollment`：用户确认当前主机是否为一个已发现项目运行 Global Owner Scout 的本机配置；不是行为 Owner。
-- `project_session_front_door`：当前绑定 Git 项目任务中的唯一 Scout 用户入口；负责显式意图、Fresh 项目绑定、Git
-  资格、执行上下文 preflight 与自动隔离路由，不负责在 Local 执行项目深挖。
-- `isolated_review_executor`：由宿主从项目任务自动投影的 worktree 任务；继承同一正式调用并完成只读 Project Scout，
-  不要求用户重复项目、路径或 prompt。
+- `project_session_front_door`：当前绑定 Git 项目任务中的唯一 Scout 用户入口；解析显式查看、复盘及原报告续接，
+  核对Fresh绑定与完整快照，在当前Local或用户已有worktree中只读执行，不自动另建任务。
+- `isolated_review_executor`：历史前门自动创建worktree任务的名称；当前交互入口不创建这种执行者。
+  已由用户选择的worktree仍是合法上下文；Scheduled的隔离要求由其独立契约维护。
 - `enrollment_pack`：Bootstrap 对本机项目发现、自然活动覆盖、隔离资格、现有状态和建议动作的中文确认界面。
 - `task_review_artifact`：当前 Scout 任务在宿主显式 generated-output root 中创建的不可变完整 Review Pack；它位于
   被复盘项目外，只在当前任务展示，不被跨任务发现或摄取，不是 Store、Inbox、数据库、Manifest 或行为 Owner。
-- `scout_delivery_manifest`：`global_owner_scout_delivery_v1` 的紧凑控制面；绑定 task artifact 的名称、字节 hash/长度、
-  Review Pack/body hash 与卡片/动作守恒，不包含绝对路径、任务 ID、Owner 正文、项目证据正文或长期状态。
+- `scout_delivery_manifest`：`global_owner_scout_delivery_v2` 的紧凑控制面；绑定同源Markdown与可选原生交互投影、
+  artifact字节、Review Pack和卡片/动作守恒；文件完整性、实际展示及理解分别取证，不成为长期状态。
 - `scout_terminal_result`：`global_owner_scout_terminal_v1` 的 manifest-free 失败控制面；在完整 Review Pack 尚未形成时
   绑定 phase、reason、项目状态与不可确认结果，不是部分 Review Pack、Delivery manifest 或长期状态。
 - `repo_bootstrap_anchor`：连续性工程内的极小冷启动 Skill；验证不可变发行物并从安全展开的 portable 在同一任务
@@ -128,8 +128,8 @@ SQLite 历史行、Git commit、Hook 输出、Memories 召回和 Agent 自述都
 - `delivery_prepared`：确定性 Review Pack 已创建为 task artifact、完成同文件回读并生成有效 Delivery manifest；只证明
   交付准备，不证明宿主已展示、用户可见或 Production 可用。
 - `surface_pending`：宿主明确返回 `queued` 后，实际 task final 保留经 Delivery manifest 绑定的 artifact 链接，外部
-  controller 已复核字节、hash、卡片和动作守恒；只证明完整内容可发现，不证明用户已打开，确认关闭且不计 Production。
-- `surface_observed`：外部 controller 从实际任务结果回读 compact receipt，并验证同任务 artifact 字节与 Delivery
-  manifest 一致；内部 verifier、文件存在、宿主 open 调用或模型自述都不能单独证明该层。
+  观察者可复核字节、hash、卡片和动作守恒；只证明完整内容可发现，不证明用户已打开或已接受。
+- `surface_observed`：从实际任务结果回读完整交付回执，并验证同任务 artifact 与 Delivery manifest 一致；
+  交互续接由当前任务从原生历史恢复，不要求另建controller或聊天；文件核验、实际展示与人的理解分别取证。
 
 证据不可跨级。Doctor、单元测试、Hook 自检、文件 parity 或 SQLite 记录都不能冒充模型采用。

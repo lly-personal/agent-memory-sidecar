@@ -45,7 +45,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         self.fixture_root = Path(self.fixture.name).resolve()
         self.native_entries = []
         self.native_hashes = {}
-        for name, version in (("agent-memory-workstation-bootstrap", "2.4.7"), ("global-owner-scout", "5.15.0")):
+        for name, version in (("agent-memory-workstation-bootstrap", "2.4.8"), ("global-owner-scout", "5.16.0")):
             root = self.fixture_root / "codex" / "skills" / name
             root.mkdir(parents=True)
             (root / "SKILL.md").write_text(f"---\nname: {name}\ndescription: Fixture\n---\n# Fixture\n- Skill version: `{version}`\n")
@@ -84,9 +84,9 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "core_version": "0.3.10",
             "plugin_version": "1.5.1",
             "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.4.7",
+            "bootstrap_version": "2.4.8",
             "bootstrap_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
-            "scout_version": "5.15.0",
+            "scout_version": "5.16.0",
             "scout_sha256": self.native_hashes["global-owner-scout"],
         }
 
@@ -133,10 +133,10 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "unavailable",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.4.7", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
+                "status": "unchanged", "version": "2.4.8", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
             },
             "scout_skill": {
-                "status": "unchanged", "version": "5.15.0", "content_sha256": self.native_hashes["global-owner-scout"],
+                "status": "unchanged", "version": "5.16.0", "content_sha256": self.native_hashes["global-owner-scout"],
             },
         }
 
@@ -249,7 +249,10 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
     def test_development_sources_are_outside_automatic_discovery(self):
         for name in self.reconcile.CONSUMER_SKILLS:
             self.assertTrue((ROOT / "skills" / name / "SKILL.md").is_file())
-            self.assertFalse((ROOT / ".agents" / "skills" / name).exists())
+            # Native discovery requires SKILL.md, not a directory left by historical
+            # bytecode/cache state. Preserve unrelated local state; reject any actual
+            # discoverable development entry, including a nested one.
+            self.assertFalse(any((ROOT / ".agents" / "skills" / name).rglob("SKILL.md")))
 
     @unittest.skipUnless(shutil.which("codex"), "native Codex CLI unavailable")
     def test_real_native_catalog_disabled_source_and_single_installed_entry(self):
@@ -317,7 +320,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                     "name": "agent-memory-workstation-bootstrap", "version": "1.9.0",
                     "scope": "repo", "enabled": True, "content_sha256": "9" * 64, "relation": "drifted",
                 }, {
-                    "name": "global-owner-scout", "version": "5.15.0", "scope": "user", "enabled": True,
+                    "name": "global-owner-scout", "version": "5.16.0", "scope": "user", "enabled": True,
                     "content_sha256": self.native_hashes["global-owner-scout"], "relation": "exact",
                 }],
             }],
@@ -513,12 +516,12 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.4.7",
+                "version": "2.4.8",
                 "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.15.0",
+                "version": "5.16.0",
                 "content_sha256": self.native_hashes["global-owner-scout"],
             },
         }
@@ -557,10 +560,10 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "verified",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.4.7", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
+                "status": "unchanged", "version": "2.4.8", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
             },
             "scout_skill": {
-                "status": "unchanged", "version": "5.15.0", "content_sha256": self.native_hashes["global-owner-scout"],
+                "status": "unchanged", "version": "5.16.0", "content_sha256": self.native_hashes["global-owner-scout"],
             },
         }
         source_sync = {
@@ -625,10 +628,10 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             plugin_manifest.parent.mkdir()
             plugin_manifest.write_text(json.dumps({"version": "1.5.1"}), encoding="utf-8")
             (bootstrap / "SKILL.md").write_text(
-                "# Bootstrap\n\n- Skill version: `2.4.7`\n", encoding="utf-8",
+                "# Bootstrap\n\n- Skill version: `2.4.8`\n", encoding="utf-8",
             )
             (scout / "SKILL.md").write_text(
-                "# Scout\n\n- Skill version: `5.15.0`\n", encoding="utf-8",
+                "# Scout\n\n- Skill version: `5.16.0`\n", encoding="utf-8",
             )
             source_manifest = {
                 "contract_version": "agent_memory_source_manifest_v1",
@@ -654,7 +657,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 },
                 "versions": {
                     "core": "0.3.10", "plugin": "1.5.1",
-                    "bootstrap": "2.4.7", "scout": "5.15.0",
+                    "bootstrap": "2.4.8", "scout": "5.16.0",
                 },
                 "artifacts": [],
                 "verification": {},
@@ -687,7 +690,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
 
             self.assertEqual("v0.3.10", desired["release_ref"])
             self.assertEqual("1.5.1", desired["plugin_version"])
-            self.assertEqual("2.4.7", desired["bootstrap_version"])
+            self.assertEqual("2.4.8", desired["bootstrap_version"])
             self.assertEqual("a" * 40, sidecar.expected_commit)
             self.assertRegex(source_hash, r"^[0-9a-f]{64}$")
             self.assertRegex(desired["plugin_sha256"], r"^[0-9a-f]{64}$")
@@ -821,8 +824,8 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             codex_home = root / "codex-home"
             self.reconcile.sync_sources(codex_home, spec)
             for name, version in (
-                ("agent-memory-workstation-bootstrap", "2.4.7"),
-                ("global-owner-scout", "5.15.0"),
+                ("agent-memory-workstation-bootstrap", "2.4.8"),
+                ("global-owner-scout", "5.16.0"),
             ):
                 skill = codex_home / "skills" / name
                 skill.mkdir(parents=True)
@@ -852,7 +855,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             self.assertEqual("verified", observed["core"]["status"])
             self.assertEqual(commit, observed["core"]["source_commit"])
             self.assertEqual("verified", observed["doctor"])
-            self.assertEqual("2.4.7", observed["bootstrap_skill"]["version"])
+            self.assertEqual("2.4.8", observed["bootstrap_skill"]["version"])
             self.assertRegex(observed["scout_skill"]["content_sha256"], r"^[0-9a-f]{64}$")
 
     def test_distribution_participant_rolls_back_with_source_transaction(self) -> None:

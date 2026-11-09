@@ -7,7 +7,7 @@ description: Show a project overview or deeply review it when explicitly request
 
 ## Contract
 
-- Skill version: `5.15.0`
+- Skill version: `5.16.0`
 - Project result: `global_owner_scout_project_v7`
 - User review: `global_owner_scout_review_pack_v8`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -33,6 +33,11 @@ and Core preview. Freeze `view_ready` or `degraded` with the uncovered scope. Do
 Both purposes explain the whole system even with zero recommendations; the evidence model does not prescribe a visible diagram. Ordinary authorized development maintains the affected Owner and
 acceptance through its existing workflow; it does not start a whole-project review. The user chooses model, reasoning and time
 investment; do not inject overrides or impose a fixed matrix size, advice count or review time limit.
+
+For reuse-related questions, explain how a natural task reaches the current Owner, formal tool and actual result consumer.
+Keep intended routing, observed invocation, fulfilled dependencies and accepted results separate. Existing workflow-evaluation
+evidence can inform a review, but Scout never launches its batches or writes project cases. Target-project maintenance and
+acceptance stay in the scope the user selected; asking for an overview does not authorize either.
 
 Choose presentation from the user's question and the target project's actual architecture. Plain prose or a table can be sufficient;
 a static relation can use Mermaid; an explorable process, state comparison or spatial relation can use the installed `visualize` Skill.

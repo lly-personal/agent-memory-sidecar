@@ -55,7 +55,7 @@ When task projectId is null/absent, its native cwd may uniquely match an invento
 Conflicting non-null IDs/roots, ambiguous inventory matches and missing native context remain blocked. Shell cwd, labels and
 prompt paths alone are insufficient. Use the same rule for history association; keep raw host IDs/paths out of results.
 
-- Skill `5.15.0`; Project result `global_owner_scout_project_v7`; Review Pack
+- Skill `5.16.0`; Project result `global_owner_scout_project_v7`; Review Pack
   `global_owner_scout_review_pack_v8`; Delivery `global_owner_scout_delivery_v2`; manifest-free terminal
   `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators, excluding their own hash field.

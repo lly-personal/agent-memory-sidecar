@@ -3,6 +3,14 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.15 (2026-11-09)
+
+- Explain how ordinary tasks reach the current Owner, formal tool, required dependencies and actual result consumer; distinguish each observed failure layer.
+- Consume optional workflow-evaluation evidence without launching batches, writing project cases, or expanding a read-only Scout request into target-project acceptance.
+- Align the active glossary with current-task Local/worktree execution and Delivery v2; remove obsolete extra-controller implications.
+- Check discoverable Skill entries rather than historical cache-only directories. Preserve unrelated local state and separate structural tests from real-host adoption.
+- Components: Core 0.5.15, Plugin 1.7.15, Bootstrap 2.4.8 and Scout 5.16.0; Project v7, Review Pack v8 and Delivery v2 remain compatible.
+
 ## 0.5.14 (2026-11-04)
 
 - Explain project goals and real action consequences before recommendations; preserve descendant relationships, shared ownership and the visible journey during discussion.
