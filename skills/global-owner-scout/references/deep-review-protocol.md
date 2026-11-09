@@ -111,6 +111,15 @@ implementation or runtime evidence. Freeze the map without manufacturing events/
 continue the following source/causal phases and link real maintenance deltas to map objects. Project/Skill improvements survive
 existing global coverage; route repeatable methods to an existing Skill or Engineering Contract Review when appropriate.
 
+When reviewing reuse or drift, trace the natural task through its current routing Owner, actual tool call, required dependencies,
+and independent result consumer. Distinguish a selection failure from invocation, dependency, consumer-verification or maintenance
+drift. A document read, matching file count, tool name in prose or self-selected checklist does not prove execution. Preserve
+valid equivalent paths and scoped exploratory probes. An optional workflow evaluator may supply frozen case/host/version-bound
+traces and checks; inspect their actual evidence and unmeasured scope, not just the report verdict. Its absence does not block
+Scout. Do not start an evaluation, install a dependency, alter a model, or write target-project cases from this read-only review.
+User-requested capture/execution continues through that capability in the appropriate project scope. Use existing map sources,
+journeys and engineering cards; do not create another registry or a mandatory per-task review.
+
 
 Read the project instruction chain, L1/L2/L3 or equivalent Owners, current-status Owner, relevant ADR/specs, windowed Git changes,
 tests, failures, acceptance, and bound project snapshot. Recheck Session leads against these sources. Record each source's availability.
