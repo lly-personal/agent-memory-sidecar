@@ -2,6 +2,17 @@
 
 ## Current project-map contracts
 
+Native history import is a private artifact operation, not another project/result Owner. `import-history`
+accepts one actual read_thread response plus independently resolved session/project identity, writes one
+content-addressed native export and index in the granted root, and preserves cursor/truncation metadata.
+The receipt never claims that the source was understood or that the full chat was read. Re-importing the
+same page reuses read-only bytes; changed pages create new identities. No database/transcript discovery.
+Both writes/readback hold the output directory identity: Windows denies ancestor write/delete sharing, POSIX
+uses relative directory descriptors. Concurrent redirection cannot send private pages into a protected
+project. Missing containment blocks; it never loosens system security or retries by another writer.
+Use `--input-file` with existing validation/preparation commands; `describe-input project|review` exposes
+shared validator fields and exact modes. These helpers do not synthesize missing semantic evidence.
+
 New results use Project v7, Review Pack v8 and Delivery v2. Historical Project v5/v6 and Review Pack v6/v7
 remain readable; do not rewrite old artifacts or infer a missing map. The definitions below remain the review lane's shared
 fields. Project v6 additionally requires `purpose` (`inspect` or `review`) and `project_map`.
