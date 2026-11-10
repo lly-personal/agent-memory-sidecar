@@ -43,7 +43,9 @@ Scheduled retains its verified inline/Inbox surface and has no artifact-root or 
    updates are outside the frozen observation, not a reason to wait for the task to finish.
 6. No transcript parser, database, background queue, task polling service or automation memory substitutes for native evidence.
 
-Forward actual native page objects through host code orchestration to `import-history`; seal each page once,
+Forward actual native page objects through host code orchestration to a file-write data tool, then
+`import-history --input-file`; do not embed large pages in executable JavaScript or split code to avoid
+host review-size limits. Seal each page once,
 reuse its native_file/hash and preserve original cursors/truncation. Never transcribe raw history in model-written
 JSON chunks. Use `--input-file` for result validation/preparation and `describe-input` for current field requirements.
 For continuation, reuse the verified report and update only changed sources; do not restart its census.
