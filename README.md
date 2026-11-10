@@ -97,7 +97,7 @@ For normal Codex Desktop use, register the immutable repository Marketplace,
 install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.5.15
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.5.16
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 

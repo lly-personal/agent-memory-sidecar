@@ -15,7 +15,7 @@ from typing import Any, Callable, Iterable
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.16.0"
+SKILL_VERSION = "5.17.0"
 PROJECT_CONTRACT = "global_owner_scout_project_v7"
 MAP_PROJECT_CONTRACT = "global_owner_scout_project_v6"
 REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v8"
@@ -773,17 +773,30 @@ def validate_discovery_trace(obj: dict[str, Any]) -> None:
         require(bool(obj["observations"]), "no_material_delta requires evidenced observations")
 
 
+PROJECT_INPUT_KEYS = {
+    "contract_version", "mode", "status", "display_locale", "project_key", "project_identity", "run_id", "task_id", "skill_version",
+    "evidence_window", "model_observation", "owner_snapshot", "session_coverage", "evidence_sources",
+    "events", "observations", "project_cards", "read_only_proof", "limitations",
+}
+REVIEW_INPUT_KEYS = {"contract_version", "mode", "status", "display_locale", "skill_version", "project_result", "owner_parity", "review_cards", "selection_preview", "limitations", "review_pack_hash"}
+
+
+def describe_input(kind: str) -> dict[str, Any]:
+    return dict(contract_version=PROJECT_CONTRACT if kind == 'project' else REVIEW_PACK_CONTRACT,
+                mode='project_scout' if kind == 'project' else 'review_pack', skill_version=SKILL_VERSION,
+                display_locale=DISPLAY_LOCALE,
+                required_keys=sorted(PROJECT_INPUT_KEYS | {'purpose', 'project_map'} if kind == 'project' else REVIEW_INPUT_KEYS),
+                purpose_choices=['inspect', 'review'] if kind == 'project' else None,
+                semantic_input='Use current source-backed claims, evidence refs and coverage; no inferred defaults.')
+
+
 def validate_project(value: Any) -> dict[str, Any]:
     obj = require_object(value, "$")
     mapped = obj.get('contract_version') in {PROJECT_CONTRACT, MAP_PROJECT_CONTRACT}
     inspect = mapped and obj.get('purpose') == 'inspect'
     require_exact_keys(
         obj,
-        {
-            "contract_version", "mode", "status", "display_locale", "project_key", "project_identity", "run_id", "task_id", "skill_version",
-            "evidence_window", "model_observation", "owner_snapshot", "session_coverage", "evidence_sources",
-            "events", "observations", "project_cards", "read_only_proof", "limitations",
-        } | ({'purpose', 'project_map'} if mapped else set()),
+        PROJECT_INPUT_KEYS | ({'purpose', 'project_map'} if mapped else set()),
         "$",
     )
     require(obj["contract_version"] in {PROJECT_CONTRACT, MAP_PROJECT_CONTRACT, LEGACY_PROJECT_CONTRACT}, "$.contract_version invalid")
@@ -1113,7 +1126,7 @@ def validate_review_pack(value: Any, *, require_preview: bool = True) -> dict[st
     obj = require_object(value, "$")
     require_exact_keys(
         obj,
-        {"contract_version", "mode", "status", "display_locale", "skill_version", "project_result", "owner_parity", "review_cards", "selection_preview", "limitations", "review_pack_hash"},
+        REVIEW_INPUT_KEYS,
         "$",
     )
     require(obj["contract_version"] in {REVIEW_PACK_CONTRACT, MAP_REVIEW_PACK_CONTRACT, LEGACY_REVIEW_PACK_CONTRACT}, "$.contract_version invalid")

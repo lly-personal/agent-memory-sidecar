@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.5.16 (2026-11-10)
+
+- Freeze native history pages through the Scout import-history helper instead of model-written JSON chunks; preserve identity, cursors and truncation metadata with immutable readback.
+- Accept file inputs for existing result helpers and describe current shared validator fields; preserve Project v7, Review Pack v8 and Delivery v2.
+- Keep source acquisition separate from semantic analysis, and installed/component checks separate from natural-use acceptance.
+- Components: Core 0.5.16, Plugin 1.7.16, Bootstrap 2.4.9 and Scout 5.17.0. Bootstrap only updates component identities.
+
 ## 0.5.15 (2026-11-09)
 
 - Explain how ordinary tasks reach the current Owner, formal tool, required dependencies and actual result consumer; distinguish each observed failure layer.

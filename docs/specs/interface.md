@@ -474,6 +474,13 @@ Owner 内容或跨主机租约。自动化调和全部成功后才原子替换 P
 
 ### 用户主动触发入口
 
+Scout 的 `import-history --project-root ROOT --session-id ID --artifact-dir OUTPUT --protected-root ROOT`
+从 stdin 或 `--input-file` 接收原生 read_thread 返回对象（可为 MCP 单一 JSON text 包装），核对会话和工程，
+将同一页面封存一次并返回 native_file、SHA-256、分页及截断信息。通过宿主代码编排直接传递对象，
+不由模型逐段转写；文件只进入宿主明确授予的项目外输出目录。模型仍须阅读相关原文，不能用保存或计数证明理解。
+既有 validate/prepare/render 命令支持 `--input-file`；`describe-input project|review` 从 validator 共用字段定义
+返回当前最小输入形状，不生成虚构的语义、覆盖或建议。旧报告和 Project v7/Pack v8/Delivery v2 保持兼容。
+
 正式交互入口只允许用户在目标 Git 工程的当前项目任务中显式发送：
 
 ```text

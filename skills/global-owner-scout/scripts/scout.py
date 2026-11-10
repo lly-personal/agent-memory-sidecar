@@ -22,6 +22,7 @@ from prepare_delivery import (
     render_terminal_receipt,
     validate_delivery_manifest,
     validate_output_root,
+    safe_artifact_bytes,
     verify_final_receipt,
 )
 from render_review import render_review_pack
@@ -29,8 +30,9 @@ from project_map import resolve_selection
 from prepare_review import prepare_review
 from resolve_owner_parity import resolve
 from utf8_stdio import configure_utf8_stdio
-from validate_output import ContractError, validate_project, validate_review_pack
+from validate_output import ContractError, validate_project, validate_review_pack, describe_input
 from verify_visible_output import verify_visible_output
+from history_import import import_history
 
 
 PREFLIGHT_CONTRACT = "global_owner_scout_preflight_v1"
@@ -43,9 +45,9 @@ def require(condition: bool, message: str) -> None:
         raise ContractError(message)
 
 
-def load_stdin_json() -> Any:
+def load_stdin_json(input_file: Path | None = None) -> Any:
     try:
-        return json.load(sys.stdin)
+        return json.loads(safe_artifact_bytes(input_file).decode('utf-8-sig')) if input_file else json.load(sys.stdin)
     except json.JSONDecodeError as exc:
         raise ContractError(f"stdin is not valid JSON: {exc}") from exc
 
@@ -124,6 +126,13 @@ def main() -> int:
     configure_utf8_stdio()
     parser = argparse.ArgumentParser(description="Run one active Global Owner Scout helper operation.")
     commands = parser.add_subparsers(dest="command", required=True)
+    history = commands.add_parser('import-history', help='Freeze one native read_thread page; never retype it through the model.')
+    history.add_argument('--project-root', type=Path, required=True)
+    history.add_argument('--session-id', required=True)
+    history.add_argument('--artifact-dir', type=Path, required=True)
+    history.add_argument('--protected-root', action='append', type=Path, required=True)
+    description = commands.add_parser('describe-input')
+    description.add_argument('kind', choices=('project', 'review'))
     context = commands.add_parser("inspect-context")
     context.add_argument("--project-root", type=Path, required=True)
     output = commands.add_parser("inspect-output")
@@ -153,40 +162,51 @@ def main() -> int:
     verify_final.add_argument("--project-root", type=Path)
     verify_final.add_argument("--object", dest="selected_object")
     verify_final.add_argument("--journey")
+    for name in ('import-history', 'validate-project', 'validate-review-pack', 'prepare-review',
+                 'render-review', 'verify-visible', 'prepare-delivery', 'render-receipt', 'render-terminal', 'verify-final'):
+        commands.choices[name].add_argument('--input-file', type=Path, help='Consume an existing UTF-8 input instead of serializing it again through stdin.')
     args = parser.parse_args()
+    def load_input() -> Any:
+        return load_stdin_json(args.input_file)
 
     try:
-        if args.command == "inspect-context":
+        if args.command == 'import-history':
+            print(json.dumps(import_history(load_input(), project_root=args.project_root, session_id=args.session_id,
+                artifact_dir=args.artifact_dir, protected_roots=args.protected_root), ensure_ascii=False, separators=(',', ':')))
+        elif args.command == 'describe-input':
+            print(json.dumps(describe_input(args.kind), ensure_ascii=False, separators=(',', ':')))
+        elif args.command == "inspect-context":
             print(json.dumps(inspect_git_context(args.project_root), separators=(",", ":")))
         elif args.command == "inspect-output":
             validate_output_root(args.artifact_dir, args.protected_root)
             print(json.dumps({"status": "ok", "output_root_contained": True, "writes_performed": False}))
         elif args.command == "validate-project":
-            validated = validate_project(load_stdin_json())
+            validated = validate_project(load_input())
             result = {"status": "ok", "mode": "project_scout", "contract_version": validated["contract_version"]}
             print(json.dumps(result, separators=(",", ":")))
         elif args.command == "validate-review-pack":
-            validated = validate_review_pack(load_stdin_json())
+            validated = validate_review_pack(load_input())
             result = {"status": "ok", "mode": "review_pack", "contract_version": validated["contract_version"]}
             print(json.dumps(result, separators=(",", ":")))
         elif args.command == "prepare-review":
             configured = os.environ.get("CODEX_HOME")
             codex_home = Path(configured).expanduser() if configured else Path.home() / ".codex"
-            print(json.dumps(prepare_review(load_stdin_json(), codex_home=codex_home, selected_card_ids=args.select_card), ensure_ascii=False, separators=(",", ":")))
+            print(json.dumps(prepare_review(load_input(), codex_home=codex_home, selected_card_ids=args.select_card), ensure_ascii=False, separators=(",", ":")))
         elif args.command == "resolve-owner-parity":
             configured = os.environ.get("CODEX_HOME")
             codex_home = Path(configured).expanduser() if configured else Path.home() / ".codex"
             print(json.dumps(resolve(codex_home), ensure_ascii=False, separators=(",", ":")))
         elif args.command == "render-review":
-            print(render_review_pack(load_stdin_json(), surface=args.surface), end="")
+            print(render_review_pack(load_input(), surface=args.surface), end="")
         elif args.command == "verify-visible":
-            print(json.dumps(verify_visible_output(sys.stdin.read(), surface=args.surface), ensure_ascii=False, separators=(",", ":")))
+            text = safe_artifact_bytes(args.input_file).decode('utf-8-sig') if args.input_file else sys.stdin.read()
+            print(json.dumps(verify_visible_output(text, surface=args.surface), ensure_ascii=False, separators=(",", ":")))
         elif args.command == "prepare-delivery":
-            manifest, _ = prepare_delivery(load_stdin_json(), artifact_dir=args.artifact_dir, protected_roots=args.protected_root,
+            manifest, _ = prepare_delivery(load_input(), artifact_dir=args.artifact_dir, protected_roots=args.protected_root,
                                            visual_input=args.visual_input)
             print(json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
         elif args.command == "render-receipt":
-            manifest = validate_delivery_manifest(load_stdin_json())
+            manifest = validate_delivery_manifest(load_input())
             if args.outcome == "open_failed" and args.artifact_path is None and args.artifact_root is None:
                 print(render_blocked_receipt(manifest), end="")
             else:
@@ -195,9 +215,9 @@ def main() -> int:
                 print(render_delivery_receipt(manifest, artifact_path=args.artifact_path, artifact_root=args.artifact_root,
                                               outcome=args.outcome, text_only=args.text_only), end="")
         elif args.command == "render-terminal":
-            print(render_terminal_receipt(load_stdin_json()), end="")
+            print(render_terminal_receipt(load_input()), end="")
         else:
-            result = verify_final_receipt(sys.stdin.read(), artifact_root=args.artifact_root)
+            result = verify_final_receipt(safe_artifact_bytes(args.input_file).decode('utf-8') if args.input_file else sys.stdin.read(), artifact_root=args.artifact_root)
             result["source_status"] = "not_checked"
             if args.selected_object or args.journey:
                 require(result['project_map_bundle'] is not None, 'original report has no map')

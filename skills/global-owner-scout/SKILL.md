@@ -7,7 +7,7 @@ description: Show a project overview or deeply review it when explicitly request
 
 ## Contract
 
-- Skill version: `5.16.0`
+- Skill version: `5.17.0`
 - Project result: `global_owner_scout_project_v7`
 - User review: `global_owner_scout_review_pack_v8`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -24,6 +24,20 @@ and never asks the user to provide resource settings. The Scout uses the current
 project name, path, project ID, candidate hint, or the deep-review procedure.
 
 ## Purpose and native presentation
+
+For native history, pass the actual tool result directly through host code orchestration into
+`scout.py import-history --project-root <native-source-root> --session-id <native-id> --artifact-dir <granted-root> --protected-root <target-root>`.
+The helper reads JSON on stdin or `--input-file`, seals one acquired page and returns its file/hash,
+cursor and truncation metadata. Reuse that native_file for authorized workflow-eval capture; never
+retype large history JSON through model-written chunks. Host tools may forward objects to the native
+file-write tool as data and pass that exact path with `--input-file`. Generate that transfer in host
+code from the actual tool object; do not embed an entire page in executable REPL code, which has a
+separate review-size limit. Small native REPL transfers remain optional. Use the current tool schema,
+not a guessed database or transcript. Do not split executable payloads to evade a host review limit.
+If direct transfer is unavailable, expose the precise evidence gap instead of claiming a complete raw export.
+Read the selected source passages for meaning; mechanical import/counts do not prove understanding.
+Validation and preparation accept `--input-file`; use `describe-input project|review` for current shared
+field/mode requirements before writing semantic results, not engine source or a second schema copy.
 
 Choose from the user's actual request, not the repository name. “看懂当前工程全貌” uses `purpose=inspect`: recover an existing
 map if identifiable, check its source revision and relevant source changes, and reuse it when still current. If absent or stale,
