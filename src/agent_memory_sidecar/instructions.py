@@ -6,6 +6,7 @@ import re
 import stat
 import tempfile
 import time
+import uuid
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -576,11 +577,12 @@ def plan_deploy_bundle(
 
 
 def read_document(
-    *, path: Path | str, target: InstructionTarget, shadowed: bool = False
+    *, path: Path | str, target: InstructionTarget, shadowed: bool = False,
+    directory_fd: int | None = None,
 ) -> DocumentSnapshot:
     logical = _logical_absolute(path)
     try:
-        existed, data = _read_regular_bytes(logical)
+        existed, data = _read_regular_bytes(logical, directory_fd=directory_fd)
     except OSError as exc:
         raise CoreError(
             "instruction_file_unreadable",
@@ -756,11 +758,12 @@ def render_rule(rule: ConfirmedRule, *, newline: str) -> str:
     )
 
 
-def atomic_write(path: Path, data: bytes) -> None:
+def atomic_write(path: Path, data: bytes, *, directory_fd: int | None = None) -> None:
     path = _logical_absolute(path)
     parent = path.parent
-    _assert_physical_parent(parent)
-    existing = _assert_physical_target(path, allow_missing=True)
+    if directory_fd is None:
+        _assert_physical_parent(parent)
+    existing = _assert_physical_target(path, allow_missing=True, directory_fd=directory_fd)
     mode: int | None = None
     if existing is not None:
         try:
@@ -769,25 +772,33 @@ def atomic_write(path: Path, data: bytes) -> None:
             mode = None
     temporary: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="wb",
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-            dir=parent,
-            delete=False,
-        ) as handle:
+        if directory_fd is None:
+            handle = tempfile.NamedTemporaryFile(mode="wb", prefix=f".{path.name}.", suffix=".tmp", dir=parent, delete=False)
             temporary = Path(handle.name)
+        else:
+            candidate = parent / f".{path.name}.{uuid.uuid4().hex}.tmp"
+            descriptor = os.open(candidate.name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                                 0o600, dir_fd=directory_fd)
+            temporary = candidate
+            handle = os.fdopen(descriptor, "wb")
+        with handle:
             handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
-        if mode is not None:
+            if mode is not None and directory_fd is not None:
+                os.fchmod(handle.fileno(), mode)
+        if mode is not None and directory_fd is None:
             os.chmod(temporary, mode)
-        _assert_physical_target(temporary, allow_missing=False)
-        _assert_physical_parent(parent)
-        _assert_physical_target(path, allow_missing=True)
-        os.replace(temporary, path)
+        _assert_physical_target(temporary, allow_missing=False, directory_fd=directory_fd)
+        if directory_fd is None:
+            _assert_physical_parent(parent)
+        _assert_physical_target(path, allow_missing=True, directory_fd=directory_fd)
+        if directory_fd is None:
+            os.replace(temporary, path)
+        else:
+            os.replace(temporary.name, path.name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
         temporary = None
-        _assert_physical_target(path, allow_missing=False)
+        _assert_physical_target(path, allow_missing=False, directory_fd=directory_fd)
     except OSError as exc:
         raise CoreError(
             "instruction_write_failed",
@@ -796,7 +807,10 @@ def atomic_write(path: Path, data: bytes) -> None:
         ) from exc
     finally:
         if temporary is not None:
-            temporary.unlink(missing_ok=True)
+            if directory_fd is None:
+                temporary.unlink(missing_ok=True)
+            else:
+                os.unlink(temporary.name, dir_fd=directory_fd)
 
 
 def restore_file(*, path: Path, existed: bool, data: bytes) -> None:
@@ -1158,17 +1172,16 @@ def assert_physical_directory(path: Path | str, *, allow_missing: bool = False) 
 
 
 def _assert_physical_target(
-    path: Path, *, allow_missing: bool
+    path: Path, *, allow_missing: bool, directory_fd: int | None = None,
 ) -> os.stat_result | None:
     logical = _logical_absolute(path)
-    parent = _assert_physical_parent(
-        logical.parent,
-        allow_missing=allow_missing,
-    )
-    if parent is None:
-        return None
+    if directory_fd is None:
+        parent = _assert_physical_parent(logical.parent, allow_missing=allow_missing)
+        if parent is None:
+            return None
     try:
-        value = logical.lstat()
+        value = (logical.lstat() if directory_fd is None else
+                 os.stat(logical.name, dir_fd=directory_fd, follow_symlinks=False))
     except FileNotFoundError:
         if allow_missing:
             return None
@@ -1198,12 +1211,14 @@ def _assert_physical_target(
     return value
 
 
-def _read_regular_bytes(path: Path) -> tuple[bool, bytes]:
+def _read_regular_bytes(path: Path, *, directory_fd: int | None = None) -> tuple[bool, bytes]:
     logical = _logical_absolute(path)
-    before = _assert_physical_target(logical, allow_missing=True)
+    before = _assert_physical_target(logical, allow_missing=True, directory_fd=directory_fd)
     if before is None:
         return False, b""
-    with logical.open("rb") as handle:
+    handle = (logical.open("rb") if directory_fd is None else
+              os.fdopen(os.open(logical.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd), "rb"))
+    with handle:
         opened = os.fstat(handle.fileno())
         if (
             not stat.S_ISREG(opened.st_mode)
@@ -1216,7 +1231,7 @@ def _read_regular_bytes(path: Path) -> tuple[bool, bytes]:
                 path=str(logical),
             )
         data = handle.read()
-    after = _assert_physical_target(logical, allow_missing=False)
+    after = _assert_physical_target(logical, allow_missing=False, directory_fd=directory_fd)
     assert after is not None
     if (after.st_dev, after.st_ino) != (before.st_dev, before.st_ino):
         raise CoreError(
