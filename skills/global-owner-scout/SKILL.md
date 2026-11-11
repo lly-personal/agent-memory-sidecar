@@ -15,6 +15,7 @@ description: Show a project overview or deeply review it when explicitly request
 - Mode: `project_scout`; interactive-only `central_review` remains optional.
 - For a new review, read [references/contracts.md](references/contracts.md) and execute
   [references/deep-review-protocol.md](references/deep-review-protocol.md) completely. For follow-up, use Recovery and continuation below.
+  Prefer the host's file-read tool for long required references; batch independent reads when supported and reuse acquired content.
 
 This Skill creates project-read-only review drafts. It never creates proposals, approval refs, Owner mutations, project files,
 database rows, commits, pushes, or external-system writes. Its only output write is an immutable Review Pack artifact under the
@@ -58,6 +59,9 @@ For review, first check the output grant in the current request, then use the sa
 `--plugin-data` from its current native value and `--artifact-dir`
 from the exact current output grant, with the same literal-argument handling.
 The agent handles these arguments; the user supplies a review request and, only if absent, an output location.
+For parameter discovery, run the loaded `claude_native.mjs --help`; it needs neither a project nor a prepared SDK.
+Resolve sibling methods through their native namespaced Skill entry or the installed marketplace's explicit `skills` paths.
+Those methods have their own reference base, which may differ from the Scout's directory layout.
 For an explicitly selected historical session, add `--source-session-id` without changing the current caller's session.
 Page with `--offset` and `--limit`; SDK pages remain observed-only and never prove full history or a chat terminal.
 Read selected passages from the returned immutable file, then continue the native review and delivery contract.
@@ -78,8 +82,9 @@ separate review-size limit. Small native REPL transfers remain optional. Use the
 not a guessed database or transcript. Do not split executable payloads to evade a host review limit.
 If direct transfer is unavailable, expose the precise evidence gap instead of claiming a complete raw export.
 Read the selected source passages for meaning; mechanical import/counts do not prove understanding.
-Validation and preparation accept `--input-file`; use `describe-input project|review` for current shared
-field/mode requirements before writing semantic results, not engine source or a second schema copy.
+Validation and preparation accept `--input-file`. Pi/Claude use `describe-input native-project|native-review` for Project v8 /
+Pack v9; Codex uses `describe-input project|review` for Project v7 / Pack v8. Read these current field/mode requirements
+before writing semantic results, rather than searching engine source or maintaining a second schema copy.
 
 Choose from the user's actual request, not the repository name. “看懂当前工程全貌” uses `purpose=inspect`: recover an existing
 map if identifiable, check its source revision and relevant source changes, and reuse it when still current. If absent or stale,

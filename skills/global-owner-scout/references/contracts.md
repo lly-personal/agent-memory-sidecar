@@ -10,8 +10,9 @@ same page reuses read-only bytes; changed pages create new identities. No databa
 Both writes/readback hold the output directory identity: Windows denies ancestor write/delete sharing, POSIX
 uses relative directory descriptors. Concurrent redirection cannot send private pages into a protected
 project. Missing containment blocks; it never loosens system security or retries by another writer.
-Use `--input-file` with existing validation/preparation commands; `describe-input project|review` exposes
-shared validator fields and exact modes. These helpers do not synthesize missing semantic evidence.
+Use `--input-file` with existing validation/preparation commands. `describe-input project|review` describes Codex v7/v8;
+`describe-input native-project|native-review` describes Pi/Claude v8/v9, including observed-only coverage. Both use the
+shared validator. These helpers do not synthesize missing semantic evidence.
 
 New results use Project v7, Review Pack v8 and Delivery v2. Historical Project v5/v6 and Review Pack v6/v7
 remain readable; do not rewrite old artifacts or infer a missing map. The definitions below remain the review lane's shared
@@ -158,6 +159,9 @@ dynamic shell injection, permission grant, Hook, model override or private trans
 `claude_native.mjs context|capture` resolves the existing Python helper, validates current binding before history,
 and, for capture, checks the current authorized output before using the scoped official SDK and immutable importer.
 Caller session and selected historical source session remain separate. SDK errors remain errors, not empty history.
+Its read-only `--help` lists the accepted parameters and native preparation descriptors without Python, project binding,
+session access or SDK runtime loading. Sibling methods are resolved from native Skill discovery or explicit marketplace
+Skill paths; a default `plugin_root/skills/<name>` directory is not a portable reference base.
 
 SDK 0.3.322 is an explicit deployment prerequisite, prepared by `prepare_claude_runtime.mjs` under the native
 plugin data directory's `scout-runtime/claude-sdk-0.3.322`. Preparation uses the checked-in lock with

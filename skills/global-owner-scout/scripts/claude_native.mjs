@@ -48,14 +48,25 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     const [operation, ...args] = process.argv.slice(2), options = {operation};
     const fields = new Set(['session-id','project-root','skill-dir','plugin-root','plugin-data','artifact-dir','source-session-id','offset','limit']);
-    if (args.length % 2) throw Error('claude_native_argument_value_required');
-    for (let i = 0; i < args.length; i += 2) {
-      const field = args[i].replace(/^--/, '');
-      if (!args[i].startsWith('--') || !fields.has(field)) throw Error('claude_native_argument_unknown:' + args[i]);
-      const key = field.replaceAll('-', '_');
-      if (key in options) throw Error('claude_native_argument_duplicate:' + field);
-      options[key] = ['offset', 'limit'].includes(field) ? Number(args[i+1]) : args[i+1];
+    if (['--help', '-h'].includes(operation) && args.length === 0) {
+      console.log(`Usage: node claude_native.mjs context|capture [options]
+context requires current native session-id, project-root, skill-dir and plugin-root.
+capture also requires plugin-data and the current authorized artifact-dir.
+source-session-id selects an explicitly authorized historical source; offset/limit page that source.
+Options (one value each):
+${[...fields].map(field => '  --' + field + ' VALUE').join('\n')}
+Prepare native results: scout.py describe-input native-project|native-review
+Help reads no project, session or SDK runtime and grants no output access.`);
+    } else {
+      if (args.length % 2) throw Error('claude_native_argument_value_required');
+      for (let i = 0; i < args.length; i += 2) {
+        const field = args[i].replace(/^--/, '');
+        if (!args[i].startsWith('--') || !fields.has(field)) throw Error('claude_native_argument_unknown:' + args[i]);
+        const key = field.replaceAll('-', '_');
+        if (key in options) throw Error('claude_native_argument_duplicate:' + field);
+        options[key] = ['offset', 'limit'].includes(field) ? Number(args[i+1]) : args[i+1];
+      }
+      console.log(JSON.stringify(await invokeClaude(options)));
     }
-    console.log(JSON.stringify(await invokeClaude(options)));
   } catch (e) { console.error(e.message); process.exitCode = 1; }
 }
