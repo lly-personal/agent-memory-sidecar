@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -43,6 +44,18 @@ const base={operation:'context',session_id:'caller',project_root:cwd,
                               str(self.output), str(self.data)], cwd=self.project,
                              capture_output=True, text=True, encoding='utf-8')
         self.assertEqual(run.returncode, 0, run.stderr)
+
+    def test_cli_help_routes_native_preparation_without_loading_a_project(self):
+        result = subprocess.run([self.node, str(SCRIPTS / 'claude_native.mjs'), '--help'],
+                                cwd=self.output, env=dict(os.environ, PATH=''),
+                                capture_output=True, text=True, encoding='utf-8')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('context|capture', result.stdout)
+        for field in ('session-id', 'project-root', 'skill-dir', 'plugin-root', 'plugin-data',
+                      'artifact-dir', 'source-session-id', 'offset', 'limit'):
+            self.assertIn('--' + field, result.stdout)
+        self.assertIn('describe-input native-project|native-review', result.stdout)
+        self.assertEqual(list(self.output.iterdir()), [])
 
     def test_binding_rejects_wrong_skill_and_unresolved_values_without_history(self):
         self.js('''
