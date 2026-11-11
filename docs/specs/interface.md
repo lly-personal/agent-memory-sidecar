@@ -11,7 +11,8 @@
 ## 普通任务的安装入口
 
 Scout原生会话适配的当前候选契约由[Scout contracts](../../skills/global-owner-scout/references/contracts.md)维护：
-`inspect-native`核对当前Pi ExtensionContext或Claude原生init与Git身份，不从历史摘要或shell cwd猜当前调用。
+`inspect-native`核对当前Pi ExtensionContext、Claude原生init或明确标识的当前Skill替换值与Git身份，不从历史摘要或shell cwd猜当前调用。
+Claude普通入口与独立SDK部署前提由同一契约维护，不伪造init、不改变权限，也不在只读复盘时临时安装依赖。
 Project v8 / Review Pack v9为Pi/Claude保留实际原生范围及未知/降级覆盖；原Codex v7/v8及历史结果含义不变。
 输出可由当前任务宿主元数据或用户在当前原生调用明确选定；原包含检查不代替授权，原写入保护全部保留。
 当前活动轮次可冻结，无须等整个聊天终止。源码候选、发行安装与自然采用分别签收。

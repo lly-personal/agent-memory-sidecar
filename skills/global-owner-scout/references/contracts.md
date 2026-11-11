@@ -125,7 +125,15 @@ Before history reads, mechanically export the actual current Pi ExtensionContext
 with `native_session_export.mjs`, then call `inspect-native --project-root <bound-root>`.
 The `global_owner_scout_native_context_v1` envelope has `native_host, context` in addition to its version.
 Pi context contains native `cwd, session_id, session` (the untouched session header) and `mode`;
-Claude context is the untouched current `system/init` object, not a historical SDK session summary.
+Claude programmatic context is the untouched current `system/init` object, not a historical SDK session summary.
+The ordinary Claude Skill instead forwards current native substitutions with exact fields
+`source_kind=claude_skill_substitution, cwd, project_dir, session_id, skill_dir, plugin_root`. This is a distinct provenance
+variant, never a synthesized init event. `project_dir` is the native startup substitution; `cwd` is the inherited helper
+process directory, not a replacement authority. The helper must run in the current tool context without changing cwd to
+match the startup path. `inspect-native` rejects disagreement between their Git roots (including a worktree switch), checks
+the running Skill's physical location and Git root,
+and returns `binding_scope=native_skill_substitution_git`. Substitution values must come from the current loaded
+Skill, not historical material or guessed shell state; CLI fixtures do not qualify natural invocation.
 The dispatcher derives the Git root from the native cwd, or checks an explicitly supplied root, and returns
 `global_owner_scout_native_binding_v1` with the source hash and existing Git preflight snapshot.
 This is the session-host equivalent of current-task/workspace binding; it does not invent a Desktop inventory or association.
@@ -141,6 +149,25 @@ Child cancellation inherits the native tool signal. No credentials, model reques
 private parser or second writer is introduced. Root derivation appears only in the private binding receipt, never public evidence refs.
 Git probes likewise use an absolute PATH executable outside the reviewed workspace; project-supplied runtime names are not executed.
 Git-source paths and portable-archive paths are projected from the same package manifest; no second method source is maintained.
+
+Claude's root marketplace entry explicitly selects the two existing plugin methods and the shared Scout directory.
+The portable producer projects only paths and generates root plugin metadata for native local-plugin consumption;
+it never copies a second Scout method. Ordinary invocation is `/agent-memory-sidecar:global-owner-scout`.
+The loaded Skill supplies session/project/Skill/plugin paths through native Markdown substitutions, with no
+dynamic shell injection, permission grant, Hook, model override or private transcript parser.
+`claude_native.mjs context|capture` resolves the existing Python helper, validates current binding before history,
+and, for capture, checks the current authorized output before using the scoped official SDK and immutable importer.
+Caller session and selected historical source session remain separate. SDK errors remain errors, not empty history.
+
+SDK 0.3.322 is an explicit deployment prerequisite, prepared by `prepare_claude_runtime.mjs` under the native
+plugin data directory's `scout-runtime/claude-sdk-0.3.322`. Preparation uses the checked-in lock with
+`npm ci --ignore-scripts --omit=optional`; it neither installs another Claude CLI nor changes PATH/auth/config.
+Only a fresh runtime or an identity-matching existing runtime is accepted; unknown or partial contents block reuse.
+Ordinary Scout never installs dependencies. Missing runtime returns the exact preparation condition.
+Its receipt pins lock, installed SDK and entry bytes; it is installation evidence, not an authorization or trust sandbox.
+History remains observed/degraded even when this consumer succeeds. Discovery, dependency preparation, scoped source
+capture, natural invocation and complete semantic review are separately reported; a native permission refusal stops
+the affected action without another entry that bypasses the same refusal.
 
 `observePiTurn(before, events, after)` and `observeClaudeTurn(init, events)` read native protocol observations,
 not private transcript files. Their `global_owner_scout_native_turn_v1` result records only the native turn state;

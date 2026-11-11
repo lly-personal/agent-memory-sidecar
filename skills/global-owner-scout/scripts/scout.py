@@ -158,19 +158,32 @@ def inspect_native_context(value: Any, project_root: Path | None = None) -> dict
                 and header.get('id') == context.get('session_id') and header.get('cwd') == context.get('cwd')
                 and isinstance(context['mode'], str) and context['mode'] in {'tui', 'rpc', 'json', 'print'}, 'native_context_mismatch')
     elif host == 'claude':
-        require(context.get('type') == 'system' and context.get('subtype') == 'init', 'native_context_mismatch')
+        if context.get('source_kind') == 'claude_skill_substitution':
+            require(set(context) == {'source_kind', 'cwd', 'project_dir', 'session_id', 'skill_dir', 'plugin_root'}, 'native_context_invalid')
+            require(all(isinstance(context[k], str) and Path(context[k]).is_absolute()
+                        for k in ('skill_dir', 'plugin_root', 'project_dir')), 'native_context_mismatch')
+            skill = Path(context['skill_dir']).resolve(strict=True)
+            plugin = Path(context['plugin_root']).resolve(strict=True)
+            require(skill == Path(__file__).resolve().parents[1] and skill.is_relative_to(plugin), 'native_context_skill_mismatch')
+        else:
+            require(context.get('type') == 'system' and context.get('subtype') == 'init', 'native_context_mismatch')
     else:
         raise ContractError('native_context_host_unsupported')
     require(isinstance(context.get('session_id'), str) and bool(context['session_id'])
             and isinstance(context.get('cwd'), str) and Path(context['cwd']).is_absolute(), 'native_context_mismatch')
     cwd = Path(context['cwd']).resolve(strict=True)
     native_root = resolve_git_path(cwd, git_output(cwd, 'rev-parse', '--show-toplevel'))
+    if context.get('source_kind') == 'claude_skill_substitution':
+        startup = Path(context['project_dir']).resolve(strict=True)
+        require(native_root == resolve_git_path(startup, git_output(startup, 'rev-parse', '--show-toplevel')),
+                'native_context_startup_execution_mismatch')
     require(project_root is None or native_root == project_root.resolve(strict=True), 'native_context_project_mismatch')
     return dict(contract_version='global_owner_scout_native_binding_v1', native_host=host,
                 project_root=str(native_root),
                 source_sha256=sha256_bytes(canonical_json(value)),
                 session_ref_sha256=sha256_bytes(context['session_id'].encode('utf-8')),
-                binding_scope='native_current_session_git', git_snapshot=inspect_git_context(native_root))
+                binding_scope=('native_skill_substitution_git' if context.get('source_kind') == 'claude_skill_substitution'
+                               else 'native_current_session_git'), git_snapshot=inspect_git_context(native_root))
 
 
 def main() -> int:

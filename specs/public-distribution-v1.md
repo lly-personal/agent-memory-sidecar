@@ -102,8 +102,9 @@ not enter Core wheel/sdist or introduce a separate service, Store, version field
 and standalone-copy handoff follow the [method SOP](../docs/specs/interface.md#按需方法的维护与交接).
 
 The Codex manifest and Claude Code manifest live under the same Plugin root and must agree on Plugin name, version and Skill
-directory. The root Pi package points directly at that Plugin's Anchor and engineering method directories. The root Claude
-marketplace points at the existing Plugin root. The portable archive includes these discovery manifests and the same method
+directory for the legacy subtree. The root Pi package points directly at that Plugin's Anchor and engineering method directories.
+Claude's root marketplace explicitly selects those same directories plus the shared Scout source. The portable archive includes
+these discovery manifests, projected root Claude metadata and the same method
 files; no new implementation, Store, version authority or updater is introduced. Native package/plugin managers own installed
 caches and enablement. They do not authorize instruction synchronization or source/Store mutations. The
 [user entry](../README.md#optional-engineering-methods-on-codex-pi-and-claude-code) owns installation and invocation guidance.
@@ -166,7 +167,12 @@ host must wait for the entire chat to end. Native turn observations remain disti
 The Pi package exposes the shared Scout source and its read-only native context tool. Its Git manifest uses `skills/`;
 the deterministic portable producer projects those managed Skill/extension references to the existing `.agents/skills/` layout.
 Both consumers validate actual referenced files. This is one method source with a package-path projection, not a second Skill copy.
-Claude's ordinary installed Scout entry still needs its native caller projection; native init/SDK components alone do not complete it.
+Claude's root marketplace entry selects the same two plugin methods and the shared Scout source through explicit native
+Skill paths. The portable producer projects those paths and root plugin metadata, without copying method text.
+Its ordinary entry forwards native Skill substitutions as a distinct caller context, never a fabricated init event;
+the pinned official SDK is a separate deployment prerequisite under native plugin data. Ordinary Scout does not run npm.
+See [the caller and runtime contract](../skills/global-owner-scout/references/contracts.md#native-session-source-snapshots).
+This source entry does not itself qualify a released installation or natural invocation.
 The Pi source entry's qualification does not qualify an installed release or natural model routing. Follow the same versioned
 release and native package installation paths as the engineering method; report each host's observed scope independently.
 No additional account access, production write, global-rule change, background collector or permanent capability registry follows

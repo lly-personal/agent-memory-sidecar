@@ -219,7 +219,7 @@ class PublicDistributionTests(unittest.TestCase):
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
         self.assertEqual(
-            {"core": "0.6.2", "plugin": "1.10.0", "bootstrap": "2.5.1", "scout": "5.18.0"},
+            {"core": "0.6.3", "plugin": "1.11.0", "bootstrap": "2.5.2", "scout": "5.19.0"},
             facts,
         )
         allowlist = json.loads(
@@ -450,7 +450,7 @@ class PublicDistributionTests(unittest.TestCase):
                 archive.extractall(installed)
             marketplace = json.loads((installed / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
             self.assertEqual(1, len(marketplace["plugins"]))
-            plugin = installed / marketplace["plugins"][0]["source"]
+            plugin = installed / "plugins/agent-memory-sidecar"
             codex = json.loads((plugin / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
             claude = json.loads((plugin / ".claude-plugin/plugin.json").read_text(encoding="utf-8"))
             for key in ("name", "version", "skills"):
@@ -462,6 +462,13 @@ class PublicDistributionTests(unittest.TestCase):
             scout = installed / '.agents/skills/global-owner-scout'
             expected.add(scout.resolve())
             self.assertEqual(expected, pi_paths)
+            entry = marketplace['plugins'][0]
+            self.assertEqual('.', entry['source'])
+            self.assertEqual(expected, {(installed / p).resolve() for p in entry['skills']})
+            root_manifest = json.loads((installed / '.claude-plugin/plugin.json').read_text(encoding='utf-8'))
+            self.assertEqual(entry['skills'], root_manifest['skills'])
+            self.assertEqual(codex['version'], root_manifest['version'])
+            self.assertFalse((installed / 'skills').exists())
             self.assertTrue(all(path.is_dir() for path in pi_paths))
             self.assertEqual([str((scout / 'scripts/pi_context_extension.mjs').relative_to(installed)).replace('\\', '/')], native['pi']['extensions'])
             self.assertTrue((scout / 'scripts/pi_context_extension.mjs').is_file())
