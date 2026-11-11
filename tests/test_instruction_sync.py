@@ -401,16 +401,24 @@ class InstructionSyncTests(unittest.TestCase):
     def test_claude_exit_does_not_recreate_a_concurrently_removed_store(self):
         home = self.enroll_claude()
         set_binding = sync._replace_exit_binding
+        removed = refused = False
         def remove_store_after_binding(db, expected, value):
+            nonlocal removed, refused
             set_binding(db, expected, value)
             if value is None:
-                sync._store(home).unlink()
+                try:
+                    sync._store(home).unlink()
+                    removed = True
+                except PermissionError:
+                    refused = True
+                    raise
                 raise OSError("fixture concurrent Store removal")
         with patch.object(sync, "_replace_exit_binding", side_effect=remove_store_after_binding):
             with self.assertRaises(CoreError) as caught:
                 self.exit_claude()
         self.assertEqual("instruction_sync_recovery_required", caught.exception.code)
-        self.assertFalse(sync._store(home).exists())
+        self.assertTrue(removed or refused)
+        self.assertEqual(refused, sync._store(home).exists())
         self.assertTrue((self.state / "instruction-sync-recovery.json").is_file())
 
     def test_claude_exit_committed_cleanup_failure_is_not_rolled_back(self):
@@ -585,7 +593,7 @@ class InstructionSyncTests(unittest.TestCase):
                 save()
             return unlink(path, *args, **kwargs)
         def race_replace(src, dst, *args, **kwargs):
-            if str(src) == target.name and str(dst) == "instruction":
+            if str(src) in (target.name, str(target)) and Path(dst).name == "instruction":
                 save()
             return replace(src, dst, *args, **kwargs)
         with patch.object(Path, "unlink", race_unlink), patch.object(os, "replace", race_replace):

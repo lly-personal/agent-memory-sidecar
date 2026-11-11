@@ -114,10 +114,11 @@ def _hold_windows_directory_chain(directory: Path) -> Iterator[None]:
         for component in (None, *directory.parts[1:]):
             if component is not None:
                 cursor = cursor / component
-            # Denying FILE_SHARE_DELETE pins each ancestor; opening the reparse
-            # point itself lets the handle check reject links and junctions.
+            # FILE_LIST_DIRECTORY participates in sharing checks; attributes-only
+            # access does not pin against rename. Opening the reparse point itself
+            # lets the handle check reject links and junctions.
             handle = kernel32.CreateFileW(
-                str(cursor), 0x80, 0x01 | 0x02, None,
+                str(cursor), 0x01 | 0x80, 0x01 | 0x02, None,
                 3, 0x02000000 | 0x00200000, None,
             )
             if handle == ctypes.c_void_p(-1).value:
