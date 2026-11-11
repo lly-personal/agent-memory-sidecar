@@ -10,6 +10,12 @@
 
 ## 普通任务的安装入口
 
+Scout原生会话适配的当前候选契约由[Scout contracts](../../skills/global-owner-scout/references/contracts.md)维护：
+`inspect-native`核对当前Pi ExtensionContext或Claude原生init与Git身份，不从历史摘要或shell cwd猜当前调用。
+Project v8 / Review Pack v9为Pi/Claude保留实际原生范围及未知/降级覆盖；原Codex v7/v8及历史结果含义不变。
+输出可由当前任务宿主元数据或用户在当前原生调用明确选定；原包含检查不代替授权，原写入保护全部保留。
+当前活动轮次可冻结，无须等整个聊天终止。源码候选、发行安装与自然采用分别签收。
+
 设计依据、原生能力比较和失败场景见 [ADR 0082](../decisions/0082-installed-memory-command-entry.zh.md)。
 
 Desktop 安装的 Agent Memory Skill 必须随包携带 `scripts/agent-memory.py` 与同一 Core 源码，

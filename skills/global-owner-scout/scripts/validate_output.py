@@ -17,8 +17,12 @@ from utf8_stdio import configure_utf8_stdio
 
 SKILL_VERSION = "5.17.0"
 PROJECT_CONTRACT = "global_owner_scout_project_v7"
+NATIVE_PROJECT_CONTRACT = "global_owner_scout_project_v8"
 MAP_PROJECT_CONTRACT = "global_owner_scout_project_v6"
 REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v8"
+NATIVE_REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v9"
+NATIVE_COVERAGE_KEYS = {'native_host', 'scopes', 'discovered_task_count', 'selected_task_count',
+                        'fully_read_task_count', 'status', 'discovery_methods'}
 MAP_REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v7"
 LEGACY_PROJECT_CONTRACT = "global_owner_scout_project_v5"
 LEGACY_REVIEW_PACK_CONTRACT = "global_owner_scout_review_pack_v6"
@@ -331,6 +335,32 @@ def validate_evidence_refs(value: Any, path: str, *, nonempty: bool = True) -> N
         reference = require_string(item["ref"], f"{item_path}.ref")
         require("/" not in reference and "\\" not in reference, f"{item_path}.ref must be a logical reference")
         require_string(item["summary"], f"{item_path}.summary")
+
+
+def validate_native_session_coverage(value: Any, path: str, project_status: str) -> None:
+    obj = require_object(value, path)
+    require_exact_keys(obj, NATIVE_COVERAGE_KEYS, path)
+    require(require_string(obj['native_host'], f'{path}.native_host') in {'pi', 'claude'}, f'{path} native host invalid')
+    discovered = require_int(obj['discovered_task_count'], f'{path}.discovered_task_count')
+    selected = require_int(obj['selected_task_count'], f'{path}.selected_task_count')
+    read = require_int(obj['fully_read_task_count'], f'{path}.fully_read_task_count')
+    require(read == 0 and read <= selected <= discovered, f'{path} cannot prove loss-free selected histories')
+    require(obj['status'] == project_status == 'degraded', f'{path} native history must remain degraded')
+    require(obj['discovery_methods'] == ['native_scoped_sources_observed'], f'{path} native discovery method invalid')
+    seen = set()
+    for scope in require_list(obj['scopes'], f'{path}.scopes', nonempty=True):
+        require_exact_keys(require_object(scope, path), {'kind', 'coverage', 'record_count', 'evidence_refs'}, path)
+        require(require_string(scope['kind'], path) in {'project_sessions', 'session_messages'}, f'{path} native scope invalid')
+        require(require_string(scope['coverage'], path) in {'observed_only', 'unknown', 'failed'}, f'{path} scope cannot claim complete')
+        refs = require_list(scope['evidence_refs'], path, nonempty=scope['coverage'] == 'observed_only')
+        require(all(isinstance(ref, str) and ref for ref in refs) and len(refs) == len(set(refs)), f'{path} scope refs invalid')
+        if scope['coverage'] == 'observed_only':
+            require_int(scope['record_count'], f'{path}.record_count')
+        else:
+            require(scope['record_count'] is None, f'{path} unknown/failed count must remain unknown')
+        key = (scope['kind'], tuple(sorted(refs)))
+        require(key not in seen, f'{path} duplicate native scope')
+        seen.add(key)
 
 
 def validate_session_coverage(value: Any, path: str, project_status: str) -> None:
@@ -782,24 +812,31 @@ REVIEW_INPUT_KEYS = {"contract_version", "mode", "status", "display_locale", "sk
 
 
 def describe_input(kind: str) -> dict[str, Any]:
-    return dict(contract_version=PROJECT_CONTRACT if kind == 'project' else REVIEW_PACK_CONTRACT,
-                mode='project_scout' if kind == 'project' else 'review_pack', skill_version=SKILL_VERSION,
+    project = kind in {'project', 'native-project'}
+    native = kind.startswith('native-')
+    result = dict(contract_version=(NATIVE_PROJECT_CONTRACT if native else PROJECT_CONTRACT) if project else (NATIVE_REVIEW_PACK_CONTRACT if native else REVIEW_PACK_CONTRACT),
+                mode='project_scout' if project else 'review_pack', skill_version=SKILL_VERSION,
                 display_locale=DISPLAY_LOCALE,
-                required_keys=sorted(PROJECT_INPUT_KEYS | {'purpose', 'project_map'} if kind == 'project' else REVIEW_INPUT_KEYS),
-                purpose_choices=['inspect', 'review'] if kind == 'project' else None,
+                required_keys=sorted(PROJECT_INPUT_KEYS | {'purpose', 'project_map'} if project else REVIEW_INPUT_KEYS),
+                purpose_choices=['inspect', 'review'] if project else None,
                 semantic_input='Use current source-backed claims, evidence refs and coverage; no inferred defaults.')
+    if native:
+        result['native_session_coverage_keys'] = sorted(NATIVE_COVERAGE_KEYS)
+        result['history_guarantee'] = 'observed scopes only; history completeness unknown; review remains degraded'
+    return result
 
 
 def validate_project(value: Any) -> dict[str, Any]:
     obj = require_object(value, "$")
-    mapped = obj.get('contract_version') in {PROJECT_CONTRACT, MAP_PROJECT_CONTRACT}
+    native = obj.get('contract_version') == NATIVE_PROJECT_CONTRACT
+    mapped = obj.get('contract_version') in {NATIVE_PROJECT_CONTRACT, PROJECT_CONTRACT, MAP_PROJECT_CONTRACT}
     inspect = mapped and obj.get('purpose') == 'inspect'
     require_exact_keys(
         obj,
         PROJECT_INPUT_KEYS | ({'purpose', 'project_map'} if mapped else set()),
         "$",
     )
-    require(obj["contract_version"] in {PROJECT_CONTRACT, MAP_PROJECT_CONTRACT, LEGACY_PROJECT_CONTRACT}, "$.contract_version invalid")
+    require(obj["contract_version"] in {NATIVE_PROJECT_CONTRACT, PROJECT_CONTRACT, MAP_PROJECT_CONTRACT, LEGACY_PROJECT_CONTRACT}, "$.contract_version invalid")
     if mapped:
         require(obj['purpose'] in {'inspect', 'review'}, 'invalid project purpose')
     require(obj['status'] != 'view_ready' or inspect, 'view_ready is only for inspection')
@@ -816,6 +853,7 @@ def validate_project(value: Any) -> dict[str, Any]:
         require(obj["project_identity"]["git_worktree_eligible"], "Scheduled v5 run requires isolated worktree eligibility")
         require(obj["project_identity"]["binding_status"] != "ambiguous", "Scheduled v5 run rejects ambiguous binding")
     window = require_object(obj["evidence_window"], "$.evidence_window")
+    require(not native or window.get('kind') != 'rolling_72h', 'native-session candidate is interactive only')
     require_exact_keys(window, {"kind", "start", "end"}, "$.evidence_window")
     require(window["kind"] in ({'current'} if inspect else {"manual_30d", "rolling_72h"}), "$.evidence_window.kind invalid")
     start = validate_iso(window["start"], "$.evidence_window.start")
@@ -831,7 +869,7 @@ def validate_project(value: Any) -> dict[str, Any]:
         require(obj['session_coverage'] is None and not obj['events'] and not obj['observations'] and not obj['project_cards'], 'inspection cannot claim census, discoveries or actions')
         require(status in {'view_ready', 'degraded'}, 'inspection status invalid')
     else:
-        validate_session_coverage(obj["session_coverage"], "$.session_coverage", status)
+        (validate_native_session_coverage if native else validate_session_coverage)(obj["session_coverage"], "$.session_coverage", status)
     sources = require_list(obj["evidence_sources"], "$.evidence_sources", nonempty=True)
     source_statuses: dict[str, str] = {}
     for index, raw in enumerate(sources):
@@ -844,6 +882,10 @@ def validate_project(value: Any) -> dict[str, Any]:
         source_statuses[kind] = item["status"]
         require_string(item["coverage"], f"{path}.coverage")
     require("sessions" in source_statuses, "$.evidence_sources must include sessions")
+    if native and not inspect:
+        require(source_statuses['sessions'] in {'degraded', 'unavailable'}, 'native history cannot claim full availability')
+        refs = {r['ref'] for s in sources if s['kind'] == 'sessions' for r in s['refs']}
+        require(all(set(scope['evidence_refs']) <= refs for scope in obj['session_coverage']['scopes']), 'native scopes must resolve declared Session evidence')
     discovery_methods = set() if inspect else set(obj["session_coverage"]["discovery_methods"])
     if inspect:
         require(source_statuses['sessions'] == 'not_applicable', 'inspection must not claim Session coverage')
@@ -873,7 +915,8 @@ def validate_project(value: Any) -> dict[str, Any]:
         require_string(item["summary"], f"{path}.summary")
         validate_evidence_refs(item["direct_evidence"], f"{path}.direct_evidence")
     cards = require_list(obj["project_cards"], "$.project_cards")
-    require(obj["contract_version"] == PROJECT_CONTRACT or all("kind" not in c for c in cards), "engineering cards require Project v7")
+    require(not native or all(c.get('kind') == 'engineering' for c in cards), 'native-session candidate supports engineering advice only; rule Owner migration is unqualified')
+    require(obj["contract_version"] in {NATIVE_PROJECT_CONTRACT, PROJECT_CONTRACT} or all("kind" not in c for c in cards), "engineering cards require Project v7 or v8")
     validate_card_hierarchy(cards)
     hashes = [validate_project_card(card, f"$.project_cards[{index}]")["project_claim_hash"] for index, card in enumerate(cards)]
     require(len(hashes) == len(set(hashes)), "$.project_cards contains duplicate claim hashes")
@@ -1129,17 +1172,17 @@ def validate_review_pack(value: Any, *, require_preview: bool = True) -> dict[st
         REVIEW_INPUT_KEYS,
         "$",
     )
-    require(obj["contract_version"] in {REVIEW_PACK_CONTRACT, MAP_REVIEW_PACK_CONTRACT, LEGACY_REVIEW_PACK_CONTRACT}, "$.contract_version invalid")
+    require(obj["contract_version"] in {NATIVE_REVIEW_PACK_CONTRACT, REVIEW_PACK_CONTRACT, MAP_REVIEW_PACK_CONTRACT, LEGACY_REVIEW_PACK_CONTRACT}, "$.contract_version invalid")
     require(obj["mode"] == "review_pack", "$.mode invalid")
     require(obj["display_locale"] == DISPLAY_LOCALE, f"$.display_locale must be {DISPLAY_LOCALE}")
     require(obj["skill_version"] == SKILL_VERSION, "$.skill_version invalid")
     project = validate_project(obj["project_result"])
-    require({REVIEW_PACK_CONTRACT: PROJECT_CONTRACT, MAP_REVIEW_PACK_CONTRACT: MAP_PROJECT_CONTRACT, LEGACY_REVIEW_PACK_CONTRACT: LEGACY_PROJECT_CONTRACT}[obj['contract_version']] == project['contract_version'], 'pack and project generations differ')
+    require({NATIVE_REVIEW_PACK_CONTRACT: NATIVE_PROJECT_CONTRACT, REVIEW_PACK_CONTRACT: PROJECT_CONTRACT, MAP_REVIEW_PACK_CONTRACT: MAP_PROJECT_CONTRACT, LEGACY_REVIEW_PACK_CONTRACT: LEGACY_PROJECT_CONTRACT}[obj['contract_version']] == project['contract_version'], 'pack and project generations differ')
     require(obj["status"] == project["status"], "$.status must match project_result.status")
     if project.get('purpose') == 'inspect':
         require(obj['owner_parity'] is None and not obj['review_cards'] and obj['selection_preview'] is None, 'inspection cannot use Owner integration or approval')
         parity = None
-    elif project["contract_version"] == PROJECT_CONTRACT and all(c.get("kind") == "engineering" for c in project["project_cards"]):
+    elif project["contract_version"] in {NATIVE_PROJECT_CONTRACT, PROJECT_CONTRACT} and all(c.get("kind") == "engineering" for c in project["project_cards"]):
         require(obj["owner_parity"] is None, "engineering advice does not require Global Owner")
         parity = None
     else:

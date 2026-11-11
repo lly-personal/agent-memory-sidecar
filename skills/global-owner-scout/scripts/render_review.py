@@ -87,6 +87,8 @@ def render_conversation_brief(pack: dict[str, Any]) -> str:
     lines = [*(['\n\n'.join(overview), ''] if overview else []), f"本次有 {len(actionable)} 项建议可继续讨论；{references} 项已有覆盖或无需变更，{unproven} 项证据不足。现有规则未改变。"]
     if pack["status"] == "degraded":
         lines.append("部分资料未覆盖；以下建议只适用于已取得的证据，完整缺口见原报告。")
+        if host := project['session_coverage'].get('native_host'):
+            lines.append(f"本次只按 {host} 实际取得的原生范围复盘；完整历史仍未知，没有授予全项目历史覆盖资格。")
     if not actionable:
         lines.extend(["", "已核查范围没有可直接推进的新增建议，无需确认或逐项忽略。证据不足不代表已验收，也不要求你补做测试。"])
         return "\n".join(lines)
@@ -363,6 +365,12 @@ def render_review_pack(pack: dict[str, Any], *, surface: str, visual: str | None
     pack = validate_review_pack(pack)
     project = pack["project_result"]
     coverage = project["session_coverage"]
+    coverage_line = 'Session 普查：本次未请求。'
+    if coverage and 'native_host' in coverage:
+        scopes = '；'.join(f"{s['kind']}：{s['coverage']}，记录 {s['record_count'] if s['record_count'] is not None else '未知'}" for s in coverage['scopes'])
+        coverage_line = f"Session 来源：`{coverage['native_host']}`；`degraded`；{scopes}。完整历史仍未知，不代表全项目会话已覆盖。"
+    elif coverage:
+        coverage_line = f"Session 覆盖：`{coverage['status']}`；发现 {coverage['discovered_task_count']}，窗口内 {coverage['window_task_count']}，选择 {coverage['selected_task_count']}，完整读取 {coverage['fully_read_task_count']}，读取 {coverage['turn_pages_read']} 页/轮；索引 {coverage['index_pages_read']} 页，每页至多 {coverage['task_index_limit']} 项；active `{coverage['index_terminals']['active']}`，archived `{coverage['index_terminals']['archived']}`；截断 `{str(coverage['truncated']).lower()}`。"
     model = project["model_observation"]
     window = project["evidence_window"]
     proof = project["read_only_proof"]
@@ -498,7 +506,7 @@ def render_review_pack(pack: dict[str, Any], *, surface: str, visual: str | None
             f"**模型请求**：`{model['requested_model']} + {model['requested_reasoning']}`  ",
             f"**实际模型**：`{model['actual_model'] or model['runtime_metadata_status']} + {model['actual_reasoning'] or model['runtime_metadata_status']}`",
             "",
-            (f"Session 覆盖：`{coverage['status']}`；发现 {coverage['discovered_task_count']}，窗口内 {coverage['window_task_count']}，选择 {coverage['selected_task_count']}，完整读取 {coverage['fully_read_task_count']}，读取 {coverage['turn_pages_read']} 页/轮；索引 {coverage['index_pages_read']} 页，每页至多 {coverage['task_index_limit']} 项；active `{coverage['index_terminals']['active']}`，archived `{coverage['index_terminals']['archived']}`；截断 `{str(coverage['truncated']).lower()}`。" if coverage else 'Session 普查：本次未请求。'),
+            coverage_line,
             "",
             "### 证据来源",
             "",

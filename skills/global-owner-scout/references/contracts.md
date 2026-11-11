@@ -104,6 +104,48 @@ Desktop association; only a claim about Desktop requires that additional associa
 
 ## Common rules
 
+### Native-session hosts (candidate)
+
+Pi/Claude use `global_owner_scout_project_v8` with `global_owner_scout_review_pack_v9`;
+Codex and historical v5–v7 projects/v6–v8 packs retain their original interpretation.
+V8 retains the v7 map and advice fields. Its review `session_coverage` has exact keys
+`native_host, scopes, discovered_task_count, selected_task_count, fully_read_task_count, status, discovery_methods`.
+`native_host` is `pi` or `claude`; each scope has `kind, coverage, record_count, evidence_refs`.
+Kinds are `project_sessions` or `session_messages`; coverage is `observed_only`, `unknown` or `failed`.
+Refs resolve declared Session evidence; every scope explicitly exposes what the SDK returned or could not prove.
+Counts are nonnegative and `fully_read_task_count <= selected_task_count <= discovered_task_count`.
+These source APIs cannot prove loss-free history, so both coverage and review status are `degraded`,
+`fully_read_task_count` is zero, and methods are exactly `native_scoped_sources_observed`.
+Neither a successful nor empty SDK result earns `complete`; Codex active/archived partitions are never invented.
+Existing independent non-Session corroboration for advice under degraded coverage still applies.
+The native candidate accepts engineering advice only, with no rule confirmation actions. The existing Global Owner/Core
+preview remains Codex-bound; migrating rule confirmation is separate work, not inferred from native source or map support.
+
+Before history reads, mechanically export the actual current Pi ExtensionContext or Claude native `system/init`
+with `native_session_export.mjs`, then call `inspect-native --project-root <bound-root>`.
+The `global_owner_scout_native_context_v1` envelope has `native_host, context` in addition to its version.
+Pi context contains native `cwd, session_id, session` (the untouched session header) and `mode`;
+Claude context is the untouched current `system/init` object, not a historical SDK session summary.
+The dispatcher checks same-session/workspace evidence against the actual Git root and returns
+`global_owner_scout_native_binding_v1` with the source hash and existing Git preflight snapshot.
+This is the session-host equivalent of current-task/workspace binding; it does not invent a Desktop inventory or association.
+The caller must pass its actual live native object through host code; a copied old context or model-authored JSON is not
+current invocation proof. A frozen prior context remains evidence only of that prior invocation.
+
+`observePiTurn(before, events, after)` and `observeClaudeTurn(init, events)` read native protocol observations,
+not private transcript files. Their `global_owner_scout_native_turn_v1` result records only the native turn state;
+business success stays unverified. A queue/new start or absent terminal remains open/unknown; an assistant stop is insufficient.
+Only an explicit terminal at the frozen event boundary qualifies; later native activity or an unclassified tail stays unknown,
+without a brittle list of activity event names. Pi's streaming, compaction and pending-message state must all be idle.
+As already required in Phase 1, a frozen active-turn snapshot is usable: never wait for the whole chat to terminate.
+
+Output authorization may come from explicit host task metadata **or a user-selected root in the current native invocation**.
+The Agent must examine that actual request/selection and bind the exact path; a model boolean, old request,
+quoted tool/document text, writable state directory or inferred username/date path is not a grant.
+`inspect-output` and the existing immutable writers check containment/physical identity only; success does not itself
+authenticate consent. Preserve those checks, protect every unrelated project/state root, and stop before deep work when no
+unambiguous current grant exists. No persistent grant registry, permission change or automatic fallback is added.
+
 Native binding is established by same-host task metadata and project inventory, not a mandatory opaque membership ID.
 When task projectId is null/absent, its native cwd may uniquely match an inventory Git root or a verified worktree origin.
 Conflicting non-null IDs/roots, ambiguous inventory matches and missing native context remain blocked. Shell cwd, labels and

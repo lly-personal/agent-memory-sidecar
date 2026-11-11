@@ -50,7 +50,7 @@ def validate_map(project):
         return result
 
     nodes = entities('nodes', {'id', 'label', 'kind', 'summary', 'owner', 'evidence_refs', 'claims', 'card_ids'})
-    layered = project.get('contract_version') == 'global_owner_scout_project_v7'
+    layered = project.get('contract_version') in {'global_owner_scout_project_v7', 'global_owner_scout_project_v8'}
     edges = entities('edges', {'id', 'source', 'target', 'label', 'evidence_refs', 'claims', 'card_ids'} | ({'kind'} if layered else set()))
     for node in nodes.values():
         for key in ('kind', 'summary', 'owner'): require_string(node[key], key)
@@ -105,7 +105,7 @@ def map_context(pack):
                         'recommended_action': reviews[c['project_claim_hash']]['recommended_action'],
                         'recommended_action_reason': reviews[c['project_claim_hash']]['recommended_action_reason']}
                        for c in p['project_cards']]}
-    if p.get('contract_version') == 'global_owner_scout_project_v7':
+    if p.get('contract_version') in {'global_owner_scout_project_v7', 'global_owner_scout_project_v8'}:
         context['project_contract'] = p['contract_version']
         for advice, card in zip(context['advice'], p['project_cards']):
             if card.get('kind') == 'engineering':
@@ -194,7 +194,7 @@ def recover_map(body):
         c = value['context']
         require_exact_keys(c, {'purpose', 'project_key', 'project_identity', 'context_snapshot_hash', 'project_map', 'evidence_sources', 'advice'} | ({'project_contract'} if 'project_contract' in c else set()), 'map context')
         require(c['purpose'] in {'inspect', 'review'}, 'invalid map purpose')
-        require(c.get('project_contract') in {None, 'global_owner_scout_project_v7'}, 'invalid map generation')
+        require(c.get('project_contract') in {None, 'global_owner_scout_project_v7', 'global_owner_scout_project_v8'}, 'invalid map generation')
         validate_map(dict(contract_version=c.get('project_contract'), project_map=c['project_map'], evidence_sources=c['evidence_sources'], project_cards=c['advice'],
                           read_only_proof={'after_head': c['project_map']['source_revision']}))
         require_exact_keys(value['visual'], {'visual_name', 'visual_sha256', 'visual_bytes'}, 'visual descriptor')
@@ -212,7 +212,7 @@ def markdown_map(pack, *, visual=None):
     for n in m['nodes']:
         lines.append('| ' + ' | '.join(text(x) for x in (n['label'], n['summary'], n['owner'], '、'.join(n['evidence_refs']))) + ' |')
     nodes = {n['id']: n for n in m['nodes']}; edges = {e['id']: e for e in m['edges']}
-    if pack['project_result'].get('contract_version') == 'global_owner_scout_project_v7':
+    if pack['project_result'].get('contract_version') in {'global_owner_scout_project_v7', 'global_owner_scout_project_v8'}:
         lines += ['', '### 结构、依赖与演进', '', '| 起点 | 关系 | 终点 | 说明 | 依据 |', '| --- | --- | --- | --- | --- |']
         for edge in m['edges']:
             lines.append('| ' + ' | '.join(text(x) for x in (nodes[edge['source']]['label'], RELATIONS[edge['kind']], nodes[edge['target']]['label'], edge['label'], '、'.join(edge['evidence_refs']))) + ' |')
