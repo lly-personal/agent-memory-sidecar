@@ -132,6 +132,32 @@ directory as a task output grant. A future adapter must preserve current context
 artifact containment and deterministic terminal behavior through its real native entry before qualification. Full Scout support
 must not be inferred from the independently portable engineering method.
 
+The native-source component can mechanically export the current Pi read-only session manager and seal its header/entries
+through Scout's existing importer; see [native source snapshots](../skills/global-owner-scout/references/contracts.md#native-session-source-snapshots).
+Its scope is one SDK session object, not project enrollment, a complete history index, a task terminal or an output grant.
+Pi 1.5.2's native parser skips malformed lines and its scoped list can hide directory errors as an empty result. This blocks a
+complete-history claim until a native diagnostic/coverage interface or an explicitly approved contract change addresses it.
+Do not compensate with a private transcript parser or silently convert a snapshot to a complete Scout review. Claude still
+requires an exercised SDK source adapter and actual Desktop/local-session binding before accepting its format here.
+
+#### Adapter work and decisions
+
+Method portability and host qualification are independent work. The following gaps are not permanent unsupported-host labels:
+
+| Boundary | Work within the current project | Additional requirement before full qualification |
+| --- | --- | --- |
+| Current Pi source | Export the host-supplied read-only SessionManager header/entries and reuse immutable sealing; validate exact session/root and reject conflicting objects. | Observe that component through the real host entry. A current native session is a source identity, not a fabricated Desktop project ID or project-inventory proof. |
+| Project binding | Preserve native session/workspace evidence and Git identity; reject ambiguity rather than taking shell cwd as authority. | Any non-Desktop binding alternative must explicitly define equivalent native evidence in the existing Scout contract and pass same-host positive/conflicting-context checks. It is a design change, not permission to scan other projects. |
+| History coverage and task terminal | Reproduce native API error/record-loss behavior on isolated fixtures; keep snapshots and observed assistant stop reasons separate from complete-index/task-terminal claims. | A strict native coverage/error and terminal interface, or a separately approved equivalent contract. Do not add a private transcript parser to compensate for silently lost native data. |
+| Artifact output | Reuse existing explicit-grant containment, immutable write and readback checks. A parent Codex task may grant its own isolated verification output without proving a Pi-native grant. | The native caller must supply an actual task output grant. Supporting an explicit per-task user-selected root instead of host-generated metadata needs an explicit contract decision; a writable directory or agent state root is insufficient. |
+| Local Claude source | Exercise the official SDK in isolation with an explicit project `dir`, `includeWorktrees:false` for indexing, and system-boundary messages requested when needed. Keep the Desktop/session association separate. | Bind observed native session identity, complete results/errors and termination before accepting a new source format. Installing a test SDK is not permission to change login, security or model configuration. |
+
+The [official Claude SDK reference](https://code.claude.com/docs/en/agent-sdk/typescript)
+documents optional system-message inclusion; its default user/assistant-only view cannot stand in for an unqualified full history.
+No additional account access, production write, global-rule change, background collector or permanent capability registry follows
+from this adapter work. A genuine missing output authorization or a product-contract choice is reported separately from an SDK
+capability gap; neither should be replaced with a generic permission request.
+
 ### Release source identity
 
 The release manifest's `source` object has exact fields:

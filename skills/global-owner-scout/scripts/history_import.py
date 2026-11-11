@@ -107,15 +107,32 @@ def import_history(value: Any, *, project_root: Path, session_id: str,
         texts = [c.get('text') for c in value['content'] if isinstance(c, dict) and c.get('type') == 'text']
         require(len(texts) == 1 and isinstance(texts[0], str), 'native_history_single_json_response_required')
         value = json.loads(texts[0])
-    require(isinstance(value, dict) and value.get('schemaVersion') == 1, 'native_history_schema_unsupported')
-    thread = value.get('thread')
-    require(isinstance(thread, dict) and thread.get('kind') == 'codex', 'native_history_thread_required')
+    require(isinstance(value, dict), 'native_history_object_required')
+    pi_source = value.get('contract_version') == 'global_owner_scout_native_session_v1'
+    if pi_source:
+        require(set(value) == {'contract_version', 'native_host', 'session', 'entries'}
+                and value.get('native_host') == 'pi', 'native_history_source_unsupported')
+        thread = value['session']
+        require(isinstance(thread, dict) and thread.get('type') == 'session'
+                and type(thread.get('version')) is int and thread['version'] == 3,
+                'native_history_session_header_unsupported')
+        entries = value['entries']
+        require(isinstance(entries, list) and all(isinstance(entry, dict)
+                and isinstance(entry.get('id'), str) and bool(entry['id'])
+                and isinstance(entry.get('type'), str) and bool(entry['type']) for entry in entries),
+                'native_history_entry_shape_invalid')
+        require(len({entry['id'] for entry in entries}) == len(entries), 'native_history_duplicate_entry')
+    else:
+        require(value.get('schemaVersion') == 1, 'native_history_schema_unsupported')
+        thread = value.get('thread')
+        require(isinstance(thread, dict) and thread.get('kind') == 'codex', 'native_history_thread_required')
+        turns = value.get('turns')
+        require(isinstance(turns, list), 'native_history_turns_required')
+        require(all(isinstance(t, dict) and isinstance(t.get('items'), list) for t in turns),
+                'native_history_turn_shape_invalid')
     require(thread.get('id') == session_id and bool(session_id), 'native_history_session_mismatch')
     require(isinstance(thread.get('cwd'), str) and bool(thread['cwd']), 'native_history_project_missing')
     require(Path(thread['cwd']).resolve(strict=True) == project_root.resolve(strict=True), 'native_history_project_mismatch')
-    turns = value.get('turns')
-    require(isinstance(turns, list), 'native_history_turns_required')
-    require(all(isinstance(t, dict) and isinstance(t.get('items'), list) for t in turns), 'native_history_turn_shape_invalid')
     truncations: list[str] = []
 
     def visit(item: Any, location: str) -> None:
@@ -134,12 +151,18 @@ def import_history(value: Any, *, project_root: Path, session_id: str,
     digest = hashlib.sha256(data).hexdigest()
     native_file = root / f'native-history-{digest}.json'
     existed = native_file.exists()
-    index = dict(contract_version='global_owner_scout_history_page_v1', native_file=str(native_file),
-                 sha256=digest, session_id=session_id, project_root=thread['cwd'],
-                 page=value.get('page'), turn_ids=[t.get('id') for t in turns],
-                 item_count=sum(len(t['items']) for t in turns), truncation_paths=truncations,
-                 evidence_scope='one acquired native page; not full-chat or comprehension proof',
+    index = dict(native_file=str(native_file), sha256=digest, session_id=session_id,
+                 project_root=thread['cwd'], truncation_paths=truncations,
                  serialization='canonical UTF-8 native payload; not transport wire bytes')
+    if pi_source:
+        index.update(contract_version='global_owner_scout_history_page_v2', native_host='pi',
+                     entry_ids=[entry['id'] for entry in entries], record_count=len(entries),
+                     evidence_scope='one Pi SDK session snapshot; project binding, project-history completeness, '
+                                    'task termination and full Scout qualification remain unverified')
+    else:
+        index.update(contract_version='global_owner_scout_history_page_v1', page=value.get('page'),
+                     turn_ids=[t.get('id') for t in turns], item_count=sum(len(t['items']) for t in turns),
+                     evidence_scope='one acquired native page; not full-chat or comprehension proof')
     index_file = root / f'native-history-{digest}.index.json'
     with pinned_directory(root) as descriptor:
         write_native_artifact(root, descriptor, native_file.name, data)

@@ -59,6 +59,32 @@ and rationale, current recommended action/reason and unproven scope. It contains
 Covered advice remains in the frozen report but creates no UI task; challenged advice retains its current clarification status.
 Older contexts without these fields stay readable from their original artifacts rather than being regenerated or embellished.
 
+## Native session source snapshots
+
+The existing `import-history` operation also accepts a mechanically exported Pi session:
+
+```text
+contract_version = global_owner_scout_native_session_v1
+native_host = pi
+session = the unmodified SessionManager.getHeader() object (session format 3)
+entries = the unmodified SessionManager.getEntries() array
+```
+
+`scripts/native_session_export.mjs` exports this object from the current host's read-only session manager.
+It reads no files, lists no sessions and does not create a project identifier. Pass its returned object through
+host orchestration to the same `import-history` entry, with the exact expected native session ID, project root
+and already granted artifact root. Do not transcribe the payload or supply a directory merely because it is writable.
+The importer retains the original objects, verifies session/root identity, and uses the existing immutable output guards.
+Codex page input and its `global_owner_scout_history_page_v1` index remain unchanged. Pi returns a
+`global_owner_scout_history_page_v2` index with `native_host`, `entry_ids` and `record_count`; entries are not renamed turns.
+
+This is one native source snapshot, **not** a qualified Pi Scout entry or proof of native project binding,
+complete project history, native task termination, or output authorization. Pi's current SDK can skip malformed
+history lines and turn directory errors into an empty list. Neither a successful export nor a final assistant
+message may be promoted to `native_index_completed`, a task terminal result or full Scout qualification.
+Missing host binding/output grants still block the full entry. No Claude source format is accepted until its
+actual SDK objects and identity/termination semantics have been exercised; do not fabricate Codex-shaped pages.
+
 ## Common rules
 
 Native binding is established by same-host task metadata and project inventory, not a mandatory opaque membership ID.
