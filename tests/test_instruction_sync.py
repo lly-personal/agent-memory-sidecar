@@ -41,7 +41,8 @@ class InstructionSyncTests(unittest.TestCase):
         self.git(self.root, "init", "--bare", str(self.remote))
         self.git(self.source, "remote", "add", "origin", str(self.remote))
         self.git(self.source, "push", "-u", "origin", "main")
-        env = patch.dict(os.environ, {"CODEX_HOME": str(self.codex), "PI_CODING_AGENT_DIR": str(self.pi)})
+        env = patch.dict(os.environ, {"CODEX_HOME": str(self.codex), "PI_CODING_AGENT_DIR": str(self.pi),
+                                      "CLAUDE_CONFIG_DIR": ""})
         env.start()
         self.addCleanup(env.stop)
         self.kw = dict(source=self.source, codex_home=self.codex, pi_agent_dir=self.pi, state_dir=self.state)
@@ -259,6 +260,206 @@ class InstructionSyncTests(unittest.TestCase):
     def test_claude_enrollment_requires_existing_host_directory(self):
         self.assert_error("instruction_targets_missing", claude_home=self.root / "not-a-host")
         self.assertFalse(self.codex.exists())
+
+    def enroll_claude(self):
+        home = self.root / "claude"
+        home.mkdir()
+        self.deploy(claude_home=home)
+        return home
+
+    def exit_claude(self):
+        plan = sync.unenroll_claude(state_dir=self.state)
+        return sync.unenroll_claude(state_dir=self.state, apply=True, plan_hash=plan["plan_hash"])
+
+    def test_claude_exit_cli_preview_and_apply_preserve_other_state(self):
+        home = self.enroll_claude()
+        target, config = home / "CLAUDE.md", self.state / "instruction-sync.json"
+        settings = home / "settings.json"
+        settings.write_text('{"user":"content"}')
+        paths = [target, config, sync._store(home), self.codex / "AGENTS.md", self.pi / "AGENTS.md",
+                 sync._store(self.codex), sync._store(self.pi), settings]
+        before = {path: path.read_bytes() for path in paths}
+        args = ["instructions", "sync", "--unenroll-claude", "--state-dir", str(self.state)]
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(0, cli.main(args))
+        plan = json.loads(output.getvalue())["data"]
+        self.assertEqual(before, {path: path.read_bytes() for path in paths})
+        self.assertFalse((self.state / "instruction-sync-recovery.json").exists())
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(0, cli.main([*args, "--apply", "--plan-hash", plan["plan_hash"]]))
+        result = json.loads(output.getvalue())["data"]
+        self.assertEqual("unenrolled", result["status"])
+        self.assertEqual({"contract_version", "host", "plan_hash", "remaining_hosts", "applied", "adoption", "status"}, set(result))
+        self.assertEqual(["codex", "pi"], result["remaining_hosts"])
+        self.assertFalse(target.exists())
+        self.assertIsNone(sync._binding(home))
+        self.assertTrue(sync._store(home).is_file())
+        for path in paths[3:]:
+            self.assertEqual(before[path], path.read_bytes())
+        self.assertEqual({"codex", "pi"}, set(json.loads(config.read_bytes())["targets"]))
+        # A second exit must never remove an independently created user document.
+        target.write_text("new user content")
+        with self.assertRaises(CoreError) as caught:
+            self.exit_claude()
+        self.assertEqual("instruction_host_not_enrolled", caught.exception.code)
+        self.assertEqual("new user content", target.read_text())
+
+    def test_claude_exit_drift_context_and_stale_plan_are_blocked(self):
+        home = self.enroll_claude()
+        target = home / "CLAUDE.md"
+        plan = sync.unenroll_claude(state_dir=self.state)
+        with patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(self.root / "other")}):
+            with self.assertRaises(CoreError) as caught:
+                self.exit_claude()
+            self.assertEqual("instruction_target_rebind_required", caught.exception.code)
+        binding = sync._binding(home)
+        sync._set_binding(home, {**binding, "updated_at": "2026-01-02T00:00:00Z"})
+        with self.assertRaises(CoreError) as caught:
+            sync.unenroll_claude(state_dir=self.state, apply=True, plan_hash=plan["plan_hash"])
+        self.assertEqual("instruction_sync_stale_plan", caught.exception.code)
+        target.write_text("user edit")
+        with self.assertRaises(CoreError) as caught:
+            self.exit_claude()
+        self.assertEqual("global_instruction_drift", caught.exception.code)
+        self.assertEqual("user edit", target.read_text())
+        target.unlink()
+        with self.assertRaises(CoreError) as caught:
+            self.exit_claude()
+        self.assertEqual("global_instruction_drift", caught.exception.code)
+
+    def test_claude_exit_is_offline_and_preserves_runtime_registry(self):
+        home = self.enroll_claude()
+        with CoreDatabase(sync._store(home)) as db:
+            registry = InstallationRegistry(db)
+            registry.bind_runtime(artifact_path=self.root / "runtime", artifact_sha256="a" * 64,
+                                  hook_config_sha256="b" * 64, platform_command_sha256="c" * 64,
+                                  source_commit=None, source_tree_clean=True, skill_sha256=None)
+            db.conn.commit()
+            runtime = registry.runtime().to_dict()
+        self.remote.rename(self.root / "offline.git")
+        with patch.object(sync, "_git", side_effect=AssertionError("exit must not call Git")):
+            self.assertEqual("unenrolled", self.exit_claude()["status"])
+        with CoreDatabase(sync._store(home)) as db:
+            self.assertEqual(runtime, InstallationRegistry(db).runtime().to_dict())
+
+    def test_claude_exit_write_failure_restores_projection_binding_and_config(self):
+        home = self.enroll_claude()
+        target, config = home / "CLAUDE.md", self.state / "instruction-sync.json"
+        before, binding, config_before = target.read_bytes(), sync._binding(home), config.read_bytes()
+        write = sync.atomic_write
+        failed = False
+        def fail_once(path, data):
+            nonlocal failed
+            if path == config and not failed:
+                failed = True
+                raise OSError("fixture enrollment write failure")
+            return write(path, data)
+        with patch.object(sync, "atomic_write", side_effect=fail_once):
+            with self.assertRaises(OSError):
+                self.exit_claude()
+        self.assertEqual(before, target.read_bytes())
+        self.assertEqual(binding, sync._binding(home))
+        self.assertEqual(config_before, config.read_bytes())
+        self.assertFalse((self.state / "instruction-sync-recovery.json").exists())
+
+    def test_claude_exit_preserves_concurrent_edit_and_retains_recovery(self):
+        home = self.enroll_claude()
+        target = home / "CLAUDE.md"
+        set_binding = sync._set_binding
+        def fail_after_binding(path, value, **kwargs):
+            set_binding(path, value, **kwargs)
+            if value is None:
+                target.write_text("concurrent user edit")
+                raise OSError("fixture failure after binding removal")
+        with patch.object(sync, "_set_binding", side_effect=fail_after_binding):
+            with self.assertRaises(CoreError) as caught:
+                self.exit_claude()
+        self.assertEqual("instruction_sync_recovery_required", caught.exception.code)
+        self.assertEqual("concurrent user edit", target.read_text())
+        self.assertTrue((self.state / "instruction-sync-recovery.json").is_file())
+        with self.assertRaises(CoreError) as caught:
+            self.exit_claude()
+        self.assertEqual("instruction_sync_recovery_required", caught.exception.code)
+
+    def test_claude_exit_does_not_restore_a_file_it_did_not_remove(self):
+        home = self.enroll_claude()
+        target, journal = home / "CLAUDE.md", self.state / "instruction-sync-recovery.json"
+        write = sync.atomic_write
+        def delete_before_removal(path, data):
+            write(path, data)
+            if path == journal:
+                target.unlink()
+        with patch.object(sync, "atomic_write", side_effect=delete_before_removal):
+            with self.assertRaises(CoreError) as caught:
+                self.exit_claude()
+        self.assertEqual("instruction_sync_recovery_required", caught.exception.code)
+        self.assertFalse(target.exists())
+
+    def test_claude_exit_does_not_recreate_a_concurrently_removed_store(self):
+        home = self.enroll_claude()
+        set_binding = sync._set_binding
+        def remove_store_after_binding(path, value, **kwargs):
+            set_binding(path, value, **kwargs)
+            if value is None:
+                sync._store(home).unlink()
+                raise OSError("fixture concurrent Store removal")
+        with patch.object(sync, "_set_binding", side_effect=remove_store_after_binding):
+            with self.assertRaises(CoreError) as caught:
+                self.exit_claude()
+        self.assertEqual("instruction_sync_recovery_required", caught.exception.code)
+        self.assertFalse(sync._store(home).exists())
+        self.assertTrue((self.state / "instruction-sync-recovery.json").is_file())
+
+    def test_claude_exit_committed_cleanup_failure_is_not_rolled_back(self):
+        home = self.enroll_claude()
+        journal = self.state / "instruction-sync-recovery.json"
+        unlink = Path.unlink
+        def fail_journal(path, *args, **kwargs):
+            if path == journal:
+                raise OSError("fixture journal cleanup failure")
+            return unlink(path, *args, **kwargs)
+        with patch.object(Path, "unlink", fail_journal):
+            with self.assertRaises(CoreError) as caught:
+                self.exit_claude()
+        self.assertEqual("instruction_sync_cleanup_required", caught.exception.code)
+        self.assertTrue(caught.exception.details["operation_committed"])
+        self.assertFalse((home / "CLAUDE.md").exists())
+        self.assertIsNone(sync._binding(home))
+        self.assertNotIn("claude", json.loads((self.state / "instruction-sync.json").read_bytes())["targets"])
+        self.assertTrue(journal.is_file())
+
+    def test_claude_exit_rolled_back_cleanup_failure_retains_blocker(self):
+        home = self.enroll_claude()
+        target, journal, config = home / "CLAUDE.md", self.state / "instruction-sync-recovery.json", self.state / "instruction-sync.json"
+        before, binding, saved = target.read_bytes(), sync._binding(home), config.read_bytes()
+        write, unlink = sync.atomic_write, Path.unlink
+        def fail_config(path, data):
+            if path == config:
+                raise OSError("fixture config write failure")
+            return write(path, data)
+        def fail_journal(path, *args, **kwargs):
+            if path == journal:
+                raise OSError("fixture journal cleanup failure")
+            return unlink(path, *args, **kwargs)
+        with patch.object(sync, "atomic_write", side_effect=fail_config), patch.object(Path, "unlink", fail_journal):
+            with self.assertRaises(CoreError) as caught:
+                self.exit_claude()
+        self.assertEqual("instruction_sync_recovery_required", caught.exception.code)
+        self.assertFalse(caught.exception.details["operation_committed"])
+        self.assertEqual(before, target.read_bytes())
+        self.assertEqual(binding, sync._binding(home))
+        self.assertEqual(saved, config.read_bytes())
+        self.assertTrue(journal.is_file())
+
+    def test_claude_exit_rejects_combined_source_options(self):
+        self.enroll_claude()
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(1, cli.main(["instructions", "sync", "--unenroll-claude", "--source", str(self.source),
+                                          "--state-dir", str(self.state)]))
+        self.assertEqual("invalid_request", json.loads(output.getvalue())["error"]["code"])
 
     def test_changed_target_after_lock_wait_is_rejected(self):
         from contextlib import contextmanager
@@ -482,6 +683,15 @@ class InstructionSyncTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual("reload_required", json.loads(result.stdout)["data"]["status"])
         self.assertEqual((self.source / "global" / "AGENTS.md").read_bytes(), (claude / "CLAUDE.md").read_bytes())
+        exit_args = [sys.executable, "-B", str(script), "--portable-root", str(portable), "--unenroll-claude",
+                     "--state-dir", str(self.state)]
+        result = subprocess.run(exit_args, capture_output=True, text=True)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        exit_plan = json.loads(result.stdout)["data"]
+        result = subprocess.run([*exit_args, "--apply", "--plan-hash", exit_plan["plan_hash"]], capture_output=True, text=True)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual("unenrolled", json.loads(result.stdout)["data"]["status"])
+        self.assertFalse((claude / "CLAUDE.md").exists())
         wheel.write_bytes(b"tampered")
         result = subprocess.run(args, capture_output=True, text=True)
         self.assertEqual(1, result.returncode)

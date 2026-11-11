@@ -153,6 +153,11 @@ Claude Code's user `CLAUDE.md`; local drift blocks overwrites. This does not ins
 project-instruction discovery, or claim model adoption. Claude interprets imports and comments differently, and effective session
 context must be checked separately. See [the synchronization contract](specs/global-instruction-sync-v1.md), including rollback limits.
 
+Before downgrading to an older Codex/Pi-only sync runtime, the new verified runtime must preview and apply an explicitly approved
+`instructions sync --unenroll-claude` operation. It removes only the unchanged managed Claude projection and enrollment, retaining
+other hosts and user files. Source-content rollback remains a published revert followed by normal sync; neither operation proves
+that an already-running session has dropped its prior context.
+
 The root Pi package manifest exposes the existing Bootstrap Anchor through Pi's native Git-package discovery. Use an immutable
 release ref `v0.5.0` or later; verify the installed release before claiming this capability is available. A new device needs one
 source selection and existing Git credentials; subsequent synchronization uses

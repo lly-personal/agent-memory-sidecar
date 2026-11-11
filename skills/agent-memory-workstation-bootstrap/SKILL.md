@@ -31,6 +31,9 @@ not change the Host Profile. Only an explicit request to retest or configure Sch
 For `同步并部署本机 Agent Memory` requests whose purpose is updating global standards, use the Bootstrap Anchor's instruction
 lane: resolve the immutable Release first, then invoke `scripts/sync_instructions.py` from that verified portable bundle.
 This lane synchronizes all enrolled local Codex/Pi/Claude Code targets and does not install Codex Hooks, run Scout, or request project inventory. Claude first requires an explicitly observed `--claude-home` and separately authorized enrollment; never enroll it from directory presence. Its effective session and project instructions remain separate checks.
+Before downgrading to a Codex/Pi-only sync runtime, an explicitly authorized Claude exit uses the same verified wrapper's
+`--unenroll-claude` preview/apply path. Do not combine it with synchronization or source options; require successful removal
+readback and keep recovery/cleanup blockers visible. Missing release support blocks downgrade rather than authorizing a source-script fallback.
 Do not route a Pi instruction request through `workstation-reconcile`, and do not use this installed script instead of the
 Resolver-verified bundle. Report instruction deployment separately from full capability readiness. Full Codex installation and
 migration continue through `inspect` below.

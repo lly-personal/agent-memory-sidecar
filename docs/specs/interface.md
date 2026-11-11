@@ -304,7 +304,7 @@ generated-output artifact，但不得写入 Store、文件 Inbox、项目文件�
 [global-instruction-sync-v1](../../specs/global-instruction-sync-v1.md)，不是 Pi 的完整 Core/Scout 安装。
 Anchor 先验证 immutable Release，再从 verified portable 的 Core wheel 调用 `instructions sync`：预览返回
 `plan_hash`，apply 重算准确计划后才执行。参数与 token 由 Agent 处理，不要求用户重复输入路径。
-`--source`、`--codex-home`、`--pi-agent-dir`、`--claude-home` 只用于首次明确绑定或已有实际上下文；后续使用本机绑定。Claude 必须显式接入，并写入其用户级 `CLAUDE.md`，文件读回不证明项目 `AGENTS.md` 或有效会话加载。部署和配置持久化仍需单独授权；旧版运行时不认识新增 Claude 绑定，回退前须先有经审阅的退出方案。
+`--source`、`--codex-home`、`--pi-agent-dir`、`--claude-home` 只用于首次明确绑定或已有实际上下文；后续使用本机绑定。Claude 必须显式接入，并写入其用户级 `CLAUDE.md`，文件读回不证明项目 `AGENTS.md` 或有效会话加载。部署和配置持久化仍需单独授权。旧版不认识 Claude 绑定；降级前用支持该操作的 verified portable 入口预览并获准执行 `--unenroll-claude`，读回规则文件已移除、绑定已清除且其余宿主保留后再降级。退出返回 `global_instruction_unenroll_v1 / unenrolled`，不改规范源、不取远端；漂移、冲突或中断均保留准确阻碍。完整退出与回退条件沿同一同步契约维护。
 新设备首次私有源选择与 Git 认证不可省略，也不能写入公开发行物。
 
 状态包含 `planned`、`reload_required`；后者仅表示本机文件与绑定回读成功，其他设备和采用始终单列未验证。

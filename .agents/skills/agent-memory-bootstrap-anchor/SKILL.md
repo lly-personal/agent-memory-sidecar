@@ -28,6 +28,12 @@ separate authorization applicable to that host. Check actual Claude engine/sessi
 do not claim Scout, Hooks, plugin installation, or adoption from the projected file. Review the old-runtime rollback boundary in
 `specs/global-instruction-sync-v1.md` before enrollment.
 
+For an explicitly requested Claude exit before runtime downgrade, use this same verified portable entry with
+`--unenroll-claude` instead of source or other-host options. Preview, obtain the applicable approval for removing the exact managed
+projection, then apply only its fresh plan hash. Stop if the verified release lacks this flag; never fall back to checkout scripts
+or edit saved state. Require `unenrolled` and fresh target/binding readback before running an older Codex/Pi-only release. Preserve
+committed-cleanup and recovery blockers; a current session may still retain previously loaded instructions.
+
 The preview covers all enrolled local hosts. If successful, repeat with `--apply --plan-hash <returned-plan-hash>`; the user's
 synchronization request authorizes this exact published-version deployment. Do not run per-host copy commands. Drift, override,
 identity changes or unpublished edits stop without a force option. Explain the affected host and preserve its content. First-time

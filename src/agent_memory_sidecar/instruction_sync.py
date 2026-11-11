@@ -105,9 +105,9 @@ def _binding(home: Path) -> dict[str, Any] | None:
         raise CoreError("instruction_binding_unavailable", "Existing Store requires its supported migration path") from exc
 
 
-def _set_binding(home: Path, value: dict[str, Any] | None) -> None:
+def _set_binding(home: Path, value: dict[str, Any] | None, *, require_existing: bool = False) -> None:
     path = _store(home)
-    with CoreDatabase(path, create=not path.exists(), now=datetime.now(UTC).isoformat()) as db:
+    with CoreDatabase(path, create=not require_existing and not path.exists(), now=datetime.now(UTC).isoformat()) as db:
         with db.transaction():
             db.conn.execute("DELETE FROM global_instruction_binding WHERE singleton=1")
             if value is not None:
@@ -346,3 +346,113 @@ def _apply(state: Path, snapshot_root: Path, stage: Path, data: bytes, targets: 
         journal.unlink()
     except OSError as exc:
         raise CoreError("instruction_sync_cleanup_required", "Deployment committed; recovery journal cleanup remains", operation_committed=True) from exc
+
+
+def unenroll_claude(*, claude_home: Path | None = None, state_dir: Path | None = None,
+                   apply: bool = False, plan_hash: str | None = None) -> dict[str, Any]:
+    """Remove only an exact managed Claude projection before an older-runtime downgrade."""
+    state = logical_absolute(state_dir or Path.home() / ".agents" / "agent-memory")
+    assert_physical_directory(state, allow_missing=True)
+    journal, config_path = state / "instruction-sync-recovery.json", state / "instruction-sync.json"
+    if _bytes(journal) is not None:
+        raise CoreError("instruction_sync_recovery_required", "An interrupted transaction requires reviewed recovery")
+    config_before = _bytes(config_path)
+    saved = _record(config_path) or {}
+    targets = saved.get("targets", {})
+    if not isinstance(targets, dict) or set(targets) - set(HOST_ENV):
+        raise CoreError("instruction_sync_state_invalid", "Unknown host binding")
+    if "claude" not in targets:
+        raise CoreError("instruction_host_not_enrolled", "Claude is not enrolled; no files were removed")
+    home = logical_absolute(targets["claude"])
+    if any(logical_absolute(path) == home for name, path in targets.items() if name != "claude"):
+        raise CoreError("instruction_target_alias", "Hosts must have distinct instruction directories")
+    for observed in (claude_home, os.environ.get(HOST_ENV["claude"])):
+        if observed and logical_absolute(observed) != home:
+            raise CoreError("instruction_target_rebind_required", "Claude directory differs from the saved enrollment", host="claude")
+    assert_physical_directory(home)
+    target = home / HOST_FILE["claude"]
+    before, binding = _bytes(target), _binding(home)
+    if (binding is None or not saved.get("source_root")
+            or logical_absolute(binding["source_root"]) != logical_absolute(saved["source_root"])
+            or binding["source_file_sha256"] != binding["target_file_sha256"]):
+        raise CoreError("instruction_binding_unavailable", "Claude enrollment and source binding do not match")
+    if before is None or _hash(before) != binding["target_file_sha256"]:
+        raise CoreError("global_instruction_drift", "Claude instructions differ from their bound deployment; nothing was removed", host="claude")
+    store_stat = _store(home).stat()
+    config_after = _json({**saved, "targets": {name: path for name, path in targets.items() if name != "claude"}})
+    plan = {"contract_version": "global_instruction_unenroll_v1", "host": "claude", "home": str(home),
+            "config_before_sha256": _hash(config_before), "before_sha256": _hash(before), "binding": binding,
+            "store_identity": [store_stat.st_dev, store_stat.st_ino]}
+    computed_hash = _hash(_json(plan))
+    receipt = {"contract_version": plan["contract_version"], "host": "claude", "plan_hash": computed_hash,
+               "remaining_hosts": sorted(set(targets) - {"claude"}), "applied": False, "adoption": "unverified"}
+    if not apply:
+        return {**receipt, "status": "planned"}
+    if not plan_hash or plan_hash != computed_hash:
+        raise CoreError("instruction_sync_stale_plan", "Exit preview changed; inspect a fresh plan before applying")
+    with InstructionRepository().lock_paths([config_path, journal, target]):
+        if (_bytes(journal) is not None or _bytes(config_path) != config_before
+                or _bytes(target) != before or _binding(home) != binding
+                or not os.path.samestat(store_stat, _store(home).stat())):
+            raise CoreError("instruction_sync_stale_plan", "Claude enrollment changed while waiting for the lock")
+        recovery = {"contract_version": plan["contract_version"], "targets": {"claude": {
+            "home": str(home), "before": base64.b64encode(before).decode(), "binding": binding,
+            "store_existed": True}}, "config_before": base64.b64encode(config_before).decode(), "after_sha256": None}
+        atomic_write(journal, _json(recovery))
+        file_removed = binding_started = config_started = False
+        try:
+            if _bytes(target) != before:
+                raise CoreError("instruction_sync_stale_plan", "Claude instructions changed before removal")
+            target.unlink()
+            file_removed = True
+            if _binding(home) != binding or not os.path.samestat(store_stat, _store(home).stat()):
+                raise CoreError("instruction_sync_stale_plan", "Claude binding changed before removal")
+            binding_started = True
+            _set_binding(home, None, require_existing=True)
+            if _bytes(config_path) != config_before:
+                raise CoreError("instruction_sync_stale_plan", "Enrollment changed before removal")
+            config_started = True
+            atomic_write(config_path, config_after)
+            if (_bytes(target) is not None or _binding(home) is not None or _bytes(config_path) != config_after
+                    or not os.path.samestat(store_stat, _store(home).stat())):
+                raise CoreError("instruction_sync_readback_failed", "Claude exit readback differs")
+        except BaseException as failure:
+            errors = []
+            try:
+                current = _bytes(config_path)
+                if config_started and current == config_after:
+                    atomic_write(config_path, config_before)
+                elif current != config_before:
+                    errors.append("source_binding")
+            except Exception:
+                errors.append("source_binding")
+            try:
+                if not os.path.samestat(store_stat, _store(home).stat()):
+                    raise CoreError("instruction_binding_unavailable", "Claude Store was replaced; retain it unchanged")
+                current_binding = _binding(home)
+                if binding_started and current_binding is None:
+                    _set_binding(home, binding, require_existing=True)
+                elif current_binding != binding:
+                    errors.append("claude_binding")
+            except Exception:
+                errors.append("claude_binding")
+            try:
+                current = _bytes(target)
+                if file_removed and current is None:
+                    atomic_write(target, before)
+                elif current != before:
+                    errors.append("claude_file")
+            except Exception:
+                errors.append("claude_file")
+            if errors:
+                raise CoreError("instruction_sync_recovery_required", "Exit rollback incomplete; preserve recovery data", hosts=errors) from failure
+            try:
+                journal.unlink()
+            except OSError as exc:
+                raise CoreError("instruction_sync_recovery_required", "Exit rolled back; journal cleanup remains", operation_committed=False) from exc
+            raise
+        try:
+            journal.unlink()
+        except OSError as exc:
+            raise CoreError("instruction_sync_cleanup_required", "Claude exit committed; journal cleanup remains", operation_committed=True) from exc
+    return {**receipt, "status": "unenrolled", "applied": True}
