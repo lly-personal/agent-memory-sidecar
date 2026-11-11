@@ -78,12 +78,29 @@ The importer retains the original objects, verifies session/root identity, and u
 Codex page input and its `global_owner_scout_history_page_v1` index remain unchanged. Pi returns a
 `global_owner_scout_history_page_v2` index with `native_host`, `entry_ids` and `record_count`; entries are not renamed turns.
 
-This is one native source snapshot, **not** a qualified Pi Scout entry or proof of native project binding,
+The same operation accepts a scoped Claude SDK page:
+
+```text
+contract_version = global_owner_scout_native_page_v1
+native_host = claude
+session = the unmodified getSessionInfo(session_id, {dir}) result
+messages = the unmodified getSessionMessages(session_id, options) result
+page_request = {offset, limit, includeSystemMessages: true}
+```
+
+`exportClaudeSessionPage(sdk, {project_root, session_id, offset, limit})` calls the official SDK with an explicit
+project directory, checks the native session/workspace identity before reading messages, and returns this object.
+The project root must be absolute, the session ID nonempty, offset a nonnegative integer and limit a positive integer;
+invalid page requests fail before either SDK call.
+The importer checks every message's native session/UUID and preserves the request separately from response records.
+Its v2 index contains `message_ids`, `record_count` and `page_request`; it invents no cursor, EOF or task terminal.
+
+These are native source snapshots, **not** qualified Pi/Claude Scout entries or proof of native project binding,
 complete project history, native task termination, or output authorization. Pi's current SDK can skip malformed
 history lines and turn directory errors into an empty list. Neither a successful export nor a final assistant
 message may be promoted to `native_index_completed`, a task terminal result or full Scout qualification.
-Missing host binding/output grants still block the full entry. No Claude source format is accepted until its
-actual SDK objects and identity/termination semantics have been exercised; do not fabricate Codex-shaped pages.
+Missing host binding/output grants still block the full entry. Claude SDK source identity is distinct from
+Desktop association; only a claim about Desktop requires that additional association. Do not fabricate Codex-shaped pages.
 
 ## Common rules
 

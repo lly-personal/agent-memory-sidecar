@@ -116,6 +116,93 @@ console.log(JSON.stringify(result));
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertEqual(json.loads(run.stdout)['native_host'], 'pi')
 
+    def claude_page(self):
+        return dict(contract_version='global_owner_scout_native_page_v1', native_host='claude',
+                    session=dict(sessionId='native-session', cwd=str(self.project), lastModified=1),
+                    messages=[dict(type='system', uuid='native-boundary', session_id='native-session',
+                                   message=dict(content='原生边界'))],
+                    page_request=dict(offset=0, limit=2, includeSystemMessages=True))
+
+    def test_claude_page_preserves_native_objects_without_inventing_coverage(self):
+        source = self.claude_page()
+        first = self.save(source); second = self.save(source)
+        self.assertEqual(json.loads(Path(first['native_file']).read_bytes()), source)
+        self.assertEqual(first['native_host'], 'claude')
+        self.assertEqual(first['message_ids'], ['native-boundary'])
+        self.assertEqual(first['page_request'], source['page_request'])
+        self.assertEqual(second['status'], 'reused')
+        self.assertIn('remain unverified', first['evidence_scope'])
+        self.assertFalse({'has_more', 'next_cursor', 'terminal_status', 'turn_ids'} & first.keys())
+        source['messages'] = []
+        empty = self.save(source)
+        self.assertEqual(empty['record_count'], 0)
+        self.assertFalse({'has_more', 'next_cursor', 'terminal_status'} & empty.keys())
+
+    def test_claude_mixed_session_page_and_invalid_requests_fail_before_writes(self):
+        candidates = []
+        for field, value in [('sessionId', 'other'), ('cwd', str(self.output))]:
+            bad = self.claude_page(); bad['session'][field] = value; candidates.append(bad)
+        for field, value in [('session_id', 'other'), ('uuid', ''), ('type', 'result')]:
+            bad = self.claude_page(); bad['messages'][0][field] = value; candidates.append(bad)
+        bad = self.claude_page(); bad['messages'] *= 2; candidates.append(bad)
+        for field, value in [('offset', -1), ('offset', True), ('limit', 0),
+                             ('limit', True), ('includeSystemMessages', False)]:
+            bad = self.claude_page(); bad['page_request'][field] = value; candidates.append(bad)
+        bad = self.claude_page(); bad['native_host'] = 'pi'; candidates.append(bad)
+        for candidate in candidates:
+            with self.subTest(candidate=candidate), self.assertRaises(ContractError):
+                self.save(candidate)
+        self.assertFalse(list(self.output.iterdir()))
+
+    def test_claude_sdk_helper_scopes_reads_and_rejects_context_before_message_access(self):
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('Node is unavailable; Python page contract checks still execute')
+        script = '''
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const { exportClaudeSessionPage } = await import(pathToFileURL(process.argv[1]));
+const project_root = path.resolve('isolated-native-project');
+const request = { project_root, session_id: 'native-session', offset: 0, limit: 2 };
+const session = { sessionId: request.session_id, cwd: project_root };
+const messages = [{ type: 'system', uuid: 'native-boundary', session_id: request.session_id }];
+let messageCalls = 0;
+const sdk = {
+  getSessionInfo: async (id, options) => {
+    assert.equal(id, request.session_id); assert.deepEqual(options, { dir: project_root });
+    return session;
+  },
+  getSessionMessages: async (id, options) => {
+    messageCalls++;
+    assert.equal(id, request.session_id);
+    assert.deepEqual(options, { dir: project_root, offset: 0, limit: 2, includeSystemMessages: true });
+    return messages;
+  },
+};
+const exported = await exportClaudeSessionPage(sdk, request);
+messages[0].uuid = 'changed-after-export';
+assert.equal(exported.messages[0].uuid, 'native-boundary');
+for (const metadata of [{ ...session, sessionId: 'other' },
+                        { ...session, cwd: path.resolve('other-project') }, undefined]) {
+  await assert.rejects(exportClaudeSessionPage({ ...sdk, getSessionInfo: async () => metadata }, request),
+                       /native_session_context_mismatch/);
+}
+let metadataCalls = 0;
+for (const bad of [{ offset: -1 }, { offset: true }, { limit: 0 }, { limit: true },
+                   { project_root: 'relative-project' }, { session_id: '' }]) {
+  await assert.rejects(exportClaudeSessionPage({ ...sdk, getSessionInfo: async () => metadataCalls++ },
+                                             { ...request, ...bad }), /native_session_page_request_invalid/);
+}
+assert.equal(metadataCalls, 0); assert.equal(messageCalls, 1);
+console.log(JSON.stringify(exported));
+'''
+        run = subprocess.run([node, '--input-type=module', '-e', script,
+                              str(SCRIPTS / 'native_session_export.mjs')],
+                             capture_output=True, text=True, encoding='utf-8')
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(json.loads(run.stdout)['native_host'], 'claude')
+
 
 if __name__ == '__main__':
     unittest.main()

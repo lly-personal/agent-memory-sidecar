@@ -126,7 +126,7 @@ def main() -> int:
     configure_utf8_stdio()
     parser = argparse.ArgumentParser(description="Run one active Global Owner Scout helper operation.")
     commands = parser.add_subparsers(dest="command", required=True)
-    history = commands.add_parser('import-history', help='Freeze a native Codex page or Pi SDK session snapshot without model transcription.')
+    history = commands.add_parser('import-history', help='Freeze native Codex, Pi or Claude source objects without model transcription.')
     history.add_argument('--project-root', type=Path, required=True)
     history.add_argument('--session-id', required=True)
     history.add_argument('--artifact-dir', type=Path, required=True)

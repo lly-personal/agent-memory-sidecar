@@ -110,13 +110,15 @@ caches and enablement. They do not authorize instruction synchronization or sour
 
 ### Scout host qualification
 
-The current Scout contract is Desktop-bound. A method file, SDK symbol, empty session list or successful source import does not
+The existing qualified Scout entry is Codex Desktop-bound. Additional native hosts must meet the same binding, coverage and
+output-grant obligations through their actual CLI/SDK/API entry; Desktop UI is not a universal prerequisite.
+A method file, SDK symbol, empty session list or successful source import does not
 establish the complete native contract. Evaluate each host independently:
 
 | Requirement | Codex Desktop | Pi | Local Claude Code |
 |---|---|---|---|
-| Current project identity | Same-host project inventory plus native task cwd/Git identity | Extension/session context exposes cwd; no qualified Scout binding adapter yet | SDK session metadata exposes cwd; no qualified Desktop-to-local-session binding adapter yet |
-| Project history | Native active/archived listing and per-task reads, with exact cursors | Native `SessionManager.list(cwd)` and `open(...).getEntries()` exist; complete-coverage/error semantics need qualification | Native SDK `listSessions({dir, includeWorktrees:false})` and `getSessionMessages(id,{dir,...})` exist; Desktop session coverage and native termination semantics need qualification |
+| Current project identity | Same-host project inventory plus native task cwd/Git identity | Extension/session context exposes cwd; no qualified Scout binding adapter yet | SDK session/workspace metadata exists; current-host project binding adapter is not yet qualified; Desktop association is separate when relevant |
+| Project history | Native active/archived listing and per-task reads, with exact cursors | Native `SessionManager.list(cwd)` and `open(...).getEntries()` exist; complete-coverage/error semantics need qualification | Native SDK `listSessions({dir, includeWorktrees:false})` and `getSessionMessages(id,{dir,...})` exist; complete-coverage/error and native termination semantics need qualification; Desktop coverage is separate when relevant |
 | Artifact authorization | Current task's explicit output metadata, checked before deep work | No qualified Scout output-grant adapter | No qualified Scout output-grant adapter |
 | Product qualification | Existing Project v7 / Review Pack v8 / Delivery v2 contracts | Not qualified; do not expose the Desktop Skill as supported | Not qualified; do not expose the Desktop Skill as supported |
 
@@ -137,8 +139,10 @@ through Scout's existing importer; see [native source snapshots](../skills/globa
 Its scope is one SDK session object, not project enrollment, a complete history index, a task terminal or an output grant.
 Pi 1.5.2's native parser skips malformed lines and its scoped list can hide directory errors as an empty result. This blocks a
 complete-history claim until a native diagnostic/coverage interface or an explicitly approved contract change addresses it.
-Do not compensate with a private transcript parser or silently convert a snapshot to a complete Scout review. Claude still
-requires an exercised SDK source adapter and actual Desktop/local-session binding before accepting its format here.
+Do not compensate with a private transcript parser or silently convert a snapshot to a complete Scout review.
+Claude's source bridge calls scoped `getSessionInfo`/`getSessionMessages`, checks identity before fetching messages and seals
+the original page plus its request. It does not fabricate EOF or task termination. SDK source validation does not prove a
+Desktop session association; require that association only when the claim concerns Desktop.
 
 #### Adapter work and decisions
 
@@ -150,7 +154,7 @@ Method portability and host qualification are independent work. The following ga
 | Project binding | Preserve native session/workspace evidence and Git identity; reject ambiguity rather than taking shell cwd as authority. | Any non-Desktop binding alternative must explicitly define equivalent native evidence in the existing Scout contract and pass same-host positive/conflicting-context checks. It is a design change, not permission to scan other projects. |
 | History coverage and task terminal | Reproduce native API error/record-loss behavior on isolated fixtures; keep snapshots and observed assistant stop reasons separate from complete-index/task-terminal claims. | A strict native coverage/error and terminal interface, or a separately approved equivalent contract. Do not add a private transcript parser to compensate for silently lost native data. |
 | Artifact output | Reuse existing explicit-grant containment, immutable write and readback checks. A parent Codex task may grant its own isolated verification output without proving a Pi-native grant. | The native caller must supply an actual task output grant. Supporting an explicit per-task user-selected root instead of host-generated metadata needs an explicit contract decision; a writable directory or agent state root is insufficient. |
-| Local Claude source | Exercise the official SDK in isolation with an explicit project `dir`, `includeWorktrees:false` for indexing, and system-boundary messages requested when needed. Keep the Desktop/session association separate. | Bind observed native session identity, complete results/errors and termination before accepting a new source format. Installing a test SDK is not permission to change login, security or model configuration. |
+| Local Claude source | Exercise the official SDK with an explicit project `dir`, `includeWorktrees:false` for indexing, and system-boundary messages requested. The source bridge retains native session/page identity; CLI method use is verified through the CLI, not gated on UI. | Complete history/errors and task termination remain separate from a source page. Desktop association is required only for a Desktop claim. Installing a test SDK is not permission to change login, security or model configuration. |
 
 The [official Claude SDK reference](https://code.claude.com/docs/en/agent-sdk/typescript)
 documents optional system-message inclusion; its default user/assistant-only view cannot stand in for an unqualified full history.
