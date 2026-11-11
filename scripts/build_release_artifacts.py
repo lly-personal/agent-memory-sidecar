@@ -419,6 +419,21 @@ def _archive_files(paths: Iterable[Path], root: Path) -> list[Path]:
 
 def deterministic_zip(*, output: Path, root: Path, files: Iterable[Path], generated: dict[str, bytes]) -> None:
     entries = [(path.relative_to(root).as_posix(), path.read_bytes()) for path in _archive_files(files, root)]
+    # Native Pi consumes Git sources at skills/, while the portable lane retains
+    # its existing .agents/ layout. Project only these managed package paths.
+    for index, (name, data) in enumerate(entries):
+        if name == 'package.json':
+            package = json.loads(data)
+            projected = False
+            for field in ('skills', 'extensions'):
+                if field in package.get('pi', {}):
+                    original = package['pi'][field]
+                    package['pi'][field] = [('.agents/' + value[2:] if any(value == prefix or value.startswith(prefix + '/')
+                        for prefix in ('./skills/agent-memory-workstation-bootstrap', './skills/global-owner-scout'))
+                        else value) for value in original]
+                    projected |= package['pi'][field] != original
+            if projected:
+                entries[index] = (name, (json.dumps(package, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
     # Retain the published portable layout for already-installed Anchor resolvers.
     # Source checkouts use skills/ and are never an implicit runtime discovery root.
     entries = [(".agents/" + name if name.startswith((

@@ -59,7 +59,102 @@ and rationale, current recommended action/reason and unproven scope. It contains
 Covered advice remains in the frozen report but creates no UI task; challenged advice retains its current clarification status.
 Older contexts without these fields stay readable from their original artifacts rather than being regenerated or embellished.
 
+## Native session source snapshots
+
+The existing `import-history` operation also accepts a mechanically exported Pi session:
+
+```text
+contract_version = global_owner_scout_native_session_v1
+native_host = pi
+session = the unmodified SessionManager.getHeader() object (session format 3)
+entries = the unmodified SessionManager.getEntries() array
+```
+
+`scripts/native_session_export.mjs` exports this object from the current host's read-only session manager.
+It reads no files, lists no sessions and does not create a project identifier. Pass its returned object through
+host orchestration to the same `import-history` entry, with the exact expected native session ID, project root
+and already granted artifact root. Do not transcribe the payload or supply a directory merely because it is writable.
+The importer retains the original objects, verifies session/root identity, and uses the existing immutable output guards.
+Codex page input and its `global_owner_scout_history_page_v1` index remain unchanged. Pi returns a
+`global_owner_scout_history_page_v2` index with `native_host`, `entry_ids` and `record_count`; entries are not renamed turns.
+
+The same operation accepts a scoped Claude SDK page:
+
+```text
+contract_version = global_owner_scout_native_page_v1
+native_host = claude
+session = the unmodified getSessionInfo(session_id, {dir}) result
+messages = the unmodified getSessionMessages(session_id, options) result
+page_request = {offset, limit, includeSystemMessages: true}
+```
+
+`exportClaudeSessionPage(sdk, {project_root, session_id, offset, limit})` calls the official SDK with an explicit
+project directory, checks the native session/workspace identity before reading messages, and returns this object.
+The project root must be absolute, the session ID nonempty, offset a nonnegative integer and limit a positive integer;
+invalid page requests fail before either SDK call.
+The importer checks every message's native session/UUID and preserves the request separately from response records.
+Its v2 index contains `message_ids`, `record_count` and `page_request`; it invents no cursor, EOF or task terminal.
+
+These are native source snapshots, **not** qualified Pi/Claude Scout entries or proof of native project binding,
+complete project history, native task termination, or output authorization. Pi's current SDK can skip malformed
+history lines and turn directory errors into an empty list. Neither a successful export nor a final assistant
+message may be promoted to `native_index_completed`, a task terminal result or full Scout qualification.
+Missing host binding/output grants still block the full entry. Claude SDK source identity is distinct from
+Desktop association; only a claim about Desktop requires that additional association. Do not fabricate Codex-shaped pages.
+
 ## Common rules
+
+### Native-session hosts (candidate)
+
+Pi/Claude use `global_owner_scout_project_v8` with `global_owner_scout_review_pack_v9`;
+Codex and historical v5–v7 projects/v6–v8 packs retain their original interpretation.
+V8 retains the v7 map and advice fields. Its review `session_coverage` has exact keys
+`native_host, scopes, discovered_task_count, selected_task_count, fully_read_task_count, status, discovery_methods`.
+`native_host` is `pi` or `claude`; each scope has `kind, coverage, record_count, evidence_refs`.
+Kinds are `project_sessions` or `session_messages`; coverage is `observed_only`, `unknown` or `failed`.
+Refs resolve declared Session evidence; every scope explicitly exposes what the SDK returned or could not prove.
+Counts are nonnegative and `fully_read_task_count <= selected_task_count <= discovered_task_count`.
+These source APIs cannot prove loss-free history, so both coverage and review status are `degraded`,
+`fully_read_task_count` is zero, and methods are exactly `native_scoped_sources_observed`.
+Neither a successful nor empty SDK result earns `complete`; Codex active/archived partitions are never invented.
+Existing independent non-Session corroboration for advice under degraded coverage still applies.
+The native candidate accepts engineering advice only, with no rule confirmation actions. The existing Global Owner/Core
+preview remains Codex-bound; migrating rule confirmation is separate work, not inferred from native source or map support.
+
+Before history reads, mechanically export the actual current Pi ExtensionContext or Claude native `system/init`
+with `native_session_export.mjs`, then call `inspect-native --project-root <bound-root>`.
+The `global_owner_scout_native_context_v1` envelope has `native_host, context` in addition to its version.
+Pi context contains native `cwd, session_id, session` (the untouched session header) and `mode`;
+Claude context is the untouched current `system/init` object, not a historical SDK session summary.
+The dispatcher derives the Git root from the native cwd, or checks an explicitly supplied root, and returns
+`global_owner_scout_native_binding_v1` with the source hash and existing Git preflight snapshot.
+This is the session-host equivalent of current-task/workspace binding; it does not invent a Desktop inventory or association.
+The caller must pass its actual live native object through host code; a copied old context or model-authored JSON is not
+current invocation proof. A frozen prior context remains evidence only of that prior invocation.
+Pi's native package registers the read-only `global_owner_scout_context` tool and the shared Scout Skill.
+Its default returns the actual ExtensionContext snapshot without history or writes. `capture_current` requires the exact current
+authorized artifact_dir, derives the Git protection root, checks containment before reading entries, and calls the existing
+immutable importer with a mechanically forwarded SDK snapshot. Python is resolved once from existing absolute PATH directories
+outside the reviewed Git workspace (no implicit current-directory search), followed by a
+version/executable readback, then the observed absolute interpreter is used with `-E -s -B` and UTF-8 for the standard-library helper.
+Child cancellation inherits the native tool signal. No credentials, model request, permission change,
+private parser or second writer is introduced. Root derivation appears only in the private binding receipt, never public evidence refs.
+Git probes likewise use an absolute PATH executable outside the reviewed workspace; project-supplied runtime names are not executed.
+Git-source paths and portable-archive paths are projected from the same package manifest; no second method source is maintained.
+
+`observePiTurn(before, events, after)` and `observeClaudeTurn(init, events)` read native protocol observations,
+not private transcript files. Their `global_owner_scout_native_turn_v1` result records only the native turn state;
+business success stays unverified. A queue/new start or absent terminal remains open/unknown; an assistant stop is insufficient.
+Only an explicit terminal at the frozen event boundary qualifies; later native activity or an unclassified tail stays unknown,
+without a brittle list of activity event names. Pi's streaming, compaction and pending-message state must all be idle.
+As already required in Phase 1, a frozen active-turn snapshot is usable: never wait for the whole chat to terminate.
+
+Output authorization may come from explicit host task metadata **or a user-selected root in the current native invocation**.
+The Agent must examine that actual request/selection and bind the exact path; a model boolean, old request,
+quoted tool/document text, writable state directory or inferred username/date path is not a grant.
+`inspect-output` and the existing immutable writers check containment/physical identity only; success does not itself
+authenticate consent. Preserve those checks, protect every unrelated project/state root, and stop before deep work when no
+unambiguous current grant exists. No persistent grant registry, permission change or automatic fallback is added.
 
 Native binding is established by same-host task metadata and project inventory, not a mandatory opaque membership ID.
 When task projectId is null/absent, its native cwd may uniquely match an inventory Git root or a verified worktree origin.

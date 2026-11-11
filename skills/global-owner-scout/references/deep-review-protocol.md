@@ -17,6 +17,13 @@ For interactive delivery, read the host-injected environment roots before declar
 Terminal v1 before deep work; a changed snapshot invalidates stability without attributing an unproved mutation to Scout.
 Scheduled retains its verified inline/Inbox surface and has no artifact-root or file-preview prerequisite.
 
+Native-session candidate adapters are defined in contracts.md. Pi uses the current ExtensionContext, Claude the current
+native init stream; mechanically pass those to `inspect-native` before history. A current, explicitly user-selected output root
+is also allowed; inspect the actual native request/selection, never grant from a model assertion or quoted path.
+For Pi/Claude review use Project v8/Pack v9 native scopes, preserve the original SDK records and expose unknown/error coverage.
+Do not fabricate Codex active/archived partitions, EOF or completed task histories. Current active-turn snapshots remain usable;
+the native turn observer does not require the whole chat to finish or prove business success. The Codex procedure below stays unchanged.
+
 ## Phase 1: identity and task census
 
 1. Derive identity and freeze the 30-day start/end from the current Desktop binding; never a prompt-supplied path or allowlist.

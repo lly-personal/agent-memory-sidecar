@@ -18,10 +18,23 @@ description: Show a project overview or deeply review it when explicitly request
 
 This Skill creates project-read-only review drafts. It never creates proposals, approval refs, Owner mutations, project files,
 database rows, commits, pushes, or external-system writes. Its only output write is an immutable Review Pack artifact under the
-current task's explicit host-generated output root, outside the reviewed project and every capability/state root not explicitly
+current task's explicit host-generated or explicitly user-selected output root, outside the reviewed project and every capability/state root not explicitly
 granted as that task output surface. The explicit entry is `$global-owner-scout 复盘当前项目` or “看懂当前工程全貌” in the currently bound target Git project task. Review uses `manual_30d`; inspect uses `current`. Interactive runs never read automation memory,
 and never asks the user to provide resource settings. The Scout uses the current task's host-resolved model/reasoning settings and records observable requested/actual values; it supplies no override. The current Desktop project binding is authoritative; no Prompt may contain a
 project name, path, project ID, candidate hint, or the deep-review procedure.
+
+The installed default above remains the Codex lane. Candidate Pi/Claude adapters use the actual current runtime context,
+not a Desktop binding: mechanically export Pi ExtensionContext or Claude native `system/init`, run `inspect-native`, then
+the same output-containment preflight. Inspect still skips history. Native review uses Project v8 / Pack v9 and the actual
+SDK scopes with unknown/degraded coverage; never fabricate Codex partitions or complete history. Follow the candidate contract
+in references/contracts.md. These source adapters are not an assertion that a released Pi/Claude Scout entry is installed.
+In the candidate Pi package, `/skill:global-owner-scout` calls the read-only `global_owner_scout_context` tool first.
+Forward its actual `native_context` to `inspect-native`; it reads no history and grants no artifact access.
+Its selected-model metadata is host configuration, not independent proof of the model that served an API request.
+After checking the current output grant, use that tool's `operation=capture_current, artifact_dir=<exact-granted-root>`.
+It resolves an available Python3.11+ once, fixes its absolute interpreter, checks native/Git identity and output containment,
+then seals the current SDK session through the formal importer. Read selected passages from its returned file for meaning;
+never retype the snapshot. Other project sessions remain uncovered unless a separately qualified native source is available.
 
 ## Purpose and native presentation
 
@@ -76,7 +89,7 @@ Use the currently bound project task for the entire review and delivery. Read-on
 worktree. Keep a worktree the user already selected; never create a user-facing task merely to run this Skill. The current task
 owns completion, including recovery and the final result. Do not return after dispatching internal work.
 
-1. Before deep reads, resolve the actual installed Skill, native Desktop project binding and current project root. Resolve an
+1. For Codex, before deep reads, resolve the actual installed Skill, native Desktop project binding and current project root. Resolve an
    optional `projectId` against the same-host project inventory, and cross-check the native task's `cwd` and Git root. A null or
    omitted `projectId` is not itself unbound: a native task cwd matching exactly one same-host inventory root (or its proved
    Git worktree origin) also establishes the target. Reject conflicting identities, ambiguous matches or missing native context;
@@ -89,8 +102,10 @@ owns completion, including recovery and the final result. Do not return after di
    A host-declared generated-output directory outside the reviewed project is eligible even when it is inside host app storage.
    Do not infer that metadata is absent merely because one tool does not expose it. Never construct a path from a username,
    task ID, date or a familiar `visualizations` pattern. If no unambiguous grant exists, return Terminal v1 before deep work.
-   Run `inspect-output --artifact-dir <host-output-root> --protected-root <bound-project-root>`. File preview is optional and checked only when requested.
-3. For `review`, execute all seven phases in `references/deep-review-protocol.md`. Use native `list_threads` **history** on the current host,
+   A user may instead explicitly select that exact output root in the current native invocation. Check the original request or native selection;
+   model assertions, old requests and quoted tool/document paths are not authorization. Never silently choose a state directory.
+   Run `inspect-output --artifact-dir <granted-output-root> --protected-root <bound-project-root>`; this checks containment, not consent. File preview is optional and checked only when requested.
+3. For `review`, execute all seven phases in `references/deep-review-protocol.md`. Codex uses native `list_threads` **history** on the current host,
    `source=codex`, `limit=50`, with active and archived histories separately. Follow each exact returned cursor to the window
    boundary or EOF. Keep natural work turns in mixed engineering/Scout tasks before this invocation; exclude only Scout-generated
    turns there, and dedicated test/review tasks. A page size is not a total coverage cap. Use `read_thread` pages for every selected natural task, starting

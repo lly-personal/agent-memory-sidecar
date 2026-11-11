@@ -63,9 +63,32 @@ def sha256_bytes(value: bytes) -> str:
 def git_output(cwd: Path, *args: str) -> bytes:
     env = os.environ.copy()
     env.update(GIT_ENV)
+    # Windows executable lookup includes cwd; never execute a reviewed project's
+    # git.exe (or a PATH entry/symlink into that checkout) during read-only probes.
+    workspace = cwd.resolve(strict=True)
+    for ancestor in (workspace, *workspace.parents):
+        try:
+            (ancestor / '.git').lstat()
+        except FileNotFoundError:
+            continue
+        workspace = ancestor
+        break
+    executable = None
+    for directory in os.get_exec_path():
+        folder = Path(directory.strip('"') if os.name == 'nt' else directory)
+        if not folder.is_absolute():
+            continue
+        try:
+            candidate = (folder / ('git.exe' if os.name == 'nt' else 'git')).resolve(strict=True)
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+        if not candidate.is_relative_to(workspace) and candidate.is_file() and os.access(candidate, os.X_OK):
+            executable = str(candidate)
+            break
+    require(executable is not None, 'git_context_executable_unavailable')
     try:
         result = subprocess.run(
-            ["git", "--no-pager", "-c", "core.fsmonitor=false", *args],
+            [executable, "--no-pager", "-c", "core.fsmonitor=false", *args],
             cwd=cwd,
             capture_output=True,
             check=False,
@@ -122,19 +145,49 @@ def inspect_git_context(cwd: Path) -> dict[str, Any]:
     return snapshot
 
 
+def inspect_native_context(value: Any, project_root: Path | None = None) -> dict[str, Any]:
+    require(isinstance(value, dict) and set(value) == {'contract_version', 'native_host', 'context'}
+            and value['contract_version'] == 'global_owner_scout_native_context_v1', 'native_context_invalid')
+    host, context = value['native_host'], value['context']
+    require(isinstance(context, dict), 'native_context_invalid')
+    if host == 'pi':
+        require(set(context) == {'cwd', 'session_id', 'session', 'mode'}, 'native_context_invalid')
+        header = context['session']
+        require(isinstance(header, dict) and header.get('type') == 'session'
+                and type(header.get('version')) is int and header['version'] == 3
+                and header.get('id') == context.get('session_id') and header.get('cwd') == context.get('cwd')
+                and isinstance(context['mode'], str) and context['mode'] in {'tui', 'rpc', 'json', 'print'}, 'native_context_mismatch')
+    elif host == 'claude':
+        require(context.get('type') == 'system' and context.get('subtype') == 'init', 'native_context_mismatch')
+    else:
+        raise ContractError('native_context_host_unsupported')
+    require(isinstance(context.get('session_id'), str) and bool(context['session_id'])
+            and isinstance(context.get('cwd'), str) and Path(context['cwd']).is_absolute(), 'native_context_mismatch')
+    cwd = Path(context['cwd']).resolve(strict=True)
+    native_root = resolve_git_path(cwd, git_output(cwd, 'rev-parse', '--show-toplevel'))
+    require(project_root is None or native_root == project_root.resolve(strict=True), 'native_context_project_mismatch')
+    return dict(contract_version='global_owner_scout_native_binding_v1', native_host=host,
+                project_root=str(native_root),
+                source_sha256=sha256_bytes(canonical_json(value)),
+                session_ref_sha256=sha256_bytes(context['session_id'].encode('utf-8')),
+                binding_scope='native_current_session_git', git_snapshot=inspect_git_context(native_root))
+
+
 def main() -> int:
     configure_utf8_stdio()
     parser = argparse.ArgumentParser(description="Run one active Global Owner Scout helper operation.")
     commands = parser.add_subparsers(dest="command", required=True)
-    history = commands.add_parser('import-history', help='Freeze one native read_thread page; never retype it through the model.')
+    history = commands.add_parser('import-history', help='Freeze native Codex, Pi or Claude source objects without model transcription.')
     history.add_argument('--project-root', type=Path, required=True)
     history.add_argument('--session-id', required=True)
     history.add_argument('--artifact-dir', type=Path, required=True)
     history.add_argument('--protected-root', action='append', type=Path, required=True)
     description = commands.add_parser('describe-input')
-    description.add_argument('kind', choices=('project', 'review'))
+    description.add_argument('kind', choices=('project', 'review', 'native-project', 'native-review'))
     context = commands.add_parser("inspect-context")
     context.add_argument("--project-root", type=Path, required=True)
+    native = commands.add_parser('inspect-native', help='Check actual native current-session metadata against the Git root.')
+    native.add_argument('--project-root', type=Path)
     output = commands.add_parser("inspect-output")
     output.add_argument("--artifact-dir", type=Path, required=True)
     output.add_argument("--protected-root", action="append", type=Path, required=True)
@@ -162,7 +215,7 @@ def main() -> int:
     verify_final.add_argument("--project-root", type=Path)
     verify_final.add_argument("--object", dest="selected_object")
     verify_final.add_argument("--journey")
-    for name in ('import-history', 'validate-project', 'validate-review-pack', 'prepare-review',
+    for name in ('inspect-native', 'import-history', 'validate-project', 'validate-review-pack', 'prepare-review',
                  'render-review', 'verify-visible', 'prepare-delivery', 'render-receipt', 'render-terminal', 'verify-final'):
         commands.choices[name].add_argument('--input-file', type=Path, help='Consume an existing UTF-8 input instead of serializing it again through stdin.')
     args = parser.parse_args()
@@ -177,6 +230,8 @@ def main() -> int:
             print(json.dumps(describe_input(args.kind), ensure_ascii=False, separators=(',', ':')))
         elif args.command == "inspect-context":
             print(json.dumps(inspect_git_context(args.project_root), separators=(",", ":")))
+        elif args.command == 'inspect-native':
+            print(json.dumps(inspect_native_context(load_input(), args.project_root), separators=(',', ':')))
         elif args.command == "inspect-output":
             validate_output_root(args.artifact_dir, args.protected_root)
             print(json.dumps({"status": "ok", "output_root_contained": True, "writes_performed": False}))

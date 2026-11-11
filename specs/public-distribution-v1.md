@@ -110,15 +110,17 @@ caches and enablement. They do not authorize instruction synchronization or sour
 
 ### Scout host qualification
 
-The current Scout contract is Desktop-bound. A method file, SDK symbol, empty session list or successful source import does not
+The existing qualified Scout entry is Codex Desktop-bound. Additional native hosts must meet the same binding, coverage and
+output-grant obligations through their actual CLI/SDK/API entry; Desktop UI is not a universal prerequisite.
+A method file, SDK symbol, empty session list or successful source import does not
 establish the complete native contract. Evaluate each host independently:
 
 | Requirement | Codex Desktop | Pi | Local Claude Code |
 |---|---|---|---|
-| Current project identity | Same-host project inventory plus native task cwd/Git identity | Extension/session context exposes cwd; no qualified Scout binding adapter yet | SDK session metadata exposes cwd; no qualified Desktop-to-local-session binding adapter yet |
-| Project history | Native active/archived listing and per-task reads, with exact cursors | Native `SessionManager.list(cwd)` and `open(...).getEntries()` exist; complete-coverage/error semantics need qualification | Native SDK `listSessions({dir, includeWorktrees:false})` and `getSessionMessages(id,{dir,...})` exist; Desktop session coverage and native termination semantics need qualification |
-| Artifact authorization | Current task's explicit output metadata, checked before deep work | No qualified Scout output-grant adapter | No qualified Scout output-grant adapter |
-| Product qualification | Existing Project v7 / Review Pack v8 / Delivery v2 contracts | Not qualified; do not expose the Desktop Skill as supported | Not qualified; do not expose the Desktop Skill as supported |
+| Current project identity | Same-host project inventory plus native task cwd/Git identity | Current ExtensionContext/header/session identity reaches the native/Git preflight; released entry adoption remains unverified | Current native init adapter plus native/Git preflight; historical SDK metadata alone is not a current invocation; Desktop association is separate when relevant |
+| Project history | Native active/archived listing and per-task reads, with exact cursors | Native `SessionManager.list(cwd)` and `open(...).getEntries()` exist; complete-coverage/error semantics need qualification | Native SDK `listSessions({dir, includeWorktrees:false})` and `getSessionMessages(id,{dir,...})` exist; complete-coverage/error and native termination semantics need qualification; Desktop coverage is separate when relevant |
+| Artifact authorization | Explicit current task metadata or an explicitly user-selected root; original native request checked before deep work | Same current-request consent rule and immutable containment checks; installed natural entry not yet verified | Same current-request consent rule and immutable containment checks; installed natural entry not yet verified |
+| Product qualification | Existing Project v7 / Review Pack v8 / Delivery v2 contracts | Candidate Project v8 / Pack v9 bounded review reaches formal delivery/recovery; not a released or naturally accepted entry | Candidate Project v8 / Pack v9 bounded review reaches formal delivery/recovery; not a released or naturally accepted entry |
 
 Primary interface owners are [Codex App Server](https://developers.openai.com/codex/app-server/),
 [Pi SessionManager](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/session-manager.ts),
@@ -131,6 +133,43 @@ Sidecar to expand an authorized project, parse raw private transcripts itself, i
 directory as a task output grant. A future adapter must preserve current context, source provenance, coverage/error states,
 artifact containment and deterministic terminal behavior through its real native entry before qualification. Full Scout support
 must not be inferred from the independently portable engineering method.
+
+The native-source component can mechanically export the current Pi read-only session manager and seal its header/entries
+through Scout's existing importer; see [native source snapshots](../skills/global-owner-scout/references/contracts.md#native-session-source-snapshots).
+Its scope is one SDK session object, not project enrollment, a complete history index, a task terminal or an output grant.
+Pi 1.5.2's native parser skips malformed lines and its scoped list can hide directory errors as an empty result. This blocks a
+complete-history claim until a native diagnostic/coverage interface or an explicitly approved contract change addresses it.
+Do not compensate with a private transcript parser or silently convert a snapshot to a complete Scout review.
+Claude's source bridge calls scoped `getSessionInfo`/`getSessionMessages`, checks identity before fetching messages and seals
+the original page plus its request. It does not fabricate EOF or task termination. SDK source validation does not prove a
+Desktop session association; require that association only when the claim concerns Desktop.
+
+#### Adapter work and decisions
+
+Method portability and host qualification are independent work. The following gaps are not permanent unsupported-host labels:
+
+| Boundary | Work within the current project | Additional requirement before full qualification |
+| --- | --- | --- |
+| Current Pi source | Export the host-supplied read-only SessionManager header/entries and reuse immutable sealing; validate exact session/root and reject conflicting objects. | Observe that component through the real host entry. A current native session is a source identity, not a fabricated Desktop project ID or project-inventory proof. |
+| Project binding | The session-host contract binds actual current Pi ExtensionContext/header or Claude system/init to the Git root, rejecting conflicting native identities and historical-summary substitutions. | A released entry must actually supply that live native object. A frozen old object proves only its original invocation; it is not permission to scan other projects. |
+| History coverage and task terminal | Reproduce native API error/record-loss behavior on isolated fixtures; keep snapshots and observed assistant stop reasons separate from complete-index/task-terminal claims. | A strict native coverage/error and terminal interface, or a separately approved equivalent contract. Do not add a private transcript parser to compensate for silently lost native data. |
+| Artifact output | Reuse existing explicit-grant containment, immutable write and readback checks. A parent Codex task may grant its own isolated verification output without proving a Pi-native grant. | The native caller must supply actual task output metadata or the user's explicit selection in that current invocation. A model declaration, stale request, writable directory or agent state root is insufficient; containment alone does not authenticate consent. |
+| Local Claude source | Exercise the official SDK with an explicit project `dir`, `includeWorktrees:false` for indexing, and system-boundary messages requested. The source bridge retains native session/page identity; CLI method use is verified through the CLI, not gated on UI. | Complete history/errors and task termination remain separate from a source page. Desktop association is required only for a Desktop claim. Installing a test SDK is not permission to change login, security or model configuration. |
+
+The [official Claude SDK reference](https://code.claude.com/docs/en/agent-sdk/typescript)
+documents optional system-message inclusion; its default user/assistant-only view cannot stand in for an unqualified full history.
+
+Current SDK omissions do not block every useful review: the native-session Project v8 / Pack v9 lane represents actual observed
+scopes with unknown/degraded history and independent current-Owner corroboration. It never awards complete history. Codex v7/v8
+and historical artifacts retain their interpretation. The existing protocol permits a frozen active-turn snapshot, so neither
+host must wait for the entire chat to end. Native turn observations remain distinct from business success and user adoption.
+The candidate Pi package exposes the shared Scout source and its read-only native context tool. Its Git manifest uses `skills/`;
+the deterministic portable producer projects those managed Skill/extension references to the existing `.agents/skills/` layout.
+Both consumers validate actual referenced files. This is one method source with a package-path projection, not a second Skill copy.
+Claude's ordinary installed Scout entry still needs its native caller projection; native init/SDK components alone do not complete it.
+No additional account access, production write, global-rule change, background collector or permanent capability registry follows
+from this adapter work. A genuine missing output authorization or a product-contract choice is reported separately from an SDK
+capability gap; neither should be replaced with a generic permission request.
 
 ### Release source identity
 
