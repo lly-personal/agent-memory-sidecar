@@ -126,11 +126,21 @@ with `native_session_export.mjs`, then call `inspect-native --project-root <boun
 The `global_owner_scout_native_context_v1` envelope has `native_host, context` in addition to its version.
 Pi context contains native `cwd, session_id, session` (the untouched session header) and `mode`;
 Claude context is the untouched current `system/init` object, not a historical SDK session summary.
-The dispatcher checks same-session/workspace evidence against the actual Git root and returns
+The dispatcher derives the Git root from the native cwd, or checks an explicitly supplied root, and returns
 `global_owner_scout_native_binding_v1` with the source hash and existing Git preflight snapshot.
 This is the session-host equivalent of current-task/workspace binding; it does not invent a Desktop inventory or association.
 The caller must pass its actual live native object through host code; a copied old context or model-authored JSON is not
 current invocation proof. A frozen prior context remains evidence only of that prior invocation.
+Pi's native package registers the read-only `global_owner_scout_context` tool and the shared Scout Skill.
+Its default returns the actual ExtensionContext snapshot without history or writes. `capture_current` requires the exact current
+authorized artifact_dir, derives the Git protection root, checks containment before reading entries, and calls the existing
+immutable importer with a mechanically forwarded SDK snapshot. Python is resolved once from existing absolute PATH directories
+outside the reviewed Git workspace (no implicit current-directory search), followed by a
+version/executable readback, then the observed absolute interpreter is used with `-E -s -B` and UTF-8 for the standard-library helper.
+Child cancellation inherits the native tool signal. No credentials, model request, permission change,
+private parser or second writer is introduced. Root derivation appears only in the private binding receipt, never public evidence refs.
+Git probes likewise use an absolute PATH executable outside the reviewed workspace; project-supplied runtime names are not executed.
+Git-source paths and portable-archive paths are projected from the same package manifest; no second method source is maintained.
 
 `observePiTurn(before, events, after)` and `observeClaudeTurn(init, events)` read native protocol observations,
 not private transcript files. Their `global_owner_scout_native_turn_v1` result records only the native turn state;

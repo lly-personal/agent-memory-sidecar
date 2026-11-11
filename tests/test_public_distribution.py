@@ -441,7 +441,7 @@ class PublicDistributionTests(unittest.TestCase):
             self.assertTrue((method / "agents" / "openai.yaml").is_file())
 
     def test_native_discovery_surfaces_share_the_built_method_source(self) -> None:
-        paths = [ROOT / "package.json", ROOT / ".claude-plugin/marketplace.json", ROOT / "plugins/agent-memory-sidecar"]
+        paths = [ROOT / "package.json", ROOT / ".claude-plugin/marketplace.json", ROOT / "plugins/agent-memory-sidecar", ROOT / 'skills/global-owner-scout']
         with tempfile.TemporaryDirectory() as temporary:
             archive_path = Path(temporary) / "native.zip"
             self.release.deterministic_zip(output=archive_path, root=ROOT, files=paths, generated={})
@@ -459,7 +459,12 @@ class PublicDistributionTests(unittest.TestCase):
             native = json.loads((installed / "package.json").read_text(encoding="utf-8"))
             pi_paths = { (installed / path).resolve() for path in native["pi"]["skills"] }
             expected = { (plugin / "skills" / name).resolve() for name in ("agent-memory-bootstrap-anchor", "engineering-contract-review") }
+            scout = installed / '.agents/skills/global-owner-scout'
+            expected.add(scout.resolve())
             self.assertEqual(expected, pi_paths)
+            self.assertTrue(all(path.is_dir() for path in pi_paths))
+            self.assertEqual([str((scout / 'scripts/pi_context_extension.mjs').relative_to(installed)).replace('\\', '/')], native['pi']['extensions'])
+            self.assertTrue((scout / 'scripts/pi_context_extension.mjs').is_file())
             method = plugin / claude["skills"] / "engineering-contract-review"
             self.assertIn(method.resolve(), pi_paths)
             for path in method.rglob("*"):

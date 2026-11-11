@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -35,6 +36,62 @@ def native_pack(host='pi'):
 
 
 class NativeProtocolTests(unittest.TestCase):
+    def test_native_capture_does_not_execute_project_supplied_runtime_names(self):
+        node = shutil.which('node')
+        if not node: self.skipTest('Node unavailable')
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp).resolve()
+            subprocess.run(['git', 'init', '-q', str(project)], check=True)
+            subprocess.run(['git', '-C', str(project), '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+                            'commit', '--allow-empty', '-qm', 'isolated context'], check=True)
+            names = ('python.exe', 'git.exe', 'where.exe') if os.name == 'nt' else ('python3', 'git', 'which')
+            for name in names:
+                (project/name).write_text('inert fixture; not an executable', encoding='utf-8')
+            script = '''
+import assert from 'node:assert/strict';
+import {pathToFileURL} from 'node:url';
+const {default:register}=await import(pathToFileURL(process.argv[1]));
+const cwd=process.cwd(), header={type:'session',version:3,id:'native',cwd};
+const ctx={cwd,mode:'rpc',sessionManager:{getHeader:()=>header,getSessionId:()=>header.id,getCwd:()=>cwd,
+  getEntries:()=>{throw Error('history_read_before_rejected_output')}}};
+let tool;register({registerTool:value=>tool=value});
+await assert.rejects(tool.execute('capture',{operation:'capture_current',artifact_dir:cwd},undefined,undefined,ctx),
+                     /output_preflight_unavailable/);
+'''
+            env = dict(os.environ, PATH=str(project)+os.pathsep+os.environ['PATH'])
+            run = subprocess.run([node, '--input-type=module', '-e', script, str(SCRIPTS/'pi_context_extension.mjs')],
+                                 cwd=project, env=env, capture_output=True, text=True, encoding='utf-8')
+            self.assertEqual(run.returncode, 0, run.stderr)
+
+    def test_native_capture_seals_nonempty_snapshot_and_returns_compact_receipt(self):
+        node = shutil.which('node')
+        if not node: self.skipTest('Node unavailable')
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp).resolve(); project=root/'project'; project.mkdir(); output=root/'granted'; output.mkdir()
+            subprocess.run(['git','init','-q',str(project)],check=True)
+            subprocess.run(['git','-C',str(project),'-c','user.name=Fixture','-c','user.email=fixture@example.invalid',
+                            'commit','--allow-empty','-qm','isolated context'],check=True)
+            script='''
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {pathToFileURL} from 'node:url';
+const {default:register}=await import(pathToFileURL(process.argv[1]));
+const cwd=process.cwd(),session={type:'session',version:3,id:'native',cwd};
+const entries=Array.from({length:1000},(_,i)=>({type:'custom',id:'entry-'+i,fixture:true}));
+const ctx={cwd,mode:'rpc',sessionManager:{getHeader:()=>session,getSessionId:()=>session.id,
+  getCwd:()=>cwd,getEntries:()=>entries}};
+let tool;register({registerTool:value=>tool=value});
+const result=await tool.execute('capture',{operation:'capture_current',artifact_dir:process.argv[2]},undefined,undefined,ctx);
+const receipt=result.details.capture;
+assert.equal(receipt.record_count,entries.length);assert.equal('entry_ids' in receipt,false);
+assert.deepEqual(JSON.parse(await fs.readFile(receipt.native_file,'utf8')).entries,entries);
+assert.equal(JSON.parse(await fs.readFile(receipt.index_path,'utf8')).entry_ids.length,entries.length);
+assert.ok(result.details.python.sha256);
+'''
+            run=subprocess.run([node,'--input-type=module','-e',script,str(SCRIPTS/'pi_context_extension.mjs'),str(output)],
+                               cwd=project,capture_output=True,text=True,encoding='utf-8')
+            self.assertEqual(run.returncode,0,run.stderr)
+
     def test_native_review_uses_real_delivery_and_recovery_without_codex_partitions(self):
         for host in ('pi', 'claude'):
             pack = native_pack(host)
@@ -125,6 +182,17 @@ const cwd=process.cwd(), session={type:'session',version:3,id:'native',cwd};
 const ctx={cwd,mode:'rpc',sessionManager:{getHeader:()=>session,getSessionId:()=>session.id,
   getCwd:()=>cwd,getEntries:()=>{throw Error('history read before authorization')}}};
 assert.equal(n.exportPiContext(ctx).context.session_id,'native');
+const {default:register}=await import(pathToFileURL(process.argv[2]));
+let definition;register({registerTool:tool=>definition=tool});
+assert.equal(definition.name,'global_owner_scout_context');
+assert.equal(definition.parameters.additionalProperties,false);
+const toolResult=await definition.execute('context-only',{},undefined,undefined,ctx);
+assert.deepEqual(toolResult.details.native_context,n.exportPiContext(ctx));
+assert.equal(toolResult.details.selected_model,null);
+await assert.rejects(definition.execute('capture', {operation:'capture_current'}, undefined, undefined, ctx),
+                     /current_authorized_artifact_dir_required/);
+await assert.rejects(definition.execute('capture', {operation:'capture_current',artifact_dir:cwd}, undefined, undefined, ctx),
+                     /output_preflight_unavailable/);
 assert.throws(()=>n.exportPiContext({...ctx,cwd:cwd+'/other'}));
 const init={type:'system',subtype:'init',cwd,session_id:'native'};
 assert.equal(n.exportClaudeContext(init).context.cwd,cwd);
@@ -153,7 +221,7 @@ assert.throws(()=>n.observeClaudeTurn(init,[{...result,session_id:'other'}]));
 assert.equal(n.observeClaudeTurn(init,[init,result]).business_success,'unverified');
 console.log('native boundaries passed');
 '''
-        run = subprocess.run([node, '--input-type=module', '-e', script, str(SCRIPTS/'native_session_export.mjs')],
+        run = subprocess.run([node, '--input-type=module', '-e', script, str(SCRIPTS/'native_session_export.mjs'), str(SCRIPTS/'pi_context_extension.mjs')],
                              capture_output=True, text=True, encoding='utf-8')
         self.assertEqual(run.returncode, 0, run.stderr)
 

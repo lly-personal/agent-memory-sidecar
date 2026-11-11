@@ -1,12 +1,14 @@
 {
   "name": "agent-memory-sidecar",
   "private": true,
-  "description": "Pi discovery surface for Agent Memory bootstrap and optional engineering contract review methods.",
+  "description": "Pi entry for Agent Memory bootstrap, engineering methods and bounded read-only Scout.",
   "keywords": ["pi-package"],
   "pi": {
     "skills": [
       "./plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor",
-      "./plugins/agent-memory-sidecar/skills/engineering-contract-review"
-    ]
+      "./plugins/agent-memory-sidecar/skills/engineering-contract-review",
+      "./skills/global-owner-scout"
+    ],
+    "extensions": ["./skills/global-owner-scout/scripts/pi_context_extension.mjs"]
   }
 }

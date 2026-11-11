@@ -63,9 +63,32 @@ def sha256_bytes(value: bytes) -> str:
 def git_output(cwd: Path, *args: str) -> bytes:
     env = os.environ.copy()
     env.update(GIT_ENV)
+    # Windows executable lookup includes cwd; never execute a reviewed project's
+    # git.exe (or a PATH entry/symlink into that checkout) during read-only probes.
+    workspace = cwd.resolve(strict=True)
+    for ancestor in (workspace, *workspace.parents):
+        try:
+            (ancestor / '.git').lstat()
+        except FileNotFoundError:
+            continue
+        workspace = ancestor
+        break
+    executable = None
+    for directory in os.get_exec_path():
+        folder = Path(directory.strip('"') if os.name == 'nt' else directory)
+        if not folder.is_absolute():
+            continue
+        try:
+            candidate = (folder / ('git.exe' if os.name == 'nt' else 'git')).resolve(strict=True)
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+        if not candidate.is_relative_to(workspace) and candidate.is_file() and os.access(candidate, os.X_OK):
+            executable = str(candidate)
+            break
+    require(executable is not None, 'git_context_executable_unavailable')
     try:
         result = subprocess.run(
-            ["git", "--no-pager", "-c", "core.fsmonitor=false", *args],
+            [executable, "--no-pager", "-c", "core.fsmonitor=false", *args],
             cwd=cwd,
             capture_output=True,
             check=False,
@@ -122,7 +145,7 @@ def inspect_git_context(cwd: Path) -> dict[str, Any]:
     return snapshot
 
 
-def inspect_native_context(value: Any, project_root: Path) -> dict[str, Any]:
+def inspect_native_context(value: Any, project_root: Path | None = None) -> dict[str, Any]:
     require(isinstance(value, dict) and set(value) == {'contract_version', 'native_host', 'context'}
             and value['contract_version'] == 'global_owner_scout_native_context_v1', 'native_context_invalid')
     host, context = value['native_host'], value['context']
@@ -142,8 +165,9 @@ def inspect_native_context(value: Any, project_root: Path) -> dict[str, Any]:
             and isinstance(context.get('cwd'), str) and Path(context['cwd']).is_absolute(), 'native_context_mismatch')
     cwd = Path(context['cwd']).resolve(strict=True)
     native_root = resolve_git_path(cwd, git_output(cwd, 'rev-parse', '--show-toplevel'))
-    require(native_root == project_root.resolve(strict=True), 'native_context_project_mismatch')
+    require(project_root is None or native_root == project_root.resolve(strict=True), 'native_context_project_mismatch')
     return dict(contract_version='global_owner_scout_native_binding_v1', native_host=host,
+                project_root=str(native_root),
                 source_sha256=sha256_bytes(canonical_json(value)),
                 session_ref_sha256=sha256_bytes(context['session_id'].encode('utf-8')),
                 binding_scope='native_current_session_git', git_snapshot=inspect_git_context(native_root))
@@ -163,7 +187,7 @@ def main() -> int:
     context = commands.add_parser("inspect-context")
     context.add_argument("--project-root", type=Path, required=True)
     native = commands.add_parser('inspect-native', help='Check actual native current-session metadata against the Git root.')
-    native.add_argument('--project-root', type=Path, required=True)
+    native.add_argument('--project-root', type=Path)
     output = commands.add_parser("inspect-output")
     output.add_argument("--artifact-dir", type=Path, required=True)
     output.add_argument("--protected-root", action="append", type=Path, required=True)

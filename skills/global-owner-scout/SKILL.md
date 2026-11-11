@@ -28,6 +28,13 @@ not a Desktop binding: mechanically export Pi ExtensionContext or Claude native 
 the same output-containment preflight. Inspect still skips history. Native review uses Project v8 / Pack v9 and the actual
 SDK scopes with unknown/degraded coverage; never fabricate Codex partitions or complete history. Follow the candidate contract
 in references/contracts.md. These source adapters are not an assertion that a released Pi/Claude Scout entry is installed.
+In the candidate Pi package, `/skill:global-owner-scout` calls the read-only `global_owner_scout_context` tool first.
+Forward its actual `native_context` to `inspect-native`; it reads no history and grants no artifact access.
+Its selected-model metadata is host configuration, not independent proof of the model that served an API request.
+After checking the current output grant, use that tool's `operation=capture_current, artifact_dir=<exact-granted-root>`.
+It resolves an available Python3.11+ once, fixes its absolute interpreter, checks native/Git identity and output containment,
+then seals the current SDK session through the formal importer. Read selected passages from its returned file for meaning;
+never retype the snapshot. Other project sessions remain uncovered unless a separately qualified native source is available.
 
 ## Purpose and native presentation
 
