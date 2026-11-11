@@ -7,7 +7,7 @@ description: Show a project overview or deeply review it when explicitly request
 
 ## Contract
 
-- Skill version: `5.17.0`
+- Skill version: `5.18.0`
 - Project result: `global_owner_scout_project_v7`
 - User review: `global_owner_scout_review_pack_v8`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -23,18 +23,25 @@ granted as that task output surface. The explicit entry is `$global-owner-scout 
 and never asks the user to provide resource settings. The Scout uses the current task's host-resolved model/reasoning settings and records observable requested/actual values; it supplies no override. The current Desktop project binding is authoritative; no Prompt may contain a
 project name, path, project ID, candidate hint, or the deep-review procedure.
 
-The installed default above remains the Codex lane. Candidate Pi/Claude adapters use the actual current runtime context,
-not a Desktop binding: mechanically export Pi ExtensionContext or Claude native `system/init`, run `inspect-native`, then
-the same output-containment preflight. Inspect still skips history. Native review uses Project v8 / Pack v9 and the actual
-SDK scopes with unknown/degraded coverage; never fabricate Codex partitions or complete history. Follow the candidate contract
-in references/contracts.md. These source adapters are not an assertion that a released Pi/Claude Scout entry is installed.
-In the candidate Pi package, `/skill:global-owner-scout` calls the read-only `global_owner_scout_context` tool first.
+The default contract above is the Codex lane. The Pi package exposes the same Scout source through
+`/skill:global-owner-scout`; call the read-only `global_owner_scout_context` tool first. Use the actual current runtime context,
+not a Desktop binding: mechanically export Pi ExtensionContext, run `inspect-native`, then the same output-containment
+preflight. Inspect still skips history. Native review uses Project v8 / Pack v9 and the actual SDK scopes with
+unknown/degraded coverage; never fabricate Codex partitions or complete history. Follow the host contract in
+references/contracts.md. Package discovery, source-level execution and installed natural use remain separate evidence.
 Forward its actual `native_context` to `inspect-native`; it reads no history and grants no artifact access.
 Its selected-model metadata is host configuration, not independent proof of the model that served an API request.
 After checking the current output grant, use that tool's `operation=capture_current, artifact_dir=<exact-granted-root>`.
 It resolves an available Python3.11+ once, fixes its absolute interpreter, checks native/Git identity and output containment,
 then seals the current SDK session through the formal importer. Read selected passages from its returned file for meaning;
 never retype the snapshot. Other project sessions remain uncovered unless a separately qualified native source is available.
+When invoking Pi, ask for the overview or review in the current project as usual; the agent resolves these tool parameters.
+If the host provides no task output grant, the user may select an exact project-external output root in the current request.
+No model/thinking override, JSON preparation or full-history claim follows from this choice. Missing context, output grant
+or runtime prerequisites stop the affected operation with its precise recovery condition, before reading history.
+
+Claude's native `system/init` and scoped SDK adapters remain available programmatically; its ordinary Scout Skill
+projection is not included. A Claude engineering-method installation does not provide a Scout entry.
 
 ## Purpose and native presentation
 

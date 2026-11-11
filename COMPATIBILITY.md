@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.6.2 | 0.6.2 | 1.10.0 | 2.5.1 | 5.18.0 | v8 | 3.11–3.13 |
 | v0.6.1 | 0.6.1 | 1.9.0 | 2.5.0 | 5.17.0 | v8 | 3.11–3.13 |
 | v0.6.0 | 0.6.0 | 1.8.0 | 2.5.0 | 5.17.0 | v8 | 3.11–3.13 |
 | v0.5.16 | 0.5.16 | 1.7.16 | 2.4.9 | 5.17.0 | v8 | 3.11–3.13 |
@@ -108,3 +109,5 @@ Scout 5.12.0 adds artifact-bound conversational advice and `not_requested` deliv
 Delivery v1 manifest and Core rule-bundle schemas. Historical opened/queued receipts remain readable. Native implicit selection
 is scoped to follow-up on an identifiable delivered report; fresh reviews still require explicit invocation. Bootstrap 2.4.2
 installs the matching Scout. These technical changes do not establish natural Desktop or remote-host adoption.
+
+Scout 5.18.0 adds the Pi native context/capture entry and a bounded Project v8 / Review Pack v9 lane for Pi/Claude source adapters. Codex keeps Project v7 / Review Pack v8; Delivery v2 and historical results are unchanged. The new lane cannot claim complete history or offer Codex-bound rule confirmation. Plugin 1.10.0 exposes the shared Scout source through the Pi package; Claude ordinary Scout projection is not included. Bootstrap 2.5.1 only updates managed component identities. Release, installation, source-level native execution and natural use remain separate evidence.

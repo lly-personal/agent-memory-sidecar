@@ -163,10 +163,12 @@ Current SDK omissions do not block every useful review: the native-session Proje
 scopes with unknown/degraded history and independent current-Owner corroboration. It never awards complete history. Codex v7/v8
 and historical artifacts retain their interpretation. The existing protocol permits a frozen active-turn snapshot, so neither
 host must wait for the entire chat to end. Native turn observations remain distinct from business success and user adoption.
-The candidate Pi package exposes the shared Scout source and its read-only native context tool. Its Git manifest uses `skills/`;
+The Pi package exposes the shared Scout source and its read-only native context tool. Its Git manifest uses `skills/`;
 the deterministic portable producer projects those managed Skill/extension references to the existing `.agents/skills/` layout.
 Both consumers validate actual referenced files. This is one method source with a package-path projection, not a second Skill copy.
 Claude's ordinary installed Scout entry still needs its native caller projection; native init/SDK components alone do not complete it.
+The Pi source entry's qualification does not qualify an installed release or natural model routing. Follow the same versioned
+release and native package installation paths as the engineering method; report each host's observed scope independently.
 No additional account access, production write, global-rule change, background collector or permanent capability registry follows
 from this adapter work. A genuine missing output authorization or a product-contract choice is reported separately from an SDK
 capability gap; neither should be replaced with a generic permission request.
