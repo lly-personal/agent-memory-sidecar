@@ -3,6 +3,14 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.2 (2026-11-11)
+
+- Expose the shared Scout source and a read-only context/capture tool through Pi's native package. Bind the current session to its Git root and seal SDK snapshots through the existing immutable importer without model transcription.
+- Add bounded Project v8 / Review Pack v9 consumers for Pi/Claude native sources. Preserve unknown coverage, engineering-only advice and historical Codex result semantics; do not claim complete history or natural adoption.
+- Accept an exact output root explicitly selected in the current native request while retaining all containment and immutable-write guards. Reject project-local executable shadowing and stale turn-success observations.
+- Document when and where to invoke Pi Scout, what the agent handles and which paths remain unverified. Claude's ordinary Scout projection is not included; its scoped SDK/init adapters remain separate from that entry.
+- Components: Core 0.6.2, Plugin 1.10.0, Bootstrap 2.5.1 and Scout 5.18.0. Bootstrap only updates managed component identities; existing Core rule, approval and storage contracts are unchanged.
+
 ## 0.6.1 (2026-11-11)
 
 - Expose the existing Engineering Contract Review source through the native Pi package and Claude Code plugin, alongside its Codex plugin entry; keep one method source and the existing Plugin version owner.

@@ -97,7 +97,7 @@ For normal Codex Desktop use, register the immutable repository Marketplace,
 install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.6.1
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.6.2
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -117,8 +117,8 @@ Plugin, Pi package and Claude Code Plugin expose that same directory; their inst
 For Pi or local Claude Code, install the tagged source through the host's native manager:
 
 ```sh
-pi install git:github.com/lly-personal/agent-memory-sidecar@v0.6.1
-claude plugin marketplace add https://github.com/lly-personal/agent-memory-sidecar.git#v0.6.1
+pi install git:github.com/lly-personal/agent-memory-sidecar@v0.6.2
+claude plugin marketplace add https://github.com/lly-personal/agent-memory-sidecar.git#v0.6.2
 claude plugin install agent-memory-sidecar@agent-memory --scope user
 ```
 
@@ -132,7 +132,23 @@ must be checked before migration, rather than overwritten or deleted by name.
 
 These packages also expose the existing Bootstrap Anchor. Installing or calling a method does not deploy Core, change global
 instructions, grant new tools, or prove model adoption. Local Claude Code plugins do not establish Cowork/cloud support.
-Scout is qualified separately: its current Desktop-bound entry is not exposed by the Pi/Claude packages. See the
+
+### Bounded Scout on Pi
+
+In the target Git project, invoke `/skill:global-owner-scout 看懂当前工程全貌` for an overview, or
+`/skill:global-owner-scout 复盘当前工程` to review the available sources. The agent binds the current Pi session to the Git root,
+reads the current project Owners, and returns an evidence-linked overview or bounded review. For review, the native
+`global_owner_scout_context` tool can seal the current SDK session directly; the agent does not retype history JSON.
+
+The output must use the current host's explicit task grant or an exact project-external directory the user selects in this
+request. When no grant is available, name that directory in the request; do not prepare internal JSON or tool profiles.
+Scout preserves the project's read-only boundary and reports unavailable context, runtime or output authorization precisely.
+It does not change Owners, run workflow-eval, select models or start background collection.
+
+Pi's current-session SDK snapshot is not complete project history. Missing coverage remains unknown/degraded, and the new
+lane returns project advice without Codex-bound rule confirmations. Source-level native capture and delivery have been
+verified; released installation and natural use require their own evidence. Claude's ordinary Scout Skill is not included;
+its native init/SDK adapters alone do not provide that entry. See the
 [native interface and qualification boundaries](specs/public-distribution-v1.md#scout-host-qualification).
 
 Desktop setup also installs a self-contained command entry with the Agent Memory Skill. The Agent runs
