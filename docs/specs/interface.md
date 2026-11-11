@@ -792,7 +792,9 @@ Agent 进入原子规则包链的起点：Agent 必须重新读取最新 global 
 
 本工程拥有可选配套方法 `engineering-contract-review` 的唯一源码：
 [`plugins/agent-memory-sidecar/skills/engineering-contract-review`](../../plugins/agent-memory-sidecar/skills/engineering-contract-review/SKILL.md)。
-它随 Plugin 的版本与内容身份维护、分发和更新，Bootstrap 的 Plugin 读回覆盖其文件完整性；不新增 Core 字段、
+它随 Plugin 的版本与内容身份维护、分发和更新；Codex 与 Claude Code 的原生 Plugin 和 Pi package 都指向同一源码目录，
+宿主命令、更新路径及 Scout 的独立资格边界见 [公开分发契约](../../specs/public-distribution-v1.md#compatibility)。
+Bootstrap 的 Plugin 读回覆盖其文件完整性；不新增 Core 字段、
 Store、常驻规则或独立更新器。正常工程任务按需选择方法，不经过 Scout，也不要求另装 `check` 或 `hunt`。
 该技能可在宿主现有 Skill 配置中单独停用；卸载所属 Plugin 随之移除托管副本。
 

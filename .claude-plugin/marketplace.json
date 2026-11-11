@@ -1,0 +1,8 @@
+{
+  "name": "agent-memory",
+  "owner": {"name": "IIyaqoo", "url": "https://github.com/IIyaqoo"},
+  "description": "Agent Memory bootstrap and optional engineering contract review methods.",
+  "plugins": [
+    {"name": "agent-memory-sidecar", "source": "./plugins/agent-memory-sidecar"}
+  ]
+}

@@ -95,9 +95,17 @@ def version_facts(root: Path = ROOT) -> dict[str, str]:
     init_text = (root / "src" / "agent_memory_sidecar" / "__init__.py").read_text(encoding="utf-8")
     init_match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', init_text, re.MULTILINE)
     require(init_match is not None and init_match.group(1) == core, "release_core_version_mismatch")
-    plugin = json.loads(
+    codex_plugin = json.loads(
         (root / "plugins" / "agent-memory-sidecar" / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
-    )["version"]
+    )
+    plugin = codex_plugin["version"]
+    claude_plugin = json.loads(
+        (root / "plugins" / "agent-memory-sidecar" / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8")
+    )
+    require(
+        all(claude_plugin[key] == codex_plugin[key] for key in ("name", "version", "skills")),
+        "release_plugin_host_identity_mismatch",
+    )
     bootstrap_text = (
         root / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "managed_sources.py"
     ).read_text(encoding="utf-8")
@@ -559,6 +567,9 @@ def inspect_portable(
                 relative = Path(name)
                 require(not relative.is_absolute() and ".." not in relative.parts, "release_portable_path_invalid")
             required = {
+                "package.json",
+                ".claude-plugin/marketplace.json",
+                "plugins/agent-memory-sidecar/.claude-plugin/plugin.json",
                 "source-manifest.json",
                 "plugins/agent-memory-sidecar/source-manifest.json",
                 ".agents/plugins/marketplace.json",
@@ -723,6 +734,8 @@ def build(
             output=portable,
             root=root,
             files=[
+                root / "package.json",
+                root / ".claude-plugin" / "marketplace.json",
                 root / ".agents" / "skills" / "agent-memory-bootstrap-anchor",
                 root / "skills" / "agent-memory-workstation-bootstrap",
                 root / "skills" / "global-owner-scout",

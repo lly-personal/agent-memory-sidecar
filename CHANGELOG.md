@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.1 (2026-11-11)
+
+- Expose the existing Engineering Contract Review source through the native Pi package and Claude Code plugin, alongside its Codex plugin entry; keep one method source and the existing Plugin version owner.
+- Include and validate all three discovery manifests in the portable release. Installation, model invocation and later adoption remain separate evidence.
+- Document the native session interfaces available to Scout on Pi and Claude Code, and the unqualified binding, history coverage and output-grant boundaries; do not install the Desktop-bound Scout through these method packages.
+- Components: Core 0.6.1 and Plugin 1.9.0; Bootstrap 2.5.0, Scout 5.17.0 and existing review contracts are unchanged.
+
 ## 0.6.0 (2026-11-11)
 
 - Explicitly enroll Claude Code in the existing canonical instruction sync, projecting the same published document into its user-level CLAUDE.md while preserving Codex/Pi behavior.
