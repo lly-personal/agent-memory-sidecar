@@ -7,7 +7,7 @@ description: Show a project overview or deeply review it when explicitly request
 
 ## Contract
 
-- Skill version: `5.18.0`
+- Skill version: `5.19.0`
 - Project result: `global_owner_scout_project_v7`
 - User review: `global_owner_scout_review_pack_v8`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -40,8 +40,30 @@ If the host provides no task output grant, the user may select an exact project-
 No model/thinking override, JSON preparation or full-history claim follows from this choice. Missing context, output grant
 or runtime prerequisites stop the affected operation with its precise recovery condition, before reading history.
 
-Claude's native `system/init` and scoped SDK adapters remain available programmatically; its ordinary Scout Skill
-projection is not included. A Claude engineering-method installation does not provide a Scout entry.
+In Claude, invoke `/agent-memory-sidecar:global-owner-scout` in the target Git project, with an overview or review request.
+This is the same method source. These values are supplied by Claude when this Skill is loaded:
+session `${CLAUDE_SESSION_ID}`, project `${CLAUDE_PROJECT_DIR}`, Skill `${CLAUDE_SKILL_DIR}`,
+plugin `${CLAUDE_PLUGIN_ROOT}`, dependency data `${CLAUDE_PLUGIN_DATA}`.
+Invoke the loaded Skill's `scripts/claude_native.mjs context` with `--session-id`, `--project-root`,
+`--skill-dir` and `--plugin-root` mapped to those current values. Treat substituted paths as data, never shell code.
+Prefer a host argument-vector API. With a shell, encode every value as a shell literal: PowerShell single quotes with each
+embedded single quote doubled; POSIX single quotes with each embedded single quote escaped by closing/reopening the literal.
+Expandable double quotes are insufficient for paths containing `$()` or backticks. Escape the Node/script paths too.
+Resolve the existing Node executable normally under the current host policy; do not run an unresolved placeholder.
+This checks current binding without history or writes.
+Keep the helper in the current tool's inherited working directory; never cd or set cwd to the startup project merely to pass
+binding. Claude's project substitution is startup-stable, so a different current Git tree blocks this route rather than reviewing
+the old tree. A child directory in the same Git tree is valid. Historical SDK scope remains the selected native project directory.
+For review, first check the output grant in the current request, then use the same entry with `capture`, adding
+`--plugin-data` from its current native value and `--artifact-dir`
+from the exact current output grant, with the same literal-argument handling.
+The agent handles these arguments; the user supplies a review request and, only if absent, an output location.
+For an explicitly selected historical session, add `--source-session-id` without changing the current caller's session.
+Page with `--offset` and `--limit`; SDK pages remain observed-only and never prove full history or a chat terminal.
+Read selected passages from the returned immutable file, then continue the native review and delivery contract.
+The deployment prerequisite prepares the pinned SDK separately; Scout never installs it on demand. If unavailable, report
+that exact condition. All helper calls obey existing permissions: preserve a refusal and do not reroute around it.
+Discovery, scoped capture and natural semantic review are distinct evidence; none alone proves the full chain.
 
 ## Purpose and native presentation
 

@@ -3,6 +3,14 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.3 (2026-11-12)
+
+- Add Claude's ordinary namespaced Scout entry using the same method source as Codex/Pi; project only native discovery paths in portable artifacts.
+- Keep native startup-project substitutions distinct from inherited execution cwd and historical sources. Reject tree mismatches before history, preserve current permissions and handle shell arguments as literal data.
+- Prepare the pinned official history SDK separately under native plugin data, without another Claude CLI or on-demand installation. Preserve partial runtime failures and seal scoped pages through the existing importer.
+- Native discovery and scoped SDK capture do not prove natural model routing, a complete semantic review or full history. No new model trial or business-project change is included.
+- Components: Core 0.6.3, Plugin 1.11.0, Bootstrap 2.5.2 and Scout 5.19.0. Bootstrap only synchronizes managed component identities.
+
 ## 0.6.2 (2026-11-11)
 
 - Expose the shared Scout source and a read-only context/capture tool through Pi's native package. Bind the current session to its Git root and seal SDK snapshots through the existing immutable importer without model transcription.

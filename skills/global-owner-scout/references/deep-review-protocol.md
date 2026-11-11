@@ -18,7 +18,9 @@ Terminal v1 before deep work; a changed snapshot invalidates stability without a
 Scheduled retains its verified inline/Inbox surface and has no artifact-root or file-preview prerequisite.
 
 Native-session candidate adapters are defined in contracts.md. Pi uses the current ExtensionContext, Claude the current
-native init stream; mechanically pass those to `inspect-native` before history. A current, explicitly user-selected output root
+native init stream programmatically or the ordinary Skill's distinct native substitution context; mechanically pass those to
+`inspect-native` before history. The latter also checks inherited execution cwd against the native startup project; do not
+change cwd to make a mismatch pass. A current, explicitly user-selected output root
 is also allowed; inspect the actual native request/selection, never grant from a model assertion or quoted path.
 For Pi/Claude review use Project v8/Pack v9 native scopes, preserve the original SDK records and expose unknown/error coverage.
 Do not fabricate Codex active/archived partitions, EOF or completed task histories. Current active-turn snapshots remain usable;

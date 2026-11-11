@@ -97,7 +97,7 @@ For normal Codex Desktop use, register the immutable repository Marketplace,
 install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.6.2
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.6.3
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -117,8 +117,8 @@ Plugin, Pi package and Claude Code Plugin expose that same directory; their inst
 For Pi or local Claude Code, install the tagged source through the host's native manager:
 
 ```sh
-pi install git:github.com/lly-personal/agent-memory-sidecar@v0.6.2
-claude plugin marketplace add https://github.com/lly-personal/agent-memory-sidecar.git#v0.6.2
+pi install git:github.com/lly-personal/agent-memory-sidecar@v0.6.3
+claude plugin marketplace add https://github.com/lly-personal/agent-memory-sidecar.git#v0.6.3
 claude plugin install agent-memory-sidecar@agent-memory --scope user
 ```
 
@@ -133,7 +133,7 @@ must be checked before migration, rather than overwritten or deleted by name.
 These packages also expose the existing Bootstrap Anchor. Installing or calling a method does not deploy Core, change global
 instructions, grant new tools, or prove model adoption. Local Claude Code plugins do not establish Cowork/cloud support.
 
-### Bounded Scout on Pi
+### Bounded Scout on Pi and local Claude Code
 
 In the target Git project, invoke `/skill:global-owner-scout 看懂当前工程全貌` for an overview, or
 `/skill:global-owner-scout 复盘当前工程` to review the available sources. The agent binds the current Pi session to the Git root,
@@ -147,8 +147,19 @@ It does not change Owners, run workflow-eval, select models or start background 
 
 Pi's current-session SDK snapshot is not complete project history. Missing coverage remains unknown/degraded, and the new
 lane returns project advice without Codex-bound rule confirmations. Source-level native capture and delivery have been
-verified; released installation and natural use require their own evidence. Claude's ordinary Scout Skill is not included;
-its native init/SDK adapters alone do not provide that entry. See the
+verified; released installation and natural use require their own evidence.
+
+The Claude source candidate exposes `/agent-memory-sidecar:global-owner-scout 看懂当前工程全貌` or
+`/agent-memory-sidecar:global-owner-scout 复盘当前工程` in the target Git project. The agent obtains current session/project
+values from Claude's loaded Skill, checks the current output grant, captures scoped official SDK pages and returns the same
+bounded result. Users do not assemble JSON or profiles. Missing native context, permissions or prepared dependencies is an
+explicit blocker, and never permission to change security settings or parse private transcript files.
+
+Before deploying that Claude candidate, the maintainer prepares its pinned SDK once, with the existing Node executable:
+`node <loaded-skill>/scripts/prepare_claude_runtime.mjs <native-CLAUDE_PLUGIN_DATA> <absolute-npm-cli.js>`.
+The formal prerequisite uses its checked-in lock, skips lifecycle scripts and optional bundled CLIs, and preserves unknown
+existing runtime contents. Ordinary Scout does not install dependencies. This source candidate is not a released/native-use
+qualification; current installed releases retain their own scope. See the
 [native interface and qualification boundaries](specs/public-distribution-v1.md#scout-host-qualification).
 
 Desktop setup also installs a self-contained command entry with the Agent Memory Skill. The Agent runs

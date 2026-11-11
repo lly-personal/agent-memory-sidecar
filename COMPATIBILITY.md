@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.6.3 | 0.6.3 | 1.11.0 | 2.5.2 | 5.19.0 | v8 | 3.11–3.13 |
 | v0.6.2 | 0.6.2 | 1.10.0 | 2.5.1 | 5.18.0 | v8 | 3.11–3.13 |
 | v0.6.1 | 0.6.1 | 1.9.0 | 2.5.0 | 5.17.0 | v8 | 3.11–3.13 |
 | v0.6.0 | 0.6.0 | 1.8.0 | 2.5.0 | 5.17.0 | v8 | 3.11–3.13 |
@@ -111,3 +112,5 @@ is scoped to follow-up on an identifiable delivered report; fresh reviews still 
 installs the matching Scout. These technical changes do not establish natural Desktop or remote-host adoption.
 
 Scout 5.18.0 adds the Pi native context/capture entry and a bounded Project v8 / Review Pack v9 lane for Pi/Claude source adapters. Codex keeps Project v7 / Review Pack v8; Delivery v2 and historical results are unchanged. The new lane cannot claim complete history or offer Codex-bound rule confirmation. Plugin 1.10.0 exposes the shared Scout source through the Pi package; Claude ordinary Scout projection is not included. Bootstrap 2.5.1 only updates managed component identities. Release, installation, source-level native execution and natural use remain separate evidence.
+
+Scout 5.19.0 adds Claude ordinary Skill provenance and the shared-source entry in Plugin 1.11.0. A separate pinned SDK prerequisite lives under native plugin data; startup-project and inherited execution Git roots must agree. Bootstrap 2.5.2 only updates managed identities. Native discovery and scoped SDK source consumption do not prove natural routing, complete review or complete history; prior result contracts remain unchanged.

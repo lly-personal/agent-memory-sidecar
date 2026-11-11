@@ -1,8 +1,20 @@
 {
   "name": "agent-memory",
   "owner": {"name": "IIyaqoo", "url": "https://github.com/IIyaqoo"},
-  "description": "Agent Memory bootstrap and optional engineering contract review methods.",
+  "description": "Agent Memory bootstrap, engineering methods and explicit project Scout.",
   "plugins": [
-    {"name": "agent-memory-sidecar", "source": "./plugins/agent-memory-sidecar"}
+    {
+      "name": "agent-memory-sidecar",
+      "source": ".",
+      "version": "1.11.0",
+      "description": "Portable Agent Memory bootstrap, engineering methods and explicit project Scout.",
+      "author": {"name": "IIyaqoo", "url": "https://github.com/IIyaqoo"},
+      "repository": "https://github.com/lly-personal/agent-memory-sidecar",
+      "skills": [
+        "./plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor",
+        "./plugins/agent-memory-sidecar/skills/engineering-contract-review",
+        "./skills/global-owner-scout"
+      ]
+    }
   ]
 }

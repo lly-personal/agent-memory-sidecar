@@ -106,6 +106,13 @@ def version_facts(root: Path = ROOT) -> dict[str, str]:
         all(claude_plugin[key] == codex_plugin[key] for key in ("name", "version", "skills")),
         "release_plugin_host_identity_mismatch",
     )
+    claude_entry = json.loads((root / '.claude-plugin/marketplace.json').read_text(encoding='utf-8'))['plugins']
+    require(len(claude_entry) == 1 and claude_entry[0]['source'] == '.'
+            and all(claude_entry[0][key] == codex_plugin[key] for key in ('name', 'version'))
+            and claude_entry[0]['skills'] == [
+                './plugins/agent-memory-sidecar/skills/agent-memory-bootstrap-anchor',
+                './plugins/agent-memory-sidecar/skills/engineering-contract-review',
+                './skills/global-owner-scout'], 'release_claude_entry_mismatch')
     bootstrap_text = (
         root / "skills" / "agent-memory-workstation-bootstrap" / "scripts" / "managed_sources.py"
     ).read_text(encoding="utf-8")
@@ -434,6 +441,16 @@ def deterministic_zip(*, output: Path, root: Path, files: Iterable[Path], genera
                     projected |= package['pi'][field] != original
             if projected:
                 entries[index] = (name, (json.dumps(package, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
+        elif name == '.claude-plugin/marketplace.json':
+            marketplace = json.loads(data)
+            entry = marketplace['plugins'][0]
+            entry['skills'] = ['./.agents/' + value[2:] if value == './skills/global-owner-scout'
+                               else value for value in entry['skills']]
+            entries[index] = (name, (json.dumps(marketplace, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
+            # Portable has no default skills/ directory. Metadata selects the same
+            # source files for native --plugin-dir; methods are never duplicated.
+            generated = {**generated, '.claude-plugin/plugin.json':
+                (json.dumps({k: v for k, v in entry.items() if k != 'source'}, ensure_ascii=False, indent=2) + '\n').encode('utf-8')}
     # Retain the published portable layout for already-installed Anchor resolvers.
     # Source checkouts use skills/ and are never an implicit runtime discovery root.
     entries = [(".agents/" + name if name.startswith((
