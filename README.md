@@ -144,12 +144,14 @@ not use normal sync to replace it. The unified deployment flow reviews and appli
 existing private Owner remains a separate optional backend unless explicitly
 detached.
 
-## Global instructions across Codex and Pi
+## Global instructions across Codex, Pi and Claude Code
 
 The same `同步并部署本机 Agent Memory` intent has an instruction-distribution lane: resolve the verified Release, preview
 and apply its Core `instructions sync` operation, then report each enrolled local host separately. A single published canonical
-`global/AGENTS.md` is deployed byte-for-byte to Codex and Pi; local drift blocks overwrites. It does not install Codex Hooks in Pi
-or claim Scout support or model adoption. See [the synchronization contract](specs/global-instruction-sync-v1.md).
+`global/AGENTS.md` is deployed byte-for-byte to enrolled Codex and Pi instruction files and, only after explicit enrollment, to
+Claude Code's user `CLAUDE.md`; local drift blocks overwrites. This does not install Hooks or Scout in Pi or Claude Code, prove
+project-instruction discovery, or claim model adoption. Claude interprets imports and comments differently, and effective session
+context must be checked separately. See [the synchronization contract](specs/global-instruction-sync-v1.md), including rollback limits.
 
 The root Pi package manifest exposes the existing Bootstrap Anchor through Pi's native Git-package discovery. Use an immutable
 release ref `v0.5.0` or later; verify the installed release before claiming this capability is available. A new device needs one

@@ -125,12 +125,13 @@ def build_parser(*, daily_only: bool = False) -> argparse.ArgumentParser:
     )
 
     if not daily_only:
-        instructions = commands.add_parser("instructions", help="Synchronize published global instructions to Codex and Pi.")
+        instructions = commands.add_parser("instructions", help="Synchronize published global instructions to enrolled hosts.")
         instruction_commands = instructions.add_subparsers(dest="instruction_command", required=True)
         sync = instruction_commands.add_parser("sync", help="Preview or apply whole-document workstation synchronization.")
         sync.add_argument("--source", type=Path)
         sync.add_argument("--codex-home", type=Path)
         sync.add_argument("--pi-agent-dir", type=Path)
+        sync.add_argument("--claude-home", type=Path)
         sync.add_argument("--state-dir", type=Path)
         sync.add_argument("--apply", action="store_true")
         sync.add_argument("--plan-hash")
@@ -407,7 +408,7 @@ def cmd_proposal_discard(args: argparse.Namespace) -> _OperationResult:
 
 
 def cmd_instruction_sync(args: argparse.Namespace) -> dict[str, Any]:
-    return synchronize(source=args.source, codex_home=args.codex_home, pi_agent_dir=args.pi_agent_dir,
+    return synchronize(source=args.source, codex_home=args.codex_home, pi_agent_dir=args.pi_agent_dir, claude_home=args.claude_home,
                        state_dir=args.state_dir, apply=args.apply, plan_hash=args.plan_hash,
                        adopt_existing=args.adopt_existing)
 

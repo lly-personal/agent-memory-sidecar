@@ -23,7 +23,8 @@ from .instructions import InstructionRepository, assert_physical_directory, atom
 
 CONTRACT = "global_instruction_sync_v1"
 OWNER_FILE = "global/AGENTS.md"
-HOST_ENV = {"codex": "CODEX_HOME", "pi": "PI_CODING_AGENT_DIR"}
+HOST_ENV = {"codex": "CODEX_HOME", "pi": "PI_CODING_AGENT_DIR", "claude": "CLAUDE_CONFIG_DIR"}
+HOST_FILE = {"codex": "AGENTS.md", "pi": "AGENTS.md", "claude": "CLAUDE.md"}
 GIT_OBSERVATION_SECONDS = 60
 
 
@@ -117,23 +118,31 @@ def _set_binding(home: Path, value: dict[str, Any] | None) -> None:
                 })
 
 
-def _targets(codex_home: Path | None, pi_agent_dir: Path | None, saved: dict[str, Any]) -> dict[str, Path]:
-    explicit = {name: path for name, path in {"codex": codex_home, "pi": pi_agent_dir}.items() if path is not None}
+def _targets(codex_home: Path | None, pi_agent_dir: Path | None, claude_home: Path | None,
+             saved: dict[str, Any]) -> dict[str, Path]:
+    explicit = {name: path for name, path in {"codex": codex_home, "pi": pi_agent_dir, "claude": claude_home}.items() if path is not None}
     targets = {name: logical_absolute(path) for name, path in saved.get("targets", {}).items()}
     if set(targets) - set(HOST_ENV):
         raise CoreError("instruction_sync_state_invalid", "Unknown host binding")
     defaults = {"codex": Path.home() / ".codex", "pi": Path.home() / ".pi" / "agent"}
     for name in HOST_ENV:
+        if name == "claude" and name not in explicit and name not in targets:
+            continue
         observed = explicit.get(name)
         configured = os.environ.get(HOST_ENV[name])
+        if (name == "claude" and observed is not None and configured
+                and logical_absolute(observed) != logical_absolute(configured)):
+            raise CoreError("instruction_target_rebind_required", "Explicit Claude directory differs from the active host context", host=name)
         if observed is None and configured:
             observed = Path(configured)
         if observed is not None:
             observed = logical_absolute(observed)
             if name in targets and targets[name] != observed:
                 raise CoreError("instruction_target_rebind_required", "Existing host directory differs; review the binding before changing it", host=name)
+            if name == "claude" and name not in targets and not observed.is_dir():
+                raise CoreError("instruction_targets_missing", "Claude enrollment requires an existing observed host directory", host=name)
             targets[name] = observed
-        elif name not in targets and not explicit and defaults[name].is_dir():
+        elif name not in targets and not explicit and name in defaults and defaults[name].is_dir():
             targets[name] = logical_absolute(defaults[name])
     if not targets:
         raise CoreError("instruction_targets_missing", "No enrolled or observed host directory")
@@ -143,7 +152,7 @@ def _targets(codex_home: Path | None, pi_agent_dir: Path | None, saved: dict[str
 
 
 def synchronize(*, source: Path | None = None, codex_home: Path | None = None,
-                pi_agent_dir: Path | None = None, state_dir: Path | None = None,
+                pi_agent_dir: Path | None = None, claude_home: Path | None = None, state_dir: Path | None = None,
                 apply: bool = False, plan_hash: str | None = None,
                 adopt_existing: list[str] | None = None) -> dict[str, Any]:
     state = logical_absolute(state_dir or Path.home() / ".agents" / "agent-memory")
@@ -154,7 +163,7 @@ def synchronize(*, source: Path | None = None, codex_home: Path | None = None,
     config_path = state / "instruction-sync.json"
     config_before = _bytes(config_path)
     saved = _record(config_path) or {}
-    targets = _targets(codex_home, pi_agent_dir, saved)
+    targets = _targets(codex_home, pi_agent_dir, claude_home, saved)
     bindings = {name: _binding(home) for name, home in targets.items()}
     accepted: dict[str, str] = {}
     for selection in adopt_existing or []:
@@ -206,8 +215,8 @@ def synchronize(*, source: Path | None = None, codex_home: Path | None = None,
         rows = []
         for name, home in targets.items():
             assert_physical_directory(home, allow_missing=True)
-            target = home / "AGENTS.md"
-            if _bytes(home / "AGENTS.override.md") is not None:
+            target = home / HOST_FILE[name]
+            if name != "claude" and _bytes(home / "AGENTS.override.md") is not None:
                 raise CoreError("instruction_target_shadowed", "Host override prevents global instruction qualification", host=name)
             current = _bytes(target)
             before[name] = current
@@ -234,15 +243,15 @@ def synchronize(*, source: Path | None = None, codex_home: Path | None = None,
             return {**receipt, "status": "planned"}
         if not plan_hash or plan_hash != computed_hash:
             raise CoreError("instruction_sync_stale_plan", "Preview changed; inspect the fresh plan before applying")
-        paths = [config_path, journal, *(home / "AGENTS.md" for home in targets.values()),
+        paths = [config_path, journal, *(home / HOST_FILE[name] for name, home in targets.items()),
                  *(Path(row["source_root"]) / OWNER_FILE for row in bindings.values() if row)]
         repository = InstructionRepository()
         with repository.lock_paths(paths):
             if _bytes(journal) is not None or _bytes(config_path) != config_before:
                 raise CoreError("instruction_sync_stale_plan", "Synchronization state changed while waiting for the lock")
             for name, home in targets.items():
-                if (_bytes(home / "AGENTS.md") != before[name] or _binding(home) != bindings[name]
-                        or _bytes(home / "AGENTS.override.md") is not None):
+                if (_bytes(home / HOST_FILE[name]) != before[name] or _binding(home) != bindings[name]
+                        or (name != "claude" and _bytes(home / "AGENTS.override.md") is not None)):
                     raise CoreError("instruction_sync_stale_plan", "Host changed while waiting for the lock", host=name)
             for row in bindings.values():
                 if row:
@@ -281,20 +290,21 @@ def _apply(state: Path, snapshot_root: Path, stage: Path, data: bytes, targets: 
     touched: list[str] = []
     try:
         for name, home in targets.items():
-            if (_bytes(home / "AGENTS.md") != before[name] or _binding(home) != bindings[name]
-                    or _bytes(home / "AGENTS.override.md") is not None):
+            target = home / HOST_FILE[name]
+            if (_bytes(target) != before[name] or _binding(home) != bindings[name]
+                    or (name != "claude" and _bytes(home / "AGENTS.override.md") is not None)):
                 raise CoreError("instruction_sync_stale_plan", "Host changed before its write", host=name)
-            prepare_store_parent(home / "AGENTS.md")
+            prepare_store_parent(target)
             touched.append(name)
             if before[name] != data:
-                atomic_write(home / "AGENTS.md", data)
+                atomic_write(target, data)
             row = {"source_root": str(snapshot_root), "source_commit": snapshot_root.name,
                    "source_file_sha256": digest, "target_file_sha256": digest,
                    "updated_at": datetime.now(UTC).isoformat()}
             previous = bindings[name]
             if previous is None or any(previous[key] != row[key] for key in row if key != "updated_at"):
                 _set_binding(home, row)
-            if _bytes(home / "AGENTS.md") != data or _binding(home)["target_file_sha256"] != digest:
+            if _bytes(target) != data or _binding(home)["target_file_sha256"] != digest:
                 raise CoreError("instruction_sync_readback_failed", "Target or binding readback differs", host=name)
         if _bytes(config_path) != _json(config):
             atomic_write(config_path, _json(config))
@@ -304,13 +314,14 @@ def _apply(state: Path, snapshot_root: Path, stage: Path, data: bytes, targets: 
         errors = []
         for name in reversed(touched):
             home = targets[name]
+            target = home / HOST_FILE[name]
             try:
-                if _bytes(home / "AGENTS.md") not in (before[name], data):
+                if _bytes(target) not in (before[name], data):
                     raise CoreError("instruction_sync_recovery_required", "Concurrent edit retained during rollback", host=name)
                 if before[name] is None:
-                    (home / "AGENTS.md").unlink(missing_ok=True)
+                    target.unlink(missing_ok=True)
                 else:
-                    atomic_write(home / "AGENTS.md", before[name])
+                    atomic_write(target, before[name])
                 if stores_existed[name]:
                     _set_binding(home, bindings[name])
                 else:

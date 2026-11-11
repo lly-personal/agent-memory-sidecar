@@ -151,6 +151,115 @@ class InstructionSyncTests(unittest.TestCase):
         self.assertEqual(["codex"], [row["host"] for row in plan["hosts"]])
         self.assertFalse(self.pi.exists())
 
+    def test_claude_requires_explicit_enrollment_and_reuses_it(self):
+        claude = self.root / "claude"
+        claude.mkdir()
+        with patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(claude)}):
+            self.assertEqual({"codex", "pi"}, {row["host"] for row in sync.synchronize(**self.kw)["hosts"]})
+            self.assert_error("instruction_target_rebind_required", claude_home=self.root / "other")
+            self.deploy(claude_home=claude)
+            self.assertEqual((self.source / "global" / "AGENTS.md").read_bytes(), (claude / "CLAUDE.md").read_bytes())
+            self.assertFalse((claude / "AGENTS.md").exists())
+            self.assertEqual({"codex", "pi", "claude"}, {row["host"] for row in sync.synchronize(**self.kw)["hosts"]})
+            self.assert_error("instruction_target_rebind_required", claude_home=self.root / "other")
+
+    def test_claude_first_enrollment_and_subsequent_drift_fail_closed(self):
+        claude = self.root / "claude"
+        claude.mkdir()
+        target = claude / "CLAUDE.md"
+        target.write_bytes(b"existing instructions\n")
+        self.assert_error("global_instruction_drift", claude_home=claude)
+        self.assertFalse(self.codex.exists())
+        self.deploy(claude_home=claude, adopt_existing=["claude=" + sync._hash(target.read_bytes())])
+        old_codex = (self.codex / "AGENTS.md").read_bytes()
+        target.write_bytes(b"local edit\n")
+        self.publish()
+        self.assert_error("global_instruction_drift", claude_home=claude)
+        self.assertEqual(old_codex, (self.codex / "AGENTS.md").read_bytes())
+        self.assertEqual(b"local edit\n", target.read_bytes())
+
+    def test_claude_write_failure_rolls_back_other_hosts(self):
+        claude = self.root / "claude"
+        claude.mkdir()
+        self.deploy(claude_home=claude)
+        homes = {self.codex: "AGENTS.md", self.pi: "AGENTS.md", claude: "CLAUDE.md"}
+        before = {home: (home / name).read_bytes() for home, name in homes.items()}
+        bindings = {home: sync._binding(home) for home in homes}
+        self.publish()
+        write = sync.atomic_write
+        failed = False
+        def fail_once(path, data):
+            nonlocal failed
+            if path == claude / "CLAUDE.md" and not failed:
+                failed = True
+                raise OSError("fixture write failure")
+            return write(path, data)
+        with patch.object(sync, "atomic_write", side_effect=fail_once):
+            with self.assertRaises(OSError):
+                self.deploy(claude_home=claude)
+        for home, name in homes.items():
+            self.assertEqual(before[home], (home / name).read_bytes())
+            self.assertEqual(bindings[home], sync._binding(home))
+        self.assertFalse((self.state / "instruction-sync-recovery.json").exists())
+
+    def test_published_update_and_revert_reach_all_three_hosts(self):
+        claude = self.root / "claude"
+        claude.mkdir()
+        self.deploy(claude_home=claude)
+        original = (claude / "CLAUDE.md").read_bytes()
+        updated = self.publish()
+        self.deploy(claude_home=claude)
+        homes = {self.codex: "AGENTS.md", self.pi: "AGENTS.md", claude: "CLAUDE.md"}
+        for home, name in homes.items():
+            self.assertEqual(updated, (home / name).read_bytes())
+        self.git(self.source, "revert", "--no-edit", "HEAD")
+        self.git(self.source, "push")
+        self.deploy(claude_home=claude)
+        for home, name in homes.items():
+            self.assertEqual(original, (home / name).read_bytes())
+
+    def test_claude_linked_instruction_file_is_rejected(self):
+        claude = self.root / "claude"
+        claude.mkdir()
+        original = self.root / "external"
+        original.write_text("user content\n")
+        try:
+            (claude / "CLAUDE.md").symlink_to(original)
+        except OSError as exc:
+            self.skipTest(f"symlinks unavailable: {exc}")
+        with self.assertRaises(CoreError):
+            sync.synchronize(**self.kw, claude_home=claude)
+        self.assertEqual("user content\n", original.read_text())
+        self.assertFalse(self.codex.exists())
+
+    def test_cli_claude_target_and_changed_plan(self):
+        claude = self.root / "claude"
+        claude.mkdir()
+        args = ["instructions", "sync", "--source", str(self.source), "--codex-home", str(self.codex),
+                "--pi-agent-dir", str(self.pi), "--claude-home", str(claude), "--state-dir", str(self.state)]
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(0, cli.main(args))
+        plan = json.loads(output.getvalue())["data"]
+        self.publish()
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(1, cli.main([*args, "--apply", "--plan-hash", plan["plan_hash"]]))
+        self.assertEqual("instruction_sync_stale_plan", json.loads(output.getvalue())["error"]["code"])
+        self.assertFalse((claude / "CLAUDE.md").exists())
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(0, cli.main(args))
+        plan = json.loads(output.getvalue())["data"]
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(0, cli.main([*args, "--apply", "--plan-hash", plan["plan_hash"]]))
+        self.assertEqual((self.source / "global" / "AGENTS.md").read_bytes(), (claude / "CLAUDE.md").read_bytes())
+
+    def test_claude_enrollment_requires_existing_host_directory(self):
+        self.assert_error("instruction_targets_missing", claude_home=self.root / "not-a-host")
+        self.assertFalse(self.codex.exists())
+
     def test_changed_target_after_lock_wait_is_rejected(self):
         from contextlib import contextmanager
         self.deploy()
@@ -361,14 +470,18 @@ class InstructionSyncTests(unittest.TestCase):
             archive.write(wheel, "core/" + wheel.name)
         (resolved / "resolution.json").write_text(json.dumps({"status": "verified", "portable_root": "portable",
             "assets": {archive_path.name: {"sha256": hashlib.sha256(archive_path.read_bytes()).hexdigest()}}}))
+        claude = self.root / "portable-claude"
+        claude.mkdir()
         args = [sys.executable, "-B", str(script), "--portable-root", str(portable), "--source", str(self.source),
-                "--state-dir", str(self.state), "--codex-home", str(self.codex), "--pi-agent-dir", str(self.pi)]
+                "--state-dir", str(self.state), "--codex-home", str(self.codex), "--pi-agent-dir", str(self.pi),
+                "--claude-home", str(claude)]
         result = subprocess.run(args, capture_output=True, text=True)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         plan = json.loads(result.stdout)["data"]
         result = subprocess.run([*args, "--apply", "--plan-hash", plan["plan_hash"]], capture_output=True, text=True)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual("reload_required", json.loads(result.stdout)["data"]["status"])
+        self.assertEqual((self.source / "global" / "AGENTS.md").read_bytes(), (claude / "CLAUDE.md").read_bytes())
         wheel.write_bytes(b"tampered")
         result = subprocess.run(args, capture_output=True, text=True)
         self.assertEqual(1, result.returncode)

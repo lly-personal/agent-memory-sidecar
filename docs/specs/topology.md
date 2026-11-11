@@ -304,7 +304,7 @@ proposal body、before 文档和规则正文始终留在实际 instruction targe
 ## 全局规范的多宿主按需分发
 
 规则发布与完整文档分发是两条边界不同的链路。`instructions sync` 从 canonical Git 的已发布 main 固定提交，
-经隔离 clone 读取完整字节，不 pull 或覆盖活跃工程。一次本机操作向已接入 Codex/Pi 物化，并逐宿主回读。
+经隔离 clone 读取完整字节，不 pull 或覆盖活跃工程。一次本机操作向已接入 Codex/Pi/Claude Code 物化，并逐宿主回读；Claude 只通过显式目录接入，其用户级文件与项目指令的实际加载各自验收。
 宿主目标与源发现信息保存在本机同步 metadata；每个宿主的既有格式 Installation Registry 保存该目标最后部署的 hash，
 不复制行为内容、运行事件或授权。Codex 继续使用其现有 Store，Pi 只使用相同 registry schema，不安装 Codex runtime。
 同步后的受管源 snapshot 由现有 Bootstrap 显式识别并校验后承接，不能把外部路径相似当作 Owner 身份证据。

@@ -1,6 +1,6 @@
 ---
 name: agent-memory-bootstrap-anchor
-description: Synchronize global instructions across local Codex and Pi, or restore Agent Memory workstation capability, from a verified immutable release when the user says “同步并部署本机 Agent Memory”. Use for explicit synchronization, cold start or migration; not ordinary project work.
+description: Synchronize global instructions across enrolled local Codex, Pi and Claude Code, or restore Agent Memory workstation capability, from a verified immutable release when the user says “同步并部署本机 Agent Memory”. Use for explicit synchronization, cold start or migration; not ordinary project work.
 ---
 
 # Agent Memory Bootstrap Anchor
@@ -9,19 +9,24 @@ This is a cold-start distribution anchor, not the Bootstrap implementation and n
 
 When the user says `同步并部署本机 Agent Memory`:
 
-Choose the requested operation, not the current host alone. Global-standard synchronization on either Codex or Pi uses the
+Choose the requested operation, not the current host alone. Global-standard synchronization on Codex, Pi or Claude Code uses the
 instruction lane below; full Codex capability installation/migration uses the existing workstation lane. An established Owner
 with a request to synchronize standards defaults to the instruction lane. Do not install Codex Hooks or Scout to satisfy a Pi
 instruction request. Both lanes first complete step 1's immutable Release resolution.
 
-## Instruction lane: Codex and Pi
+## Instruction lane: Codex, Pi and Claude Code
 
 After step 1, run `python -B <portable_root>/.agents/skills/agent-memory-workstation-bootstrap/scripts/sync_instructions.py
 --portable-root <portable_root>` to preview the verified wheel's `instructions sync` operation. Do not use an ambient installed
 Core or bypass missing release support with source-checkout scripts. The implementation resolves saved target/source bindings;
-for first enrollment, pass `--codex-home` / `--pi-agent-dir` only from observed host configuration, and `--source` from the existing
+for first enrollment, pass `--codex-home` / `--pi-agent-dir` / `--claude-home` only from observed host configuration, and `--source` from the existing
 canonical Owner binding or an explicitly selected private source checkout. Never guess a repository or overwrite an ambiguous
 home. First-time source selection is a one-time user choice, not a recurring path-entry requirement.
+
+Claude Code is never enrolled from directory presence. Its first persistent enrollment and user-level `CLAUDE.md` change require the
+separate authorization applicable to that host. Check actual Claude engine/session loading and project instructions independently;
+do not claim Scout, Hooks, plugin installation, or adoption from the projected file. Review the old-runtime rollback boundary in
+`specs/global-instruction-sync-v1.md` before enrollment.
 
 The preview covers all enrolled local hosts. If successful, repeat with `--apply --plan-hash <returned-plan-hash>`; the user's
 synchronization request authorizes this exact published-version deployment. Do not run per-host copy commands. Drift, override,
