@@ -310,7 +310,8 @@ proposal body、before 文档和规则正文始终留在实际 instruction targe
 同步后的受管源 snapshot 由现有 Bootstrap 显式识别并校验后承接，不能把外部路径相似当作 Owner 身份证据。
 
 统一入口先完成原有 Release Resolver；指令分发调用 verified portable 内 Core wheel，完整 Codex 能力安装仍走
-Workstation Reconcile。Pi 原生 package manifest 仅暴露同一 Bootstrap Anchor，不引入第二实现。
+Workstation Reconcile。Pi 原生 package manifest 暴露同一 Bootstrap Anchor 与可选 Engineering Contract Review，
+Claude Code 原生 Plugin 读取相同 Skill 目录；方法分发不引入第二实现，也不授予 Desktop-bound Scout 资格。
 详见[同步契约](../../specs/global-instruction-sync-v1.md)。本机部署与另一设备、刷新加载、行为采用分开验收。
 
 ## Scope 与 Desktop

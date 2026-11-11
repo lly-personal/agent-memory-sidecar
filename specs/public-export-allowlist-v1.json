@@ -5,6 +5,7 @@
     ".gitignore",
     "pyproject.toml",
     "package.json",
+    ".claude-plugin/marketplace.json",
     "MANIFEST.in",
     "domain.md",
     "CHANGELOG.md",

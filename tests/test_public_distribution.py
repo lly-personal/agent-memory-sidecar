@@ -219,7 +219,7 @@ class PublicDistributionTests(unittest.TestCase):
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
         self.assertEqual(
-            {"core": "0.6.0", "plugin": "1.8.0", "bootstrap": "2.5.0", "scout": "5.17.0"},
+            {"core": "0.6.1", "plugin": "1.9.0", "bootstrap": "2.5.0", "scout": "5.17.0"},
             facts,
         )
         allowlist = json.loads(
@@ -439,6 +439,34 @@ class PublicDistributionTests(unittest.TestCase):
                     (method / relative).read_bytes(),
                 )
             self.assertTrue((method / "agents" / "openai.yaml").is_file())
+
+    def test_native_discovery_surfaces_share_the_built_method_source(self) -> None:
+        paths = [ROOT / "package.json", ROOT / ".claude-plugin/marketplace.json", ROOT / "plugins/agent-memory-sidecar"]
+        with tempfile.TemporaryDirectory() as temporary:
+            archive_path = Path(temporary) / "native.zip"
+            self.release.deterministic_zip(output=archive_path, root=ROOT, files=paths, generated={})
+            installed = Path(temporary) / "installed"
+            with zipfile.ZipFile(archive_path) as archive:
+                archive.extractall(installed)
+            marketplace = json.loads((installed / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
+            self.assertEqual(1, len(marketplace["plugins"]))
+            plugin = installed / marketplace["plugins"][0]["source"]
+            codex = json.loads((plugin / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+            claude = json.loads((plugin / ".claude-plugin/plugin.json").read_text(encoding="utf-8"))
+            for key in ("name", "version", "skills"):
+                self.assertEqual(codex[key], claude[key])
+            self.assertEqual({"name", "version", "description", "author", "repository", "skills"}, set(claude))
+            native = json.loads((installed / "package.json").read_text(encoding="utf-8"))
+            pi_paths = { (installed / path).resolve() for path in native["pi"]["skills"] }
+            expected = { (plugin / "skills" / name).resolve() for name in ("agent-memory-bootstrap-anchor", "engineering-contract-review") }
+            self.assertEqual(expected, pi_paths)
+            method = plugin / claude["skills"] / "engineering-contract-review"
+            self.assertIn(method.resolve(), pi_paths)
+            for path in method.rglob("*"):
+                if path.is_file():
+                    source = ROOT / path.relative_to(installed)
+                    self.assertEqual(source.read_bytes(), path.read_bytes())
+            self.assertFalse((plugin / claude["skills"] / "global-owner-scout").exists())
 
     def test_sdist_normalization_is_reproducible(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

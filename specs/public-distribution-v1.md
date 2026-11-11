@@ -101,7 +101,40 @@ methods travel in the same Plugin/portable payload and are identified by the exi
 not enter Core wheel/sdist or introduce a separate service, Store, version field, or automatic Owner update. Method maintenance
 and standalone-copy handoff follow the [method SOP](../docs/specs/interface.md#按需方法的维护与交接).
 
-Its `source` object has exact fields:
+The Codex manifest and Claude Code manifest live under the same Plugin root and must agree on Plugin name, version and Skill
+directory. The root Pi package points directly at that Plugin's Anchor and engineering method directories. The root Claude
+marketplace points at the existing Plugin root. The portable archive includes these discovery manifests and the same method
+files; no new implementation, Store, version authority or updater is introduced. Native package/plugin managers own installed
+caches and enablement. They do not authorize instruction synchronization or source/Store mutations. The
+[user entry](../README.md#optional-engineering-methods-on-codex-pi-and-claude-code) owns installation and invocation guidance.
+
+### Scout host qualification
+
+The current Scout contract is Desktop-bound. A method file, SDK symbol, empty session list or successful source import does not
+establish the complete native contract. Evaluate each host independently:
+
+| Requirement | Codex Desktop | Pi | Local Claude Code |
+|---|---|---|---|
+| Current project identity | Same-host project inventory plus native task cwd/Git identity | Extension/session context exposes cwd; no qualified Scout binding adapter yet | SDK session metadata exposes cwd; no qualified Desktop-to-local-session binding adapter yet |
+| Project history | Native active/archived listing and per-task reads, with exact cursors | Native `SessionManager.list(cwd)` and `open(...).getEntries()` exist; complete-coverage/error semantics need qualification | Native SDK `listSessions({dir, includeWorktrees:false})` and `getSessionMessages(id,{dir,...})` exist; Desktop session coverage and native termination semantics need qualification |
+| Artifact authorization | Current task's explicit output metadata, checked before deep work | No qualified Scout output-grant adapter | No qualified Scout output-grant adapter |
+| Product qualification | Existing Project v7 / Review Pack v8 / Delivery v2 contracts | Not qualified; do not expose the Desktop Skill as supported | Not qualified; do not expose the Desktop Skill as supported |
+
+Primary interface owners are [Codex App Server](https://developers.openai.com/codex/app-server/),
+[Pi SessionManager](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/session-manager.ts),
+[Pi extension context](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md) and the
+[Claude Agent SDK reference](https://code.claude.com/docs/en/agent-sdk/typescript#listsessions).
+These references establish available primitives, not Sidecar adoption. The Pi 1.5.2 installed SDK was exercised with an explicit
+current-project directory and returned a scoped empty list; this proves the call shape only. Claude's directory options must
+always be explicit: omitting `dir` searches across projects, and worktree inclusion defaults to true. Neither interface permits
+Sidecar to expand an authorized project, parse raw private transcripts itself, invent a Desktop project ID, or treat a writable
+directory as a task output grant. A future adapter must preserve current context, source provenance, coverage/error states,
+artifact containment and deterministic terminal behavior through its real native entry before qualification. Full Scout support
+must not be inferred from the independently portable engineering method.
+
+### Release source identity
+
+The release manifest's `source` object has exact fields:
 
 ```text
 repository, ref, commit, authority_epoch, engineering_source_commit,

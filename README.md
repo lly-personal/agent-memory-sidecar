@@ -97,7 +97,7 @@ For normal Codex Desktop use, register the immutable repository Marketplace,
 install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.6.0
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.6.1
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -109,6 +109,31 @@ refresh only if the capability is missing or the host explicitly requires it. Re
 same task without proving automatic loading.
 Marketplace registration and a repository checkout are discovery surfaces;
 they are not source authority and do not by themselves prove host deployment.
+
+### Optional engineering methods on Codex, Pi and Claude Code
+
+Engineering Contract Review is maintained once in the Plugin's `skills/engineering-contract-review` directory. The Codex
+Plugin, Pi package and Claude Code Plugin expose that same directory; their installed caches are derived copies.
+For Pi or local Claude Code, install the tagged source through the host's native manager:
+
+```sh
+pi install git:github.com/lly-personal/agent-memory-sidecar@v0.6.1
+claude plugin marketplace add https://github.com/lly-personal/agent-memory-sidecar.git#v0.6.1
+claude plugin install agent-memory-sidecar@agent-memory --scope user
+```
+
+Ask the agent to use Engineering Contract Review for a design, failure-recovery, verification or performance question. It reads
+only the relevant bundled method and returns an evidence-bounded review within the current task's authorization. Explicit
+commands are `$agent-memory-sidecar:engineering-contract-review` in Codex, `/skill:engineering-contract-review` in Pi and
+`/agent-memory-sidecar:engineering-contract-review` in Claude Code. The native plugin namespace is part of Claude's command
+syntax, not a separate method. Reload only when the host requires it. To update a pinned installation, select the next published
+tag through the same native manager; do not edit installed method copies. Existing independently maintained same-name skills
+must be checked before migration, rather than overwritten or deleted by name.
+
+These packages also expose the existing Bootstrap Anchor. Installing or calling a method does not deploy Core, change global
+instructions, grant new tools, or prove model adoption. Local Claude Code plugins do not establish Cowork/cloud support.
+Scout is qualified separately: its current Desktop-bound entry is not exposed by the Pi/Claude packages. See the
+[native interface and qualification boundaries](specs/public-distribution-v1.md#scout-host-qualification).
 
 Desktop setup also installs a self-contained command entry with the Agent Memory Skill. The Agent runs
 `<python> -B <loaded-skill>/scripts/agent-memory.py` from the current project; no global console script,
