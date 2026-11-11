@@ -10,7 +10,7 @@
 Codex Desktop users register the tagged public Marketplace and install the plugin:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.5.16
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.6.0
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 

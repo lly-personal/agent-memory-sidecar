@@ -8,7 +8,7 @@ engineering-authority epochs, first-release cutover gate, and steady-state publi
 managed sources, host materialization, and same-task read-only consumer scope verification.
 `global-owner-scout-delivery-v1.md` owns task-scoped Review Pack artifacts, compact receipts, and actual task-surface qualification.
 `release-promotion-v1.md` owns the deterministic inspect/apply transition from a verified draft to an attested immutable Release.
-`global-instruction-sync-v1.md` owns on-demand whole-document distribution to enrolled Codex/Pi hosts; it does not install Pi Core or Scout.
+`global-instruction-sync-v1.md` owns on-demand whole-document distribution to enrolled Codex/Pi/Claude Code hosts; it does not install Pi or Claude Core/Scout.
 
 All other Markdown contracts in this directory are retained historical contracts. `public-export-allowlist-v1.json` is the
 machine-owned allowlist for the active public distribution contract. Historical files are

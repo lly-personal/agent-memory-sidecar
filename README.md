@@ -97,7 +97,7 @@ For normal Codex Desktop use, register the immutable repository Marketplace,
 install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.5.16
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.6.0
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -144,12 +144,19 @@ not use normal sync to replace it. The unified deployment flow reviews and appli
 existing private Owner remains a separate optional backend unless explicitly
 detached.
 
-## Global instructions across Codex and Pi
+## Global instructions across Codex, Pi and Claude Code
 
 The same `同步并部署本机 Agent Memory` intent has an instruction-distribution lane: resolve the verified Release, preview
 and apply its Core `instructions sync` operation, then report each enrolled local host separately. A single published canonical
-`global/AGENTS.md` is deployed byte-for-byte to Codex and Pi; local drift blocks overwrites. It does not install Codex Hooks in Pi
-or claim Scout support or model adoption. See [the synchronization contract](specs/global-instruction-sync-v1.md).
+`global/AGENTS.md` is deployed byte-for-byte to enrolled Codex and Pi instruction files and, only after explicit enrollment, to
+Claude Code's user `CLAUDE.md`; local drift blocks overwrites. This does not install Hooks or Scout in Pi or Claude Code, prove
+project-instruction discovery, or claim model adoption. Claude interprets imports and comments differently, and effective session
+context must be checked separately. See [the synchronization contract](specs/global-instruction-sync-v1.md), including rollback limits.
+
+Before downgrading to an older Codex/Pi-only sync runtime, the new verified runtime must preview and apply an explicitly approved
+`instructions sync --unenroll-claude` operation. It removes only the unchanged managed Claude projection and enrollment, retaining
+other hosts and user files. Source-content rollback remains a published revert followed by normal sync; neither operation proves
+that an already-running session has dropped its prior context.
 
 The root Pi package manifest exposes the existing Bootstrap Anchor through Pi's native Git-package discovery. Use an immutable
 release ref `v0.5.0` or later; verify the installed release before claiming this capability is available. A new device needs one

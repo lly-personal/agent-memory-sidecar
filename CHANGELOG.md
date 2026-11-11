@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.0 (2026-11-11)
+
+- Explicitly enroll Claude Code in the existing canonical instruction sync, projecting the same published document into its user-level CLAUDE.md while preserving Codex/Pi behavior.
+- Preview and apply a scoped Claude exit before returning to an older Codex/Pi-only sync runtime, preserving user edits and other host state.
+- Keep file delivery, native instruction and skill discovery, actual model execution, and user adoption as separate evidence; Claude Hooks and Desktop-bound Scout remain outside this sync capability.
+- Components: Core 0.6.0, Plugin 1.8.0 and Bootstrap 2.5.0; Scout 5.17.0 and existing review contracts are unchanged.
+
 ## 0.5.16 (2026-11-10)
 
 - Freeze native history pages through the Scout import-history helper instead of model-written JSON chunks; preserve identity, cursors and truncation metadata with immutable readback.

@@ -7,7 +7,7 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `2.4.9`
+- Skill version: `2.5.0`
 - Modes: `inspect`, `verify_consumer`, `apply_enrollment`
 - Deployment pack: `agent_memory_workstation_deployment_pack_v4`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
@@ -26,11 +26,14 @@ This Skill separates six facts that must never be collapsed:
 A normal deployment request always enters `inspect`. It must not create, update, pause, resume, or delete Scheduled tasks and must
 not change the Host Profile. Only an explicit request to retest or configure Scheduled capability enters `apply_enrollment`.
 
-## Global-standard synchronization (Codex or Pi)
+## Global-standard synchronization (Codex, Pi or Claude Code)
 
 For `同步并部署本机 Agent Memory` requests whose purpose is updating global standards, use the Bootstrap Anchor's instruction
 lane: resolve the immutable Release first, then invoke `scripts/sync_instructions.py` from that verified portable bundle.
-This lane synchronizes all enrolled local Codex/Pi targets and does not install Codex Hooks, run Scout, or request project inventory.
+This lane synchronizes all enrolled local Codex/Pi/Claude Code targets and does not install Codex Hooks, run Scout, or request project inventory. Claude first requires an explicitly observed `--claude-home` and separately authorized enrollment; never enroll it from directory presence. Its effective session and project instructions remain separate checks.
+Before downgrading to a Codex/Pi-only sync runtime, an explicitly authorized Claude exit uses the same verified wrapper's
+`--unenroll-claude` preview/apply path. Do not combine it with synchronization or source options; require successful removal
+readback and keep recovery/cleanup blockers visible. Missing release support blocks downgrade rather than authorizing a source-script fallback.
 Do not route a Pi instruction request through `workstation-reconcile`, and do not use this installed script instead of the
 Resolver-verified bundle. Report instruction deployment separately from full capability readiness. Full Codex installation and
 migration continue through `inspect` below.
@@ -55,7 +58,7 @@ migration continue through `inspect` below.
      root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
 3. Run exact-hash `workstation-reconcile --apply`. Marketplace/Plugin mutation participates in the source-cutover rollback
    transaction. The transaction then runs Core setup, binds the explicit or preserved canonical Owner, verifies Doctor, installs
-   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.4.9`, Scout `5.17.0`,
+   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.5.0`, Scout `5.17.0`,
    and every desired identity. The result is `reload_required`; it proves host materialization, not model adoption or project-level
    same-name Skill parity.
 4. If the user also requested verification, continue through `verify_consumer` in this same task after exact readback; that request

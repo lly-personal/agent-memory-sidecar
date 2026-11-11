@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import re
 import stat
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from .errors import CoreError
@@ -10,6 +12,145 @@ from .errors import CoreError
 
 def logical_absolute(path: Path | str) -> Path:
     return Path(os.path.abspath(os.fspath(Path(path).expanduser())))
+
+
+@contextmanager
+def hold_physical_directory(path: Path | str) -> Iterator[int | None]:
+    """Hold a physical directory without changing its permissions.
+
+    POSIX callers must use the yielded descriptor for relative operations;
+    directory renames remain possible. Windows callers use paths while every
+    ancestor is held against deletion or renaming. No pathname check runs on
+    exit, so callers can finish recovery through the held directory.
+    """
+
+    directory = logical_absolute(path)
+    if os.name == "nt":
+        with _hold_windows_directory_chain(directory):
+            yield None
+        return
+
+    descriptor = None
+    try:
+        try:
+            flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+            cursor = Path(directory.anchor)
+            descriptor = os.open(cursor, flags)
+            for part in directory.parts[1:]:
+                cursor = cursor / part
+                before = os.stat(part, dir_fd=descriptor, follow_symlinks=False)
+                trusted_alias = _is_trusted_host_directory_alias(cursor, before)
+                if not trusted_alias and (
+                    not stat.S_ISDIR(before.st_mode)
+                    or _is_reparse_point(before)
+                ):
+                    raise CoreError(
+                        "store_unsafe",
+                        "held ancestor must be a physical directory",
+                        path=str(cursor),
+                    )
+                child = os.open(
+                    part,
+                    flags & ~os.O_NOFOLLOW if trusted_alias else flags,
+                    dir_fd=descriptor,
+                )
+                try:
+                    opened = os.fstat(child)
+                    expected = (
+                        os.stat(part, dir_fd=descriptor)
+                        if trusted_alias else before
+                    )
+                    if not stat.S_ISDIR(opened.st_mode) or (
+                        opened.st_dev, opened.st_ino
+                    ) != (expected.st_dev, expected.st_ino):
+                        raise CoreError(
+                            "store_unsafe",
+                            "physical directory changed while being held",
+                            path=str(cursor),
+                        )
+                except BaseException:
+                    os.close(child)
+                    raise
+                os.close(descriptor)
+                descriptor = child
+        except OSError as exc:
+            raise CoreError(
+                "store_unsafe",
+                "physical directory could not be held safely",
+                path=str(directory),
+            ) from exc
+        yield descriptor
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+@contextmanager
+def _hold_windows_directory_chain(directory: Path) -> Iterator[None]:
+    import ctypes
+    from ctypes import wintypes
+
+    class FileAttributeTagInfo(ctypes.Structure):
+        _fields_ = [
+            ("FileAttributes", wintypes.DWORD),
+            ("ReparseTag", wintypes.DWORD),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateFileW.argtypes = [
+        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+        wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE,
+    ]
+    kernel32.CreateFileW.restype = wintypes.HANDLE
+    kernel32.GetFileInformationByHandleEx.argtypes = [
+        wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD,
+    ]
+    kernel32.GetFileInformationByHandleEx.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handles = []
+    cursor = Path(directory.anchor)
+    try:
+        for component in (None, *directory.parts[1:]):
+            if component is not None:
+                cursor = cursor / component
+            # FILE_LIST_DIRECTORY participates in sharing checks; attributes-only
+            # access does not pin against rename. Opening the reparse point itself
+            # lets the handle check reject links and junctions.
+            handle = kernel32.CreateFileW(
+                str(cursor), 0x01 | 0x80, 0x01 | 0x02, None,
+                3, 0x02000000 | 0x00200000, None,
+            )
+            if handle == ctypes.c_void_p(-1).value:
+                raise CoreError(
+                    "store_unsafe",
+                    "physical directory could not be held safely",
+                    path=str(cursor),
+                    windows_error=ctypes.get_last_error(),
+                )
+            handles.append(handle)
+            information = FileAttributeTagInfo()
+            if not kernel32.GetFileInformationByHandleEx(
+                handle, 9, ctypes.byref(information), ctypes.sizeof(information),
+            ):
+                raise CoreError(
+                    "store_unsafe",
+                    "held directory metadata is unavailable",
+                    path=str(cursor),
+                    windows_error=ctypes.get_last_error(),
+                )
+            if not information.FileAttributes & 0x10 or (
+                information.FileAttributes & 0x400
+            ):
+                raise CoreError(
+                    "store_unsafe",
+                    "held ancestor must be a physical directory",
+                    path=str(cursor),
+                )
+        yield
+    finally:
+        for handle in reversed(handles):
+            kernel32.CloseHandle(handle)
 
 
 def _is_trusted_host_directory_alias(
