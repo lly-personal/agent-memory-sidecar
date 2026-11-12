@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.4 (2026-11-12)
+
+- Route Pi and Claude Scout preparation to the existing native result descriptors, and locate sibling methods through native discovery or declared plugin paths.
+- Add read-only parameter help for Claude capture and prefer native file readers for long references so agents can discover the existing flow without reading helper implementations.
+- Preserve complete review obligations and unknown history coverage; full natural review and any reduction in time or token use remain unverified.
+- Components: Core 0.6.4, Plugin 1.11.1, Bootstrap 2.5.3 and Scout 5.19.1. Bootstrap only synchronizes managed component identities.
+
 ## 0.6.3 (2026-11-12)
 
 - Add Claude's ordinary namespaced Scout entry using the same method source as Codex/Pi; project only native discovery paths in portable artifacts.
