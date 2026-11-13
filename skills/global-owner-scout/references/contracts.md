@@ -21,6 +21,8 @@ fields. Project v6 additionally requires `purpose` (`inspect` or `review`) and `
 Project v7 retains those fields. Each edge adds `kind`: `contains`, `depends_on`, `constrains`, `implements`, `handoff`, or `evolves`.
 Containment is acyclic; shared ownership may have multiple parents. Other relations may be cyclic. Unknown hierarchy does not
 block independent nodes or journeys. Claims carry the reasons, conditions and evidence of decisions; do not invent dates or edges.
+`depends_on` points from the dependent to its prerequisite; `constrains` points from a constraint to what it limits.
+These relations retain their source claims, including permission limits and unresolved or conflicting evidence.
 
 V7 engineering cards have `kind=engineering`, nullable `parent_card_id`, `card_id`, `human_context`, `evidence_level`,
 `normalized_evidence_hash`, `owner_recommendation`, `direct_evidence`, `owner_rationale`, `anti_examples`, `privacy_check`,
@@ -43,6 +45,15 @@ Each coverage item has `dimension, status, explanation, evidence_refs`; status i
 IDs are unique within their kind; edges resolve nodes; journeys form a connected directed path from entry. All evidence refs
 resolve declared available/degraded sources, and card IDs resolve actual Project Cards. Unknown claims and uncovered dimensions
 remain explicit; no synthetic edge or fixed dimension quota proves completeness. Source revision binds the read-only proof's HEAD. Recovery also retains the existing project identity and full after-context snapshot hash, including dirty/untracked state; a matching HEAD alone does not prove currentness.
+
+Selection recovery is a view of this same map. Without an explicit journey, a node, edge or linked advice recovers all recorded
+journeys containing it (including a node's containment ancestors); it does not choose one silently. An explicit journey keeps
+that path. Include its containment ancestry and recursively recorded prerequisites/constraints, never unrelated dependent
+branches. Historical v6 relations have no typed prerequisite semantics. Preserve journey outcomes/recovery, claim layers and
+evidence sources. `selected_context` also carries `purpose, project_key, project_identity, context_snapshot_hash, goal, boundary,
+observed_at, source_revision, coverage` and the optional `project_contract`. Coverage remains project-wide, not proof that this
+selection is complete. The `verify-final` entry adds its actual `source_status` and optional `source_reason` to this context;
+`not_checked`, `changed` and `unavailable` never grant currentness, execution or mutation authority. No missing journey is invented.
 
 Inspect uses `status=view_ready` (or `degraded` with limitations), `evidence_window.kind=current`, and `session_coverage=null`.
 Events, observations and cards are empty. Session sources are not applicable. Review Pack has `owner_parity=null`,
