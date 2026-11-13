@@ -93,12 +93,12 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.5.5",
+                "version": "2.5.6",
                 "content_sha256": "b" * 64,
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.19.2",
+                "version": "5.19.3",
                 "content_sha256": "c" * 64,
             },
         }
@@ -845,8 +845,8 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         desired = {
             "release_ref": "v0.3.10", "source_commit": "a" * 40,
             "core_version": "0.3.10", "plugin_version": "1.5.1", "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.5.5", "bootstrap_sha256": "c" * 64,
-            "scout_version": "5.19.2", "scout_sha256": "d" * 64,
+            "bootstrap_version": "2.5.6", "bootstrap_sha256": "c" * 64,
+            "scout_version": "5.19.3", "scout_sha256": "d" * 64,
         }
         source_sha = "e" * 64
         pack = self.managed_sources.build_deployment_pack(
@@ -863,15 +863,15 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             host_materialization={
                 "core": {"status": "verified", "version": "0.3.10", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
                 "global_binding": "unavailable", "doctor": "verified",
-                "bootstrap_skill": {"status": "unchanged", "version": "2.5.5", "content_sha256": "c" * 64},
-                "scout_skill": {"status": "unchanged", "version": "5.19.2", "content_sha256": "d" * 64},
+                "bootstrap_skill": {"status": "unchanged", "version": "2.5.6", "content_sha256": "c" * 64},
+                "scout_skill": {"status": "unchanged", "version": "5.19.3", "content_sha256": "d" * 64},
             },
             requires_reload=True,
             consumer_verified=False,
             generated_at="2026-08-21T12:00:00+08:00",
         )
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("2.5.5", validated["desired_bundle"]["bootstrap_version"])
+        self.assertEqual("2.5.6", validated["desired_bundle"]["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
         for label in ("期望发行身份", "Plugin 分发", "能力源同步", "主机物化", "项目消费者范围", "消费者入口条件"):
             self.assertIn(label, rendered)
@@ -917,7 +917,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 json.loads(text),
                 expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
             )
-            self.assertEqual("v0.6.7", value["plugins"][0]["source"]["ref"])
+            self.assertEqual("v0.6.8", value["plugins"][0]["source"]["ref"])
         else:
             self.assertTrue(
                 (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()
@@ -1027,7 +1027,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_v5_prompt_has_no_fixed_binding(self) -> None:
         prompt = (
             "Use $global-owner-scout in project_scout mode for the current bound project; rolling 72 hours; "
-            "Skill 5.19.2; global_owner_scout_project_v7; global_owner_scout_review_pack_v8; "
+            "Skill 5.19.3; global_owner_scout_project_v7; global_owner_scout_review_pack_v8; "
             "gpt-5.6-sol; medium; read-only."
         )
         self.bootstrap.validate_prompt(prompt)
@@ -1177,6 +1177,129 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         protocol_failure["session_coverage"]["index_terminals"] = {"active": "eof", "archived": "eof"}
         self.scout_validator.validate_project(protocol_failure)
         self.assertEqual([], protocol_failure["project_cards"])
+
+    def test_successful_truncated_page_and_recovered_call_use_existing_coverage_consumer(self) -> None:
+        project = self.scout_validator.valid_project(thread_pages_terminal_failure=True)
+        project["limitations"] = [
+            "原生页面成功返回，但有字段截断；原游标和失败请求均已保留。",
+            "此前参数错误已在原授权和重试边界内更正，当前执行已取得终态。",
+        ]
+        sessions = next(source for source in project["evidence_sources"] if source["kind"] == "sessions")
+        sessions["coverage"] = "所选聊天已取得原生终态，部分字段在当前读取边界仍不完整。"
+        sessions["uncovered"] = ["一个选中任务的命令字段仍截断，不能证明逐项完整。"]
+        result = subprocess.run(
+            [sys.executable, "-B", str(SCOUT_RUNTIME), "validate-project"], cwd=SCOUT_SCRIPTS,
+            input=json.dumps(project, ensure_ascii=False), capture_output=True, text=True, encoding="utf-8",
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("ok", json.loads(result.stdout)["status"])
+        self.assertEqual("degraded", self.scout_validator.validate_project(project)["status"])
+        self.assertGreater(len(project["project_cards"]), 0)
+
+        complete = json.loads(json.dumps(project))
+        complete["status"] = "ok"
+        complete["session_coverage"]["status"] = "complete"
+        complete["session_coverage"]["discovery_methods"] = ["native_index_completed", "native_thread_pages_completed"]
+        with self.assertRaises(self.scout_validator.ContractError):
+            self.scout_validator.validate_project(complete)
+
+        unrecovered = json.loads(json.dumps(project))
+        unrecovered["session_coverage"]["discovery_methods"] = ["native_index_completed", "execution_protocol_failed"]
+        with self.assertRaisesRegex(self.scout_validator.ContractError, "execution_protocol_failed requires project status failed"):
+            self.scout_validator.validate_project(unrecovered)
+
+    def test_unavailable_output_copy_does_not_infer_missing_authorization(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            chosen_output = Path(temporary) / "not-created" / "chosen-output"
+            preflight = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_RUNTIME), "inspect-output", "--artifact-dir", str(chosen_output),
+                 "--protected-root", str(ROOT)],
+                cwd=SCOUT_SCRIPTS, capture_output=True, text=True, encoding="utf-8",
+            )
+            self.assertNotEqual(0, preflight.returncode)
+            self.assertEqual("output_preflight_unavailable", json.loads(preflight.stderr)["message"])
+            self.assertFalse(chosen_output.exists())
+            for reason, phase, expected in (
+                ("output_preflight_unavailable", "preflight", "输出根检查未通过"),
+                ("output_root_unavailable", "delivery", "输出根目录不可用"),
+            ):
+                with self.subTest(reason=reason):
+                    terminal = {"contract_version": "global_owner_scout_terminal_v1", "status": "interactive_host_blocked",
+                                "phase": phase, "reason_code": reason, "project_state": "unverified", "confirmation_eligible": False}
+                    rendered = subprocess.run(
+                        [sys.executable, "-B", str(SCOUT_RUNTIME), "render-terminal"], cwd=SCOUT_SCRIPTS,
+                        input=json.dumps(terminal), capture_output=True, text=True, encoding="utf-8", check=True,
+                    ).stdout
+                    self.assertIn(expected, rendered)
+                    self.assertNotIn("没有安全且明确授权", rendered)
+                    self.assertIn("confirmation_eligible=false", rendered)
+                    self.assertNotIn(str(chosen_output), rendered)
+
+    def test_documented_native_final_selection_preserves_bytes_and_existing_evidence(self) -> None:
+        protocol = (SCOUT_SCRIPTS.parent / "references" / "deep-review-protocol.md").read_text(encoding="utf-8")
+        example = protocol.split("```python\n", 1)[1].split("\n```", 1)[0]
+        final = "原生正文\r\n保留反引号 `literal`、$() 和引号 '。\n"
+        native = {"turns": [{"id": "selected", "items": [
+            {"type": "agentMessage", "phase": "commentary", "text": "not the final"},
+            {"type": "agentMessage", "phase": "final_answer", "text": final},
+        ]}, {"id": "other", "items": [{"type": "agentMessage", "phase": "final_answer", "text": "other final"}]}]}
+        with tempfile.TemporaryDirectory() as temporary:
+            source, target = Path(temporary) / "native.json", Path(temporary) / "receipt.txt"
+            source.write_bytes(json.dumps(native, ensure_ascii=False).encode("utf-8"))
+            command = [sys.executable, "-B", "-c", example, str(source), "selected", str(target)]
+            selected = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(0, selected.returncode, selected.stderr)
+            self.assertEqual(final.encode("utf-8"), target.read_bytes())
+            existing = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
+            self.assertNotEqual(0, existing.returncode)
+            self.assertEqual(final.encode("utf-8"), target.read_bytes())
+            absent = Path(temporary) / "absent.txt"
+            missing = subprocess.run([sys.executable, "-B", "-c", example, str(source), "missing", str(absent)],
+                                     capture_output=True, text=True, encoding="utf-8")
+            self.assertNotEqual(0, missing.returncode)
+            self.assertFalse(absent.exists())
+            native["turns"][0]["items"].append({"type": "agentMessage", "phase": "final_answer", "text": "ambiguous"})
+            source.write_bytes(json.dumps(native, ensure_ascii=False).encode("utf-8"))
+            ambiguous = subprocess.run([sys.executable, "-B", "-c", example, str(source), "selected", str(absent)],
+                                       capture_output=True, text=True, encoding="utf-8")
+            self.assertNotEqual(0, ambiguous.returncode)
+            self.assertFalse(absent.exists())
+            self.assertEqual(final.encode("utf-8"), target.read_bytes())
+
+    def test_documented_native_final_rejects_truncation_even_with_valid_receipt(self) -> None:
+        protocol = (SCOUT_SCRIPTS.parent / "references" / "deep-review-protocol.md").read_text(encoding="utf-8")
+        example = protocol.split("```python\n", 1)[1].split("\n```", 1)[0]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            prepared = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_RUNTIME), "prepare-delivery", "--artifact-dir", str(root),
+                 "--protected-root", str(ROOT)], input=self._review_pack_json(1),
+                capture_output=True, text=True, encoding="utf-8", check=True,
+            )
+            manifest = json.loads(prepared.stdout)
+            receipt = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_RUNTIME), "render-receipt", "not_requested",
+                 "--artifact-path", str(root / manifest["artifact_name"]), "--artifact-root", str(root)],
+                input=prepared.stdout, capture_output=True, text=True, encoding="utf-8", check=True,
+            ).stdout
+            # A valid receipt cannot prove that surrounding native final prose survived clipping.
+            verified = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_RUNTIME), "verify-final", "--artifact-root", str(root)],
+                input=receipt, capture_output=True, text=True, encoding="utf-8", check=True,
+            )
+            self.assertEqual("artifact_verified", json.loads(verified.stdout)["status"])
+            for flag in ("truncated", "textTruncated"):
+                with self.subTest(flag=flag):
+                    source, target = root / f"{flag}.json", root / f"{flag}.txt"
+                    source.write_text(json.dumps({"turns": [{"id": "selected", "items": [
+                        {"type": "agentMessage", "phase": "final_answer", "text": receipt, flag: True},
+                    ]}]}), encoding="utf-8")
+                    extracted = subprocess.run(
+                        [sys.executable, "-B", "-c", example, str(source), "selected", str(target)],
+                        capture_output=True, text=True, encoding="utf-8",
+                    )
+                    self.assertNotEqual(0, extracted.returncode)
+                    self.assertFalse(target.exists())
 
     def test_single_runtime_dispatcher_renders_manifest_free_terminal(self) -> None:
         context = subprocess.run(
@@ -1924,7 +2047,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             target = Path(temporary) / "global-owner-scout"
             source = ROOT / "skills" / "global-owner-scout"
             installed = self.bootstrap.install_skill(source, target)
-            self.assertEqual("5.19.2", installed["version"])
+            self.assertEqual("5.19.3", installed["version"])
             helper = target / "scripts" / "prepare_delivery.py"
             dispatcher = target / "scripts" / "scout.py"
             self.assertTrue(helper.is_file())

@@ -38,17 +38,21 @@ the native turn observer does not require the whole chat to finish or prove busi
    a pinned/recent list or one old item is not sufficient. Deduplicate task identity across pages before counting. Record
    `index_pages_read` and `index_terminals.active/archived`; unavailable history remains bounded/degraded, not a complete census.
 3. Resume a yielded cell to its actual terminal result before another call; use bounded waits so the user is not left without
-   progress. An abandoned cell or invalid call is `execution_protocol_failed`; explicit terminal index failure is
-   `native_index_terminal_failure`. Existing partial results are retained without inventing missing pages.
+   progress. Retain and diagnose rejected calls and local transfer/parse errors. If the same source and cursor can be recovered
+   within the original authorization and retry limits, correct the call and continue; unfinished work alone is not a failure.
+   An unrecovered cell, lost source provenance or unrecovered interruption is `execution_protocol_failed`; explicit terminal
+   index failure is `native_index_terminal_failure`. Never hide the original error or invent missing pages.
 4. Associate natural tasks by native project identity or proved worktree origin. Exclude dedicated Scout, test, Scheduled and
    delegated tasks. In a mixed engineering/Scout task, retain natural work turns before the frozen invocation boundary and exclude
    Scout-generated review/acceptance turns; never drop the whole current task because it also invokes Scout. Page selected tasks to the frozen boundary or EOF using `read_thread`; begin with one turn and bounded
    output. Read relevant truncated output separately. On an explicit capacity error, retry the same cursor once with a smaller
-   output request; if it still fails, record `native_thread_pages_terminal_failure` and the exact unread scope. Preserve the
-   original failed attempt even if recovery succeeds. Do not change cursor, omit a failed page, or use transcript files.
+   output request; if it still fails, record `native_thread_pages_terminal_failure` and the exact unread scope. A successful
+   page with fields still truncated after available native reads uses that same compatibility enum, with the actual successful
+   return and missing fields stated in `coverage/uncovered` and `limitations`, not a claimed native exception. Preserve earlier
+   failed attempts even after recovery. Do not change cursor, omit a failed page, or use transcript files.
 5. Count discovered, in-window, selected and fully read tasks. `complete` requires both history partitions to reach
    `window_boundary/eof` plus every selected task read to boundary/EOF. `bounded` means history remains incomplete but selected
-   reads completed. `degraded` exposes explicit failures. The current active-turn snapshot is sufficient; later concurrent
+   reads completed. `degraded` exposes explicit failures or unrecoverable selected-content truncation. The current active-turn snapshot is sufficient; later concurrent
    updates are outside the frozen observation, not a reason to wait for the task to finish.
 6. No transcript parser, database, background queue, task polling service or automation memory substitutes for native evidence.
 
@@ -326,6 +330,31 @@ that same immutable file; never regenerate the evidence or rewrite the previous 
 the existing installed Agent Memory bundle handoff after artifact verification and Fresh Core preview. Preserve the queued
 observation; it neither grants authorization nor permanently blocks a later independently verified human selection.
 The optional paused Scheduled path retains `render-review --surface scheduled` and `verify-visible --surface scheduled`.
+
+For continuation from an already mechanically acquired Codex native page, the following host-code example selects one exact
+final without retyping it. Run it with Python `-B` and the acquired native file, selected source turn ID and a new input file
+under the current checked output grant as its three arguments. These values come from the current native metadata and output
+selection, not user setup or a guessed path. This reads no new history and does not establish the acquired file's provenance.
+
+```python
+import json
+import sys
+from pathlib import Path
+
+page = json.loads(Path(sys.argv[1]).read_bytes())
+final, = [item for turn in page["turns"] if turn["id"] == sys.argv[2]
+          for item in turn["items"] if item["type"] == "agentMessage" and item.get("phase") == "final_answer"]
+if final.get("truncated") or final.get("textTruncated"):
+    raise ValueError("selected native final is truncated")
+with Path(sys.argv[3]).open("xb") as output:
+    output.write(final["text"].encode("utf-8"))
+```
+
+Pass that file unchanged to the existing `scout.py verify-final --input-file` with the original `--artifact-root` and current
+native-bound `--project-root`. A missing, ambiguous or natively marked truncated final, or an existing input file fails without
+overwriting evidence. A valid receipt cannot prove that the surrounding final prose survived clipping; `verify-final` retains
+its artifact/receipt verification scope. This example proves only byte-preserving selection; original acquisition, helper
+execution and semantic acceptance remain separate.
 
 Capture the user-level Skill directory bytecode-cache baseline before helper execution and recheck it afterward. A new or changed
 `__pycache__`, `.pyc`, or `.pyo` is an external side effect and fails the run; do not delete it from inside the Scout to hide the
