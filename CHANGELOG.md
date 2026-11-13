@@ -3,6 +3,12 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.6 (2026-11-13)
+
+- Check Engineering Contract Review alongside Bootstrap and Scout during native project consumer verification, including duplicate or changed entries.
+- Preserve explicitly disabled Plugin entries and independent local copies; an intentionally disabled review skill remains visible in the result.
+- Components: Core 0.6.6, Plugin 1.11.2, Bootstrap 2.5.4 and Scout 5.19.1. Installation and natural adoption remain separate.
+
 ## 0.6.5 (2026-11-13)
 
 - Preserve independent responsibilities and their exceptions when reviewing compound contracts, and check hot-path work and state against actual needs.

@@ -426,8 +426,12 @@ matching_skill_count, projects, limitations
 
 每个 project 精确包含 `project_ref, display_name, status, skills`；每个 Skill 精确包含
 `name, scope, enabled, version, content_sha256, relation`。原生 `skills/list` 负责发现与启用状态，调用时显式传入目标主机
-Codex home、每个项目 cwd 和 `forceReload=true`。每项能力必须恰有一个启用且内容匹配的入口；停用项以 `disabled`
-记录且不读正文，重复启用或内容不符为 drift，缺失或读取不完整为 bounded。物理树校验仍保持读取预算与防别名约束。
+Codex home、每个项目 cwd 和 `forceReload=true`。Bootstrap 与 Scout 必须各有一个启用且内容匹配的入口；工程契约审查
+按同一能力合并检查 Plugin 命名空间和独立同名入口，启用时也须唯一且匹配。原生清单必须发现位于预期缓存路径的托管插件入口，
+独立同内容副本不能替代它。用户明确停用托管 Plugin 入口时允许保持停用并提示；
+缺失入口不能推定为主动停用。项目候选检查将停用项记为 `disabled` 且不读取其正文；托管 Plugin 完整性检查仍读取其安装文件。
+重复启用或内容不符为 drift，缺失或读取不完整为 bounded。
+工程契约审查的期望内容来自已验证发行归档；内容匹配时记录所属 Plugin 版本，不据此推定候选入口的来源。物理树校验仍保持读取预算与防别名约束。
 临时 Desktop 项目清单保持 v1，路径不进入 Pack。CLI 清单不证明当前 Desktop 进程缓存或模型已采用。
 源码、安装及旧 Anchor 兼容路径由 [Workstation Reconcile](../../specs/workstation-reconcile-v2.md) 统一定义。
 

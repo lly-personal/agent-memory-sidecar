@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.6.6 | 0.6.6 | 1.11.2 | 2.5.4 | 5.19.1 | v8 | 3.11–3.13 |
 | v0.6.5 | 0.6.5 | 1.11.2 | 2.5.3 | 5.19.1 | v8 | 3.11–3.13 |
 | v0.6.4 | 0.6.4 | 1.11.1 | 2.5.3 | 5.19.1 | v8 | 3.11–3.13 |
 | v0.6.3 | 0.6.3 | 1.11.0 | 2.5.2 | 5.19.0 | v8 | 3.11–3.13 |
@@ -120,3 +121,5 @@ Scout 5.19.0 adds Claude ordinary Skill provenance and the shared-source entry i
 Scout 5.19.1 corrects native result-descriptor and sibling-method discovery and adds read-only Claude parameter help. Plugin 1.11.1 carries these fixes; Bootstrap 2.5.3 only updates managed identities. Existing result contracts, permissions and SDK versions are unchanged. Full natural review and efficiency improvements remain unverified.
 
 Plugin 1.11.2 preserves independent contract obligations and their exceptions, and clarifies how to review necessary hot-path work and state. Its Codex prompt uses the plugin-qualified skill name. Core 0.6.5 carries the release; Bootstrap 2.5.3 and Scout 5.19.1 are unchanged. Installation and natural adoption remain separate evidence.
+
+Bootstrap 2.5.4 checks the Engineering Contract Review entry in native project consumers, preserves explicit disablement and reports enabled duplicates or content drift. Core 0.6.6 carries the release; Plugin 1.11.2 and Scout 5.19.1 are unchanged. This check does not establish natural adoption.
