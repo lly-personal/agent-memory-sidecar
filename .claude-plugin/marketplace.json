@@ -6,7 +6,7 @@
     {
       "name": "agent-memory-sidecar",
       "source": ".",
-      "version": "1.11.1",
+      "version": "1.11.2",
       "description": "Portable Agent Memory bootstrap, engineering methods and explicit project Scout.",
       "author": {"name": "IIyaqoo", "url": "https://github.com/IIyaqoo"},
       "repository": "https://github.com/lly-personal/agent-memory-sidecar",
