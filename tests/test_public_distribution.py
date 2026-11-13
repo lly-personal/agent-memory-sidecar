@@ -219,7 +219,7 @@ class PublicDistributionTests(unittest.TestCase):
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
         self.assertEqual(
-            {"core": "0.6.4", "plugin": "1.11.1", "bootstrap": "2.5.3", "scout": "5.19.1"},
+            {"core": "0.6.5", "plugin": "1.11.2", "bootstrap": "2.5.3", "scout": "5.19.1"},
             facts,
         )
         allowlist = json.loads(
@@ -431,14 +431,17 @@ class PublicDistributionTests(unittest.TestCase):
             installed_plugin = installed / "plugins" / "agent-memory-sidecar"
             manifest = json.loads((installed_plugin / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
             method = installed_plugin / manifest["skills"] / "engineering-contract-review"
-            self.assertTrue((method / "SKILL.md").is_file())
+            source_method = plugin / "skills" / "engineering-contract-review"
+            for relative in (Path("SKILL.md"), Path("agents/openai.yaml")):
+                self.assertEqual((source_method / relative).read_bytes(), (method / relative).read_bytes())
             for name in ("design", "verify", "recover", "performance"):
                 relative = Path("references") / f"{name}.md"
                 self.assertEqual(
-                    (plugin / "skills" / "engineering-contract-review" / relative).read_bytes(),
+                    (source_method / relative).read_bytes(),
                     (method / relative).read_bytes(),
                 )
-            self.assertTrue((method / "agents" / "openai.yaml").is_file())
+            prompt = (method / "agents" / "openai.yaml").read_text(encoding="utf-8")
+            self.assertIn("$agent-memory-sidecar:engineering-contract-review", prompt)
 
     def test_native_discovery_surfaces_share_the_built_method_source(self) -> None:
         paths = [ROOT / "package.json", ROOT / ".claude-plugin/marketplace.json", ROOT / "plugins/agent-memory-sidecar", ROOT / 'skills/global-owner-scout']

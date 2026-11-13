@@ -1,6 +1,6 @@
 ---
 name: engineering-contract-review
-description: Review engineering contracts in state ownership, real-consumer verification, recovery or performance. Use relevant methods for design or defect analysis; skip mechanical edits and routine commands.
+description: Review engineering contracts for state or user flows, lifecycle and integration defects, real-consumer verification, recovery, performance or user waiting. Use relevant methods only; skip ordinary prose, mechanical edits and routine commands.
 metadata:
   owner: agent-memory-sidecar
   source: https://github.com/lly-personal/agent-memory-sidecar/tree/main/plugins/agent-memory-sidecar/skills/engineering-contract-review
@@ -19,4 +19,4 @@ metadata:
 | 续接、重试、外部效果、资源与终态 | [执行与恢复](references/recover.md) | 当前授权、依赖身份与提交状态 → 安全恢复或准确停止边界 |
 | 热路径、共享资源拥塞、用户等待 | [性能与资源](references/performance.md) | 实际负载、具名预算或无预算事实 → 有条件的实测归因与最小变更 |
 
-先定位参考中的相关标题，只读取需要的适用、执行和例外，不穷举全部条目。复用身份匹配的有效证据；实现手段可等价替换时保留原结果与效果边界。只在已有实现授权内修改，研究请求交付分析。方法使用不产生外部操作授权，文件加载不证明自然采用或用户体验通过。
+先定位参考中的相关标题，只读取需要的适用、执行和例外，不穷举全部条目。复用身份匹配的有效证据；实现手段可等价替换时保留原结果与效果边界。处理复合契约时分别保留适用的独立责任和对应例外。只在已有实现授权内修改，研究请求交付分析。方法使用不产生外部操作授权，文件加载不证明自然采用或用户体验通过。

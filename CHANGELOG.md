@@ -3,6 +3,12 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.5 (2026-11-13)
+
+- Preserve independent responsibilities and their exceptions when reviewing compound contracts, and check hot-path work and state against actual needs.
+- Use the plugin-qualified name in the Codex skill's suggested prompt. Independently maintained skill copies remain untouched.
+- Components: Core 0.6.5, Plugin 1.11.2, Bootstrap 2.5.3 and Scout 5.19.1. Installation and natural adoption remain separate.
+
 ## 0.6.4 (2026-11-12)
 
 - Route Pi and Claude Scout preparation to the existing native result descriptors, and locate sibling methods through native discovery or declared plugin paths.
