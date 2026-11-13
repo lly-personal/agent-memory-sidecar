@@ -300,6 +300,8 @@ def main() -> int:
                 except (ContractError, OSError) as exc:
                     result["source_status"] = "unavailable"
                     result["source_reason"] = str(exc)
+            if 'selected_context' in result:
+                result['selected_context'].update({k: result[k] for k in ('source_status', 'source_reason') if k in result})
             print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
         return 0
     except (ContractError, AssertionError, OSError, UnicodeError, ValueError) as exc:

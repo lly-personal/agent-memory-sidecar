@@ -167,6 +167,66 @@ def shared_parent_pack(reverse=False):
 
 
 class ScoutProjectMapTests(unittest.TestCase):
+    def test_selected_scenario_retains_prerequisites_boundaries_and_counterevidence(self):
+        from project_map import map_context, resolve_selection
+        pack = map_pack(); p = pack['project_result']; m = p['project_map']
+        p['contract_version'] = 'global_owner_scout_project_v7'
+        m['edges'][0]['kind'] = 'handoff'
+        template = m['nodes'][0]; edge = m['edges'][0]
+        m['nodes'] += [dict(copy.deepcopy(template), id=i, label=i) for i in
+                       ['group', 'config', 'runtime', 'permission', 'unrelated']]
+        m['nodes'][3]['claims'] += [dict(layer='unknown', environment='受限宿主',
+            statement='当前凭证和执行权限尚未核验。', evidence_refs=[]),
+            dict(layer='observed', environment='此前宿主', statement='此前调用被拒绝。', evidence_refs=['owner:current'])]
+        m['edges'] += [dict(copy.deepcopy(edge), id=i, source=s, target=t, kind=k) for i, s, t, k in
+            [('owns', 'group', 'entry', 'contains'), ('needs-config', 'entry', 'config', 'depends_on'),
+             ('needs-runtime', 'config', 'runtime', 'depends_on'), ('feedback', 'runtime', 'config', 'depends_on'),
+             ('limited', 'permission', 'group', 'constrains'),
+             ('other-user', 'unrelated', 'config', 'depends_on'),
+             ('other-handoff', 'entry', 'unrelated', 'handoff')]]
+        context = map_context(pack)
+        for selection in ['node:entry', 'node:group', 'edge:handoff', 'journey:ordinary']:
+            with self.subTest(selection=selection):
+                result = resolve_selection(context, selection)
+                self.assertEqual(['ordinary'], [j['id'] for j in result['journeys']])
+                self.assertEqual(m['journeys'][0]['recovery'], result['journeys'][0]['recovery'])
+                self.assertEqual({'entry', 'consumer', 'group', 'config', 'runtime', 'permission'},
+                                 {n['id'] for n in result['nodes']})
+                self.assertEqual({'handoff', 'owns', 'needs-config', 'needs-runtime', 'feedback', 'limited'},
+                                 {e['id'] for e in result['edges']})
+                self.assertEqual(m['nodes'][3]['claims'], next(n for n in result['nodes'] if n['id'] == 'config')['claims'])
+                for key in ['project_key', 'project_identity', 'context_snapshot_hash']:
+                    self.assertEqual(context[key], result[key])
+                for key in ['goal', 'boundary', 'observed_at', 'source_revision', 'coverage']:
+                    self.assertEqual(m[key], result[key])
+        self.assertEqual([], context['advice'])
+
+    def test_shared_scenario_selection_preserves_alternatives_and_legacy_unknowns(self):
+        from project_map import map_context, resolve_selection
+        pack = browser_packs()['real']; context = map_context(pack)
+        result = resolve_selection(context, 'node:consumer')
+        self.assertEqual(['ordinary', 'revoke'], [j['id'] for j in result['journeys']])
+        result = resolve_selection(context, 'node:consumer', journey_id='revoke')
+        self.assertEqual(['revoke'], [j['id'] for j in result['journeys']])
+        self.assertNotIn('review', [n['id'] for n in result['nodes']])
+        self.assertEqual(2, len(resolve_selection(context, 'project:' + context['project_key'])['journeys']))
+        context['project_map']['journeys'] = []
+        result = resolve_selection(context, 'node:consumer')
+        self.assertEqual([], result['journeys'])
+        self.assertEqual([], result['object']['card_ids'])
+        self.assertNotIn('project_contract', result)
+
+    def test_advice_keeps_its_direct_links_across_scenarios_until_a_journey_is_selected(self):
+        from project_map import map_context, resolve_selection
+        pack = layered_browser_pack(); m = pack['project_result']['project_map']
+        m['nodes'].append(dict(copy.deepcopy(m['nodes'][0]), id='offline', label='独立消费入口'))
+        m['edges'].append(dict(copy.deepcopy(m['edges'][0]), id='offline-handoff', source='offline',
+                              card_ids=m['nodes'][0]['card_ids']))
+        context = map_context(pack); selection = 'advice:' + context['advice'][0]['card_id']
+        self.assertIn('offline', [n['id'] for n in resolve_selection(context, selection)['nodes']])
+        self.assertIn('offline-handoff', [e['id'] for e in resolve_selection(context, selection)['edges']])
+        self.assertNotIn('offline', [n['id'] for n in resolve_selection(context, selection, journey_id='ordinary')['nodes']])
+
     def test_review_brief_explains_the_system_before_recommendations(self):
         from render_review import render_conversation_brief
         pack = layered_pack()
@@ -451,8 +511,12 @@ class ScoutProjectMapTests(unittest.TestCase):
             manifest, artifact = d.prepare_delivery(pack, artifact_dir=root, protected_roots=[repo])
             receipt = d.render_delivery_receipt(manifest, artifact_path=artifact, artifact_root=root, outcome='not_requested')
             def recover(path=repo):
-                result = subprocess.run([sys.executable, '-B', str(SCRIPTS/'scout.py'), 'verify-final', '--artifact-root', str(root), '--project-root', str(path)], input=receipt, text=True, encoding='utf-8', capture_output=True, check=True)
-                return json.loads(result.stdout)
+                result = subprocess.run([sys.executable, '-B', str(SCRIPTS/'scout.py'), 'verify-final', '--artifact-root', str(root), '--project-root', str(path), '--object', 'journey:ordinary'], input=receipt, text=True, encoding='utf-8', capture_output=True, check=True)
+                recovered = json.loads(result.stdout)
+                self.assertEqual(recovered['source_status'], recovered['selected_context']['source_status'])
+                self.assertEqual(recovered.get('source_reason'), recovered['selected_context'].get('source_reason'))
+                self.assertEqual(snapshot['head'], recovered['selected_context']['source_revision'])
+                return recovered
             self.assertEqual('unchanged', recover()['source_status'])
             source.write_text('modified'); self.assertEqual('changed', recover()['source_status'])
             source.write_text('original'); (repo/'new.txt').write_text('new evidence')

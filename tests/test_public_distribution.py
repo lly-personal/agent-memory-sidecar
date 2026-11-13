@@ -219,7 +219,7 @@ class PublicDistributionTests(unittest.TestCase):
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
         self.assertEqual(
-            {"core": "0.6.6", "plugin": "1.11.2", "bootstrap": "2.5.4", "scout": "5.19.1"},
+            {"core": "0.6.7", "plugin": "1.11.3", "bootstrap": "2.5.5", "scout": "5.19.2"},
             facts,
         )
         allowlist = json.loads(

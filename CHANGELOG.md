@@ -3,6 +3,12 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.7 (2026-11-13)
+
+- Keep recorded journeys, prerequisites, constraints, recovery and source status when continuing from a selected map object.
+- Use the existing Scout entry to explain project roles and scenarios without requiring users to combine methods; keep unknowns, conflicting evidence and read-only boundaries visible.
+- Components: Core 0.6.7, Plugin 1.11.3, Bootstrap 2.5.5 and Scout 5.19.2. Existing result and delivery formats remain readable; natural adoption is separate evidence.
+
 ## 0.6.6 (2026-11-13)
 
 - Check Engineering Contract Review alongside Bootstrap and Scout during native project consumer verification, including duplicate or changed entries.

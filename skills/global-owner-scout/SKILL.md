@@ -1,13 +1,13 @@
 ---
 name: global-owner-scout
-description: Show a project overview or deeply review it when explicitly requested; continue discussing an identifiable delivered Scout map or review. Give a brief overview and the first concrete recommendation in the current chat, with complete evidence available by link. Do not restart discovery for follow-up questions or trigger for unrelated ordinary project work.
+description: Understand a project's goals, actors, scenarios and real workflows when asked for an overview; deeply review it when requested; continue from an identifiable delivered map. Give a brief explanation and any supported recommendation in the current chat, with complete evidence by link. Do not restart discovery for follow-ups or trigger for unrelated ordinary work.
 ---
 
 # Global Owner Scout
 
 ## Contract
 
-- Skill version: `5.19.1`
+- Skill version: `5.19.2`
 - Project result: `global_owner_scout_project_v7`
 - User review: `global_owner_scout_review_pack_v8`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -23,6 +23,13 @@ current task's explicit host-generated or explicitly user-selected output root, 
 granted as that task output surface. The explicit entry is `$global-owner-scout 复盘当前项目` or “看懂当前工程全貌” in the currently bound target Git project task. Review uses `manual_30d`; inspect uses `current`. Interactive runs never read automation memory,
 and never asks the user to provide resource settings. The Scout uses the current task's host-resolved model/reasoning settings and records observable requested/actual values; it supplies no override. The current Desktop project binding is authoritative; no Prompt may contain a
 project name, path, project ID, candidate hint, or the deep-review procedure.
+
+For “梳理当前工程的角色、场景和操作流程”, use inspect through this same entry. Derive relevant roles from the project;
+the user need not name companion Skills or supply a long procedure. Explain who wants what, the starting state and entry,
+continuous actions, branches and handoffs, the actual result consumer, and failure recovery. Reuse the existing map fields;
+missing evidence remains unknown. A clear map with no recommendation is valid. Mapping authorizes neither implementation
+nor runtime testing. On a later authorized follow-up, use the existing project workflow and the appropriate review or test
+tool only when it answers that task; Scout does not become a mandatory execution coordinator.
 
 The default contract above is the Codex lane. The Pi package exposes the same Scout source through
 `/skill:global-owner-scout`; call the read-only `global_owner_scout_context` tool first. Use the actual current runtime context,
@@ -193,6 +200,11 @@ When an object or visible journey is selected, pass it as data to `verify-final 
 `selected_context`; do not assemble shell code from the follow-up text. The project overview is `project:<project_key>`, not
 a synthetic node. A widget selection is only a locator. Recover the original receipt before resolving it, and keep changed
 source facts historical until their relevant current sources are checked.
+The recovered selection keeps recorded journeys, prerequisites, constraints, recovery, project boundaries and source-check
+status. If several journeys match, retain them and resolve only the ambiguity material to the next task. Project-wide
+coverage is not selected-path completeness. Before consuming a changed map, inspect relevant Owner/code diffs and new
+evidence, update only affected facts in a new snapshot and retain unaffected evidence; do not repeat a census or duplicate
+the business SOP. Pass these source/version bindings and limits to a downstream consumer, not just a picture or node name.
 Use the returned `recovery_bundle` for exact Core input. Historical files may return null; if the original
 exact bundle is no longer available, refresh only the affected preview for new authorization and never invent old bindings. Keep the same artifact; do not rerun discovery or recompose a large payload. An explicit later request to
 open it may reuse the returned manifest and existing `render-receipt`; repeated `queued` remains pending.

@@ -138,40 +138,55 @@ def resolve_selection(context, selection, *, journey_id=None):
         journey_id = id_
     journey = next((j for j in m['journeys'] if j['id'] == journey_id), None)
     require(journey_id is None or journey is not None, 'unknown selected journey')
-    if journey is not None and kind in {'node', 'edge', 'advice'}:
-        path_edges = [e for e in m['edges'] if e['id'] in journey['edge_ids']]
-        path_nodes = {journey['entry'], *(e['target'] for e in path_edges)}
-        ancestors = set(path_nodes)
+    def prerequisites(node_ids, edge_ids):
+        # Follow recorded authority/prerequisites inward, never unrelated dependent branches.
         while True:
-            parents = {e['source'] for e in m['edges'] if e.get('kind') == 'contains' and e['target'] in ancestors}
-            if parents <= ancestors:
+            required = [e for e in m['edges'] if
+                        (e.get('kind') in {'contains', 'constrains'} and e['target'] in node_ids) or
+                        (e.get('kind') == 'depends_on' and e['source'] in node_ids)]
+            expanded = node_ids | {i for e in required for i in (e['source'], e['target'])}
+            edge_ids.update(e['id'] for e in required)
+            if expanded == node_ids:
                 break
-            ancestors.update(parents)
-        related = (id_ in ancestors if kind == 'node' else id_ in journey['edge_ids'] if kind == 'edge' else
-                   id_ in journey['card_ids'] or any(id_ in x['card_ids'] for x in
-                       [*path_edges, *(n for n in m['nodes'] if n['id'] in ancestors)]))
-        require(related, 'selected journey does not contain selected object')
-    journeys = [j for j in m['journeys'] if j == journey or (kind == 'advice' and id_ in j['card_ids'])]
-    journey_edges = {e for j in journeys for e in j['edge_ids']}
-    node_ids = {id_} if kind == 'node' else set()
-    node_ids.update(j['entry'] for j in journeys)
-    edges = [e for e in m['edges'] if kind == 'project' or
-             (kind == 'edge' and e['id'] == id_) or
-             (kind == 'node' and id_ in (e['source'], e['target'])) or
-             (kind == 'advice' and id_ in e['card_ids']) or
-             e['id'] in journey_edges]
-    node_ids.update(i for e in edges for i in (e['source'], e['target']))
-    nodes = [n for n in m['nodes'] if kind == 'project' or n['id'] in node_ids or
-             (kind == 'advice' and id_ in n['card_ids'])]
+            node_ids.update(expanded)
+
+    journeys = []; node_ids = set(); edge_ids = set()
+    for candidate in m['journeys']:
+        path_edges = {e['id'] for e in m['edges'] if e['id'] in candidate['edge_ids']}
+        path_nodes = {candidate['entry'], *(e['target'] for e in m['edges'] if e['id'] in path_edges)}
+        prerequisites(path_nodes, path_edges)
+        related = (kind in {'project', 'journey'} or
+                   (kind == 'node' and id_ in path_nodes) or (kind == 'edge' and id_ in path_edges) or
+                   (kind == 'advice' and (id_ in candidate['card_ids'] or any(id_ in x['card_ids'] for x in
+                       [*(n for n in m['nodes'] if n['id'] in path_nodes),
+                        *(e for e in m['edges'] if e['id'] in path_edges)]))))
+        if journey is not None and candidate == journey:
+            require(related, 'selected journey does not contain selected object')
+        if related and (journey is None or candidate == journey):
+            journeys.append(candidate); node_ids.update(path_nodes); edge_ids.update(path_edges)
+    if kind == 'project' or not journeys or (kind == 'advice' and journey is None):
+        edges = [e for e in m['edges'] if kind == 'project' or
+                 (kind == 'edge' and e['id'] == id_) or
+                 (kind == 'node' and id_ in (e['source'], e['target'])) or
+                 (kind == 'advice' and id_ in e['card_ids'])]
+        edge_ids.update(e['id'] for e in edges)
+        node_ids.update(i for e in edges for i in (e['source'], e['target']))
+        node_ids.update(n['id'] for n in m['nodes'] if kind == 'project' or
+                        (kind == 'node' and n['id'] == id_) or (kind == 'advice' and id_ in n['card_ids']))
+        prerequisites(node_ids, edge_ids)
+    edges = [e for e in m['edges'] if e['id'] in edge_ids]
+    nodes = [n for n in m['nodes'] if n['id'] in node_ids]
     evidence_refs = set()
-    for item in [obj, *nodes, *edges, *journeys]:
+    for item in [obj, *nodes, *edges, *journeys, *m['coverage']]:
         evidence_refs.update(item.get('evidence_refs', []))
         evidence_refs.update(r for c in item.get('claims', []) for r in c['evidence_refs'])
     if kind == 'advice':
         evidence_refs.update(obj['human_context']['evidence_refs'])
     sources = [dict(s, refs=[r for r in s['refs'] if r['ref'] in evidence_refs])
                for s in context['evidence_sources'] if any(r['ref'] in evidence_refs for r in s['refs'])]
-    return dict(object_kind=kind, object_id=id_, object=obj, journey=journey, journeys=journeys,
+    return dict({k: context[k] for k in ('purpose', 'project_key', 'project_identity', 'context_snapshot_hash', 'project_contract') if k in context},
+                **{k: m[k] for k in ('goal', 'boundary', 'observed_at', 'source_revision', 'coverage')},
+                object_kind=kind, object_id=id_, object=obj, journey=journey, journeys=journeys,
                 nodes=nodes, edges=edges, evidence_sources=sources)
 
 
