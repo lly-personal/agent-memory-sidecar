@@ -74,13 +74,19 @@ An apply result uses `agent_memory_workstation_reconcile_receipt_v3` with exact
 
 - `status`: `ready`, `reload_required`, `consumer_scope_drift`, `consumer_scope_bounded`,
   `distribution_reconcile_blocked`, `source_sync_blocked`, or `host_materialization_blocked`.
-- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.5.3`.
+- `display_locale`: `zh-CN`; desired `bootstrap_version`: `2.5.4`.
 - `consumer_scope`: exact fields `status, inventory_status, desktop_project_count, scanned_project_count,
   matching_skill_count, projects, limitations`; status is `not_observed`, `exact`, `drifted`, or `bounded`.
 - Each consumer project has exact `project_ref, display_name, status, skills`; each Skill has exact
   `name, scope, enabled, version, content_sha256, relation`. Discovery and enablement come from native `skills/list` with
-  explicit Codex home/project cwd and forceReload. Disabled candidates have unavailable version/hash and are not read.
-  Exactly one enabled, byte-matching candidate per capability is required; duplicates drift, absent/native errors bound.
+  explicit Codex home/project cwd and forceReload. Disabled candidates have unavailable version/hash and are not read by the
+  project candidate check; the separate managed Plugin integrity check still reads installed Plugin files.
+  Bootstrap and Scout each require one enabled, byte-matching candidate. Engineering Contract Review groups Plugin-qualified
+  and standalone names; its managed Plugin-qualified entry must be found at the expected cache path, and one enabled match is
+  required unless that managed entry is explicitly disabled, which is visible and allowed. Missing entries and native errors bound;
+  duplicate enabled entries drift. Its expected tree comes from the verified portable archive, and an exact match carries the Plugin
+  version without claiming the candidate's provenance. The extracted managed review tree must still match the verified archive,
+  including when the entry is disabled. A disabled-entry notice remains in both the scope and the rendered Deployment Pack.
   Physical hash limits remain; no filesystem discovery fallback or configuration mutation. CLI catalog is not Desktop adoption.
 
 - The ephemeral input `agent_memory_desktop_project_inventory_v1` has exact `contract_version, inventory_status, projects`; each
@@ -119,7 +125,7 @@ automation_change_count, allowed_actions, limitations, pack_hash
 ```
 
 - `status`: `ready`, `bounded`, or `host_activation_blocked`.
-- `display_locale`: `zh-CN`; `bootstrap_version`: `2.5.3`.
+- `display_locale`: `zh-CN`; `bootstrap_version`: `2.5.4`.
 - `portable_layer` exact fields: `sidecar`, `canonical_owner`, `core_setup`, `doctor`, `scout_skill_version`,
   `scout_skill_hash`. State values are `synced`, `unchanged`, `installed`, `verified`, `failed`, or `unavailable`.
 - `discovery` exact fields: `inventory_status`, `activity_status`, `desktop_project_count`, `accessible_count`,

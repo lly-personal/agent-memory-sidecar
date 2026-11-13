@@ -12,6 +12,7 @@ import sys
 import tempfile
 import time
 import unittest
+import zipfile
 from pathlib import Path
 from unittest import mock
 
@@ -45,12 +46,19 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         self.fixture_root = Path(self.fixture.name).resolve()
         self.native_entries = []
         self.native_hashes = {}
-        for name, version in (("agent-memory-workstation-bootstrap", "2.5.3"), ("global-owner-scout", "5.19.1")):
+        for name, version in (("agent-memory-workstation-bootstrap", "2.5.4"), ("global-owner-scout", "5.19.1")):
             root = self.fixture_root / "codex" / "skills" / name
             root.mkdir(parents=True)
             (root / "SKILL.md").write_text(f"---\nname: {name}\ndescription: Fixture\n---\n# Fixture\n- Skill version: `{version}`\n")
             self.native_hashes[name] = self.reconcile.physical_tree_hash(root)
             self.native_entries.append({"name": name, "path": str(root / "SKILL.md"), "scope": "user", "enabled": True})
+        review_root = (self.fixture_root / "codex" / "plugins" / "cache" / "agent-memory" /
+                       "agent-memory-sidecar" / "1.5.1" / "skills" / "engineering-contract-review")
+        review_root.mkdir(parents=True)
+        (review_root / "SKILL.md").write_text("---\nname: engineering-contract-review\ndescription: Review fixture\n---\n# Review\n")
+        self.review_hash = self.reconcile.physical_tree_hash(review_root)
+        self.native_entries.append({"name": "agent-memory-sidecar:engineering-contract-review",
+                                    "path": str(review_root / "SKILL.md"), "scope": "user", "enabled": True})
         self.native_patch = mock.patch.object(self.reconcile, "native_skill_catalog", side_effect=self.catalog)
         self.native_mock = self.native_patch.start()
         self.addCleanup(self.native_patch.stop)
@@ -63,7 +71,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         project.mkdir(exist_ok=True)
         return self.reconcile.observe_consumer_scope(
             inventory or self.desktop_inventory(("Project", project)), desired=self.desired_bundle(),
-            codex_home=self.fixture_root / "codex",
+            codex_home=self.fixture_root / "codex", expected_review_sha256=self.review_hash,
         )
 
     def extra_candidate(self, *, enabled=True, stale=True):
@@ -84,7 +92,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "core_version": "0.3.10",
             "plugin_version": "1.5.1",
             "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.5.3",
+            "bootstrap_version": "2.5.4",
             "bootstrap_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
             "scout_version": "5.19.1",
             "scout_sha256": self.native_hashes["global-owner-scout"],
@@ -133,7 +141,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "unavailable",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.5.3", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
+                "status": "unchanged", "version": "2.5.4", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
             },
             "scout_skill": {
                 "status": "unchanged", "version": "5.19.1", "content_sha256": self.native_hashes["global-owner-scout"],
@@ -170,6 +178,146 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         path = Path(self.native_entries[0]["path"])
         with path.open("a") as stream: stream.write("Changed.\n")
         self.assertEqual("drifted", self.scope()["status"])
+
+    def test_consumer_scope_does_not_ignore_missing_engineering_review(self):
+        self.native_entries.pop()
+        self.assertEqual("bounded", self.scope()["status"])
+
+    def test_consumer_scope_does_not_replace_missing_managed_review_with_identical_copy(self):
+        managed = self.native_entries.pop()
+        root = self.fixture_root / "standalone-only"
+        root.mkdir()
+        shutil.copyfile(managed["path"], root / "SKILL.md")
+        self.native_entries.append({"name": "engineering-contract-review", "path": str(root / "SKILL.md"),
+                                    "scope": "user", "enabled": True})
+        self.assertEqual("bounded", self.scope()["status"])
+
+    def test_consumer_scope_rejects_managed_name_at_wrong_path(self):
+        root = self.fixture_root / "wrong-managed-path"
+        root.mkdir()
+        shutil.copyfile(self.native_entries[-1]["path"], root / "SKILL.md")
+        self.native_entries[-1]["path"] = str(root / "SKILL.md")
+        self.assertEqual("bounded", self.scope()["status"])
+
+    def test_consumer_scope_does_not_ignore_duplicate_engineering_review(self):
+        root = self.fixture_root / "standalone"
+        root.mkdir()
+        shutil.copyfile(self.native_entries[-1]["path"], root / "SKILL.md")
+        self.native_entries.append({"name": "engineering-contract-review", "path": str(root / "SKILL.md"),
+                                    "scope": "user", "enabled": True})
+        scope = self.scope()
+        self.assertEqual("drifted", scope["status"])
+
+    def test_consumer_scope_preserves_disabled_review_entries_without_reading_them(self):
+        root = self.fixture_root / "disabled"
+        root.mkdir()
+        standalone = root / "SKILL.md"
+        standalone.write_text("User modifications.\n")
+        self.native_entries.append({"name": "engineering-contract-review", "path": str(standalone),
+                                    "scope": "user", "enabled": False})
+        before = standalone.read_bytes()
+        real_path_check = self.reconcile._consumer_skill_path
+        def reject_disabled_candidate(path):
+            self.assertNotEqual(os.path.normcase(str(standalone)), os.path.normcase(str(path)))
+            return real_path_check(path)
+        with mock.patch.object(self.reconcile, "_consumer_skill_path", side_effect=reject_disabled_candidate):
+            scope = self.scope()
+        self.assertEqual("exact", scope["status"])
+        disabled = next(item for item in scope["projects"][0]["skills"] if not item["enabled"])
+        self.assertEqual(("disabled", "unavailable", "unavailable"),
+                         (disabled["relation"], disabled["version"], disabled["content_sha256"]))
+        self.assertEqual(before, standalone.read_bytes())
+        self.assertEqual("1.5.1", scope["projects"][0]["skills"][2]["version"])
+
+    def test_consumer_scope_allows_only_explicitly_disabled_managed_review(self):
+        self.native_entries[-1]["enabled"] = False
+        Path(self.native_entries[-1]["path"]).unlink()
+        scope = self.scope()
+        self.assertEqual("exact", scope["status"])
+        self.assertTrue(any("停用" in item for item in scope["limitations"]))
+        self.native_entries[-1]["path"] = str(self.fixture_root / "elsewhere" / "SKILL.md")
+        self.assertEqual("bounded", self.scope()["status"])
+
+    def test_consumer_scope_reports_managed_review_disabled_with_matching_enabled_copy(self):
+        root = self.fixture_root / "standalone-enabled"
+        root.mkdir()
+        shutil.copyfile(self.native_entries[-1]["path"], root / "SKILL.md")
+        self.native_entries[-1]["enabled"] = False
+        self.native_entries.append({"name": "engineering-contract-review", "path": str(root / "SKILL.md"),
+                                    "scope": "user", "enabled": True})
+        scope = self.scope()
+        self.assertEqual("exact", scope["status"])
+        self.assertTrue(any("停用" in item for item in scope["limitations"]))
+        self.assertEqual("exact", scope["projects"][0]["skills"][-1]["relation"])
+
+    def test_disabled_review_notice_cannot_be_dropped_from_scope_or_pack(self):
+        import copy
+        self.native_entries[-1]["enabled"] = False
+        scope = self.scope()
+        missing_notice = copy.deepcopy(scope)
+        missing_notice["limitations"] = []
+        with self.assertRaisesRegex(self.reconcile.BootstrapError, "disabled review.*notice"):
+            self.reconcile.validate_consumer_scope(missing_notice)
+        pack = self.reconcile.build_deployment_pack(
+            desired=self.desired_bundle(), observed_distribution=self.exact_distribution(), desired_source_sha256="e" * 64,
+            source_sync=self.reconcile._source_sync_from_exact_plan(self.source_plan()), host_materialization=self.exact_host(),
+            requires_reload=False, consumer_verified=True, generated_at="2026-11-13T00:00:00Z", consumer_scope=scope,
+        )
+        self.assertIn("停用", self.reconcile.render_pack(pack))
+        pack["limitations"] = [item for item in pack["limitations"] if "停用" not in item]
+        pack["pack_hash"] = self.reconcile.object_hash(pack, "pack_hash")
+        with self.assertRaisesRegex(self.reconcile.BootstrapError, "consumer scope limitations"):
+            self.reconcile.validate_pack(pack)
+
+    def test_consumer_scope_reports_review_drift_without_inventing_version(self):
+        with Path(self.native_entries[-1]["path"]).open("a") as stream:
+            stream.write("Modified.\n")
+        scope = self.scope()
+        self.assertEqual("drifted", scope["status"])
+        review = scope["projects"][0]["skills"][-1]
+        self.assertEqual(("drifted", "unavailable"), (review["relation"], review["version"]))
+
+    def test_consumer_scope_groups_other_plugin_namespace_as_same_capability(self):
+        root = self.fixture_root / "other-plugin"
+        root.mkdir()
+        shutil.copyfile(self.native_entries[-1]["path"], root / "SKILL.md")
+        self.native_entries.append({"name": "other-plugin:engineering-contract-review", "path": str(root / "SKILL.md"),
+                                    "scope": "user", "enabled": True})
+        self.assertEqual("drifted", self.scope()["status"])
+
+    def test_expected_review_hash_is_bound_to_verified_plugin_contents(self):
+        portable = self.fixture_root / "portable"
+        plugin = portable / "plugins" / "agent-memory-sidecar"
+        shutil.copytree(ROOT / "plugins" / "agent-memory-sidecar", plugin)
+        for name in ("agent-memory-workstation-bootstrap", "global-owner-scout"):
+            (portable / ".agents" / "skills" / name).mkdir(parents=True)
+        desired = {**self.desired_bundle(), "plugin_sha256": self.reconcile.physical_tree_hash(
+            plugin, excluded_relatives={"source-manifest.json"})}
+        expected = self.reconcile.physical_tree_hash(plugin / "skills" / "engineering-contract-review")
+        archive_path = self.fixture_root / "agent-memory-portable-0.3.10.zip"
+        with zipfile.ZipFile(archive_path, "w") as archive:
+            archive.writestr("plugins/agent-memory-sidecar/skills/engineering-contract-review/", b"")
+            for file in (plugin / "skills" / "engineering-contract-review").rglob("*"):
+                if file.is_file():
+                    archive.write(file, file.relative_to(portable).as_posix())
+        archive_bytes = archive_path.read_bytes()
+        archive_sha256 = hashlib.sha256(archive_bytes).hexdigest()
+        self.assertEqual(expected, self.reconcile._expected_review_hash(self.fixture_root / "release.json", desired, archive_sha256))
+        with (plugin / "skills" / "engineering-contract-review" / "SKILL.md").open("a") as stream:
+            stream.write("Changed after verification.\n")
+        with self.assertRaisesRegex(self.reconcile.BootstrapError, "verified_plugin_content_changed"):
+            self.reconcile._expected_review_hash(self.fixture_root / "release.json", desired, archive_sha256)
+        # A change before desired-bundle construction must not redefine the verified archive's expected bytes.
+        desired["plugin_sha256"] = self.reconcile.physical_tree_hash(plugin, excluded_relatives={"source-manifest.json"})
+        with self.assertRaisesRegex(self.reconcile.BootstrapError, "verified_review_content_mismatch"):
+            self.reconcile._expected_review_hash(self.fixture_root / "release.json", desired, archive_sha256)
+        shutil.copyfile(ROOT / "plugins" / "agent-memory-sidecar" / "skills" / "engineering-contract-review" / "SKILL.md",
+                        plugin / "skills" / "engineering-contract-review" / "SKILL.md")
+        desired["plugin_sha256"] = self.reconcile.physical_tree_hash(plugin, excluded_relatives={"source-manifest.json"})
+        with archive_path.open("ab") as stream:
+            stream.write(b"changed")
+        with self.assertRaisesRegex(self.reconcile.BootstrapError, "release_resolution_asset_mismatch:portable"):
+            self.reconcile._expected_review_hash(self.fixture_root / "release.json", desired, archive_sha256)
 
     def test_consumer_scope_requires_native_catalog_and_each_enabled_capability(self):
         for response in ([], [{"cwd": str(self.fixture_root / "project"), "skills": [], "errors": []}],
@@ -211,11 +359,13 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         missing = copy.deepcopy(scope)
         missing["projects"][0]["skills"].pop()
         missing["matching_skill_count"] -= 1
+        wrong_scope = copy.deepcopy(scope)
+        wrong_scope["projects"][0]["skills"][-1]["scope"] = "repo"
         omitted = {**scope, "projects": [], "matching_skill_count": 0}
         with self.assertRaisesRegex(self.reconcile.BootstrapError, "every project"):
             self.reconcile.validate_consumer_scope(omitted)
-        for forged in (duplicate, missing):
-            with self.assertRaisesRegex(self.reconcile.BootstrapError, "unique and exact|each enabled capability"):
+        for forged in (duplicate, missing, wrong_scope):
+            with self.assertRaisesRegex(self.reconcile.BootstrapError, "unique and exact|each enabled capability|managed review entry"):
                 self.reconcile.validate_consumer_scope(forged)
 
     def test_native_catalog_deadline_covers_blocked_request_write(self):
@@ -248,7 +398,8 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
 
     def test_development_sources_are_outside_automatic_discovery(self):
         for name in self.reconcile.CONSUMER_SKILLS:
-            self.assertTrue((ROOT / "skills" / name / "SKILL.md").is_file())
+            source = ROOT / "plugins" / "agent-memory-sidecar" / "skills" if name == "engineering-contract-review" else ROOT / "skills"
+            self.assertTrue((source / name / "SKILL.md").is_file())
             # Native discovery requires SKILL.md, not a directory left by historical
             # bytecode/cache state. Preserve unrelated local state; reject any actual
             # discoverable development entry, including a nested one.
@@ -262,16 +413,23 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         subprocess.run(["git", "init", "-q", str(project)], check=True)
         codex_home = self.fixture_root / "codex"
         source = self.extra_candidate(stale=False)
-        # Two byte-identical enabled candidates must not qualify.
-        self.assertEqual("drifted", self.scope()["status"])
-        (codex_home / "config.toml").write_text(
-            "[[skills.config]]\npath = " + json.dumps(str(source / "SKILL.md")) + "\nenabled = false\n",
-        )
-        self.assertEqual("exact", self.scope()["status"])
-        source.rename(project / "development-source")
-        scope = self.scope()
-        self.assertEqual("exact", scope["status"])
-        self.assertEqual(2, scope["matching_skill_count"])
+        real_catalog = self.reconcile.native_skill_catalog
+        def catalog_with_managed_review(home, roots):
+            result = real_catalog(home, roots)
+            for entry in result:
+                entry["skills"].append(self.native_entries[-1])
+            return result
+        # Bootstrap discovery and enablement use the real native server; the managed Plugin entry is a fixture.
+        with mock.patch.object(self.reconcile, "native_skill_catalog", side_effect=catalog_with_managed_review):
+            self.assertEqual("drifted", self.scope()["status"])
+            (codex_home / "config.toml").write_text(
+                "[[skills.config]]\npath = " + json.dumps(str(source / "SKILL.md")) + "\nenabled = false\n",
+            )
+            self.assertEqual("exact", self.scope()["status"])
+            source.rename(project / "development-source")
+            scope = self.scope()
+            self.assertEqual("exact", scope["status"])
+            self.assertEqual(3, scope["matching_skill_count"])
 
     def test_pack_revokes_ready_for_drifted_or_bounded_consumer_scope(self) -> None:
         exact_scope = {
@@ -313,7 +471,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
         drifted_scope = {
             **exact_scope,
             "status": "drifted", "desktop_project_count": 1, "scanned_project_count": 1,
-            "matching_skill_count": 2,
+            "matching_skill_count": 3,
             "projects": [{
                 "project_ref": "desktop-project-example", "display_name": "<Project>|Name", "status": "drifted",
                 "skills": [{
@@ -322,6 +480,9 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 }, {
                     "name": "global-owner-scout", "version": "5.19.1", "scope": "user", "enabled": True,
                     "content_sha256": self.native_hashes["global-owner-scout"], "relation": "exact",
+                }, {
+                    "name": "agent-memory-sidecar:engineering-contract-review", "version": "1.5.1", "scope": "user", "enabled": True,
+                    "content_sha256": self.review_hash, "relation": "exact",
                 }],
             }],
         }
@@ -358,15 +519,16 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             inventory.write_text(json.dumps(self.desktop_inventory(("Example", project))), encoding="utf-8")
             context = {
                 "desired": self.desired_bundle(), "observed": self.exact_distribution(),
-                "source_sha256": "e" * 64, "source_plan": self.source_plan(),
+                "source_sha256": "e" * 64, "archive_sha256": "f" * 64, "source_plan": self.source_plan(),
                 "observed_host": self.exact_host(),
             }
             # The host observer is the boundary substitute; scope observation, CLI dispatch,
             # rendering and project I/O are real. No session-loading assertion is supplied.
-            with mock.patch.object(self.reconcile, "_workstation_reconcile_context", return_value=({"status": "noop"}, context)):
+            with mock.patch.object(self.reconcile, "_workstation_reconcile_context", return_value=({"status": "noop"}, context)), \
+                 mock.patch.object(self.reconcile, "_expected_review_hash", return_value=self.review_hash):
                 output = io.StringIO()
                 argv = [
-                    str(MANAGED_SOURCES), "workstation-reconcile", "--verify-consumer", "--codex-home", str(root / "codex"),
+                    str(MANAGED_SOURCES), "workstation-reconcile", "--verify-consumer", "--codex-home", str(self.fixture_root / "codex"),
                     "--source-manifest", str(root / "source.json"),
                     "--release-manifest", str(root / "release.json"),
                     "--desktop-project-inventory", str(inventory),
@@ -516,7 +678,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.5.3",
+                "version": "2.5.4",
                 "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
             },
             "scout_skill": {
@@ -560,7 +722,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "global_binding": "verified",
             "doctor": "verified",
             "bootstrap_skill": {
-                "status": "unchanged", "version": "2.5.3", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
+                "status": "unchanged", "version": "2.5.4", "content_sha256": self.native_hashes["agent-memory-workstation-bootstrap"],
             },
             "scout_skill": {
                 "status": "unchanged", "version": "5.19.1", "content_sha256": self.native_hashes["global-owner-scout"],
@@ -628,7 +790,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             plugin_manifest.parent.mkdir()
             plugin_manifest.write_text(json.dumps({"version": "1.5.1"}), encoding="utf-8")
             (bootstrap / "SKILL.md").write_text(
-                "# Bootstrap\n\n- Skill version: `2.5.3`\n", encoding="utf-8",
+                "# Bootstrap\n\n- Skill version: `2.5.4`\n", encoding="utf-8",
             )
             (scout / "SKILL.md").write_text(
                 "# Scout\n\n- Skill version: `5.19.1`\n", encoding="utf-8",
@@ -657,7 +819,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 },
                 "versions": {
                     "core": "0.3.10", "plugin": "1.5.1",
-                    "bootstrap": "2.5.3", "scout": "5.19.1",
+                    "bootstrap": "2.5.4", "scout": "5.19.1",
                 },
                 "artifacts": [],
                 "verification": {},
@@ -684,15 +846,16 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
                 "assets": assets,
             }), encoding="utf-8")
 
-            desired, sidecar, source_hash = self.reconcile.load_desired_bundle(
+            desired, sidecar, source_hash, archive_hash = self.reconcile.load_desired_bundle(
                 source_path, release_path,
             )
 
             self.assertEqual("v0.3.10", desired["release_ref"])
             self.assertEqual("1.5.1", desired["plugin_version"])
-            self.assertEqual("2.5.3", desired["bootstrap_version"])
+            self.assertEqual("2.5.4", desired["bootstrap_version"])
             self.assertEqual("a" * 40, sidecar.expected_commit)
             self.assertRegex(source_hash, r"^[0-9a-f]{64}$")
+            self.assertEqual(hashlib.sha256(portable_archive.read_bytes()).hexdigest(), archive_hash)
             self.assertRegex(desired["plugin_sha256"], r"^[0-9a-f]{64}$")
 
             release_path.write_text(
@@ -824,7 +987,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             codex_home = root / "codex-home"
             self.reconcile.sync_sources(codex_home, spec)
             for name, version in (
-                ("agent-memory-workstation-bootstrap", "2.5.3"),
+                ("agent-memory-workstation-bootstrap", "2.5.4"),
                 ("global-owner-scout", "5.19.1"),
             ):
                 skill = codex_home / "skills" / name
@@ -855,7 +1018,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             self.assertEqual("verified", observed["core"]["status"])
             self.assertEqual(commit, observed["core"]["source_commit"])
             self.assertEqual("verified", observed["doctor"])
-            self.assertEqual("2.5.3", observed["bootstrap_skill"]["version"])
+            self.assertEqual("2.5.4", observed["bootstrap_skill"]["version"])
             self.assertRegex(observed["scout_skill"]["content_sha256"], r"^[0-9a-f]{64}$")
 
     def test_distribution_participant_rolls_back_with_source_transaction(self) -> None:
@@ -946,6 +1109,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             "desired": self.desired_bundle(),
             "observed": self.exact_distribution(),
             "source_sha256": "e" * 64,
+            "archive_sha256": "f" * 64,
             "source_plan": source_plan,
             "observed_host": self.exact_host(),
         }
@@ -965,7 +1129,7 @@ class WorkstationReconcileV2Tests(unittest.TestCase):
             )
             with mock.patch.object(
                 self.reconcile, "_workstation_reconcile_context", return_value=(plan, context),
-            ):
+            ), mock.patch.object(self.reconcile, "_expected_review_hash", return_value=self.review_hash):
                 pack = self.reconcile.verify_workstation_consumer(
                     Path("unused"), Path("source.json"), Path("release.json"), inventory,
                 )

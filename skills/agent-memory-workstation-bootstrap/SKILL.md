@@ -7,7 +7,7 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `2.5.3`
+- Skill version: `2.5.4`
 - Modes: `inspect`, `verify_consumer`, `apply_enrollment`
 - Deployment pack: `agent_memory_workstation_deployment_pack_v4`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
@@ -58,7 +58,7 @@ migration continue through `inspect` below.
      root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
 3. Run exact-hash `workstation-reconcile --apply`. Marketplace/Plugin mutation participates in the source-cutover rollback
    transaction. The transaction then runs Core setup, binds the explicit or preserved canonical Owner, verifies Doctor, installs
-   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.5.3`, Scout `5.19.1`,
+   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.5.4`, Scout `5.19.1`,
    and every desired identity. The result is `reload_required`; it proves host materialization, not model adoption or project-level
    same-name Skill parity.
 4. If the user also requested verification, continue through `verify_consumer` in this same task after exact readback; that request
@@ -85,8 +85,12 @@ Write only the exact temporary
 `workstation-reconcile --verify-consumer --desktop-project-inventory <inventory>` against the same Resolver output. This mode is read-only: it requires an exact no-op plan,
 re-observes current managed sources, Core runtime, Owner parity, Doctor, installed Bootstrap/Scout bytes, distribution identities,
 and obtains effective candidates from native `skills/list` with the explicit Codex home and each local primary folder. It reads
-`scope` and `enabled`, then physically checks enabled product Skills. Each capability needs one matching enabled entry;
-disabled copies do not drift and duplicate enabled copies do, even when their versions match. Native unavailability stays bounded. Preserve enumerated projects without a local path as bounded entries. Delete the temporary directory
+`scope` and `enabled`, then physically checks enabled product Skills. Bootstrap and Scout need one matching enabled entry each.
+Engineering Contract Review groups Plugin-qualified and standalone names: the managed Plugin entry must be discovered at its
+expected cache path, and an enabled entry must be unique and match the verified archive. An explicitly disabled managed Plugin
+entry remains disabled and is reported. The project candidate check does not read disabled copies; the separate managed Plugin
+integrity check still reads the installed Plugin files. Duplicate enabled copies drift even when their contents match. Missing entries
+and native unavailability stay bounded. Preserve enumerated projects without a local path as bounded entries. Delete the temporary directory
 after the command. A historical cutover receipt is never accepted as current host evidence. Project-level drift returns
 `consumer_scope_drift`; incomplete inventory or unsafe/unreadable scope returns `consumer_scope_bounded`. Neither state authorizes
 patching, pulling, deleting, or overwriting a project checkout. Report entry conditions separately from actual Scout execution;

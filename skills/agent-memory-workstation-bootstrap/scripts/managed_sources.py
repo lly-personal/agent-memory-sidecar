@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
@@ -19,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import uuid
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,7 +28,7 @@ from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
 
 
-BOOTSTRAP_VERSION = "2.5.3"
+BOOTSTRAP_VERSION = "2.5.4"
 SCOUT_VERSION = "5.19.1"
 PACK_VERSION = "agent_memory_workstation_deployment_pack_v4"
 DESKTOP_PROJECT_INVENTORY_VERSION = "agent_memory_desktop_project_inventory_v1"
@@ -98,7 +100,11 @@ CONSUMER_SKILL_FIELDS = {"name", "scope", "enabled", "version", "content_sha256"
 CONSUMER_SKILLS = {
     "agent-memory-workstation-bootstrap": ("bootstrap_version", "bootstrap_sha256"),
     "global-owner-scout": ("scout_version", "scout_sha256"),
+    "engineering-contract-review": ("plugin_version", None),
 }
+REVIEW_SKILL = "engineering-contract-review"
+MANAGED_REVIEW_SKILL = "agent-memory-sidecar:engineering-contract-review"
+REVIEW_DISABLED_NOTICE = "工程契约审查的托管 Plugin 入口已停用；本次保留该选择，未验证其启用后使用。"
 NATIVE_SKILLS_TIMEOUT_SECONDS = 30
 NATIVE_SKILLS_MAX_BYTES = 16 * 1024 * 1024
 CONSUMER_SKILL_MAX_ENTRIES = 512
@@ -214,7 +220,7 @@ def _portable_root_for_release_manifest(path: Path) -> Path:
 def load_desired_bundle(
     source_manifest_path: Path | str,
     release_manifest_path: Path | str,
-) -> tuple[dict[str, Any], SourceSpec, str]:
+) -> tuple[dict[str, Any], SourceSpec, str, str]:
     specs = load_source_manifest(source_manifest_path)
     by_name = {item.name: item for item in specs}
     sidecar = by_name["sidecar"]
@@ -321,7 +327,7 @@ def load_desired_bundle(
     }
     validate_desired_bundle(desired)
     source_sha256 = hashlib.sha256(normalize_remote(sidecar.remote).encode("utf-8")).hexdigest()
-    return desired, sidecar, source_sha256
+    return desired, sidecar, source_sha256, assets[portable_name]["sha256"]
 
 
 def require(condition: bool, message: str) -> None:
@@ -1497,6 +1503,16 @@ def _not_observed_consumer_scope() -> dict[str, Any]:
     }
 
 
+def _consumer_capability(name: Any) -> str | None:
+    if not isinstance(name, str):
+        return None
+    if name in CONSUMER_SKILLS:
+        return name
+    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*:engineering-contract-review", name):
+        return REVIEW_SKILL
+    return None
+
+
 def validate_consumer_scope(value: Any) -> dict[str, Any]:
     exact(value, CONSUMER_SCOPE_FIELDS, "$.consumer_scope")
     require(value["status"] in {"not_observed", "exact", "drifted", "bounded"}, "consumer scope status invalid")
@@ -1524,7 +1540,8 @@ def validate_consumer_scope(value: Any) -> dict[str, Any]:
         project_relations: set[str] = set()
         for skill_index, skill in enumerate(project["skills"]):
             exact(skill, CONSUMER_SKILL_FIELDS, f"$.consumer_scope.projects[{index}].skills[{skill_index}]")
-            require(skill["name"] in CONSUMER_SKILLS, "consumer skill name invalid")
+            capability = _consumer_capability(skill["name"])
+            require(capability is not None, "consumer skill name invalid")
             require(skill["scope"] in {"repo", "user", "system", "admin"}, "consumer skill scope invalid")
             require(isinstance(skill["enabled"], bool), "consumer skill enabled invalid")
             require(skill["relation"] in {"exact", "drifted", "unreadable", "disabled"}, "consumer skill relation invalid")
@@ -1533,7 +1550,11 @@ def validate_consumer_scope(value: Any) -> dict[str, Any]:
                 require(skill["version"] == "unavailable", "unreadable consumer skill version invalid")
                 require(skill["content_sha256"] == "unavailable", "unreadable consumer skill hash invalid")
             else:
-                require(SEMVER.fullmatch(str(skill["version"])) is not None, "consumer skill version invalid")
+                require(
+                    SEMVER.fullmatch(str(skill["version"])) is not None
+                    or (capability == REVIEW_SKILL and skill["relation"] == "drifted" and skill["version"] == "unavailable"),
+                    "consumer skill version invalid",
+                )
                 require(SHA64.fullmatch(str(skill["content_sha256"])) is not None, "consumer skill hash invalid")
             project_relations.add(skill["relation"])
             matching_skill_count += 1
@@ -1543,11 +1564,20 @@ def validate_consumer_scope(value: Any) -> dict[str, Any]:
         )
         require(project["status"] == expected_project_status, "consumer project status inconsistent")
         if project["status"] in {"exact", "drifted"}:
+            require(any(item["name"] == MANAGED_REVIEW_SKILL and item["scope"] == "user" for item in project["skills"]),
+                    "qualified consumer project requires managed review entry")
             for name in CONSUMER_SKILLS:
-                enabled = [item for item in project["skills"] if item["name"] == name and item["enabled"]]
-                require(enabled, "qualified consumer project requires each enabled capability")
+                enabled = [item for item in project["skills"] if _consumer_capability(item["name"]) == name and item["enabled"]]
+                disabled_review = name == REVIEW_SKILL and any(
+                    item["name"] == MANAGED_REVIEW_SKILL and item["scope"] == "user" and not item["enabled"]
+                    for item in project["skills"]
+                )
+                if disabled_review:
+                    require(REVIEW_DISABLED_NOTICE in value["limitations"], "disabled review requires notice")
+                require(enabled or disabled_review, "qualified consumer project requires each enabled capability")
                 if project["status"] == "exact":
-                    require(len(enabled) == 1 and enabled[0]["relation"] == "exact", "consumer effective entry must be unique and exact")
+                    require(not enabled or (len(enabled) == 1 and enabled[0]["relation"] == "exact"),
+                            "consumer effective entry must be unique and exact")
         has_drift = has_drift or "drifted" in project_relations
         has_bounded = has_bounded or project["status"] == "bounded"
     require(value["matching_skill_count"] == matching_skill_count, "consumer skill count invalid")
@@ -1681,9 +1711,12 @@ def _consumer_skill_path(raw_path: Any) -> Path:
     return path.parent
 
 
-def observe_consumer_scope(inventory: Any, *, desired: dict[str, Any], codex_home: Path) -> dict[str, Any]:
+def observe_consumer_scope(
+    inventory: Any, *, desired: dict[str, Any], codex_home: Path, expected_review_sha256: str,
+) -> dict[str, Any]:
     """Read effective native candidates, then verify enabled product Skill bytes."""
     desired = validate_desired_bundle(desired)
+    require(SHA64.fullmatch(expected_review_sha256) is not None, "expected review skill hash invalid")
     exact(inventory, DESKTOP_PROJECT_INVENTORY_FIELDS, "$.desktop_project_inventory")
     require(
         inventory["contract_version"] == DESKTOP_PROJECT_INVENTORY_VERSION,
@@ -1735,6 +1768,11 @@ def observe_consumer_scope(inventory: Any, *, desired: dict[str, Any], codex_hom
             catalogs = {}
     projects: list[dict[str, Any]] = []
     scanned_project_count = 0
+    review_disabled = False
+    managed_review_path = os.path.normcase(os.path.abspath(
+        codex_home / "plugins" / "cache" / "agent-memory" / "agent-memory-sidecar" /
+        desired["plugin_version"] / "skills" / REVIEW_SKILL / "SKILL.md"
+    ))
     for index, (display_name, project_root, is_git_repository) in enumerate(normalized):
         project_ref = "desktop-project-" + hashlib.sha256(
             canonical({"display_name": display_name, "ordinal": index})
@@ -1750,8 +1788,10 @@ def observe_consumer_scope(inventory: Any, *, desired: dict[str, Any], codex_hom
             require(native_available and isinstance(entry, dict), "native_skills_unavailable")
             require(entry.get("errors") == [] and isinstance(entry.get("skills"), list), "native_skills_incomplete")
             require(all(isinstance(item, dict) for item in entry["skills"]), "native_skills_output_invalid")
-            candidates = [item for item in entry["skills"] if item.get("name") in CONSUMER_SKILLS]
+            candidates = [item for item in entry["skills"] if _consumer_capability(item.get("name")) is not None]
             seen_candidates: set[str] = set()
+            managed_review_disabled = False
+            managed_review_found = False
             for item in candidates:
                 name = item["name"]
                 require(isinstance(item.get("enabled"), bool), "native_skill_enabled_missing")
@@ -1761,6 +1801,11 @@ def observe_consumer_scope(inventory: Any, *, desired: dict[str, Any], codex_hom
                 identity = os.path.normcase(os.path.abspath(raw_path))
                 require(identity not in seen_candidates, "native_skill_path_duplicated")
                 seen_candidates.add(identity)
+                if name == MANAGED_REVIEW_SKILL and item["scope"] == "user" and identity == managed_review_path:
+                    managed_review_found = True
+                    if not item["enabled"]:
+                        managed_review_disabled = True
+                        review_disabled = True
                 version = content_sha256 = "unavailable"
                 relation = "disabled"
                 if item["enabled"]:
@@ -1769,12 +1814,18 @@ def observe_consumer_scope(inventory: Any, *, desired: dict[str, Any], codex_hom
                         content_sha256 = bounded_physical_tree_hash(
                             skill_root, max_entries=CONSUMER_SKILL_MAX_ENTRIES, max_bytes=CONSUMER_SKILL_MAX_BYTES,
                         )
-                        version = _skill_version(skill_root)
+                        capability = _consumer_capability(name)
+                        version = _skill_version(skill_root) if capability != REVIEW_SKILL else "unavailable"
                         require(content_sha256 == bounded_physical_tree_hash(
                             skill_root, max_entries=CONSUMER_SKILL_MAX_ENTRIES, max_bytes=CONSUMER_SKILL_MAX_BYTES,
                         ), "consumer_skill_changed_during_read")
-                        version_field, hash_field = CONSUMER_SKILLS[name]
-                        relation = "exact" if version == desired[version_field] and content_sha256 == desired[hash_field] else "drifted"
+                        version_field, hash_field = CONSUMER_SKILLS[capability]
+                        if capability == REVIEW_SKILL:
+                            relation = "exact" if content_sha256 == expected_review_sha256 else "drifted"
+                            if relation == "exact":
+                                version = desired[version_field]
+                        else:
+                            relation = "exact" if version == desired[version_field] and content_sha256 == desired[hash_field] else "drifted"
                     except (BootstrapError, OSError, UnicodeError):
                         version = content_sha256 = "unavailable"
                         relation = "unreadable"
@@ -1782,9 +1833,11 @@ def observe_consumer_scope(inventory: Any, *, desired: dict[str, Any], codex_hom
                     "name": name, "scope": item["scope"], "enabled": item["enabled"],
                     "version": version, "content_sha256": content_sha256, "relation": relation,
                 })
+            require(managed_review_found, "consumer_managed_review_entry_missing")
             for name in CONSUMER_SKILLS:
-                enabled = [item for item in skills if item["name"] == name and item["enabled"]]
-                require(enabled, "consumer_skill_no_enabled_entry")
+                enabled = [item for item in skills if _consumer_capability(item["name"]) == name and item["enabled"]]
+                optional_disabled = name == REVIEW_SKILL and managed_review_disabled and not enabled
+                require(enabled or optional_disabled, "consumer_skill_no_enabled_entry")
                 if len(enabled) > 1:
                     for item in enabled:
                         if item["relation"] != "unreadable":
@@ -1815,6 +1868,8 @@ def observe_consumer_scope(inventory: Any, *, desired: dict[str, Any], codex_hom
         limitations.append("Desktop 项目清单不完整；未枚举的消费者范围保持未知。")
     if has_bounded:
         limitations.append("至少一个项目或同名 Skill 无法安全完整读取；该消费者范围保持未知。")
+    if review_disabled:
+        limitations.append(REVIEW_DISABLED_NOTICE)
     result = {
         "status": status,
         "inventory_status": inventory["inventory_status"],
@@ -2253,7 +2308,7 @@ def _workstation_reconcile_context(
     source_manifest_path: Path | str,
     release_manifest_path: Path | str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    desired, sidecar, source_sha256 = load_desired_bundle(
+    desired, sidecar, source_sha256, archive_sha256 = load_desired_bundle(
         source_manifest_path, release_manifest_path,
     )
     specs = load_source_manifest(source_manifest_path)
@@ -2280,6 +2335,7 @@ def _workstation_reconcile_context(
         "desired": desired,
         "sidecar": sidecar,
         "source_sha256": source_sha256,
+        "archive_sha256": archive_sha256,
         "specs": specs,
         "source_plan": source_plan,
         "observed": observed,
@@ -2492,6 +2548,53 @@ def _source_sync_from_exact_plan(source_plan: dict[str, Any]) -> dict[str, Any]:
     return _validate_source_sync(receipts)
 
 
+def _expected_review_hash(release_manifest_path: Path | str, desired: dict[str, Any], archive_sha256: str) -> str:
+    release_path = Path(release_manifest_path).expanduser().resolve()
+    plugin = _portable_root_for_release_manifest(release_path) / "plugins" / "agent-memory-sidecar"
+    def plugin_hash() -> str:
+        return physical_tree_hash(plugin, excluded_relatives={"source-manifest.json"})
+    require(plugin_hash() == desired["plugin_sha256"], "verified_plugin_content_changed")
+    archive_name = f"agent-memory-portable-{desired['core_version']}.zip"
+    archive_bytes = _physical_file_bytes(release_path.with_name(archive_name), "release_resolution_assets_incomplete", limit=67_108_864)
+    require(SHA64.fullmatch(archive_sha256) is not None and hashlib.sha256(archive_bytes).hexdigest() == archive_sha256,
+            "release_resolution_asset_mismatch:portable")
+    try:
+        with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+            prefix = f"plugins/agent-memory-sidecar/skills/{REVIEW_SKILL}/"
+            entries = [entry for entry in archive.infolist() if entry.filename.startswith(prefix)]
+            require(len(entries) <= CONSUMER_SKILL_MAX_ENTRIES, "component_tree_entry_budget_exceeded")
+            names = [entry.filename for entry in entries]
+            require(len(names) == len({name.casefold() for name in names}), "release_portable_duplicate")
+            files = []
+            for entry in entries:
+                if entry.filename == prefix and entry.is_dir():
+                    continue
+                relative = entry.filename[len(prefix):].rstrip("/")
+                parts = relative.split("/")
+                require(relative and all(part not in {"", ".", ".."} and ":" not in part and "\\" not in part for part in parts),
+                        "release_portable_path_invalid")
+                if not entry.is_dir() and not any(part in {".git", "__pycache__"} for part in parts):
+                    if Path(relative).suffix.casefold() not in {".pyc", ".pyo"}:
+                        files.append((relative, entry))
+            require(files, "component_tree_empty")
+            require(sum(entry.file_size for _, entry in files) <= CONSUMER_SKILL_MAX_BYTES,
+                    "component_tree_byte_budget_exceeded")
+            digest = hashlib.sha256()
+            for relative, entry in sorted(files, key=lambda item: item[0]):
+                digest.update(relative.encode("utf-8"))
+                digest.update(b"\0")
+                digest.update(archive.read(entry))
+                digest.update(b"\0")
+            review_hash = digest.hexdigest()
+    except (zipfile.BadZipFile, OSError, RuntimeError, ValueError) as exc:
+        raise BootstrapError("release_portable_invalid") from exc
+    require(bounded_physical_tree_hash(
+        plugin / "skills" / REVIEW_SKILL, max_entries=CONSUMER_SKILL_MAX_ENTRIES, max_bytes=CONSUMER_SKILL_MAX_BYTES,
+    ) == review_hash, "verified_review_content_mismatch")
+    require(plugin_hash() == desired["plugin_sha256"], "verified_plugin_content_changed")
+    return review_hash
+
+
 def verify_workstation_consumer(
     codex_home: Path,
     source_manifest_path: Path | str,
@@ -2505,7 +2608,10 @@ def verify_workstation_consumer(
     inventory = _load_json_file(
         Path(desktop_project_inventory_path), "desktop_project_inventory_unreadable",
     )
-    consumer_scope = observe_consumer_scope(inventory, desired=context["desired"], codex_home=codex_home)
+    consumer_scope = observe_consumer_scope(
+        inventory, desired=context["desired"], codex_home=codex_home,
+        expected_review_sha256=_expected_review_hash(release_manifest_path, context["desired"], context["archive_sha256"]),
+    )
     return build_deployment_pack(
         desired=context["desired"],
         observed_distribution=context["observed"],
@@ -2708,6 +2814,8 @@ def validate_pack(value: Any) -> dict[str, Any]:
         require(activation["desktop_reload"] == "not_required", "blocked pack cannot request Desktop reload")
         require(activation["interactive_entry"] == "blocked", "blocked pack must block interactive entry")
     require(isinstance(value["limitations"], list), "$.limitations must be a list")
+    if REVIEW_DISABLED_NOTICE in value["consumer_scope"]["limitations"]:
+        require(REVIEW_DISABLED_NOTICE in value["limitations"], "consumer scope limitations missing from pack")
     for index, item in enumerate(value["limitations"]):
         safe_text(item, f"$.limitations[{index}]", 300)
     require(value["pack_hash"] == object_hash(value, "pack_hash"), "deployment pack hash mismatch")
