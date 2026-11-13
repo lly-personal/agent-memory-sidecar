@@ -127,8 +127,34 @@ only the relevant bundled method and returns an evidence-bounded review within t
 commands are `$agent-memory-sidecar:engineering-contract-review` in Codex, `/skill:engineering-contract-review` in Pi and
 `/agent-memory-sidecar:engineering-contract-review` in Claude Code. The native plugin namespace is part of Claude's command
 syntax, not a separate method. Reload only when the host requires it. To update a pinned installation, select the next published
-tag through the same native manager; do not edit installed method copies. Existing independently maintained same-name skills
+release through the same native manager; do not hand-edit installed method files. Existing independently maintained same-name skills
 must be checked before migration, rather than overwritten or deleted by name.
+
+#### Preserve files when updating a Pi Git package
+
+Pi 1.5.2 can hard-reset and clean a Git package checkout when its `HEAD` differs from the requested ref. Before updating an
+existing package, use `pi list` to locate its managed checkout and verify its origin, the published release tag and its commit.
+Inspect tracked changes and the untracked or ignored paths that must be kept. Preserve the checkout if it is active, tracked files
+are modified, a target path would overwrite an untracked or ignored path, a Git hook that would run is not understood, or the sibling
+`.agent-memory-sidecar.pi-update-incomplete` marker exists. Do not reset, clean, stash or remove files to make the update run.
+
+If the installed Pi manager is verified to skip reset and clean when `HEAD` already equals the requested commit, and no missing
+dependency will trigger a package installation, the checkout can be prepared with Git before Pi records the new pin. Set
+`package_dir` to the checkout reported by Pi, and set `release_tag` and `release_commit` to the verified release identity:
+
+```sh
+git -C "$package_dir" fetch --no-tags origin "refs/tags/$release_tag" &&
+  test "$(git -C "$package_dir" rev-parse 'FETCH_HEAD^{commit}')" = "$release_commit" &&
+  git -C "$package_dir" switch --detach "$release_commit" &&
+  pi install "git:github.com/lly-personal/agent-memory-sidecar@$release_commit" --no-approve
+```
+
+The full commit pin prevents a moved tag from changing the ref Pi fetches between the switch and registration. `pi list` will show
+the commit rather than the tag, so retain their verified association. Check the checkout commit and preserved files afterward.
+If a step fails or the state changes, inspect the checkout, registered ref and marker before recovery; do not blindly retry or
+force cleanup. This path was checked on macOS with Pi 1.5.2 for v0.6.4 to v0.6.6, whose package declares no runtime dependencies.
+Recheck the manager and release conditions on other versions or platforms; package registration and Skill discovery do not prove
+session loading or model behavior. See [Pi package management](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md).
 
 These packages also expose the existing Bootstrap Anchor. Installing or calling a method does not deploy Core, change global
 instructions, grant new tools, or prove model adoption. Local Claude Code plugins do not establish Cowork/cloud support.
