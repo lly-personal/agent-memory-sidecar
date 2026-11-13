@@ -628,10 +628,14 @@ Scheduled 使用既有最终 Inbox wrapper 与可见文本校验，不增加文�
 每页至多 50 项，沿原生 cursor 到冻结 30 日边界或 EOF；只有排序与该页所有相关时间均证明边界时才能提前结束。
 `index_pages_read` 记录完成页数，`index_terminals` 精确包含 active/archived，其值为
 `window_boundary|eof|has_more|unavailable|failed`；发现任务去重后计数，不再受总数 50 限制。
-完整覆盖要求两个分区及所有选中自然任务都到边界/EOF。历史未完但选中正文读完只能 bounded；明确工具失败 degraded。
-原生调用 yield 后先恢复同一 cell 直到终态；未恢复、非法请求或中断是 `execution_protocol_failed`，不能伪装覆盖降级。
+完整覆盖要求两个分区及所有选中自然任务都到边界/EOF。历史未完但选中正文读完只能 bounded；明确工具失败或成功页面
+仍有无法补全的内容截断使用 degraded，后者不冒称原生抛错。原生调用 yield 后先恢复同一 cell 直到终态。
+参数或本地转运/解析错误保留后，在原授权和重试边界内沿同一来源、游标恢复；尚未完成不是停止理由。
+未恢复执行、来源丢失或未恢复中断才是 `execution_protocol_failed`，不能伪装覆盖降级。
 正文从单 turn 与有界输出开始，按需要补读被截断部分；明确容量失败可缩小同一 cursor 请求一次，保留原失败记录，
-仍失败则标记 `native_thread_pages_terminal_failure` 与具体未读范围。其他正式来源独立支持的卡继续保留。
+仍失败则标记 `native_thread_pages_terminal_failure` 与具体未读范围。该兼容枚举也覆盖成功返回但经可用原生读取仍无法
+补全的字段截断；在原有 Session `coverage/uncovered` 和 `limitations` 中记录实际成因，不计完整读取。
+其他正式来源独立支持的卡继续保留，隐私、完整性和只读失败仍阻断交付。
 排除专用 Scheduled、Scout、测试与委派任务；同一聊天混有工程与复盘时，保留本次触发前的自然工作，仅排除复盘生成的内容。不得因当前聊天调用 Scout 而丢弃其工程历史；不通过 transcript 文件、数据库或新队列补洞。
 
 `project_identity` 精确包含
@@ -821,10 +825,8 @@ Store、常驻规则或独立更新器。正常工程任务按需选择方法，
 
 - `session_coverage.status=bounded/degraded` 时必须精确声明未覆盖范围；项目 Git、owner 和验收事实仍可形成
   有限结果，但不得用布尔值或模糊措辞伪造完整任务普查。
-- 原生任务索引未取得终态、调用参数非法或执行协议中断时使用 `failed / execution_protocol_failed`；index 或 thread
-  page 工具明确返回终态错误才分别允许 `degraded / native_index_terminal_failure` 或
-  `degraded / native_thread_pages_terminal_failure`。运行内的失败包不得把 `failed` 再描述为
-  “degraded / Session unavailable”。Scheduled 状态变更不属于只读 Scout；外部 Host Activation Control 观察到
+- 原生执行与内容覆盖按上面的 Session coverage 分类；未恢复执行仍使用 `failed / execution_protocol_failed`，
+  不能用内容降级掩盖执行未知。可恢复错误必须保留，原失败包也不改写。Scheduled 状态变更不属于只读 Scout；外部 Host Activation Control 观察到
   首次协议错误后执行并复读 `PAUSED`。没有实际控制面调用时只能报告“需要暂停”，不得声称已暂停。
 - 输入缺失、结构不合法、E1 晋升、隐私泄漏、工作区变化、未经授权的外部写操作或无法证明只读时，该项目 Review Pack
   显示失败终态；不得输出未通过校验的卡。

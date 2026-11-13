@@ -7,7 +7,7 @@ description: Understand a project's goals, actors, scenarios and real workflows 
 
 ## Contract
 
-- Skill version: `5.19.2`
+- Skill version: `5.19.3`
 - Project result: `global_owner_scout_project_v7`
 - User review: `global_owner_scout_review_pack_v8`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -152,7 +152,9 @@ owns completion, including recovery and the final result. Do not return after di
    turns there, and dedicated test/review tasks. A page size is not a total coverage cap. Use `read_thread` pages for every selected natural task, starting
    small (`turnLimit=1`, bounded output) and fetching only needed output bodies. A capacity error may be retried once at a smaller
    size on the same cursor; retain the failed observation. Do not silently skip pages. Resume every yielded cell to a terminal
-   result before continuing. Explicit terminal failures degrade the affected evidence; abandoned execution is a protocol failure.
+   result before continuing. Recoverable call/transfer errors are retained and corrected within the same source, cursor and
+   authorization, as Phase 1 specifies. Page errors and successful-but-unrecoverable field truncation degrade only the affected
+   evidence; record their different actual causes. Unrecovered execution remains a protocol failure, not a coverage shortcut.
 4. Keep source facts, inferred obligations and Global Owner comparison separate. For a source-rich review, use an internal
    independent reviewer as Phase 5 specifies; do not create another user-facing task. Compare the complete actual Owner,
    including unmanaged principles, by trigger, required action and exception. Recombining already-covered obligations is not a
@@ -192,7 +194,7 @@ For “解释这里”, “看这条路径”, native report/object follow-ups, 
 Find the original delivery receipt for the referenced report in native chat history, including across intervening ordinary replies.
 Use the report explicitly selected by the user or the unambiguous current discussion; never substitute another report just because it is newer.
 Only unresolved ambiguity between reports needs a question. Run `verify-final --artifact-root <original-host-output-root>` with that original final
-on stdin, including surrounding delivery prose; do not manually recompose or trim the verified advice. The helper accepts one
+via stdin or `--input-file`, including surrounding delivery prose; do not manually recompose or trim the verified advice. The helper accepts one
 complete exact receipt and rejects missing/ambiguous boundaries or changed content. Surrounding prose is not verified evidence or
 authorization. Pass `--project-root <current-native-bound-root>` to check the full current snapshot, including dirty and untracked sources. Compare the returned `project_identity` with the native binding before treating the map as this project. `source_status=changed` needs relevant source review and a new snapshot; HEAD equality alone is insufficient. It reconstructs and returns the manifest from the original file, verifies direct-child containment, read-only bytes and
 all card/action hashes. Use `project_map_bundle.context` to resolve the exact selected object and source references. Never infer an object from another report or from widget state alone. Validate the map source revision against the current project before claiming currentness; inspect relevant changes and create a new snapshot for affected facts, preserving history. A stale map remains historical evidence, not current maintenance authority. Missing/tampered HTML sets `visual_status=unavailable` while verified Markdown remains usable. Old files without a map remain readable without fabricating one.

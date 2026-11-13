@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.8 (2026-11-14)
+
+- Distinguish successful but unrecoverably clipped native content from native-call errors through the existing bounded coverage contract; preserve recoverable failures and continue within the original authorization.
+- Describe an unavailable output directory without inferring that the user withheld authorization or making optional preview a prerequisite.
+- Add a byte-preserving native-final transfer example that rejects native truncation before writing; receipt verification does not establish missing surrounding prose. Retain the compatibility adapter's original deletion conditions.
+- Components: Core 0.6.8, Plugin 1.11.4, Bootstrap 2.5.6 and Scout 5.19.3. Existing result and delivery formats remain readable; natural recovery and complete fresh-session adoption remain separate evidence.
+
 ## 0.6.7 (2026-11-13)
 
 - Keep recorded journeys, prerequisites, constraints, recovery and source status when continuing from a selected map object.

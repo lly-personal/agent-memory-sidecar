@@ -99,13 +99,13 @@ TERMINAL_REASON_MAPPINGS = {
         "interactive_host_blocked",
         "preflight",
         {"unchanged", "unverified"},
-        "深挖前未能确认当前任务的安全输出根或文件预览能力。",
+        "深挖前输出根检查未通过，当前无法生成审阅文件。",
     ),
     "output_root_unavailable": (
         "interactive_host_blocked",
         "delivery",
         {"unchanged", "unverified"},
-        "当前任务没有安全且明确授权的宿主输出根目录。",
+        "当前任务的输出根目录不可用，当前无法生成审阅文件。",
     ),
     "render_integrity_failed": (
         "render_integrity_failed",

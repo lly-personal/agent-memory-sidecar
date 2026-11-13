@@ -317,7 +317,14 @@ Complete requires `native_index_completed + native_thread_pages_completed`, both
 requires `native_index_host_cap + native_thread_pages_completed`, an unfinished history partition, and all selected tasks read. Degraded requires
 an explicit `native_index_terminal_failure` or one proved index terminal result plus
 `native_thread_pages_terminal_failure`; the latter requires truncation and fewer fully read than selected tasks. In either degraded
-case, cards independently supported by formal project evidence remain. `execution_protocol_failed` requires Project status
+case, cards independently supported by formal project evidence remain. The compatibility enum
+`native_thread_pages_terminal_failure` records an observed boundary of incomplete selected-task reading: a native page error,
+or a successful page whose truncated fields cannot be recovered within the native interface. It does not assert that a
+successful native call threw an error. Record the actual cause and exact unread scope in the existing Session source
+`coverage/uncovered` and `limitations`; do not count that task as fully read.
+Retain a rejected call or local transfer/parse error. If the same native source and cursor can be recovered within the original
+authorization and retry limits, correct it and continue; unfinished work alone is not a failure. An unrecovered execution cell,
+lost source provenance or unrecovered execution interruption is `execution_protocol_failed`, which requires Project status
 `failed`; it may preserve one previously proved index terminal result, but never thread-pages completed and never cards.
 `no_material_delta` requires complete/bounded coverage and evidenced dispositions within the declared covered scope.
 
