@@ -141,26 +141,56 @@ class NativeObjectCaptureTests(unittest.TestCase):
     def test_documented_host_transfer_preserves_object_and_shell_literals(self):
         protocol = (SCRIPTS.parent/'references/deep-review-protocol.md').read_text(encoding='utf-8')
         examples = re.findall(r'```javascript\n(.*?)\n```', protocol, re.S)
-        self.assertEqual(len(examples), 2)
+        self.assertEqual(len(examples), 1)
         shell = shutil.which('pwsh') or shutil.which('powershell') if os.name == 'nt' else '/bin/sh'
         if not shell: self.skipTest('native command shell unavailable')
         harness = r'''
 const fs=require('node:fs'), cp=require('node:child_process');
-const p=JSON.parse(fs.readFileSync(0,'utf8'));let emitted;
-const source=p.page, load=()=>source, text=x=>{emitted=x;};
-const tools={exec_command:async ({cmd})=>{
+const p=JSON.parse(fs.readFileSync(0,'utf8'));let emitted,child,closed,ready,output='',stderr='',exit;
+const source=p.page, load=()=>source, text=x=>{emitted=x;}, saved=new Map(),store=(k,v)=>saved.set(k,v);
+let legacyCommandProbe=null;
+if(p.windows){
+ const literal="'"+JSON.stringify(source).replaceAll("'","''")+"'";
+ const command='$null = '+literal;
+ const probe=cp.spawnSync(p.shell,['-NoProfile','-NonInteractive','-Command',command],{encoding:'utf8'});
+ legacyCommandProbe={command_characters:command.length,exit_code:probe.status,
+                     error:probe.error?{code:probe.error.code,message:probe.error.message}:null};
+}
+const take=()=>{const value={output,stderr,...(exit===undefined?{session_id:1}:{exit_code:exit})};output='';return value;};
+const tools={exec_command:async ({cmd,tty})=>{
+ if(!tty||cmd.includes('large evidence'))throw new Error('payload was placed in the command');
  const args=p.windows?['-NoProfile','-NonInteractive','-Command',cmd]:['-c',cmd];
- const r=cp.spawnSync(p.shell,args,{cwd:p.cwd,encoding:'utf8'});
- return {exit_code:r.status,output:r.stdout,stderr:r.stderr};
+ child=cp.spawn(p.shell,args,{cwd:p.cwd,stdio:['pipe','pipe','pipe']});
+ let readyResolve,closeResolve;ready=new Promise(r=>readyResolve=r);closed=new Promise(r=>closeResolve=r);
+ child.stdout.setEncoding('utf8');child.stderr.setEncoding('utf8');
+ child.stdout.on('data',data=>{output+=data;if(output.includes('"status":"awaiting_native_object"'))readyResolve();});
+ child.stderr.on('data',data=>stderr+=data);
+ child.stdin.on('error',error=>stderr+=error.code+': '+error.message);
+ child.on('error',error=>{stderr+=error.code+': '+error.message;exit=-1;readyResolve();closeResolve();});
+ const timer=setTimeout(()=>{stderr+='owned test process guard expired';child.kill();},15000);
+ child.on('close',code=>{exit=code;clearTimeout(timer);child.stdin.destroy();readyResolve();closeResolve();});
+ await ready;return take();
+},write_stdin:async ({session_id,chars})=>{
+ if(session_id!==1)throw new Error('wrong owned session');
+ if(chars)child.stdin.write(chars); // Intentionally keep stdin open: capture must not wait for EOF.
+ await closed;return take();
 }};
 (async()=>{
  const run=new (Object.getPrototypeOf(async function(){}).constructor)(
- 'load','text','tools','pythonExecutable','scoutScript','artifactRoot','projectRoot',p.code);
- await run(load,text,tools,p.python,p.script,p.output,p.project);
- console.log(JSON.stringify({emitted,source_unchanged:JSON.stringify(source)===JSON.stringify(p.page)}));
+ 'load','store','text','tools','pythonExecutable','scoutScript','artifactRoot','projectRoot','commandShell',p.code);
+ await run(load,store,text,tools,p.python,p.script,p.output,p.project,p.windows?'powershell':'posix');
+ const acceptedOutput=emitted;
+ let failedStartRetainsSource=false;
+ const unavailable={exec_command:async()=>({exit_code:1,output:'controlled native startup failure'}),
+                    write_stdin:async()=>{throw new Error('must not send input after failed startup');}};
+ try{await run(load,store,text,unavailable,p.python,p.script,p.output,p.project,p.windows?'powershell':'posix');}
+ catch(error){failedStartRetainsSource=JSON.stringify(source)===JSON.stringify(p.page);}
+ console.log(JSON.stringify({emitted:acceptedOutput,source_unchanged:JSON.stringify(source)===JSON.stringify(p.page),
+                            failed_start_retains_source:failedStartRetainsSource,legacy_command_probe:legacyCommandProbe,
+                            owned_session_closed:saved.get('scout-capture-session')===null}));
 })().catch(e=>{console.error(e);process.exitCode=1;});
 '''
-        request = dict(page=self.returned, code=examples[1 if os.name == 'nt' else 0], windows=os.name == 'nt',
+        request = dict(page=self.returned, code=examples[0], windows=os.name == 'nt',
                        shell=shell, cwd=str(self.root), python=sys.executable, script=str(SCRIPTS/'scout.py'),
                        output=str(self.output), project=str(self.project))
         result = subprocess.run([shutil.which('node'), '-e', harness], input=json.dumps(request, ensure_ascii=False),
@@ -168,7 +198,66 @@ const tools={exec_command:async ({cmd})=>{
         self.assertEqual(result.returncode, 0, result.stderr)
         actual = json.loads(result.stdout)
         self.assertTrue(actual['source_unchanged'])
-        self.assertEqual(actual['emitted']['exit_code'], 0, actual['emitted']['stderr'])
-        receipt = json.loads(actual['emitted']['output'])
+        self.assertTrue(actual['failed_start_retains_source'])
+        self.assertTrue(actual['owned_session_closed'])
+        if actual['legacy_command_probe']:
+            print('native command-size observation: '+json.dumps(actual['legacy_command_probe']))
+        self.assertEqual(actual['emitted']['exit_code'], 0, actual['emitted'].get('stderr', actual))
+        receipt = json.loads(actual['emitted']['output'].strip().splitlines()[-1])
         self.assertEqual(json.loads(Path(receipt['raw_file']).read_bytes()), self.returned)
         self.assertFalse((self.root/'injected').exists())
+
+    @unittest.skipUnless(os.name == 'posix', 'POSIX owned terminal behavior')
+    def test_owned_terminal_accepts_large_frame_and_restores_mode(self):
+        import pty
+        import termios
+        master, slave = pty.openpty()
+        previous = termios.tcgetattr(slave)
+        child = subprocess.Popen([sys.executable, '-B', str(SCRIPTS/'scout.py'), 'capture-native', '--input-line',
+            '--artifact-dir', str(self.output), '--protected-root', str(self.project)], stdin=slave,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            self.assertEqual(json.loads(child.stdout.readline())['status'], 'awaiting_native_object')
+            self.assertFalse(termios.tcgetattr(slave)[3] & termios.ECHO)
+            data = memoryview((json.dumps(self.returned, ensure_ascii=False)+'\n').encode('utf-8'))
+            while data: data = data[os.write(master, data):]
+            stdout, stderr = child.communicate(timeout=15)
+            self.assertEqual(child.returncode, 0, stderr)
+            receipt = json.loads(stdout)
+            self.assertEqual(json.loads(Path(receipt['raw_file']).read_bytes()), self.returned)
+            observed = termios.tcgetattr(slave)
+            # macOS sets PENDIN when canonical mode resumes, even in a standalone
+            # tcsetattr control. It is pending-input state, not a changed setting.
+            observed[3] &= ~getattr(termios, 'PENDIN', 0)
+            previous[3] &= ~getattr(termios, 'PENDIN', 0)
+            self.assertEqual(observed, previous)
+        finally:
+            if child.poll() is None: child.kill(); child.wait()
+            os.close(master); os.close(slave)
+
+    @unittest.skipUnless(os.name == 'posix', 'POSIX owned terminal cancellation')
+    def test_owned_terminal_cancellation_restores_mode_without_a_capture(self):
+        import pty
+        import signal
+        import termios
+        for cancellation in (signal.SIGINT, signal.SIGTERM):
+            with self.subTest(signal=cancellation):
+                master, slave = pty.openpty()
+                previous = termios.tcgetattr(slave)
+                child = subprocess.Popen([sys.executable, '-B', str(SCRIPTS/'scout.py'), 'capture-native', '--input-line',
+                    '--artifact-dir', str(self.output), '--protected-root', str(self.project)], stdin=slave,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                try:
+                    self.assertEqual(json.loads(child.stdout.readline())['status'], 'awaiting_native_object')
+                    child.send_signal(cancellation)
+                    child.communicate(timeout=15)
+                    self.assertNotEqual(child.returncode, 0)
+                    observed = termios.tcgetattr(slave)
+                    observed[3] &= ~getattr(termios, 'PENDIN', 0)
+                    previous[3] &= ~getattr(termios, 'PENDIN', 0)
+                    self.assertEqual(observed, previous)
+                    self.assertEqual(list(self.output.iterdir()), [])
+                finally:
+                    if child.poll() is None: child.kill(); child.wait()
+                    termios.tcsetattr(slave, termios.TCSANOW, previous)
+                    os.close(master); os.close(slave)

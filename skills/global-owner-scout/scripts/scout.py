@@ -29,10 +29,10 @@ from render_review import render_review_pack
 from project_map import resolve_selection
 from prepare_review import prepare_review
 from resolve_owner_parity import resolve
-from utf8_stdio import configure_utf8_stdio
+from utf8_stdio import configure_utf8_stdio, native_line_input
 from validate_output import ContractError, validate_project, validate_review_pack, describe_input
 from verify_visible_output import verify_visible_output
-from history_import import capture_native, import_history
+from history_import import capture_native, history_output_root, import_history
 
 
 PREFLIGHT_CONTRACT = "global_owner_scout_preflight_v1"
@@ -193,6 +193,9 @@ def main() -> int:
     capture = commands.add_parser('capture-native', help='Seal one raw native return object without qualifying its source or success.')
     capture.add_argument('--artifact-dir', type=Path, required=True)
     capture.add_argument('--protected-root', action='append', type=Path, required=True)
+    capture_input = capture.add_mutually_exclusive_group()
+    capture_input.add_argument('--input-file', type=Path)
+    capture_input.add_argument('--input-line', action='store_true', help='Receive one UTF-8 JSON line without waiting for terminal EOF.')
     history = commands.add_parser('import-history', help='Freeze native Codex, Pi or Claude source objects without model transcription.')
     history.add_argument('--project-root', type=Path, required=True)
     history.add_argument('--session-id', required=True)
@@ -231,7 +234,7 @@ def main() -> int:
     verify_final.add_argument("--project-root", type=Path)
     verify_final.add_argument("--object", dest="selected_object")
     verify_final.add_argument("--journey")
-    for name in ('inspect-native', 'capture-native', 'import-history', 'validate-project', 'validate-review-pack', 'prepare-review',
+    for name in ('inspect-native', 'import-history', 'validate-project', 'validate-review-pack', 'prepare-review',
                  'render-review', 'verify-visible', 'prepare-delivery', 'render-receipt', 'render-terminal', 'verify-final'):
         commands.choices[name].add_argument('--input-file', type=Path, help='Consume an existing UTF-8 input instead of serializing it again through stdin.')
     args = parser.parse_args()
@@ -240,7 +243,14 @@ def main() -> int:
 
     try:
         if args.command == 'capture-native':
-            print(json.dumps(capture_native(load_input(), artifact_dir=args.artifact_dir,
+            if args.input_line:
+                history_output_root(args.artifact_dir, args.protected_root)
+                with native_line_input():
+                    print('{"status":"awaiting_native_object","framing":"one_utf8_json_line"}', flush=True)
+                    value = json.loads(sys.stdin.readline())
+            else:
+                value = load_input()
+            print(json.dumps(capture_native(value, artifact_dir=args.artifact_dir,
                 protected_roots=args.protected_root), ensure_ascii=False, separators=(',', ':')))
         elif args.command == 'import-history':
             print(json.dumps(import_history(load_input(), project_root=args.project_root, session_id=args.session_id,

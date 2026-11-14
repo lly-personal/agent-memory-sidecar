@@ -6,6 +6,7 @@ their own component versions in `COMPATIBILITY.md`.
 ## 0.6.9 (2026-11-14)
 
 - Preserve complete native return objects before summary output through the Scout CLI, including indexes and errors, while keeping history-source validation separate.
+- Transfer the object through framed standard input without waiting for terminal EOF or putting data in shell commands; restore owned-terminal modes after normal exit, Ctrl-C and catchable POSIX SIGTERM.
 - Explain an incomplete review without incorrectly asserting that native calls did not return, and retain premature-stop and assisted-recovery counterexamples without relaxing coverage or receipt rules.
 - Components: Core 0.6.9, Plugin 1.11.5, Bootstrap 2.5.7 and Scout 5.19.4; complete natural review and later adoption remain unverified.
 

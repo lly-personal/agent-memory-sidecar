@@ -67,41 +67,53 @@ For continuation, reuse the verified report and update only changed sources; do 
 
 ### Mechanical native-object transfer
 
-Resolve `pythonExecutable`, `scoutScript`, `artifactRoot` and `projectRoot` from the actual current runtime,
-loaded Skill, checked output grant and native binding; the agent resolves them, not the user. The following
-Codex host-code examples consume the object already retained by `store`, not model-written JSON or a tool-output
-preview. Choose by the actual command shell. The JSON is passed as literal stdin data, not executable source.
-
-POSIX shell:
-
-```javascript
-const page = load("scout-native-page");
-if (page === undefined) throw new Error("native return object was not retained");
-const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
-const argv = [pythonExecutable, "-B", scoutScript, "capture-native", "--artifact-dir", artifactRoot,
-              "--protected-root", projectRoot];
-const cmd = "printf '%s' " + quote(JSON.stringify(page)) + " | " + argv.map(quote).join(" ");
-text(await tools.exec_command({cmd, max_output_tokens: 1600}));
-```
-
-PowerShell, with UTF-8 only in this command process:
+Resolve `pythonExecutable`, `scoutScript`, `artifactRoot`, `projectRoot` and `commandShell` (`posix` or
+`powershell`) from the actual current runtime, loaded Skill, checked output grant and native binding; the agent
+resolves them, not the user. This Codex host-code example consumes the object already retained by `store`.
+The command contains only literal arguments; the complete JSON goes through the owned process's stdin as data,
+so object size does not become shell command size. `--input-line` accepts one UTF-8 JSON line without waiting
+for terminal EOF. It disables echo and terminal line-size clipping only for that input stage and restores the
+previous terminal mode on normal exit, Ctrl-C and catchable POSIX SIGTERM; it does not change host
+configuration or permissions. Forced termination cannot run restoration, so close the entire owned terminal.
 
 ```javascript
 const page = load("scout-native-page");
 if (page === undefined) throw new Error("native return object was not retained");
-const quote = value => "'" + value.replaceAll("'", "''") + "'";
-const argv = [pythonExecutable, "-B", scoutScript, "capture-native", "--artifact-dir", artifactRoot,
-              "--protected-root", projectRoot];
-const cmd = "$OutputEncoding = [System.Text.UTF8Encoding]::new($false); " + quote(JSON.stringify(page))
-          + " | & " + argv.map(quote).join(" ");
-text(await tools.exec_command({cmd, max_output_tokens: 1600}));
+if (!["posix", "powershell"].includes(commandShell)) throw new Error("command shell is not resolved");
+const quote = commandShell === "powershell"
+  ? value => "'" + value.replaceAll("'", "''") + "'"
+  : value => "'" + value.replaceAll("'", "'\\''") + "'";
+const argv = [pythonExecutable, "-B", scoutScript, "capture-native", "--input-line",
+              "--artifact-dir", artifactRoot, "--protected-root", projectRoot];
+const cmd = (commandShell === "powershell" ? "& " : "") + argv.map(quote).join(" ");
+let state = await tools.exec_command({cmd, tty: true, yield_time_ms: 1000, max_output_tokens: 1600});
+if (Number.isInteger(state.session_id)) store("scout-capture-session", state.session_id);
+let opening = state.output || "";
+while (Number.isInteger(state.session_id) && !opening.includes('"status":"awaiting_native_object"')) {
+  state = await tools.write_stdin({session_id: state.session_id, chars: "", yield_time_ms: 1000, max_output_tokens: 1600});
+  opening += state.output || "";
+}
+if (!Number.isInteger(state.session_id) || !opening.includes('"status":"awaiting_native_object"')) {
+  text(state);
+  throw new Error("capture input did not become ready; retain the original object");
+}
+let result = await tools.write_stdin({session_id: state.session_id, chars: JSON.stringify(page) + "\n",
+                                    yield_time_ms: 1000, max_output_tokens: 1600});
+let output = result.output || "";
+while (result.exit_code === undefined && Number.isInteger(result.session_id)) {
+  result = await tools.write_stdin({session_id: result.session_id, chars: "", yield_time_ms: 1000, max_output_tokens: 1600});
+  output += result.output || "";
+}
+if (result.exit_code !== undefined) store("scout-capture-session", null);
+text({...result, output});
 ```
 
 Read the command's actual completion and returned capture receipt before treating the source as sealed.
-Keep the stored object on transfer failure and correct the same operation within its original authorization;
-do not advance the source cursor, replace the object with a summary or invent a native failure. A command-size
-or host-review limit remains a limit of that transport: retain it, use an available native data writer, and do
-not split executable payloads to evade the limit. Missing capture capability is reported precisely, not inferred
+Keep the stored object and owned session on transfer failure and correct the same operation within its original
+authorization; do not advance the source cursor, replace the object with a summary or invent a native failure.
+On cancellation interrupt only that owned session and observe closure. A host data/transport limit remains a
+limit: retain it, use an available native data writer, and do not split executable payloads to evade review.
+Missing capture capability is reported precisely, not inferred
 from a tool-name search. `capture-native` writes only an immutable raw object; a history index is not a
 project-filtered task history, and an error object does not become a successful history page. Thread pages still
 go through `import-history --input-file <raw_file>` with their original session and project. Pi/Claude can keep
