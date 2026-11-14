@@ -354,12 +354,12 @@ class ScoutProjectMapTests(unittest.TestCase):
                     self.assertEqual(d.verify_final_receipt(receipt, artifact_root=root), recovered)
                     self.assertFalse(recovered['confirmation_eligible'])
                     self.assertEqual(original, artifact.read_bytes())
-                for invalid in [final.replace('让用户完成目标。', '已证明用户采用。'),
+                for presentation in [final.replace('让用户完成目标。', '已证明用户采用。'),
                                 final + receipt,
                                 final.replace(manifest['visual_name'], 'another.html').replace('\nvisualize{"path": ', '\n  \n  visualize{"path": '),
                                 final.replace(manifest['visual_name'], 'another.html')]:
-                    with self.subTest(invalid=invalid[-100:]), self.assertRaises(v.ContractError):
-                        d.verify_final_receipt(invalid, artifact_root=root)
+                    with self.subTest(presentation=presentation[-100:]):
+                        self.assertEqual(recovered, d.verify_final_receipt(presentation, artifact_root=root))
 
     def test_native_presentation_can_vary_without_changing_evidence_or_recovery(self):
         import prepare_delivery as d
@@ -463,14 +463,14 @@ class ScoutProjectMapTests(unittest.TestCase):
             with self.assertRaisesRegex(v.ContractError, 'visual descriptor'):
                 d.render_delivery_receipt(forged, artifact_path=artifact, artifact_root=root, outcome='not_requested')
 
-    def test_pointer_and_markdown_tampering_are_rejected(self):
+    def test_pointer_copy_is_independent_while_artifact_tampering_is_rejected(self):
         import prepare_delivery as d
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             manifest, artifact = d.prepare_delivery(map_pack(), artifact_dir=root, protected_roots=[SCRIPTS])
             receipt = d.render_delivery_receipt(manifest, artifact_path=artifact, artifact_root=root, outcome='not_requested')
-            with self.assertRaisesRegex(v.ContractError, 'visual pointer'):
-                d.verify_final_receipt(receipt.replace(manifest['visual_name'], 'another.html'), artifact_root=root)
+            original = d.verify_final_receipt(receipt, artifact_root=root)
+            self.assertEqual(original, d.verify_final_receipt(receipt.replace(manifest['visual_name'], 'another.html'), artifact_root=root))
             (root / manifest['visual_name']).chmod(0o600)
             (root / manifest['visual_name']).unlink()
             recovered = d.verify_final_receipt(receipt, artifact_root=root)

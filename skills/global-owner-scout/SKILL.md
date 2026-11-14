@@ -7,7 +7,7 @@ description: Understand a project's goals, actors, scenarios and real workflows 
 
 ## Contract
 
-- Skill version: `5.19.4`
+- Skill version: `5.19.5`
 - Project result: `global_owner_scout_project_v7`
 - User review: `global_owner_scout_review_pack_v8`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -198,15 +198,22 @@ confirmation. Source and technical fixes may ship while genuine later experience
 For “解释这里”, “看这条路径”, native report/object follow-ups, “基于这份复盘给沉淀建议”, “先看这一项”, scope edits, deferral or batch requests, continue in this chat; do not run a new census.
 Find the original delivery receipt for the referenced report in native chat history, including across intervening ordinary replies.
 Use the report explicitly selected by the user or the unambiguous current discussion; never substitute another report just because it is newer.
-Only unresolved ambiguity between reports needs a question. Run `verify-final --artifact-root <original-host-output-root>` with that original final
-via stdin or `--input-file`, including surrounding delivery prose; do not manually recompose or trim the verified advice. The helper accepts one
-complete exact receipt and rejects missing/ambiguous boundaries or changed content. Surrounding prose is not verified evidence or
-authorization. Pass `--project-root <current-native-bound-root>` to check the full current snapshot, including dirty and untracked sources. Compare the returned `project_identity` with the native binding before treating the map as this project. `source_status=changed` needs relevant source review and a new snapshot; HEAD equality alone is insufficient. It reconstructs and returns the manifest from the original file, verifies direct-child containment, read-only bytes and
-all card/action hashes. Use `project_map_bundle.context` to resolve the exact selected object and source references. Never infer an object from another report or from widget state alone. Validate the map source revision against the current project before claiming currentness; inspect relevant changes and create a new snapshot for affected facts, preserving history. A stale map remains historical evidence, not current maintenance authority. Missing/tampered HTML sets `visual_status=unavailable` while verified Markdown remains usable. Old files without a map remain readable without fabricating one.
-When an object or visible journey is selected, pass it as data to `verify-final --object <kind:id> [--journey <id>]` and use
-`selected_context`; do not assemble shell code from the follow-up text. The project overview is `project:<project_key>`, not
-a synthetic node. A widget selection is only a locator. Recover the original receipt before resolving it, and keep changed
-source facts historical until their relevant current sources are checked.
+Only unresolved ambiguity between reports needs a question. Prefer `recover-delivery --artifact-root <original-host-output-root>`
+with the original native `prepare-delivery` manifest via stdin or `--input-file`. Recover that producer result from native history;
+never manufacture provenance by hashing an arbitrary file. For a widget/report selection, pass its `report_hash` as `--report-hash`
+(the Review Pack hash, not the Delivery manifest hash). The old `verify-final` entry accepts the original final as a compatibility
+locator: one distinct artifact link and manifest hash, with repeated copies allowed. Different reports require explicit selection
+through the structured entry. Do not recompose a receipt or make human wording a prerequisite for recovery.
+Both entries verify the same immutable artifact and return `artifact_verified` with `confirmation_eligible=false`; summary, title,
+Markdown and surface/approval copy are not verified by recovery. Correct inaccurate copy from the artifact; do not discard a valid
+report or infer human approval. Actual host observations remain separate. Pass `--project-root <current-native-bound-root>` to
+check the full snapshot, including dirty and untracked sources. Compare returned `project_identity` with the native binding.
+`source_status=changed` preserves history but needs relevant source review before current actions; HEAD equality alone is insufficient.
+Missing/tampered HTML sets `visual_status=unavailable` while verified Markdown remains usable. A bad chat/widget pointer does not
+invalidate independent Markdown; do not certify that pointer. Old files without a map remain readable without fabricating one.
+Pass an object or journey as data to either entry using `--object <kind:id> [--journey <id>]` and use `selected_context`.
+The project overview is `project:<project_key>`. Never infer an object from another report or assemble shell code from follow-up text.
+A widget selection is a locator, not approval; bind it to the original report before resolving its object.
 The recovered selection keeps recorded journeys, prerequisites, constraints, recovery, project boundaries and source-check
 status. If several journeys match, retain them and resolve only the ambiguity material to the next task. Project-wide
 coverage is not selected-path completeness. Before consuming a changed map, inspect relevant Owner/code diffs and new
@@ -240,8 +247,9 @@ The original five-scenario evidence remains historical. Current technical accept
 window/EOF history, explicit page failure, missing output grant, queued recovery and tampering; real installed-entry adoption and
 user experience remain unverified until observed. These checks do not authorize canary chats or changes to a real Owner.
 
-Python bytecode caches are external writes. Always use `-B`; never create or clean `__pycache__` during a Scout run. Bootstrap owns
-cache-free installation. Preserve all independently supported evidence under degraded coverage and all frozen prior artifacts.
+Always use `-B`; never create or clean `__pycache__` during a Scout run. Attribute cache differences before claiming a helper
+write, and retain execution-identity limits because `-B` can read cached code. Bootstrap owns cache-free installation. Preserve
+independently supported evidence and frozen prior artifacts; unknown cache attribution does not grant stable-run qualification.
 
 ## Entry-specific resource policy
 

@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.6.10 | 0.6.10 | 1.11.6 | 2.5.8 | 5.19.5 | v8 | 3.11–3.13 |
 | v0.6.9 | 0.6.9 | 1.11.5 | 2.5.7 | 5.19.4 | v8 | 3.11–3.13 |
 | v0.6.8 | 0.6.8 | 1.11.4 | 2.5.6 | 5.19.3 | v8 | 3.11–3.13 |
 | v0.6.7 | 0.6.7 | 1.11.3 | 2.5.5 | 5.19.2 | v8 | 3.11–3.13 |
@@ -130,3 +131,5 @@ Bootstrap 2.5.4 checks the Engineering Contract Review entry in native project c
 Scout 5.19.3 distinguishes successful but unrecoverably clipped native pages from native-call failures using the existing bounded coverage contract. Recoverable calls retain evidence and continue within the original authorization; terminal output unavailability no longer implies missing user authorization. The native-final transfer example rejects native truncation before writing, while receipt verification retains its existing scope. Plugin 1.11.4 carries the shared source and Bootstrap 2.5.6 only synchronizes managed component identities. Core 0.6.8 carries this patch release; existing Project, Review Pack and Delivery formats and historical evidence remain unchanged. Technical regression does not establish natural recovery or complete fresh-session adoption.
 
 Scout 5.19.4 adds `capture-native` to seal a complete native return object before summary output, using the existing protected-directory and immutable-write implementation; raw capture does not qualify a history source or bypass `import-history`. Optional `--input-line` receives framed standard input without waiting for terminal EOF or embedding data in shell commands. Failure text no longer asserts that native calls failed to return. Plugin 1.11.5 carries the method and Bootstrap 2.5.7 synchronizes component identities for Core 0.6.9. Existing result, delivery, exact-receipt and coverage rules are unchanged; historical early stops and assisted recoveries keep their original qualification.
+
+Scout 5.19.5 recovers artifact data from the original structured manifest, with legacy receipts retained as locator-only input. Both recovery entries return artifact_verified with confirmation_eligible=false; display observations and actual Core approval remain independent. Prose and formatting do not gate recovery, while artifact integrity, report/object selection and current-source checks remain enforced. Cache evidence separates differences, attributed helper writes and actual execution identity; unknowns do not grant stable-run qualification. Plugin 1.11.6 and Bootstrap 2.5.8 carry the method and synchronized identities for Core 0.6.10. Existing Project, Review Pack and Delivery formats remain readable. This technical change does not retroactively qualify old natural runs or prove new-session adoption.

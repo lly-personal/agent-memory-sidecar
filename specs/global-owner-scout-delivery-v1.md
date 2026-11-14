@@ -27,7 +27,7 @@ The reference points only to the direct-child HTML named in the manifest. Render
 against the frozen Markdown descriptor. Recovery validates the HTML independently: missing/changed HTML gives
 `visual_status=unavailable`, preserving usable Markdown and exact rule recovery. UI availability never elevates confirmation.
 A native follow-up carries report hash and object kind/ID. Persisted widget selection is a convenience, not authority or approval.
-`verify-final --object <kind:id> [--journey <id>]` resolves project/node/edge/advice/journey against the verified map and returns
+`recover-delivery --object <kind:id> [--journey <id>]` resolves project/node/edge/advice/journey against the verified map and returns
 `selected_context` with the selected object, related nodes/edges, visible journey and source references. An unknown selection
 fails instead of switching reports. The overview uses the project key, never a fabricated node. An implicitly displayed first
 journey is a real selection and travels in both the follow-up prompt and optional widget state. Without these options historical
@@ -100,37 +100,39 @@ Covered/no-change items are grouped, not decisions; zero actual deltas produce n
 Only an explicit user request opens the file. Pre-render the outcomes, then call native preview once and emit the matching receipt.
 All new receipts retain the verified brief and artifact link, including preview failure. No polling or foreground request is needed.
 
-| Outcome | `verify-final` status | Meaning |
-| --- | --- | --- |
-| `not_requested` | `artifact_verified` | File verified, no open attempted; display unknown |
-| `open_succeeded` | `surface_observed` | Recorded native open success; user understanding/adoption unknown |
-| `open_queued` | `surface_pending` | Open accepted and queued; display unknown |
-| `open_failed` | `surface_unavailable` | Preview unavailable; verified advice remains usable |
-
-`confirmation_eligible` is false except an opened receipt with an actual recovered confirmable bundle. It never grants approval.
-Later exact human selections may resume existing Fresh Owner/Core authorization even when the historical surface was unobserved;
-this does not rewrite that observation. Native question responses or tool-relayed messages are not assumed to meet Core event binding.
-The legacy manifest-only blocked renderer remains a failure receipt and cannot invent a missing artifact path.
+Native preview outcomes (`not_requested`, `open_succeeded`, `open_queued`, `open_failed`) belong to the actual host call
+and its observation. Rendered copy does not prove that call happened. A rendered `confirmation_eligible` hint never grants approval.
+Later exact human selections may resume Fresh Owner/Core authorization even when historical display was unobserved; preserve
+that observation. Native question responses or tool-relayed messages do not substitute for Core's real user-event binding.
 
 ## Readback and recovery
 
-Locate the original delivery receipt for the report referenced in the current discussion, using native chat history across
-intervening ordinary replies. Do not assume the latest assistant message is a receipt or silently switch to a newer report.
-Feed that actual final, including ordinary closeout prose and host annotations, to `verify-final --artifact-root <original-host-output-root>`.
-It locates exactly one complete receipt by its heading and binding line, without interpreting surrounding prose as verified advice
-or authorization. Other products' receipt lines and unrelated visuals outside this block do not block Scout recovery. Only the
-visual immediately following the Scout binding line is its companion and must match the frozen descriptor.
-Missing/duplicate Scout receipt boundaries and malformed or mismatched companion pointers fail closed; do not silently
-pick the newest or a convenient valid block. The receipt itself remains byte-exact after line-ending normalization.
-It validates direct-child containment,
-immutable file identity, reconstructed manifest, body and action conservation. New advice receipts must match the exact brief
-read from that artifact; edits to the advice, link, status or binding fail closed.
+Use `recover-delivery --artifact-root <original-host-output-root> --input-file <original-manifest.json>` with the existing
+`prepare-delivery` native result for the selected report. Standard input is also supported; no new manifest format or storage
+is introduced. Recover the actual producer result from native history, or the explicit report selection; do not build a new
+manifest from a candidate file and treat its self-computed hash as provenance. A hash binds content, not the human's intent.
 
-Historical opened/queued receipts, including the legacy queued wording, remain readable without migrating the artifact. An old
-artifact without a brief may be linked and discussed after verification; never invent an original summary. Recovery returns the
-same `manifest` and the existing `recovery_bundle` when present. Missing historical bundle bindings remain null and are not guessed;
-refresh only the affected rule preview before new authorization. Accept CRLF/CR and surrounding whitespace/prose; reject
-edits inside the receipt. No new discovery, file, queue, database or controller is needed.
+`--report-hash <review_pack_hash>` binds an independent report selection, including a widget's `report_hash`. It is the Review
+Pack hash, not `delivery_manifest_sha256`. Resolve the report explicitly selected by the user or the unambiguous current
+discussion; do not silently choose the latest. Both recovery entries support `--object`, `--journey` and `--project-root`.
+They share direct-child containment, immutable regular-file checks, byte/hash/manifest verification, body/action conservation,
+map selection and current-source checks. Changed sources keep historical evidence; recheck affected current facts before action.
+
+`verify-final` remains a compatibility locator for old actual delivery replies, including intervening closeout prose. It extracts
+one distinct artifact link and one distinct `delivery_manifest_sha256`, reconstructs the manifest from that file, checks against
+the original hash, then uses the same recovery chain. Repeated identical locators are harmless. Different or missing locators
+need explicit selection of the original manifest through `recover-delivery`; do not edit the old reply to make it qualify.
+Headings, labels, summaries, line endings, Markdown layout, surface copy and confirmation hints are not identity credentials.
+Recovery does not certify their accuracy: correct a false statement from the original artifact, without discarding valid evidence.
+A wrong UI pointer invalidates that presentation/association claim; only the frozen HTML's own bytes determine `visual_status`.
+Missing/tampered HTML does not invalidate verified Markdown. Never treat a verified HTML file as proof that UI was displayed.
+
+Both entries return `status=artifact_verified`, `confirmation_eligible=false`, the verified `manifest`, existing `recovery_bundle`
+and map when present. These fields attest data recovery only, even for historical opened/queued receipts. This intentionally
+replaces statuses previously inferred from chat copy; downstream consumers must use actual host evidence for display state.
+Historical files remain readable without migration. Missing bundle/map stays null; refresh only an affected preview before new
+authorization and never invent old tokens. Actual Core checks still require current explicit user approval of the exact content,
+selection/scope, Fresh Owner/target state and one-time approval consumption. File recovery does not authorize writes.
 
 Follow-up is ordinary conversation, not another Delivery receipt. Explain each real delta, recommendation, maintenance Owner,
 scope, exception and evidence; support switching items, edits, batch requests and deferral. Reuse current-chat progress. Authorized
@@ -141,10 +143,10 @@ A valid file or concise recommendation is not proof of user comprehension, natur
 
 1. 0/1/3/6/7/8/24-card fixtures conserve bytes, hashes, every card, per-card actions, bundle and wrapper.
 2. Existing files are reused only when identical; project-contained roots, links/reparse points, multiple hard links, path escapes,
-   receipt edits and tampering fail closed. Recovery preserves the original read-only bytes and does not repeat discovery.
+   locator mismatches and artifact tampering fail closed. Recovery preserves the original read-only bytes and does not repeat discovery.
 3. Covered/no-persistence cards have zero actions and are not counted as required decisions. Evidence and stable card identities
    remain complete; rule text and actions must not be silently summarized or dropped.
-4. Queued recovery returns the same manifest and remains pending; no recovered result grants approval or claims UI visibility.
+4. Queued recovery returns the same manifest as `artifact_verified`; actual queued display remains unobserved. No recovery grants approval or claims UI visibility.
    An exact later user selection still requires verified artifact content, Fresh Owner comparison and Core's existing real-event binding.
 5. Local clean/dirty and existing-worktree checks bind explicit project context and the full before/after snapshot, including
    untracked content. Review never changes project, Owner, Store, Git or installed Skill cache.
@@ -181,7 +183,7 @@ render_integrity_failed -> render_integrity_failed / delivery / unchanged|unveri
 output_budget_exceeded -> output_budget_exceeded / project_review / unchanged|unverified
 ```
 
-A host-open failure occurs after manifest creation and retains the verified advice and link with `surface_unavailable`.
+A host-open failure occurs after manifest creation and retains verified advice and the link; actual display failure is separate from `artifact_verified` recovery.
 The manifest-only blocked receipt is a legacy compatibility path. Neither is a Terminal v1 reason.
 
 The active Skill calls validators, Owner resolution, rendering, visible verification, delivery, receipts, terminal rendering, and

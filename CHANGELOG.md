@@ -3,6 +3,12 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.10 (2026-11-14)
+
+- Recover selected reports from the original structured manifest; retain old receipts as locator-only input. Human prose and Markdown no longer gate artifact handoff or attest display/approval; preserve file identity, source/object bindings and actual Core authorization.
+- Separate cache differences, attributed helper writes and execution identity; `-B` suppresses automatic bytecode generation but can read cached code. Preserve unknowns and the original evidence without clearing caches.
+- Components: Core 0.6.10, Plugin 1.11.6, Bootstrap 2.5.8 and Scout 5.19.5. Existing formats remain readable; original failures, assisted recovery and later verification retain their distinct scope. Complete natural handoff remains unverified.
+
 ## 0.6.9 (2026-11-14)
 
 - Preserve complete native return objects before summary output through the Scout CLI, including indexes and errors, while keeping history-source validation separate.

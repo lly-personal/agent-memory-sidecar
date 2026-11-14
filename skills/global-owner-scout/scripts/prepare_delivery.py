@@ -28,29 +28,9 @@ DELIVERY_STATUS = "prepared"
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 ARTIFACT_NAME_RE = re.compile(r"^global-owner-scout-review-pack-(?P<prefix>[0-9a-f]{16})\.md$")
 VISUAL_FIELDS = {"visual_name", "visual_sha256", "visual_bytes"}
-VISUAL_DIRECTIVE_RE = re.compile(r'\nvisualize(?P<payload>[^\n]+)\n?$')
 OPENED_COPY = "完整建议已打开，现有规则未改变。仅可确认文件中已通过预演的准确选择；写入前仍会核对当前规则。"
 LEGACY_QUEUED_COPY = "完整建议已准备，打开请求仍在排队。可先审阅；文件中的确认命令暂不可执行，现有规则未改变。"
 QUEUED_COPY = "文件已校验并提供链接，打开请求仍在排队，尚未证明实际展示。审阅后回复准确选择即可恢复文件核验与规则预演，无需重复复盘。现有规则未改变。"
-FINAL_RECEIPT_PREFIX = (
-    r"^# Global Owner Scout · 完整审阅包\n\n"
-    r"\[打开完整审阅包\]\(<(?P<path>[^>\r\n]+)>\)\n\n"
-)
-FINAL_RECEIPT_BINDING = rf"\n\n交付回执：`delivery_manifest_sha256=(?P<manifest>{HASH_RE.pattern[1:-1]})`；"
-FINAL_OPENED_RECEIPT_RE = re.compile(
-    FINAL_RECEIPT_PREFIX + re.escape(OPENED_COPY) + FINAL_RECEIPT_BINDING +
-    r"`surface_observation=open_succeeded`；`confirmation_eligible=true`。\n$"
-)
-FINAL_QUEUED_RECEIPT_RE = re.compile(
-    FINAL_RECEIPT_PREFIX + "(?:" + re.escape(QUEUED_COPY) + "|" + re.escape(LEGACY_QUEUED_COPY) + ")" + FINAL_RECEIPT_BINDING +
-    r"`surface_observation=open_queued`；`confirmation_eligible=false`。\n$"
-)
-ADVICE_RECEIPT_RE = re.compile(
-    r"^# Global Owner Scout · 复盘结论与建议\n\n[\s\S]+?\n\n"
-    r"\[完整依据\]\(<(?P<path>[^>\r\n]+)>\)\n\n[\s\S]+?" + FINAL_RECEIPT_BINDING +
-    r"`surface_observation=(?P<surface>not_requested|open_succeeded|open_queued|open_failed)`；"
-    r"`confirmation_eligible=(?P<eligible>true|false)`。\n$"
-)
 SURFACE_COPY = {
     "not_requested": "完整依据已校验，按需打开；文件交付不代表已展示、理解或采用。",
     "open_succeeded": "文件打开请求已成功；实际理解与后续采用仍需分别观察。",
@@ -478,66 +458,16 @@ def render_blocked_receipt(manifest: dict[str, Any]) -> str:
     )
 
 
-def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
-    text = value.replace("\r\n", "\n").replace("\r", "\n")
-    if not text.endswith("\n"):
-        text += "\n"
-    # A real final may include engineering closeout and host annotations. Only the
-    # unique receipt is evidence; never choose between reports or trim its advice.
-    starts = list(re.finditer(r"(?m)^# Global Owner Scout · (?:完整审阅包|复盘结论与建议)\n", text))
-    ends = list(re.finditer(r"(?m)^交付回执：`delivery_manifest_sha256=[^\n]*\n", text))
-    require(len(starts) == len(ends) == 1 and starts[0].start() < ends[0].start(),
-            "actual task final must contain exactly one complete Delivery receipt")
-    # Only the immediately following visual belongs to this receipt. Other task
-    # visuals and other products' receipts are outside Scout's evidence boundary.
-    following_line = text[ends[0].end():].lstrip().split("\n", 1)[0].rstrip()
-    directive = None
-    if following_line.startswith('visualize'):
-        directive = VISUAL_DIRECTIVE_RE.fullmatch("\n" + following_line + "\n")
-        require(directive is not None, "invalid native visual pointer")
-        try:
-            visual_pointer = json.loads(directive.group("payload"))
-        except ValueError as exc:
-            raise ContractError("invalid native visual pointer") from exc
-    text = text[starts[0].start():ends[0].end()]
-    match = FINAL_OPENED_RECEIPT_RE.fullmatch(text)
-    surface_status = "surface_observed"
-    confirmation_eligible = True
-    if match is None:
-        match = FINAL_QUEUED_RECEIPT_RE.fullmatch(text)
-        surface_status = "surface_pending"
-        confirmation_eligible = False
-    advice = None
-    if match is None:
-        advice = ADVICE_RECEIPT_RE.fullmatch(text)
-        match = advice
-        if advice:
-            surface_status = {"not_requested": "artifact_verified", "open_succeeded": "surface_observed",
-                              "open_queued": "surface_pending", "open_failed": "surface_unavailable"}[advice.group("surface")]
-            confirmation_eligible = advice.group("eligible") == "true"
-    require(match is not None, "actual task final is not an exact opened or queued Delivery receipt")
+def recover_delivery(manifest: dict[str, Any], *, artifact_root: Path, report_hash: str | None = None) -> dict[str, Any]:
+    """Recover verified data from the original producer manifest, independently of prose."""
+    manifest = validate_delivery_manifest(manifest)
+    if report_hash is not None:
+        require(manifest["review_pack_hash"] == report_hash, "selected report does not match delivery manifest")
     root = safe_existing_directory(artifact_root, label="artifact-root")
-    artifact_path = Path(match.group("path"))
-    require(artifact_path.is_absolute(), "actual task final artifact path must be absolute")
-    try:
-        raw_stat = artifact_path.lstat()
-        parent = artifact_path.parent.resolve(strict=True)
-    except OSError as exc:
-        raise ContractError(f"actual task artifact is unavailable: {exc}") from exc
-    require(not artifact_path.is_symlink() and not is_reparse(raw_stat), "actual task artifact must not be a link or reparse point")
-    require(parent == root, "actual task final artifact must be a direct child of artifact-root")
-    require_artifact_read_only(artifact_path)
-    data = safe_artifact_bytes(artifact_path)
-    manifest = artifact_manifest(data, artifact_path.name)
-    require(manifest["delivery_manifest_sha256"] == match.group("manifest"), "actual task artifact does not match Delivery receipt")
-    if directive:
-        require(manifest["contract_version"] == DELIVERY_CONTRACT and visual_pointer == {"path": markdown_path(root / manifest["visual_name"])}, "native visual pointer does not bind the report")
-    if advice:
-        expected = render_delivery_receipt(manifest, artifact_path=artifact_path, artifact_root=root, outcome=advice.group("surface"))
-        expected = VISUAL_DIRECTIVE_RE.sub("", expected)
-        require(text == expected, "actual task final is not an exact opened or queued Delivery receipt or verified advice receipt")
+    data = validate_manifest_artifact(manifest, artifact_path=root / manifest["artifact_name"], artifact_root=root)
+    visible = verify_visible_output(data.decode("utf-8"), surface="interactive")
     return {
-        "status": surface_status,
+        "status": "artifact_verified",
         "manifest": manifest,
         "delivery_manifest_sha256": manifest["delivery_manifest_sha256"],
         "artifact_sha256": manifest["artifact_sha256"],
@@ -545,11 +475,28 @@ def verify_final_receipt(value: str, *, artifact_root: Path) -> dict[str, Any]:
         "project_cards": manifest["project_cards"],
         "visible_cards": manifest["visible_cards"],
         "visible_actions": manifest["visible_actions"],
-        "confirmation_eligible": confirmation_eligible,
-        "recovery_bundle": verify_visible_output(data.decode("utf-8"), surface="interactive")["recovery_bundle"],
-        "project_map_bundle": verify_visible_output(data.decode("utf-8"), surface="interactive")["project_map_bundle"],
+        "confirmation_eligible": False,
+        "recovery_bundle": visible["recovery_bundle"],
+        "project_map_bundle": visible["project_map_bundle"],
         **visual_result(manifest, root),
     }
+
+
+def verify_final_receipt(value: str, *, artifact_root: Path, report_hash: str | None = None) -> dict[str, Any]:
+    """Compatibility locator for old receipts; chat text cannot attest display or approval."""
+    paths = {path for path in re.findall(r"\]\(<([^>\r\n]+)>\)", value)
+             if ARTIFACT_NAME_RE.fullmatch(Path(path).name)}
+    hashes = set(re.findall(r"delivery_manifest_sha256=([0-9a-f]{64})(?![0-9a-f])", value))
+    require(len(paths) == len(hashes) == 1,
+            "legacy handoff needs one artifact path and manifest hash; select an original manifest with recover-delivery")
+    root = safe_existing_directory(artifact_root, label="artifact-root")
+    artifact_path = Path(paths.pop())
+    require(artifact_path.is_absolute(), "artifact path must be absolute")
+    require(artifact_path.parent.resolve(strict=True) == root, "artifact path must be a direct child of artifact-root")
+    require_artifact_read_only(artifact_path)
+    manifest = artifact_manifest(safe_artifact_bytes(artifact_path), artifact_path.name)
+    require(manifest["delivery_manifest_sha256"] == hashes.pop(), "actual task artifact does not match Delivery receipt")
+    return recover_delivery(manifest, artifact_root=root, report_hash=report_hash)
 
 
 def run_self_test() -> None:
@@ -566,12 +513,12 @@ def run_self_test() -> None:
             manifest, artifact_path = prepare_delivery(pack, artifact_dir=artifact_dir, protected_roots=[protected])
             receipt = render_opened_receipt(manifest, artifact_path=artifact_path, artifact_root=artifact_dir)
             observed = verify_final_receipt(receipt, artifact_root=artifact_dir)
-            assert observed["status"] == "surface_observed"
+            assert observed["status"] == "artifact_verified"
             assert observed["visible_cards"] == count
-            assert observed["confirmation_eligible"] == (count > 0)
+            assert observed["confirmation_eligible"] is False
             queued_receipt = render_queued_receipt(manifest, artifact_path=artifact_path, artifact_root=artifact_dir)
             pending = verify_final_receipt(queued_receipt, artifact_root=artifact_dir)
-            assert pending["status"] == "surface_pending"
+            assert pending["status"] == "artifact_verified"
             assert pending["visible_cards"] == count
             assert pending["confirmation_eligible"] is False
             host_enveloped = verify_final_receipt(queued_receipt + "\n", artifact_root=artifact_dir)

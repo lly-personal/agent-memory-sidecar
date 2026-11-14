@@ -465,17 +465,22 @@ Queued/failed preview still returns verified advice and the link, without pollin
 `not_requested`, `open_queued` and `open_failed` keep confirmation false; opened with no confirmable bundle also keeps it false.
 Card and Core authorization structures remain unchanged; Project/Pack/Delivery evolve as specified above.
 
-`verify-final` receives the original delivery receipt for the report being discussed, not necessarily the latest assistant reply.
-Recover it from native chat history across ordinary intervening replies. It reconstructs the same manifest, verifies the original
-file, compares new receipt advice byte-for-byte to its hash-bound brief, and returns the existing recovery bundle when present.
-Historical opened/queued receipts remain valid; old files are not migrated. Missing historical bundles stay null. `artifact_verified`
-means no preview was requested; `surface_pending` means queued; `surface_unavailable` means preview failed. None proves comprehension.
-Current conversation holds follow-up progress; authorized maintenance uses the existing project or Skill workflow. Natural feedback
-and native choice tools do not grant rule approval. Exact global selections still need Fresh Owner/Core and real-event authorization.
-Normalize line endings and accept zero, one or two terminal newlines; reject advice, link, binding and other semantic edits.
+`recover-delivery` consumes the original native `prepare-delivery` manifest and granted artifact root. `verify-final` is a
+legacy locator adapter for one distinct artifact link and original manifest hash; it tolerates repeated identical locators.
+Both use Delivery's single artifact verification chain. Bind a report selection with `--report-hash` (the Review Pack hash),
+and resolve object/journey against that verified map. No new manifest, result store or Markdown parser is introduced.
+Human summaries, headings, formatting and display/confirmation copy are not machine credentials. Correct inaccurate copy from
+original evidence; recovery never certifies chat prose or UI. Distinct unresolved reports require selection, not a newest-file guess.
+Recovery always returns `artifact_verified` and `confirmation_eligible=false`, replacing display statuses formerly inferred from
+copy. Observe actual native display separately. Historical bundles/maps remain null when absent; do not invent bindings or migrate
+old files. Exact global selections still require Fresh Owner/Core and current real-event authorization. Current-source status is
+separate from historical artifact integrity; changed sources require affected fact checks before current actions.
 
-Every Python helper invocation uses `python -B`. The installed Skill and its before/after proof contain no newly created or changed
-`__pycache__`, `.pyc`, or `.pyo`; any bytecode-cache write is an external side effect and fails read-only validation.
+Every Python helper invocation uses `python -B`; an attributable helper write to `__pycache__`, `.pyc` or `.pyo` still fails
+read-only validation. A cache difference alone proves neither its writer nor execution identity: `-B` can read valid cached
+code. Preserve before/after evidence, distinguish external changes from helper writes and recheck the affected execution
+source. Unknown attribution is not a mutation finding or an automatic pass; retain the affected stability/identity limit and
+independently supported evidence. Never delete caches or replace the old baseline to hide the observation.
 
 ## Manifest-free terminal
 
