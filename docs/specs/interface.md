@@ -648,6 +648,8 @@ Scheduled 使用既有最终 Inbox wrapper 与可见文本校验，不增加文�
 
 `project_identity` 精确包含
 `identity_kind, content_identity_hash, host_project_ref_hash, git_worktree_eligible, binding_status`。
+内容身份复用现有 `project_content_identity_v1` 与 Bootstrap 的只读 `enrollment.py inspect-project`，不自行对原始 remote URL 取 hash。
+Git 快照一致与身份投影正确分别取证；旧报告身份错误只撤回该层资格，在新结果中使用正式投影，不改写原文件或抹除独立有据内容。
 `binding_status` 为 `bound`、`rebound` 或 `ambiguous`；只有非 ambiguous 的 Git content identity 可以运行
 Scheduled Scout 或沿用跨路径 Host Enrollment。
 

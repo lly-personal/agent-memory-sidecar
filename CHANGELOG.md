@@ -3,6 +3,12 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.11 (2026-11-14)
+
+- Put the existing Skill/cache baseline before the first helper; retain a missed past window without inventing privacy failures, resetting history or granting automatic acceptance.
+- Reuse the existing canonical project identity inspector; preserve valid historical artifacts and revoke only a noncanonical identity claim. Add the real failures to existing source/rubric obligations.
+- Components: Core 0.6.11, Plugin 1.11.7, Bootstrap 2.5.9 and Scout 5.19.6. No new validation gate, schema, configuration or model change; complete natural handoff remains unverified.
+
 ## 0.6.10 (2026-11-14)
 
 - Recover selected reports from the original structured manifest; retain old receipts as locator-only input. Human prose and Markdown no longer gate artifact handoff or attest display/approval; preserve file identity, source/object bindings and actual Core authorization.
