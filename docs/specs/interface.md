@@ -485,6 +485,14 @@ Owner 内容或跨主机租约。自动化调和全部成功后才原子替换 P
 
 ### 用户主动触发入口
 
+原生返回对象可先经同一 dispatcher 的 `capture-native --artifact-dir <已授予目录> --protected-root <目标工程>`
+从 stdin 或 `--input-file` 封存，保留索引、错误和截断字段。它复用目录校验与不可变写入，返回 `raw_file/sha256`，
+不核定 session/project、调用成功、分页完整或理解。普通历史正文仍须把该文件交给原 `import-history` 做来源校验；
+封存错误对象不豁免该校验。先保留实际对象，再输出有界摘要；实际宿主转运示例及失败恢复沿 Scout Phase 1 维护。
+`--input-line` 与 `--input-file` 互斥；它在输出根预检后返回就绪行，再从 stdin 接收一个 UTF-8 JSON 行，不等待 EOF。
+终端行缓冲和回显只在该输入阶段暂时关闭，在正常退出、Ctrl-C 或可处理的 POSIX SIGTERM 后恢复；
+强制终止不能执行恢复，须关闭整个自有终端。数据不进入 shell 命令，进程终态和捕获结果仍须实际读回。
+
 Scout 的 `import-history --project-root ROOT --session-id ID --artifact-dir OUTPUT --protected-root ROOT`
 从 stdin 或 `--input-file` 接收原生 read_thread 返回对象（可为 MCP 单一 JSON text 包装），核对会话和工程，
 将同一页面封存一次并返回 native_file、SHA-256、分页及截断信息。通过宿主代码编排直接传递对象，

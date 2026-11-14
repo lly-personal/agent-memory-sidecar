@@ -88,9 +88,8 @@ def write_native_artifact(root: Path, descriptor: int | None, name: str, data: b
             require(stream.read() == data and os.fstat(stream.fileno()).st_nlink == 1, 'history_artifact_readback_failed')
 
 
-def import_history(value: Any, *, project_root: Path, session_id: str,
-                   artifact_dir: Path, protected_roots: list[Path]) -> dict[str, Any]:
-    root = validate_output_root(artifact_dir, [project_root, *protected_roots])
+def history_output_root(artifact_dir: Path, protected_roots: list[Path]) -> Path:
+    root = validate_output_root(artifact_dir, protected_roots)
     # Reject aliased ancestors too: resolving a path must not silently change the grant.
     for ancestor in [artifact_dir, *artifact_dir.parents]:
         observed = ancestor.lstat()
@@ -100,6 +99,30 @@ def import_history(value: Any, *, project_root: Path, session_id: str,
                    and observed.st_uid == 0 and ancestor.parent == Path(ancestor.anchor)
                    and ancestor != artifact_dir)
         require(trusted or not ancestor.is_symlink() and not is_reparse(observed), 'history_output_ancestor_alias')
+    return root
+
+
+def capture_native(value: Any, *, artifact_dir: Path, protected_roots: list[Path]) -> dict[str, Any]:
+    """Seal a returned object as data; do not qualify its source or interpret success."""
+    root = history_output_root(artifact_dir, protected_roots)
+    require(isinstance(value, dict), 'native_capture_object_required')
+    data = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')
+    digest = hashlib.sha256(data).hexdigest()
+    raw_file = root / f'native-source-{digest}.json'
+    existed = raw_file.exists()
+    with pinned_directory(root) as descriptor:
+        write_native_artifact(root, descriptor, raw_file.name, data)
+        if descriptor is None:
+            require(hashlib.sha256(safe_artifact_bytes(raw_file)).hexdigest() == digest, 'native_capture_readback_failed')
+    return dict(status='reused' if existed else 'captured', raw_file=str(raw_file), sha256=digest,
+                serialization='canonical UTF-8 object; not transport wire bytes',
+                evidence_scope='one raw native return object; source/session/project binding, call success, '
+                               'history completeness, comprehension and review acceptance remain unverified')
+
+
+def import_history(value: Any, *, project_root: Path, session_id: str,
+                   artifact_dir: Path, protected_roots: list[Path]) -> dict[str, Any]:
+    root = history_output_root(artifact_dir, [project_root, *protected_roots])
     require(isinstance(value, dict), 'native_history_object_required')
     if 'content' in value:
         require(value.get('isError') is not True, 'native_history_tool_failed')

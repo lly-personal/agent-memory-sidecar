@@ -81,7 +81,7 @@ TERMINAL_REASON_MAPPINGS = {
         "failed",
         "session_census",
         {"unchanged", "unverified"},
-        "原生任务调用没有按协议取得可分类终态。",
+        "复盘所需的证据获取、封存或执行流程未完成。本次复盘失败；具体原因以原生记录和未完成范围为准。",
     ),
     "read_only_violation": (
         "failed",

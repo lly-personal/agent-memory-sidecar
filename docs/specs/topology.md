@@ -145,7 +145,7 @@ flowchart LR
 | Capability canary | 在真实 Scheduled 来源只验证独立任务创建与原生任务索引终态 | Project Scout 深挖、卡片生成、长期任务、用普通任务替代生产入口 |
 | Standalone Scheduled Task | 为一个已确认项目创建独立运行、绑定证据窗口和隔离 worktree | 复用活跃任务上下文、修改工作区、决定项目集合 |
 | Native task execution | active/archived history 游标到窗口边界/EOF，选中自然任务正文分页；容量失败缩小同一请求并保留记录 | 将每页 50 项当总覆盖、丢弃失败页、未恢复 yield 就续跑 |
-| Scout runtime dispatcher | 可用 Python 3 + -B + 绝对脚本路径；inspect-context 显式传 project-root，复用既有 helper；Pi 当前原生只读 SessionManager 可机械导出原对象到同一封存入口 | 从 cwd 推断项目、创建新状态控制面、把单会话快照冒充项目绑定或完整历史 |
+| Scout runtime dispatcher | 可用 Python 3 + -B + 绝对脚本路径；inspect-context 显式传 project-root；capture-native 保全原对象，import-history 校验历史来源；Pi 原生只读 SessionManager 继续沿既有导出入口 | 从 cwd 推断项目、创建新状态控制面、把原始封存或单会话快照冒充项目绑定或完整历史 |
 | `project_scout` | 项目任务普查、事实重建、因果复盘、候选穷举、反证、抽象、证据等级与本地 owner 建议 | 授权、proposal、持久化候选、global owner 修订 |
 | Project Card | 以 `project_claim_hash` 同时固定中文 Human Context、项目事实、因果、证据、抽象、Rule Projection 与本地 owner 判断 | global owner 写入、中央结论 |
 | Human Context | 使用简体中文和脱敏项目业务语境解释真实事件、成本、建议、行为变化与最大风险 | 抽象规则写入、翻译后补、私有细节泄漏 |

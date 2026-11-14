@@ -7,7 +7,7 @@ description: Understand a project's goals, actors, scenarios and real workflows 
 
 ## Contract
 
-- Skill version: `5.19.3`
+- Skill version: `5.19.4`
 - Project result: `global_owner_scout_project_v7`
 - User review: `global_owner_scout_review_pack_v8`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -18,7 +18,7 @@ description: Understand a project's goals, actors, scenarios and real workflows 
   Prefer the host's file-read tool for long required references; batch independent reads when supported and reuse acquired content.
 
 This Skill creates project-read-only review drafts. It never creates proposals, approval refs, Owner mutations, project files,
-database rows, commits, pushes, or external-system writes. Its only output write is an immutable Review Pack artifact under the
+database rows, commits, pushes, or external-system writes. Its writes are immutable review artifacts and their captured native inputs under the
 current task's explicit host-generated or explicitly user-selected output root, outside the reviewed project and every capability/state root not explicitly
 granted as that task output surface. The explicit entry is `$global-owner-scout 复盘当前项目` or “看懂当前工程全貌” in the currently bound target Git project task. Review uses `manual_30d`; inspect uses `current`. Interactive runs never read automation memory,
 and never asks the user to provide resource settings. The Scout uses the current task's host-resolved model/reasoning settings and records observable requested/actual values; it supplies no override. The current Desktop project binding is authoritative; no Prompt may contain a
@@ -78,6 +78,11 @@ Discovery, scoped capture and natural semantic review are distinct evidence; non
 
 ## Purpose and native presentation
 
+Preserve each actual native return object in host code before printing a summary. Use the same dispatcher's
+`capture-native --artifact-dir <granted-root> --protected-root <target-root>` with stdin or `--input-file` when a
+native data-file writer is unavailable. It freezes the complete object, including index/error/truncation fields,
+and returns `raw_file/sha256`; it proves neither provenance, successful calls, coverage nor comprehension.
+The executable host-transfer examples and retained-error behavior are in Phase 1 of the deep-review protocol.
 For native history, pass the actual tool result directly through host code orchestration into
 `scout.py import-history --project-root <native-source-root> --session-id <native-id> --artifact-dir <granted-root> --protected-root <target-root>`.
 The helper reads JSON on stdin or `--input-file`, seals one acquired page and returns its file/hash,

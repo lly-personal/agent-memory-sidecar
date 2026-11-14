@@ -56,12 +56,70 @@ the native turn observer does not require the whole chat to finish or prove busi
    updates are outside the frozen observation, not a reason to wait for the task to finish.
 6. No transcript parser, database, background queue, task polling service or automation memory substitutes for native evidence.
 
-Forward actual native page objects through host code orchestration to a file-write data tool, then
-`import-history --input-file`; do not embed large pages in executable JavaScript or split code to avoid
-host review-size limits. Seal each page once,
+Preserve each actual return object before printing it: in Codex host orchestration call
+`store("scout-native-page", result)` immediately after the real reader returns, then expose only the needed metadata.
+Do not print a whole mixed batch as its only retained copy. Use a native data-file writer or the existing
+dispatcher's `capture-native` below; do not embed large pages in executable JavaScript or split code to avoid
+host review-size limits. Pass a captured thread page to `import-history --input-file`; seal each page once,
 reuse its native_file/hash and preserve original cursors/truncation. Never transcribe raw history in model-written
 JSON chunks. Use `--input-file` for result validation/preparation and `describe-input` for current field requirements.
 For continuation, reuse the verified report and update only changed sources; do not restart its census.
+
+### Mechanical native-object transfer
+
+Resolve `pythonExecutable`, `scoutScript`, `artifactRoot`, `projectRoot` and `commandShell` (`posix` or
+`powershell`) from the actual current runtime, loaded Skill, checked output grant and native binding; the agent
+resolves them, not the user. This Codex host-code example consumes the object already retained by `store`.
+The command contains only literal arguments; the complete JSON goes through the owned process's stdin as data,
+so object size does not become shell command size. `--input-line` accepts one UTF-8 JSON line without waiting
+for terminal EOF. It disables echo and terminal line-size clipping only for that input stage and restores the
+previous terminal mode on normal exit, Ctrl-C and catchable POSIX SIGTERM; it does not change host
+configuration or permissions. Forced termination cannot run restoration, so close the entire owned terminal.
+
+```javascript
+const page = load("scout-native-page");
+if (page === undefined) throw new Error("native return object was not retained");
+if (!["posix", "powershell"].includes(commandShell)) throw new Error("command shell is not resolved");
+const quote = commandShell === "powershell"
+  ? value => "'" + value.replaceAll("'", "''") + "'"
+  : value => "'" + value.replaceAll("'", "'\\''") + "'";
+const argv = [pythonExecutable, "-B", scoutScript, "capture-native", "--input-line",
+              "--artifact-dir", artifactRoot, "--protected-root", projectRoot];
+const cmd = (commandShell === "powershell" ? "& " : "") + argv.map(quote).join(" ");
+let state = await tools.exec_command({cmd, tty: true, yield_time_ms: 1000, max_output_tokens: 1600});
+if (Number.isInteger(state.session_id)) store("scout-capture-session", state.session_id);
+let opening = state.output || "";
+while (Number.isInteger(state.session_id) && !opening.includes('"status":"awaiting_native_object"')) {
+  state = await tools.write_stdin({session_id: state.session_id, chars: "", yield_time_ms: 1000, max_output_tokens: 1600});
+  opening += state.output || "";
+}
+if (!Number.isInteger(state.session_id) || !opening.includes('"status":"awaiting_native_object"')) {
+  text(state);
+  throw new Error("capture input did not become ready; retain the original object");
+}
+let result = await tools.write_stdin({session_id: state.session_id, chars: JSON.stringify(page) + "\n",
+                                    yield_time_ms: 1000, max_output_tokens: 1600});
+let output = result.output || "";
+while (result.exit_code === undefined && Number.isInteger(result.session_id)) {
+  result = await tools.write_stdin({session_id: result.session_id, chars: "", yield_time_ms: 1000, max_output_tokens: 1600});
+  output += result.output || "";
+}
+if (result.exit_code !== undefined) store("scout-capture-session", null);
+text({...result, output});
+```
+
+Read the command's actual completion and returned capture receipt before treating the source as sealed.
+Keep the stored object and owned session on transfer failure and correct the same operation within its original
+authorization; do not advance the source cursor, replace the object with a summary or invent a native failure.
+On cancellation interrupt only that owned session and observe closure. A host data/transport limit remains a
+limit: retain it, use an available native data writer, and do not split executable payloads to evade review.
+Missing capture capability is reported precisely, not inferred
+from a tool-name search. `capture-native` writes only an immutable raw object; a history index is not a
+project-filtered task history, and an error object does not become a successful history page. Thread pages still
+go through `import-history --input-file <raw_file>` with their original session and project. Pi/Claude can keep
+their existing native capture route. No additional reader, permissions, Store or completion flag is introduced.
+An interrupted durable write may be reused only when the existing immutable bytes match. A partial or conflicting
+file remains a blocker to reconcile with its original evidence; do not overwrite it or retry indefinitely.
 
 Acquisition and comprehension are different. A tool batch that fetches pages and prints only counts has not exposed their
 meaning to the analysis pass. Read or surface the selected bounded passages, including the user's correction, actual action
