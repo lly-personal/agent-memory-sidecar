@@ -15,7 +15,7 @@ from typing import Any, Callable, Iterable
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.19.3"
+SKILL_VERSION = "5.19.4"
 PROJECT_CONTRACT = "global_owner_scout_project_v7"
 NATIVE_PROJECT_CONTRACT = "global_owner_scout_project_v8"
 MAP_PROJECT_CONTRACT = "global_owner_scout_project_v6"

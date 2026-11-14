@@ -56,12 +56,58 @@ the native turn observer does not require the whole chat to finish or prove busi
    updates are outside the frozen observation, not a reason to wait for the task to finish.
 6. No transcript parser, database, background queue, task polling service or automation memory substitutes for native evidence.
 
-Forward actual native page objects through host code orchestration to a file-write data tool, then
-`import-history --input-file`; do not embed large pages in executable JavaScript or split code to avoid
-host review-size limits. Seal each page once,
+Preserve each actual return object before printing it: in Codex host orchestration call
+`store("scout-native-page", result)` immediately after the real reader returns, then expose only the needed metadata.
+Do not print a whole mixed batch as its only retained copy. Use a native data-file writer or the existing
+dispatcher's `capture-native` below; do not embed large pages in executable JavaScript or split code to avoid
+host review-size limits. Pass a captured thread page to `import-history --input-file`; seal each page once,
 reuse its native_file/hash and preserve original cursors/truncation. Never transcribe raw history in model-written
 JSON chunks. Use `--input-file` for result validation/preparation and `describe-input` for current field requirements.
 For continuation, reuse the verified report and update only changed sources; do not restart its census.
+
+### Mechanical native-object transfer
+
+Resolve `pythonExecutable`, `scoutScript`, `artifactRoot` and `projectRoot` from the actual current runtime,
+loaded Skill, checked output grant and native binding; the agent resolves them, not the user. The following
+Codex host-code examples consume the object already retained by `store`, not model-written JSON or a tool-output
+preview. Choose by the actual command shell. The JSON is passed as literal stdin data, not executable source.
+
+POSIX shell:
+
+```javascript
+const page = load("scout-native-page");
+if (page === undefined) throw new Error("native return object was not retained");
+const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
+const argv = [pythonExecutable, "-B", scoutScript, "capture-native", "--artifact-dir", artifactRoot,
+              "--protected-root", projectRoot];
+const cmd = "printf '%s' " + quote(JSON.stringify(page)) + " | " + argv.map(quote).join(" ");
+text(await tools.exec_command({cmd, max_output_tokens: 1600}));
+```
+
+PowerShell, with UTF-8 only in this command process:
+
+```javascript
+const page = load("scout-native-page");
+if (page === undefined) throw new Error("native return object was not retained");
+const quote = value => "'" + value.replaceAll("'", "''") + "'";
+const argv = [pythonExecutable, "-B", scoutScript, "capture-native", "--artifact-dir", artifactRoot,
+              "--protected-root", projectRoot];
+const cmd = "$OutputEncoding = [System.Text.UTF8Encoding]::new($false); " + quote(JSON.stringify(page))
+          + " | & " + argv.map(quote).join(" ");
+text(await tools.exec_command({cmd, max_output_tokens: 1600}));
+```
+
+Read the command's actual completion and returned capture receipt before treating the source as sealed.
+Keep the stored object on transfer failure and correct the same operation within its original authorization;
+do not advance the source cursor, replace the object with a summary or invent a native failure. A command-size
+or host-review limit remains a limit of that transport: retain it, use an available native data writer, and do
+not split executable payloads to evade the limit. Missing capture capability is reported precisely, not inferred
+from a tool-name search. `capture-native` writes only an immutable raw object; a history index is not a
+project-filtered task history, and an error object does not become a successful history page. Thread pages still
+go through `import-history --input-file <raw_file>` with their original session and project. Pi/Claude can keep
+their existing native capture route. No additional reader, permissions, Store or completion flag is introduced.
+An interrupted durable write may be reused only when the existing immutable bytes match. A partial or conflicting
+file remains a blocker to reconcile with its original evidence; do not overwrite it or retry indefinitely.
 
 Acquisition and comprehension are different. A tool batch that fetches pages and prints only counts has not exposed their
 meaning to the analysis pass. Read or surface the selected bounded passages, including the user's correction, actual action

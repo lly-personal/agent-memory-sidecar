@@ -97,7 +97,7 @@ For normal Codex Desktop use, register the immutable repository Marketplace,
 install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.6.8
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.6.9
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -117,8 +117,8 @@ Plugin, Pi package and Claude Code Plugin expose that same directory; their inst
 For Pi or local Claude Code, install the tagged source through the host's native manager:
 
 ```sh
-pi install git:github.com/lly-personal/agent-memory-sidecar@v0.6.8
-claude plugin marketplace add https://github.com/lly-personal/agent-memory-sidecar.git#v0.6.8
+pi install git:github.com/lly-personal/agent-memory-sidecar@v0.6.9
+claude plugin marketplace add https://github.com/lly-personal/agent-memory-sidecar.git#v0.6.9
 claude plugin install agent-memory-sidecar@agent-memory --scope user
 ```
 

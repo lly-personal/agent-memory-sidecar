@@ -2,6 +2,11 @@
 
 ## Current project-map contracts
 
+`capture-native` seals one complete returned JSON object as private raw evidence using the same output protection and
+immutable writer; it performs no history read and grants no source, session/project, call-success or coverage qualification.
+Indexes and errors remain their original objects. Its `raw_file` can feed `import-history` only when that original payload
+meets the existing history contract below. The executable transport examples live in [Phase 1](deep-review-protocol.md#mechanical-native-object-transfer).
+
 Native history import is a private artifact operation, not another project/result Owner. `import-history`
 accepts one actual read_thread response plus independently resolved session/project identity, writes one
 content-addressed native export and index in the granted root, and preserves cursor/truncation metadata.
