@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.6.12 | 0.6.12 | 1.11.8 | 2.5.10 | 5.19.7 | v8 | 3.11–3.13 |
 | v0.6.11 | 0.6.11 | 1.11.7 | 2.5.9 | 5.19.6 | v8 | 3.11–3.13 |
 | v0.6.10 | 0.6.10 | 1.11.6 | 2.5.8 | 5.19.5 | v8 | 3.11–3.13 |
 | v0.6.9 | 0.6.9 | 1.11.5 | 2.5.7 | 5.19.4 | v8 | 3.11–3.13 |
@@ -136,3 +137,5 @@ Scout 5.19.4 adds `capture-native` to seal a complete native return object befor
 Scout 5.19.5 recovers artifact data from the original structured manifest, with legacy receipts retained as locator-only input. Both recovery entries return artifact_verified with confirmation_eligible=false; display observations and actual Core approval remain independent. Prose and formatting do not gate recovery, while artifact integrity, report/object selection and current-source checks remain enforced. Cache evidence separates differences, attributed helper writes and actual execution identity; unknowns do not grant stable-run qualification. Plugin 1.11.6 and Bootstrap 2.5.8 carry the method and synchronized identities for Core 0.6.10. Existing Project, Review Pack and Delivery formats remain readable. This technical change does not retroactively qualify old natural runs or prove new-session adoption.
 
 Scout 5.19.6 moves the existing cache baseline to Phase 0 and distinguishes a missed past baseline from proved privacy/mutation failures. It points project identity to the existing canonical Bootstrap inspection rather than raw-remote hashing; historical identity and artifact/currentness claims remain separate. Plugin 1.11.7 and Bootstrap 2.5.9 synchronize the method identities for Core 0.6.11. No new schema, permission, gate, storage or automatic qualification is introduced; natural behavior remains unverified.
+
+Scout 5.19.7 separates successful clipped-field recovery from rejected native requests and extends the existing source-first review to map semantics, source-derived paths and intervention attribution. Plugin 1.11.8 and Bootstrap 2.5.10 carry the same method with Core 0.6.12. Result schemas, runtime algorithms, permissions and models are unchanged. Semantic samples and controlled review do not qualify complete natural handoff.

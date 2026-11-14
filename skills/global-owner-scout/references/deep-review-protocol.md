@@ -54,14 +54,21 @@ the native turn observer does not require the whole chat to finish or prove busi
 4. Associate natural tasks by native project identity or proved worktree origin. Exclude dedicated Scout, test, Scheduled and
    delegated tasks. In a mixed engineering/Scout task, retain natural work turns before the frozen invocation boundary and exclude
    Scout-generated review/acceptance turns; never drop the whole current task because it also invokes Scout. Page selected tasks to the frozen boundary or EOF using `read_thread`; begin with one turn and bounded
-   output. Read relevant truncated output separately. On an explicit capacity error, retry the same cursor once with a smaller
-   output request; if it still fails, record `native_thread_pages_terminal_failure` and the exact unread scope. A successful
+   output. Separate a rejected capacity request from a successful response with clipped fields. For a successful clipped page,
+   retain it and reread the same source/cursor with outputs included and a larger per-item allowance permitted by the current
+   native schema; reduce turns per page when needed to keep the aggregate return usable. A smaller per-item allowance cannot
+   recover clipped text. Compare stable item IDs and the actual truncation flags, retain both observations, and read the recovered
+   passages. On an explicit capacity error, retry the same cursor once with a smaller valid request; if it still fails, record
+   `native_thread_pages_terminal_failure` and the exact unread scope. A successful
    page with fields still truncated after available native reads uses that same compatibility enum, with the actual successful
    return and missing fields stated in `coverage/uncovered` and `limitations`, not a claimed native exception. Preserve earlier
    failed attempts even after recovery. Do not change cursor, omit a failed page, or use transcript files.
 5. Count discovered, in-window, selected and fully read tasks. `complete` requires both history partitions to reach
    `window_boundary/eof` plus every selected task read to boundary/EOF. `bounded` means history remains incomplete but selected
-   reads completed. `degraded` exposes explicit failures or unrecoverable selected-content truncation. The current active-turn snapshot is sufficient; later concurrent
+   reads completed. `degraded` exposes explicit failures or unrecoverable selected-content truncation. Remaining pages, unfinished
+   synthesis or successfully imported bytes are work to continue, not evidence of an external blocker. Do not finalize merely
+   because a helper completed. Record an actual stop condition and its scope when execution cannot continue; do not invent a
+   reason for an earlier premature stop. The current active-turn snapshot is sufficient; later concurrent
    updates are outside the frozen observation, not a reason to wait for the task to finish.
 6. No transcript parser, database, background queue, task polling service or automation memory substitutes for native evidence.
 
@@ -298,9 +305,21 @@ source obligations and accepted/reversed paths, including partially represented
 ones, and challenge each projected obligation rather than attach one decorative
 counterexample to an entire compound card. Correct evidence-backed defects and
 recheck associations, privacy and semantic hashes before the final freeze.
-After the source inventory is frozen, give the reviewer the exact Human Context and Rule Projection fields, not only draft summaries
-or an inaccessible tool-output reference. Check each card's event, cost, before/after and strongest counterpoint against its sources;
-generic filler and circular references cannot replace those decision fields. Structural validation does not perform this semantic check.
+After the source inventory is frozen, give the reviewer the full map and exact card fields, not only draft summaries or an
+inaccessible tool-output reference. From its source-derived inventory, check the map's user outcomes, relevant operational and
+maintenance paths, result consumers and recovery against the actual journeys. Complete missing paths supported by available
+sources before freezing; when evidence cannot be obtained, retain the exact coverage gap. Do not import another project's
+release or installation stages into a project that has none. Read each typed edge as a sentence:
+for `depends_on`, the source needs the target. A producer-to-consumer execution handoff is a different relation. Check direction
+and conditions against source, not the label or a connected graph. For an already delivered map, resolve a relevant object
+through the ordinary recovery consumer when available; a new draft is reviewed directly without creating a provisional delivery.
+A successful recovery proves only the recorded context, not that the source-derived path is complete.
+Check each card's event, cost, before/after and strongest counterpoint against its sources. Bind intervention claims to the
+actual sender, affected turn and action: supervising-agent continuation is not observed human re-input. Unknown actor or causal
+effect stays unknown. Generic filler and circular references cannot replace those decision fields. Structural validation and
+artifact hashes do not perform these semantic checks. Correct supported defects before freezing a new result; retain original
+failures and distinguish unassisted, assisted and observer-only recovery. This extends the same review, without a second queue
+or another mandatory reviewer.
 Preserve earlier failed evaluation records; a correction is not retroactive
 blind discovery. If independent context is unavailable, record that coverage
 limitation instead of claiming a self-review is independent qualification.

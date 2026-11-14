@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.12 (2026-11-15)
+
+- Recover successful clipped native fields by increasing the permitted per-item allowance on the same source/cursor; handle actual rejected requests by their schema/error instead of treating both as one capacity failure. Preserve unfinished work and unknown stopping causes.
+- Give the existing source-first reviewer the complete map as well as cards. Check dependency direction, source-derived operational paths and actual intervention actors; recovery and hashes do not prove those semantics.
+- Add a neutral correction/index/query semantic sample and a legitimate control without release or installation stages. No new controller, schema, state, runtime algorithm, permission or model change; full natural handoff remains unverified.
+- Components: Core 0.6.12, Plugin 1.11.8, Bootstrap 2.5.10 and Scout 5.19.7.
+
 ## 0.6.11 (2026-11-14)
 
 - Put the existing Skill/cache baseline before the first helper; retain a missed past window without inventing privacy failures, resetting history or granting automatic acceptance.

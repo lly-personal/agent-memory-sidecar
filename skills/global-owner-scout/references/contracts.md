@@ -12,6 +12,8 @@ accepts one actual read_thread response plus independently resolved session/proj
 content-addressed native export and index in the granted root, and preserves cursor/truncation metadata.
 The receipt never claims that the source was understood or that the full chat was read. Re-importing the
 same page reuses read-only bytes; changed pages create new identities. No database/transcript discovery.
+An imported page can still need pagination or recovery of clipped fields. Successful field truncation and an actual capacity
+rejection require different native read adjustments; see the existing Phase 1 recovery decision, not a new import status.
 Both writes/readback hold the output directory identity: Windows denies ancestor write/delete sharing, POSIX
 uses relative directory descriptors. Concurrent redirection cannot send private pages into a protected
 project. Missing containment blocks; it never loosens system security or retries by another writer.
@@ -28,6 +30,9 @@ Containment is acyclic; shared ownership may have multiple parents. Other relati
 block independent nodes or journeys. Claims carry the reasons, conditions and evidence of decisions; do not invent dates or edges.
 `depends_on` points from the dependent to its prerequisite; `constrains` points from a constraint to what it limits.
 These relations retain their source claims, including permission limits and unresolved or conflicting evidence.
+Reference resolution and connected journeys prove structure, not relation semantics or source coverage. The existing Phase 5
+source-first review also checks the complete map, operational paths and intervention attribution before a new freeze. Recovering
+an object cannot certify a missing source-derived path, and agent assistance cannot be reported as observed human action.
 
 V7 engineering cards have `kind=engineering`, nullable `parent_card_id`, `card_id`, `human_context`, `evidence_level`,
 `normalized_evidence_hash`, `owner_recommendation`, `direct_evidence`, `owner_rationale`, `anti_examples`, `privacy_check`,
