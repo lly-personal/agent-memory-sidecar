@@ -7,7 +7,7 @@ description: Understand a project's goals, actors, scenarios and real workflows 
 
 ## Contract
 
-- Skill version: `5.19.6`
+- Skill version: `5.19.7`
 - Project result: `global_owner_scout_project_v7`
 - User review: `global_owner_scout_review_pack_v8`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -160,13 +160,15 @@ owns completion, including recovery and the final result. Do not return after di
    `source=codex`, `limit=50`, with active and archived histories separately. Follow each exact returned cursor to the window
    boundary or EOF. Keep natural work turns in mixed engineering/Scout tasks before this invocation; exclude only Scout-generated
    turns there, and dedicated test/review tasks. A page size is not a total coverage cap. Use `read_thread` pages for every selected natural task, starting
-   small (`turnLimit=1`, bounded output) and fetching only needed output bodies. A capacity error may be retried once at a smaller
-   size on the same cursor; retain the failed observation. Do not silently skip pages. Resume every yielded cell to a terminal
+   small (`turnLimit=1`, bounded output) and fetching only needed output bodies. Recover successful clipped fields with the
+   same source/cursor and a larger valid per-item allowance; a rejected capacity request instead needs a smaller valid request.
+   Follow Phase 1's recovery decision and retain both observations. Do not silently skip pages. Resume every yielded cell to a terminal
    result before continuing. Recoverable call/transfer errors are retained and corrected within the same source, cursor and
    authorization, as Phase 1 specifies. Page errors and successful-but-unrecoverable field truncation degrade only the affected
    evidence; record their different actual causes. Unrecovered execution remains a protocol failure, not a coverage shortcut.
 4. Keep source facts, inferred obligations and Global Owner comparison separate. For a source-rich review, use an internal
-   independent reviewer as Phase 5 specifies; do not create another user-facing task. Compare the complete actual Owner,
+   independent reviewer as Phase 5 specifies, including source-derived map paths, typed relation direction and actual intervention
+   attribution; do not create another user-facing task. Compare the complete actual Owner,
    including unmanaged principles, by trigger, required action and exception. Recombining already-covered obligations is not a
    new rule. Name the specific uncovered behavior and a concrete future failure before recommending an addition. Keep method
    details in their existing Skill and project facts in their existing project owner. Uncertainty is not a new user decision.
