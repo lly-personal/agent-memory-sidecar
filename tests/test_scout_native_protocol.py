@@ -96,12 +96,14 @@ assert.ok(result.details.python.sha256);
         for host in ('pi', 'claude'):
             pack = native_pack(host)
             v.validate_review_pack(pack)
-            with self.subTest(host=host), tempfile.TemporaryDirectory() as tmp:
+            with self.subTest(host=host), tempfile.TemporaryDirectory(prefix="receipt's 数据 () ") as tmp:
                 root = Path(tmp)
                 manifest, artifact = prepare_delivery(pack, artifact_dir=root, protected_roots=[SCRIPTS])
                 receipt = render_delivery_receipt(manifest, artifact_path=artifact, artifact_root=root,
                                                  outcome='not_requested', text_only=True)
                 recovered = verify_final_receipt(receipt, artifact_root=root)
+                formatted = receipt.replace("现有规则未改变。\n", "现有规则未改变。  \n")
+                self.assertEqual(verify_final_receipt(formatted, artifact_root=root), recovered)
                 self.assertEqual(recovered['project_map_bundle']['context']['project_contract'], v.NATIVE_PROJECT_CONTRACT)
                 self.assertIn('完整历史仍未知', receipt)
                 body = artifact.read_text(encoding='utf-8')

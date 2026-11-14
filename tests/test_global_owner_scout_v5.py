@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import marshal
 import os
+import py_compile
 import subprocess
 import sys
 import tempfile
@@ -93,12 +95,12 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.5.7",
+                "version": "2.5.8",
                 "content_sha256": "b" * 64,
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.19.4",
+                "version": "5.19.5",
                 "content_sha256": "c" * 64,
             },
         }
@@ -845,8 +847,8 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         desired = {
             "release_ref": "v0.3.10", "source_commit": "a" * 40,
             "core_version": "0.3.10", "plugin_version": "1.5.1", "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.5.7", "bootstrap_sha256": "c" * 64,
-            "scout_version": "5.19.4", "scout_sha256": "d" * 64,
+            "bootstrap_version": "2.5.8", "bootstrap_sha256": "c" * 64,
+            "scout_version": "5.19.5", "scout_sha256": "d" * 64,
         }
         source_sha = "e" * 64
         pack = self.managed_sources.build_deployment_pack(
@@ -863,15 +865,15 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             host_materialization={
                 "core": {"status": "verified", "version": "0.3.10", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
                 "global_binding": "unavailable", "doctor": "verified",
-                "bootstrap_skill": {"status": "unchanged", "version": "2.5.7", "content_sha256": "c" * 64},
-                "scout_skill": {"status": "unchanged", "version": "5.19.4", "content_sha256": "d" * 64},
+                "bootstrap_skill": {"status": "unchanged", "version": "2.5.8", "content_sha256": "c" * 64},
+                "scout_skill": {"status": "unchanged", "version": "5.19.5", "content_sha256": "d" * 64},
             },
             requires_reload=True,
             consumer_verified=False,
             generated_at="2026-08-21T12:00:00+08:00",
         )
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("2.5.7", validated["desired_bundle"]["bootstrap_version"])
+        self.assertEqual("2.5.8", validated["desired_bundle"]["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
         for label in ("期望发行身份", "Plugin 分发", "能力源同步", "主机物化", "项目消费者范围", "消费者入口条件"):
             self.assertIn(label, rendered)
@@ -917,7 +919,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 json.loads(text),
                 expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
             )
-            self.assertEqual("v0.6.9", value["plugins"][0]["source"]["ref"])
+            self.assertEqual("v0.6.10", value["plugins"][0]["source"]["ref"])
         else:
             self.assertTrue(
                 (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()
@@ -990,6 +992,30 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             self.assertTrue((target / "scripts" / "helper.py").is_file())
             self.assertFalse((target / "scripts" / "__pycache__").exists())
 
+    def test_no_bytecode_writes_does_not_attest_loaded_source(self) -> None:
+        # This isolated runtime control supports cache-evidence interpretation;
+        # it is not a claim that Scout or another process changed a live cache.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "cache_probe.py"
+            source.write_text("value = 'source-result'\n", encoding="utf-8")
+            original_source = source.read_bytes()
+            cache = root / "__pycache__" / f"cache_probe.{sys.implementation.cache_tag}.pyc"
+            py_compile.compile(str(source), cfile=str(cache), doraise=True)
+            header = cache.read_bytes()[:16]
+            cache.write_bytes(header + marshal.dumps(compile("value = 'cache-result'\n", str(source), "exec")))
+            env = dict(os.environ)
+            env.pop("PYTHONPYCACHEPREFIX", None)
+            command = [sys.executable, "-B", "-c",
+                       "import cache_probe,json,sys; print(json.dumps([cache_probe.value,sys.dont_write_bytecode]))"]
+            for cache_bytes, expected in ((cache.read_bytes(), "cache-result"), (b"invalid cache", "source-result")):
+                cache.write_bytes(cache_bytes)
+                result = subprocess.run(command, cwd=root, env=env, capture_output=True,
+                                        text=True, encoding="utf-8", check=True)
+                self.assertEqual(json.loads(result.stdout), [expected, True])
+                self.assertEqual(source.read_bytes(), original_source)
+                self.assertEqual(cache.read_bytes(), cache_bytes)
+
     def test_skill_install_rejects_hardlinked_source_file(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -1027,7 +1053,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_v5_prompt_has_no_fixed_binding(self) -> None:
         prompt = (
             "Use $global-owner-scout in project_scout mode for the current bound project; rolling 72 hours; "
-            "Skill 5.19.4; global_owner_scout_project_v7; global_owner_scout_review_pack_v8; "
+            "Skill 5.19.5; global_owner_scout_project_v7; global_owner_scout_review_pack_v8; "
             "gpt-5.6-sol; medium; read-only."
         )
         self.bootstrap.validate_prompt(prompt)
@@ -1548,7 +1574,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             manifest = json.loads(result.stdout)
             artifact = output / manifest["artifact_name"]
             original = artifact.read_bytes()
-            for outcome, status in (("not_requested", "artifact_verified"), ("open_failed", "surface_unavailable")):
+            for outcome, status in (("not_requested", "artifact_verified"), ("open_failed", "artifact_verified")):
                 receipt = subprocess.run(
                     [sys.executable, "-B", str(SCOUT_RUNTIME), "render-receipt", outcome,
                      "--artifact-path", str(artifact), "--artifact-root", str(output)],
@@ -1571,7 +1597,8 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                     [sys.executable, "-B", str(SCOUT_RUNTIME), "verify-final", "--artifact-root", str(output)],
                     input=changed, capture_output=True, text=True, encoding="utf-8",
                 )
-                self.assertNotEqual(0, tampered.returncode)
+                self.assertEqual(0, tampered.returncode, tampered.stderr)
+                self.assertEqual(observed, json.loads(tampered.stdout))
             self.assertEqual(original, artifact.read_bytes())
 
     def test_interactive_evidence_may_discuss_scheduled_limits(self) -> None:
@@ -1599,6 +1626,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         sys.path.insert(0, str(SCOUT_SCRIPTS))
         try:
             renderer = load_module("scout_renderer_no_delta_brief", SCOUT_RENDERER)
+            delivery = load_module("scout_delivery_no_delta_brief", SCOUT_DELIVERY)
             for count in (0, 1):
                 pack = json.loads(self._review_pack_json(count))
                 for review in pack["review_cards"]:
@@ -1611,6 +1639,15 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 self.assertNotIn("首项建议", brief)
                 self.assertIn("无需确认或逐项忽略", brief)
                 self.assertNotIn("审阅后可回复准确选择", rendered)
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    manifest, artifact = delivery.prepare_delivery(pack, artifact_dir=root, protected_roots=[ROOT])
+                    receipt = delivery.render_delivery_receipt(manifest, artifact_path=artifact, artifact_root=root,
+                                                               outcome="not_requested", text_only=True)
+                    formatted = receipt.replace("现有规则未改变。\n", "现有规则未改变。  \n")
+                    recovered = delivery.verify_final_receipt(formatted, artifact_root=root)
+                    self.assertEqual(recovered["manifest"], manifest)
+                    self.assertFalse(recovered["confirmation_eligible"])
         finally:
             sys.path.pop(0)
 
@@ -1658,7 +1695,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         finally:
             sys.path.pop(0)
 
-    def test_markdown_hard_breaks_do_not_silently_relax_the_receipt_contract(self) -> None:
+    def test_chat_prose_does_not_attest_or_block_artifact_recovery(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             prepared = subprocess.run(
@@ -1676,13 +1713,110 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             changed = receipt.replace("现有规则未改变。", "现有规则未改变。  ")
             self.assertNotEqual(receipt, changed)
             before = artifact.read_bytes()
-            for value, accepted in ((receipt, True), (changed, False)):
+            for value, accepted in (
+                (receipt, True), (changed, True),
+                (changed.replace("现有规则未改变。", "现有规则已生效。"), True),
+                (changed.replace("`confirmation_eligible=false`", "`confirmation_eligible=true`"), True),
+            ):
                 result = subprocess.run(
                     [sys.executable, "-B", str(SCOUT_RUNTIME), "verify-final", "--artifact-root", str(root)],
                     input=value, capture_output=True, text=True, encoding="utf-8",
                 )
                 self.assertEqual(result.returncode == 0, accepted, result.stderr)
+                self.assertEqual(json.loads(result.stdout)["status"], "artifact_verified")
+                self.assertFalse(json.loads(result.stdout)["confirmation_eligible"])
+                self.assertEqual(json.loads(result.stdout)["artifact_sha256"], manifest["artifact_sha256"])
                 self.assertEqual(artifact.read_bytes(), before)
+
+    def test_literal_markdown_edits_do_not_change_recovered_artifact_data(self) -> None:
+        examples = (
+            "```text\nKEEP  \n```",
+            "    KEEP  \n    NEXT",
+            "传入 `KEEP  \nNEXT`",
+            "<pre>KEEP  \nNEXT</pre>",
+            "KEEP\\  \nNEXT",
+            *(" " * spaces + "\tKEEP  \n" + " " * spaces + "\tNEXT" for spaces in range(4)),
+            "转义标记：\\``KEEP  \nNEXT`",
+            "转义标记：\\```KEEP  \nNEXT``",
+            "保留反斜线：\\\\`KEEP  \nNEXT`",
+            "-     KEEP  \n      NEXT",
+            "同一段落的前缀：\n    `KEEP\nNEXT  \nEND`，保留代码数据。",
+        )
+        for literal in examples:
+            with self.subTest(literal=literal), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                project = self.scout_validator.valid_project(card_count=1)
+                card = project["project_cards"][0]
+                card["human_context"]["concrete_after"] = "示例片段：\n\n" + literal + "\n\n后续仍只讨论。"
+                card["project_claim_hash"] = self.scout_validator.project_claim_hash(card)
+                pack = self.scout_validator.valid_review_pack(project)
+                prepared = subprocess.run(
+                    [sys.executable, "-B", str(SCOUT_RUNTIME), "prepare-delivery", "--artifact-dir", str(root),
+                     "--protected-root", str(ROOT)], input=json.dumps(pack), capture_output=True,
+                    text=True, encoding="utf-8", check=True,
+                )
+                artifact = root / json.loads(prepared.stdout)["artifact_name"]
+                receipt = subprocess.run(
+                    [sys.executable, "-B", str(SCOUT_RUNTIME), "render-receipt", "not_requested",
+                     "--artifact-path", str(artifact), "--artifact-root", str(root)], input=prepared.stdout,
+                    capture_output=True, text=True, encoding="utf-8", check=True,
+                ).stdout
+                self.assertIn(literal, receipt)
+                paragraph_format = receipt.replace("现有规则未改变。\n", "现有规则未改变。  \n")
+                changed_literal = literal.replace("  \n", "\n")
+                self.assertNotEqual(changed_literal, literal)
+                before = artifact.read_bytes()
+                for text, accepted in (
+                    (receipt, True), (paragraph_format, True),
+                    (receipt.replace(literal, changed_literal), True),
+                ):
+                    result = subprocess.run(
+                        [sys.executable, "-B", str(SCOUT_RUNTIME), "verify-final", "--artifact-root", str(root)],
+                        input=text, capture_output=True, text=True, encoding="utf-8",
+                    )
+                    self.assertEqual(result.returncode == 0, accepted, result.stderr)
+                    self.assertFalse(json.loads(result.stdout)["confirmation_eligible"])
+                    self.assertEqual(json.loads(result.stdout)["artifact_sha256"], json.loads(prepared.stdout)["artifact_sha256"])
+                    self.assertEqual(artifact.read_bytes(), before)
+
+    def test_structured_recovery_and_legacy_locator_keep_identity_and_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            prepared = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_RUNTIME), "prepare-delivery", "--artifact-dir", str(root),
+                 "--protected-root", str(ROOT)], input=self._review_pack_json(1), capture_output=True,
+                text=True, encoding="utf-8", check=True,
+            )
+            manifest = json.loads(prepared.stdout)
+            artifact = root / manifest["artifact_name"]
+            before = artifact.read_bytes()
+            command = [sys.executable, "-B", str(SCOUT_RUNTIME), "recover-delivery", "--artifact-root", str(root)]
+            run = subprocess.run(command + ["--report-hash", manifest["review_pack_hash"]], input=prepared.stdout,
+                                 capture_output=True, text=True, encoding="utf-8", check=True)
+            expected = json.loads(run.stdout)
+            self.assertEqual(expected["manifest"], manifest)
+            self.assertFalse(expected["confirmation_eligible"])
+            for payload, extra in ((prepared.stdout, ["--report-hash", "0" * 64]),
+                                   (prepared.stdout, ["--object", "node:foreign"]),
+                                   (json.dumps(dict(manifest, artifact_sha256="0" * 64)), [])):
+                rejected = subprocess.run(command + extra, input=payload, capture_output=True, text=True, encoding="utf-8")
+                self.assertNotEqual(rejected.returncode, 0, rejected.stdout)
+            locator = f"[任意标题](<{artifact}>) delivery_manifest_sha256={manifest['delivery_manifest_sha256']}"
+            for value in (locator, locator + "\n" + locator, "规则已生效。确认已批准。\n" + locator +
+                          '\nvisualize{"path":"/unrelated.html"}'):
+                recovered = subprocess.run([sys.executable, "-B", str(SCOUT_RUNTIME), "verify-final", "--artifact-root", str(root)],
+                                           input=value, capture_output=True, text=True, encoding="utf-8", check=True)
+                self.assertEqual(json.loads(recovered.stdout), expected)
+            ambiguous = locator + "\ndelivery_manifest_sha256=" + "0" * 64
+            rejected = subprocess.run([sys.executable, "-B", str(SCOUT_RUNTIME), "verify-final", "--artifact-root", str(root)],
+                                      input=ambiguous, capture_output=True, text=True, encoding="utf-8")
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertEqual(artifact.read_bytes(), before)
+            artifact.chmod(0o600)
+            artifact.write_bytes(before + b"changed")
+            artifact.chmod(0o400)
+            rejected = subprocess.run(command, input=prepared.stdout, capture_output=True, text=True, encoding="utf-8")
+            self.assertNotEqual(rejected.returncode, 0)
 
     def test_historical_receipts_recover_without_rewriting_the_artifact(self) -> None:
         sys.path.insert(0, str(SCOUT_SCRIPTS))
@@ -1778,9 +1912,9 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                     check=True,
                 )
                 observed = json.loads(observed_result.stdout)
-                self.assertEqual("surface_observed", observed["status"])
+                self.assertEqual("artifact_verified", observed["status"])
                 self.assertEqual(count, observed["visible_cards"])
-                self.assertEqual(count > 0, observed["confirmation_eligible"])
+                self.assertFalse(observed["confirmation_eligible"])
                 self.assertIn("现有规则未改变", receipt_result.stdout)
                 self.assertNotIn("artifact_bytes=", receipt_result.stdout)
                 self.assertNotIn("visible_cards=", receipt_result.stdout)
@@ -1823,7 +1957,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                     check=True,
                 )
                 pending = json.loads(pending_result.stdout)
-                self.assertEqual("surface_pending", pending["status"])
+                self.assertEqual("artifact_verified", pending["status"])
                 self.assertEqual(count, pending["visible_cards"])
                 self.assertFalse(pending["confirmation_eligible"])
                 self.assertEqual(manifest, pending["manifest"])
@@ -1980,8 +2114,8 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 text=True,
                 encoding="utf-8",
             )
-            self.assertNotEqual(0, edited.returncode)
-            self.assertIn("not an exact opened or queued Delivery receipt", edited.stderr)
+            self.assertEqual(0, edited.returncode, edited.stderr)
+            self.assertFalse(json.loads(edited.stdout)["confirmation_eligible"])
 
             excessive_envelope = subprocess.run(
                 [
@@ -2073,7 +2207,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             target = Path(temporary) / "global-owner-scout"
             source = ROOT / "skills" / "global-owner-scout"
             installed = self.bootstrap.install_skill(source, target)
-            self.assertEqual("5.19.4", installed["version"])
+            self.assertEqual("5.19.5", installed["version"])
             helper = target / "scripts" / "prepare_delivery.py"
             dispatcher = target / "scripts" / "scout.py"
             self.assertTrue(helper.is_file())

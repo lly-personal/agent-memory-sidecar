@@ -166,7 +166,7 @@ root.addEventListener('click',async e=>{
  if(b.dataset.action==='back'){if(history.length){state=history.pop();render();focusLocation();persist();}return;}
  if(b.dataset.action==='discuss'){
   const n=node(state.node),a=advice(state.advice),[kind,id]=selection(),selected=kind+':'+id,label=a?.title||(state.edge?map.edges.find(e=>e.id===state.edge).label:n.title);
-  const prompt=`请继续讨论已交付的 Scout 结果：报告 ${source.report_hash}；工程 ${source.project_key}；来源版本 ${data.revision}；上下文 ${source.context_snapshot_hash}；对象 ${selected}「${label}」；视角 ${state.view}；路径 ${state.journey||'未选择'}。请从当前聊天恢复对应完整交付回执和原文件，将上述对象与路径作为 verify-final 的 --object 和 --journey 参数数据核对，沿同一证据解释并承接讨论；不要重跑普查，不要将本次讨论视为写入授权。`;
+  const prompt=`请继续讨论已交付的 Scout 结果：报告 ${source.report_hash}；工程 ${source.project_key}；来源版本 ${data.revision}；上下文 ${source.context_snapshot_hash}；对象 ${selected}「${label}」；视角 ${state.view}；路径 ${state.journey||'未选择'}。请从当前聊天恢复原 prepare-delivery manifest 和原文件，使用 recover-delivery，将报告 hash 作为 --report-hash、对象与路径作为 --object 和 --journey 参数数据核对，沿同一证据解释并承接讨论；不要重跑普查，不要将本次讨论视为写入授权。`;
   const fallback=`报告 ${source.report_hash}；工程 ${source.project_key}；对象 ${selected}；路径 ${state.journey||'未选择'}。可复制这些信息，在当前聊天继续讨论。`;
   if(!window.openai?.sendFollowUpMessage){status('当前端未提供原生续接。'+fallback);return;}
   b.disabled=true;try{await window.openai.sendFollowUpMessage({prompt,title:`讨论：${label}`});status('已交给原生后续消息入口；是否实际发送及后续采用，以聊天中的结果为准。');}catch{status('原生续接未完成，选择保留。'+fallback);}finally{b.disabled=false;}

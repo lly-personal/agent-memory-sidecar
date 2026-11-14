@@ -402,14 +402,19 @@ class RulePreviewTests(unittest.TestCase):
         output.mkdir()
         manifest, artifact = self.delivery.prepare_delivery(pack, artifact_dir=output, protected_roots=[codex_home])
         receipt = self.delivery.render_queued_receipt(manifest, artifact_path=artifact, artifact_root=output)
+        manifest_json = json.dumps(manifest)
         del pack, draft, bundle, manifest
         before = {str(p): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
         restored = subprocess.run([sys.executable, "-B", str(SCRIPTS / "scout.py"), "verify-final", "--artifact-root", str(output)],
             input=receipt, capture_output=True, text=True, encoding="utf-8", cwd=self.root)
         self.assertEqual(restored.returncode, 0, restored.stderr)
         result = json.loads(restored.stdout)
+        structured = subprocess.run([sys.executable, "-B", str(SCRIPTS / "scout.py"), "recover-delivery", "--artifact-root", str(output)],
+            input=manifest_json, capture_output=True, text=True, encoding="utf-8", cwd=self.root)
+        self.assertEqual(structured.returncode, 0, structured.stderr)
+        self.assertEqual(json.loads(structured.stdout), result)
         self.assertFalse(result["confirmation_eligible"])
-        self.assertEqual(result["status"], "surface_pending")
+        self.assertEqual(result["status"], "artifact_verified")
         recovered = result["recovery_bundle"]
         self.assertEqual(hashlib.sha256(self.delivery.canonical_json(recovered).encode()).hexdigest(), expected_bundle_hash)
         runtime, _ = self.preparer.installed_core(codex_home)

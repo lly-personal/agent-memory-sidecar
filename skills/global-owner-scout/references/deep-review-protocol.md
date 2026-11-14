@@ -383,8 +383,8 @@ linked and opened only on request; absence of an open call is not an error. It p
 cards; every source and card still conserves. A queued request is not proof of display. Technical completion and the result link
 stay in this task; no separate controller chat is required to finish the review.
 
-For recovery, reuse `verify-final` on the actual prior receipt and original granted output root. Reconstruct the manifest from
-that same immutable file; never regenerate the evidence or rewrite the previous artifact. Exact human selections resume through
+For recovery, use `recover-delivery` with the original native manifest and granted output root; `verify-final` remains the
+old-receipt locator adapter. Both verify the same immutable file, independently of presentation. Never regenerate provenance or rewrite the artifact. Exact human selections resume through
 the existing installed Agent Memory bundle handoff after artifact verification and Fresh Core preview. Preserve the queued
 observation; it neither grants authorization nor permanently blocks a later independently verified human selection.
 The optional paused Scheduled path retains `render-review --surface scheduled` and `verify-visible --surface scheduled`.
@@ -414,9 +414,13 @@ overwriting evidence. A valid receipt cannot prove that the surrounding final pr
 its artifact/receipt verification scope. This example proves only byte-preserving selection; original acquisition, helper
 execution and semantic acceptance remain separate.
 
-Capture the user-level Skill directory bytecode-cache baseline before helper execution and recheck it afterward. A new or changed
-`__pycache__`, `.pyc`, or `.pyo` is an external side effect and fails the run; do not delete it from inside the Scout to hide the
-failure. The Bootstrap installer, not the Scout, owns cache-free atomic installation.
+Capture the user-level Skill directory bytecode-cache baseline before helper execution and recheck it afterward. Retain a
+difference with its actual process/window evidence; it does not identify the writer. An attributable helper cache write still
+fails read-only validation. Separately check affected execution identity: `-B` suppresses automatic cache generation but can read valid cached
+code, so unchanged source hashes or no attributed write cannot establish that identity alone. An unresolved difference keeps
+the affected stability/execution claim unproved; it does not establish Scout mutation or invalidate independently verified
+artifact bytes. Reconcile the affected entry under the existing authorization without erasing the original observation or
+declaring a fresh baseline to be the old run. Scout never deletes caches; Bootstrap owns cache-free atomic installation.
 
 Terminal meanings:
 
@@ -427,7 +431,7 @@ Terminal meanings:
 - `no_material_delta`: complete/bounded census and no evidenced engineering or qualified rule-candidate delta.
 - `failed`: execution protocol, privacy, integrity, mutation, required-source, render, or read-only failure; no cards.
 - `output_budget_exceeded`: not every card fits; no partial cards.
-- `surface_pending`: the exact artifact and final link are externally verified after a host `queued` result; content is discoverable, but the user surface remains unproved and no authorization is inferred.
+- A native `queued` result leaves display unobserved; recovery returns `artifact_verified` only. Preserve actual host observations separately from chat copy, and infer no approval.
 - `interactive_host_blocked`: no safe task output root before artifact creation; no partial cards or confirmation.
 
 Artifact creation or integrity failure uses the existing failure contract in [contracts.md](contracts.md#manifest-free-terminal).

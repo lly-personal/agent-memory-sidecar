@@ -16,6 +16,7 @@ from typing import Any
 
 from prepare_delivery import (
     prepare_delivery,
+    recover_delivery,
     render_blocked_receipt,
     render_delivery_receipt,
     SURFACE_COPY,
@@ -229,13 +230,15 @@ def main() -> int:
     receipt.add_argument("--artifact-root", type=Path)
     receipt.add_argument("--text-only", action="store_true")
     commands.add_parser("render-terminal")
-    verify_final = commands.add_parser("verify-final")
-    verify_final.add_argument("--artifact-root", type=Path, required=True)
-    verify_final.add_argument("--project-root", type=Path)
-    verify_final.add_argument("--object", dest="selected_object")
-    verify_final.add_argument("--journey")
+    for command in ("recover-delivery", "verify-final"):
+        recovery = commands.add_parser(command)
+        recovery.add_argument("--artifact-root", type=Path, required=True)
+        recovery.add_argument("--report-hash", help="Review Pack hash from the actual selected report, not the manifest hash.")
+        recovery.add_argument("--project-root", type=Path)
+        recovery.add_argument("--object", dest="selected_object")
+        recovery.add_argument("--journey")
     for name in ('inspect-native', 'import-history', 'validate-project', 'validate-review-pack', 'prepare-review',
-                 'render-review', 'verify-visible', 'prepare-delivery', 'render-receipt', 'render-terminal', 'verify-final'):
+                 'render-review', 'verify-visible', 'prepare-delivery', 'render-receipt', 'render-terminal', 'recover-delivery', 'verify-final'):
         commands.choices[name].add_argument('--input-file', type=Path, help='Consume an existing UTF-8 input instead of serializing it again through stdin.')
     args = parser.parse_args()
     def load_input() -> Any:
@@ -301,7 +304,10 @@ def main() -> int:
         elif args.command == "render-terminal":
             print(render_terminal_receipt(load_input()), end="")
         else:
-            result = verify_final_receipt(safe_artifact_bytes(args.input_file).decode('utf-8') if args.input_file else sys.stdin.read(), artifact_root=args.artifact_root)
+            result = (recover_delivery(load_input(), artifact_root=args.artifact_root, report_hash=args.report_hash)
+                      if args.command == "recover-delivery" else
+                      verify_final_receipt(safe_artifact_bytes(args.input_file).decode('utf-8') if args.input_file else sys.stdin.read(),
+                                           artifact_root=args.artifact_root, report_hash=args.report_hash))
             result["source_status"] = "not_checked"
             if args.selected_object or args.journey:
                 require(result['project_map_bundle'] is not None, 'original report has no map')
