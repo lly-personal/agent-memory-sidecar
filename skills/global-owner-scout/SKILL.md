@@ -7,7 +7,7 @@ description: Understand a project's goals, actors, scenarios and real workflows 
 
 ## Contract
 
-- Skill version: `5.19.5`
+- Skill version: `5.19.6`
 - Project result: `global_owner_scout_project_v7`
 - User review: `global_owner_scout_review_pack_v8`
 - Manifest-free terminal: `global_owner_scout_terminal_v1`
@@ -141,7 +141,12 @@ owns completion, including recovery and the final result. Do not return after di
    Git worktree origin) also establishes the target. Reject conflicting identities, ambiguous matches or missing native context;
    a shell cwd, display label or prompt path alone is not binding. Apply the same rule when associating natural history tasks.
    Resolve an available Python 3 interpreter once (`python3`, `python`, or the host runtime); use it with `-B` and the absolute installed
-   `scripts/scout.py` path for every helper. Run `inspect-context --project-root <bound-project-root>` independently of shell cwd.
+   `scripts/scout.py` path for Scout helpers. Before the first helper, capture its Skill/cache baseline as Phase 0 specifies.
+   Derive `project_identity` through the existing
+   Bootstrap `enrollment.py inspect-project` from the same verified source, using the already resolved native primary folder, name and
+   host reference. Use its canonical content identity and eligibility, not a hash of the raw remote URL. This read-only projection
+   does not enroll a project or change Scheduled state; native binding remains separately required.
+   Run `inspect-context --project-root <bound-project-root>` independently of shell cwd.
    Save the complete preflight fingerprint, including untracked content. Ordinary Local and existing worktree are both eligible;
    a non-Git or unbound project returns the deterministic preflight Terminal. No model/thinking override or user setup is needed.
 2. For interactive delivery, read the **current task's** environment context, especially `filesystem.workspace_roots`, and any explicit host output metadata.

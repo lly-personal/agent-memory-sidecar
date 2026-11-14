@@ -291,8 +291,13 @@ git_worktree_eligible, binding_status
 ```
 
 Identity kind is `content` or `host_local`; binding is `bound`, `rebound`, or `ambiguous`. Raw local project IDs, paths, and remotes
-are forbidden. A Scheduled v5 run requires `content`, worktree eligibility, and non-ambiguous binding. The formal interactive entry
-starts and completes in the current bound Git project task. Local and an already selected worktree are both eligible for
+are forbidden. A Scheduled v5 run requires `content`, worktree eligibility, and non-ambiguous binding. Project identity
+uses the existing `project_content_identity_v1` projection owned by Bootstrap's `enrollment.py inspect-project`, with the
+already validated native primary folder/reference. Raw-URL hashing is not that projection. Do not invent an opaque value to satisfy its
+shape. Git snapshot equality is separate: recovery's `source_status=unchanged` does not certify a correctly projected identity.
+If an old report has a noncanonical identity, revoke that exact identity claim, retain independently verified bytes/native
+association/facts, and use the formal output in a new result without rewriting the old artifact.
+The formal interactive entry starts and completes in the current bound Git project task. Local and an already selected worktree are both eligible for
 interactive read-only inspection. Use the absolute dispatcher with an available Python 3 interpreter and `-B`; pass
 `inspect-context --project-root <bound-project-root>` explicitly. Do not create a new task or worktree for interactive review.
 The current task owns `manual_30d` evidence, the immutable artifact, recovery and the final result. Scheduled still uses its

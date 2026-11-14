@@ -8,6 +8,15 @@ and unproven claim separate.
 
 ## Phase 0: current-task context
 
+Before the first helper, capture the user-level Skill directory bytecode-cache baseline. Retain before/after evidence and
+attribute any difference: an attributable helper write still fails read-only validation. `-B` suppresses automatic generation
+but can read valid cached code, so source hashes or absence of an attributed write do not alone prove execution identity.
+If the initial baseline was missed, preserve the affected past window as unverified; a present observation starts a new window,
+never reconstructs the old one. Missing evidence alone does not establish privacy/integrity failure or helper mutation. Continue
+unaffected authorized reads and complete their actual validation; stop only affected unsafe operations or unsupported claims.
+Do not automatically grant pass/degraded or substitute this observation for the required coverage and result checks.
+Scout never deletes caches or resets the old baseline; Bootstrap owns cache-free atomic installation.
+
 Follow SKILL.md preflight before evidence reads: resolve the current native project, installed Skill, explicit output grant and
 an available Python 3 runtime. Use the absolute dispatcher with `-B` and `inspect-context --project-root <bound-project-root>`;
 helper cwd is never project authority. Keep the full snapshot hash before and after, including untracked contents. Interactive
@@ -414,13 +423,8 @@ overwriting evidence. A valid receipt cannot prove that the surrounding final pr
 its artifact/receipt verification scope. This example proves only byte-preserving selection; original acquisition, helper
 execution and semantic acceptance remain separate.
 
-Capture the user-level Skill directory bytecode-cache baseline before helper execution and recheck it afterward. Retain a
-difference with its actual process/window evidence; it does not identify the writer. An attributable helper cache write still
-fails read-only validation. Separately check affected execution identity: `-B` suppresses automatic cache generation but can read valid cached
-code, so unchanged source hashes or no attributed write cannot establish that identity alone. An unresolved difference keeps
-the affected stability/execution claim unproved; it does not establish Scout mutation or invalidate independently verified
-artifact bytes. Reconcile the affected entry under the existing authorization without erasing the original observation or
-declaring a fresh baseline to be the old run. Scout never deletes caches; Bootstrap owns cache-free atomic installation.
+Recheck the Phase 0 Skill/cache baseline at delivery. Retain attribution and execution-identity limits with their actual
+window; preserve independently supported artifacts. Do not turn an unverified past window into a privacy failure or a pass.
 
 Terminal meanings:
 
