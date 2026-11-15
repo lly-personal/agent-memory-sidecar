@@ -15,7 +15,7 @@ from typing import Any, Callable, Iterable
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.19.7"
+SKILL_VERSION = "5.19.8"
 PROJECT_CONTRACT = "global_owner_scout_project_v7"
 NATIVE_PROJECT_CONTRACT = "global_owner_scout_project_v8"
 MAP_PROJECT_CONTRACT = "global_owner_scout_project_v6"
@@ -820,6 +820,9 @@ def describe_input(kind: str) -> dict[str, Any]:
                 required_keys=sorted(PROJECT_INPUT_KEYS | {'purpose', 'project_map'} if project else REVIEW_INPUT_KEYS),
                 purpose_choices=['inspect', 'review'] if project else None,
                 semantic_input='Use current source-backed claims, evidence refs and coverage; no inferred defaults.')
+    field = 'project_claim_hash' if project else 'review_pack_hash'
+    result['hash_helpers'] = {field: dict(script='scripts/validate_output.py',
+        flag='--hash-project-card' if project else '--hash-review-pack')}
     if native:
         result['native_session_coverage_keys'] = sorted(NATIVE_COVERAGE_KEYS)
         result['history_guarantee'] = 'observed scopes only; history completeness unknown; review remains degraded'

@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.6.13 | 0.6.13 | 1.11.9 | 2.5.11 | 5.19.8 | v8 | 3.11–3.13 |
 | v0.6.12 | 0.6.12 | 1.11.8 | 2.5.10 | 5.19.7 | v8 | 3.11–3.13 |
 | v0.6.11 | 0.6.11 | 1.11.7 | 2.5.9 | 5.19.6 | v8 | 3.11–3.13 |
 | v0.6.10 | 0.6.10 | 1.11.6 | 2.5.8 | 5.19.5 | v8 | 3.11–3.13 |
@@ -139,3 +140,5 @@ Scout 5.19.5 recovers artifact data from the original structured manifest, with 
 Scout 5.19.6 moves the existing cache baseline to Phase 0 and distinguishes a missed past baseline from proved privacy/mutation failures. It points project identity to the existing canonical Bootstrap inspection rather than raw-remote hashing; historical identity and artifact/currentness claims remain separate. Plugin 1.11.7 and Bootstrap 2.5.9 synchronize the method identities for Core 0.6.11. No new schema, permission, gate, storage or automatic qualification is introduced; natural behavior remains unverified.
 
 Scout 5.19.7 separates successful clipped-field recovery from rejected native requests and extends the existing source-first review to map semantics, source-derived paths and intervention attribution. Plugin 1.11.8 and Bootstrap 2.5.10 carry the same method with Core 0.6.12. Result schemas, runtime algorithms, permissions and models are unchanged. Semantic samples and controlled review do not qualify complete natural handoff.
+
+Scout 5.19.8 reads Windows terminal frames through CR or LF without requiring EOF and advertises the existing Card/Pack hash helpers through `describe-input`. Plugin 1.11.9 and Bootstrap 2.5.11 synchronize these changes for Core 0.6.13. Project v7, Review Pack v8 and Delivery v2 remain compatible; hashes do not establish source correctness or natural adoption.

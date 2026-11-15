@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -10,11 +11,14 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import nullcontext
+from types import SimpleNamespace
 from unittest import mock
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'skills/global-owner-scout/scripts'
 sys.path.insert(0, str(SCRIPTS))
 import history_import
+import scout
 from validate_output import ContractError
 
 
@@ -58,6 +62,30 @@ class NativeObjectCaptureTests(unittest.TestCase):
         self.assertEqual(index['page'], self.page['page'])
         self.assertTrue(index['truncation_paths'])
         self.assertEqual(json.loads(Path(index['native_file']).read_bytes()), self.page)
+
+    def test_windows_terminal_frame_finishes_on_cr_or_lf_without_text_eof(self):
+        data = json.dumps(self.returned, ensure_ascii=False).encode('utf-8')
+        split = data.index('中文'.encode('utf-8')) + 1
+        for ending in (b'\r', b'\n', b'\r\n'):
+            with self.subTest(ending=ending):
+                raw = mock.Mock()
+                raw.read.side_effect = [data[:split], data[split:] + ending]
+                stdin = mock.Mock(buffer=SimpleNamespace(raw=raw))
+                stdin.isatty.return_value = True
+                stdin.readline.side_effect = BlockingIOError('text reader is waiting for EOF')
+                stdout, stderr = io.StringIO(), io.StringIO()
+                args = ['scout.py', 'capture-native', '--input-line', '--artifact-dir', str(self.output),
+                        '--protected-root', str(self.project)]
+                with mock.patch.object(scout, 'os', SimpleNamespace(name='nt')), \
+                     mock.patch.object(scout, 'native_line_input', nullcontext), \
+                     mock.patch.object(scout, 'configure_utf8_stdio'), \
+                     mock.patch.object(sys, 'argv', args), mock.patch.object(sys, 'stdin', stdin), \
+                     mock.patch.object(sys, 'stdout', stdout), mock.patch.object(sys, 'stderr', stderr):
+                    result = scout.main()
+                self.assertEqual(result, 0, stderr.getvalue())
+                receipt = json.loads(stdout.getvalue().splitlines()[-1])
+                self.assertEqual(json.loads(Path(receipt['raw_file']).read_bytes()), self.returned)
+                self.assertNotIn('large evidence', stdout.getvalue())
 
     def test_capture_error_and_index_does_not_qualify_history(self):
         for value in [dict(isError=True, content=[dict(type='text', text='original failure')]),
