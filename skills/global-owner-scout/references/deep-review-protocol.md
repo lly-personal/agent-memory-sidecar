@@ -381,6 +381,10 @@ Create engineering or rule-candidate Project Cards with their appropriate fields
 `project_claim_hash` over every semantic field. Validate the entire Project result before global comparison.
 Compute `normalized_evidence_hash` from the exact canonical `direct_evidence`
 array. Preserve the validated project object; integration adds previews only.
+Use the existing `scripts/validate_output.py --hash-project-card` helper on each completed Card after its evidence hash is
+set; `describe-input project` exposes that command. After integration, `--hash-review-pack` hashes the completed Pack.
+Both consume UTF-8 JSON on stdin with `python -B`; neither fills semantic fields nor repairs a wrong supplied hash during
+validation. Use the resulting object with `scout.py prepare-review --input-file`, then continue the existing delivery sequence.
 Zero cards require nonempty, evidenced dispositions; never fill a no-delta result
 with an empty inventory or claim exhaustive knowledge beyond the declared scope.
 

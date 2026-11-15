@@ -3,6 +3,12 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.13 (2026-11-15)
+
+- Receive native JSON through a Windows terminal as soon as CR or LF arrives, without waiting for EOF or clipping long Unicode input.
+- Make the existing Card and Review Pack hash commands discoverable through `describe-input`, and explain their order before preparation and delivery.
+- Components: Core 0.6.13, Plugin 1.11.9, Bootstrap 2.5.11 and Scout 5.19.8; existing result formats and semantic validation remain unchanged, and complete natural handoff remains unverified.
+
 ## 0.6.12 (2026-11-15)
 
 - Recover successful clipped native fields by increasing the permitted per-item allowance on the same source/cursor; handle actual rejected requests by their schema/error instead of treating both as one capacity failure. Preserve unfinished work and unknown stopping causes.

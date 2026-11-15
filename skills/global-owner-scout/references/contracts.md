@@ -20,6 +20,11 @@ project. Missing containment blocks; it never loosens system security or retries
 Use `--input-file` with existing validation/preparation commands. `describe-input project|review` describes Codex v7/v8;
 `describe-input native-project|native-review` describes Pi/Claude v8/v9, including observed-only coverage. Both use the
 shared validator. These helpers do not synthesize missing semantic evidence.
+`describe-input` also advertises the existing hash helper's Skill-relative script and flag. Send one completed Project Card
+to `python -B scripts/validate_output.py --hash-project-card`, or the completed Review Pack to
+`python -B scripts/validate_output.py --hash-review-pack`, as UTF-8 JSON on stdin. Copy only the returned derived field into
+that same object, then validate it through `scout.py`. Hash calculation does not validate identity, refs, claims or language,
+and preparation still rejects an incorrect supplied hash. Freeze source-backed fields before hashing; do not fill them from examples.
 
 New results use Project v7, Review Pack v8 and Delivery v2. Historical Project v5/v6 and Review Pack v6/v7
 remain readable; do not rewrite old artifacts or infer a missing map. The definitions below remain the review lane's shared

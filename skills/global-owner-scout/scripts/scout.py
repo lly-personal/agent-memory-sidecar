@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
@@ -250,7 +251,19 @@ def main() -> int:
                 history_output_root(args.artifact_dir, args.protected_root)
                 with native_line_input():
                     print('{"status":"awaiting_native_object","framing":"one_utf8_json_line"}', flush=True)
-                    value = json.loads(sys.stdin.readline())
+                    if os.name == 'nt' and sys.stdin.isatty():
+                        # Raw console input returns CR; the text reader can wait for EOF.
+                        frame = bytearray()
+                        while True:
+                            chunk = sys.stdin.buffer.raw.read(io.DEFAULT_BUFFER_SIZE)
+                            if not chunk:
+                                break
+                            frame.extend(chunk)
+                            if b'\r' in chunk or b'\n' in chunk:
+                                break
+                        value = json.loads(bytes(frame).split(b'\r', 1)[0].split(b'\n', 1)[0].decode('utf-8'))
+                    else:
+                        value = json.loads(sys.stdin.readline())
             else:
                 value = load_input()
             print(json.dumps(capture_native(value, artifact_dir=args.artifact_dir,

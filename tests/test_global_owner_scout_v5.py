@@ -55,6 +55,26 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         finally:
             sys.path.pop(0)
 
+    def test_described_hash_helpers_work_without_filling_semantic_fields(self):
+        validator = self.scout_validator
+        project = validator.valid_project(card_count=1)
+        pack = validator.valid_review_pack(project)
+        for kind, value, field in [('project', project['project_cards'][0], 'project_claim_hash'),
+                                   ('native-project', project['project_cards'][0], 'project_claim_hash'),
+                                   ('review', pack, 'review_pack_hash'), ('native-review', pack, 'review_pack_hash')]:
+            with self.subTest(kind=kind):
+                described = subprocess.run([sys.executable, '-B', str(SCOUT_RUNTIME), 'describe-input', kind],
+                    capture_output=True, text=True, encoding='utf-8', check=True)
+                helper = json.loads(described.stdout)['hash_helpers'][field]
+                payload = dict(value, **{field: ''})
+                before = json.dumps(payload, ensure_ascii=False)
+                hashed = subprocess.run([sys.executable, '-B', str(SCOUT_SCRIPTS.parent / helper['script']), helper['flag']],
+                    input=before, capture_output=True, text=True, encoding='utf-8', check=True)
+                self.assertEqual(json.loads(hashed.stdout), {field: value[field]})
+        pack['review_pack_hash'] = '0' * 64
+        with self.assertRaises(validator.ContractError):
+            validator.validate_review_pack(pack)
+
     def bind_managed_owner(
         self,
         codex_home: Path,
@@ -96,12 +116,12 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.5.10",
+                "version": "2.5.11",
                 "content_sha256": "b" * 64,
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.19.7",
+                "version": "5.19.8",
                 "content_sha256": "c" * 64,
             },
         }
@@ -848,8 +868,8 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         desired = {
             "release_ref": "v0.3.10", "source_commit": "a" * 40,
             "core_version": "0.3.10", "plugin_version": "1.5.1", "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.5.10", "bootstrap_sha256": "c" * 64,
-            "scout_version": "5.19.7", "scout_sha256": "d" * 64,
+            "bootstrap_version": "2.5.11", "bootstrap_sha256": "c" * 64,
+            "scout_version": "5.19.8", "scout_sha256": "d" * 64,
         }
         source_sha = "e" * 64
         pack = self.managed_sources.build_deployment_pack(
@@ -866,15 +886,15 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             host_materialization={
                 "core": {"status": "verified", "version": "0.3.10", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
                 "global_binding": "unavailable", "doctor": "verified",
-                "bootstrap_skill": {"status": "unchanged", "version": "2.5.10", "content_sha256": "c" * 64},
-                "scout_skill": {"status": "unchanged", "version": "5.19.7", "content_sha256": "d" * 64},
+                "bootstrap_skill": {"status": "unchanged", "version": "2.5.11", "content_sha256": "c" * 64},
+                "scout_skill": {"status": "unchanged", "version": "5.19.8", "content_sha256": "d" * 64},
             },
             requires_reload=True,
             consumer_verified=False,
             generated_at="2026-08-21T12:00:00+08:00",
         )
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("2.5.10", validated["desired_bundle"]["bootstrap_version"])
+        self.assertEqual("2.5.11", validated["desired_bundle"]["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
         for label in ("期望发行身份", "Plugin 分发", "能力源同步", "主机物化", "项目消费者范围", "消费者入口条件"):
             self.assertIn(label, rendered)
@@ -920,7 +940,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
                 json.loads(text),
                 expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
             )
-            self.assertEqual("v0.6.12", value["plugins"][0]["source"]["ref"])
+            self.assertEqual("v0.6.13", value["plugins"][0]["source"]["ref"])
         else:
             self.assertTrue(
                 (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()
@@ -1055,7 +1075,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_v5_prompt_has_no_fixed_binding(self) -> None:
         prompt = (
             "Use $global-owner-scout in project_scout mode for the current bound project; rolling 72 hours; "
-            "Skill 5.19.7; global_owner_scout_project_v7; global_owner_scout_review_pack_v8; "
+            "Skill 5.19.8; global_owner_scout_project_v7; global_owner_scout_review_pack_v8; "
             "gpt-5.6-sol; medium; read-only."
         )
         self.bootstrap.validate_prompt(prompt)
@@ -2209,7 +2229,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             target = Path(temporary) / "global-owner-scout"
             source = ROOT / "skills" / "global-owner-scout"
             installed = self.bootstrap.install_skill(source, target)
-            self.assertEqual("5.19.7", installed["version"])
+            self.assertEqual("5.19.8", installed["version"])
             helper = target / "scripts" / "prepare_delivery.py"
             dispatcher = target / "scripts" / "scout.py"
             self.assertTrue(helper.is_file())
