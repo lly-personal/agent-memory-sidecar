@@ -5,7 +5,12 @@ import hashlib
 import html
 import json
 import re
+import sys
 from pathlib import Path
+
+_SCRIPT_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
 
 from validate_output import (ContractError, canonical_json, require, require_exact_keys,
     require_list, require_object, require_string, validate_iso)

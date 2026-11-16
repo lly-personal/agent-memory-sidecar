@@ -129,10 +129,14 @@ def version_facts(root: Path = ROOT) -> dict[str, str]:
     bootstrap_skill_match = re.search(r"Skill version:\s*`([^`]+)`", bootstrap_skill_text)
     scout_text = (root / "skills" / "global-owner-scout" / "SKILL.md").read_text(encoding="utf-8")
     scout_match = re.search(r"Skill version:\s*`([^`]+)`", scout_text)
+    validator_text = (
+        root / "skills" / "global-owner-scout" / "scripts" / "validate_output.py"
+    ).read_text(encoding="utf-8")
+    validator_match = re.search(r'^SKILL_VERSION\s*=\s*"([^"]+)"', validator_text, re.MULTILINE)
     require(
         all(match is not None for match in (
             bootstrap_match, managed_scout_match, enrollment_bootstrap_match,
-            enrollment_scout_match, bootstrap_skill_match, scout_match,
+            enrollment_scout_match, bootstrap_skill_match, scout_match, validator_match,
         )),
         "release_component_version_missing",
     )
@@ -141,7 +145,7 @@ def version_facts(root: Path = ROOT) -> dict[str, str]:
         "release_bootstrap_version_mismatch",
     )
     require(
-        len({managed_scout_match.group(1), enrollment_scout_match.group(1), scout_match.group(1)}) == 1,
+        len({managed_scout_match.group(1), enrollment_scout_match.group(1), scout_match.group(1), validator_match.group(1)}) == 1,
         "release_scout_version_mismatch",
     )
     facts = {

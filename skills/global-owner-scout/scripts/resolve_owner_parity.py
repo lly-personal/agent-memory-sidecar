@@ -7,12 +7,16 @@ import hashlib
 import json
 import os
 import sqlite3
-import stat
 import sys
 import tempfile
 from pathlib import Path
 from typing import Any
 
+_SCRIPT_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+
+from scout_security import is_physical_directory, is_physical_file
 from utf8_stdio import configure_utf8_stdio
 
 
@@ -45,35 +49,6 @@ def parity_result(status: str, canonical_hash_value: str | None, local_hash_valu
 
 def unavailable() -> dict[str, Any]:
     return parity_result("unavailable", None, None)
-
-
-def is_physical_directory(path: Path) -> bool:
-    try:
-        value = path.lstat()
-    except OSError:
-        return False
-    attributes = getattr(value, "st_file_attributes", 0)
-    reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
-    return (
-        stat.S_ISDIR(value.st_mode)
-        and not stat.S_ISLNK(value.st_mode)
-        and not bool(attributes & reparse)
-    )
-
-
-def is_physical_file(path: Path) -> bool:
-    try:
-        value = path.lstat()
-    except OSError:
-        return False
-    attributes = getattr(value, "st_file_attributes", 0)
-    reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
-    return (
-        stat.S_ISREG(value.st_mode)
-        and not stat.S_ISLNK(value.st_mode)
-        and not bool(attributes & reparse)
-        and value.st_nlink == 1
-    )
 
 
 def read_binding(store: Path) -> Path | None:

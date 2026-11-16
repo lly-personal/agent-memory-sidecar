@@ -316,6 +316,7 @@ Anchor 先验证 immutable Release，再从 verified portable 的 Core wheel 调
 
 状态包含 `planned`、`reload_required`；后者仅表示本机文件与绑定回读成功，其他设备和采用始终单列未验证。
 同一设备显式授权发布并同步时复用此链，不新增复制脚本。完整 Codex 能力安装仍遵循下一节的独立契约。
+跨宿主能力遵循 [ADR 0083](../decisions/0083-multihost-capability-ladder.zh.md)：Pi 与 Claude Code 当前仅覆盖 L1（全局规范同步）与 L2（只读 Scout 工程审阅），未通过正式 ADR 批准“不可伪造的宿主原生确认原语”前不得开放 L3（规则审批/写入）或 Hook，且明令禁止关键词/自然语言匹配替代授权。
 
 ### Workstation Bootstrap 与 Host Enrollment
 
@@ -510,7 +511,7 @@ $global-owner-scout 复盘当前项目
 原生任务的 `projectId` 可缺失或为 null；同主机原生任务 `cwd` 与项目清单中的唯一 Git 根一致，或有已证 worktree
 归属时，仍可确定目标。非空编号与目录冲突、多重匹配或原生上下文缺失才阻断；单独 shell cwd、名称或提示词路径不构成绑定。
 会话普查使用相同关联规则，不能因可选成员编号为空而漏掉自然任务。
-通过已安装 Skill 的绝对 `scripts/scout.py` 路径执行 `inspect-context --project-root <bound-project-root>`；`-B` 禁止字节码写入。
+通过已安装 Skill 的绝对 `scripts/scout.py` 路径可先执行只读 `preflight-summary --host codex|pi|claude --purpose review|inspect` 获取 `global_owner_scout_preflight_summary_v1` 契约索引（零文件与零 Git 读取），再执行 `inspect-context --project-root <bound-project-root>`；`-B` 禁止字节码写入。
 Local 或已有 worktree 均原地完成只读复盘，不强制新建聊天或执行快照。用户不用重复调用或处理内部调度。
 先检查 `environment_context.filesystem.workspace_roots` 和明确的宿主输出元数据，再运行 `inspect-output`；
 不能因一个工具没给目录就宣布没有授权，也不能根据熟悉的路径模式构造输出位置。
@@ -876,7 +877,7 @@ Store、常驻规则或独立更新器。正常工程任务按需选择方法，
 状态声明固定使用以下证据阶梯，禁止跨级：`designed -> implemented -> installed -> production_proven ->
 longitudinally_effective`，并按入口分别报告。Fresh 反例已撤销旧的三个 inline canary 交付层证明；当前必须报告
 `interactive_project_scout=production_unproven`，直到当前安装入口的真实体验被观察；技术交付与排队展示分别报告；`scheduled_project_scout=production_blocked / PAUSED / 0 of
-14`，`owner_continuity=adoption_unproven`。跨设备冷启动只有空 profile 与受管源契约验收时必须报告
+14`，`owner_continuity=adoption_unproven`；上述 Scheduled 状态与日常交互式复盘及 Core 验收完全解耦，不会阻断交互式使用。跨设备冷启动只有空 profile 与受管源契约验收时必须报告
 `cross_host_bootstrap=implementation_verified / production_unproven`，直到真实第二台设备完成首次加载、Doctor 与
 交互 canary；不得用任一主机或入口的测试替代另一主机或入口的生产证明。
 

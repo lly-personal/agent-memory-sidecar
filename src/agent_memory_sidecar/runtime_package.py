@@ -27,6 +27,7 @@ _RUNTIME_MODULES = frozenset(
         "event_policy.py",
         "file_security.py",
         "identity.py",
+        "instruction_document.py",
         "instructions.py",
         "proposal.py",
         "rule_preview.py",

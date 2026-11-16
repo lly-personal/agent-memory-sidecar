@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic identity, validation, installation, and rendering for Bootstrap 1.9."""
+"""Deterministic identity, validation, installation, and rendering for Bootstrap 2.5.11."""
 
 from __future__ import annotations
 
@@ -11,13 +11,24 @@ import os
 import re
 import shutil
 import stat
-import subprocess
 import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
+
+_SCRIPT_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+
+from bootstrap_security import (
+    is_reparse as _security_is_reparse,
+    is_trusted_host_directory_alias as _security_trusted_alias,
+    logical_absolute as _security_logical_absolute,
+    run_git as _security_run_git,
+    validate_physical_directory_chain as _security_validate_chain,
+)
 
 
 PACK_VERSION = "global_owner_scout_enrollment_pack_v1"
@@ -123,12 +134,12 @@ def normalize_remote(raw: str) -> str:
 
 
 def run_git(path: Path, *args: str) -> str:
-    completed = subprocess.run(
-        ["git", "-C", str(path), *args], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
+    return _security_run_git(
+        ["-C", str(path), *args],
+        cwd=path,
+        error_code=f"git {' '.join(args)} failed",
+        error_cls=ContractError,
     )
-    if completed.returncode != 0:
-        raise ContractError(completed.stderr.strip() or f"git {' '.join(args)} failed")
-    return completed.stdout.strip()
 
 
 def inspect_project(path: Path, display_name: str, host_project_ref: str) -> dict[str, Any]:
@@ -276,14 +287,11 @@ def validate_profile(obj: Any) -> dict[str, Any]:
 
 
 def _logical_absolute(path: Path) -> Path:
-    return Path(os.path.abspath(os.fspath(path.expanduser())))
+    return _security_logical_absolute(path)
 
 
 def _is_reparse(value: os.stat_result) -> bool:
-    return bool(
-        getattr(value, "st_file_attributes", 0)
-        & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
-    )
+    return _security_is_reparse(value)
 
 
 def _is_trusted_host_directory_alias(
@@ -292,42 +300,16 @@ def _is_trusted_host_directory_alias(
     *,
     platform: str | None = None,
 ) -> bool:
-    platform = os.name if platform is None else platform
-    logical = Path(path)
-    return bool(
-        platform == "posix"
-        and stat.S_ISLNK(value.st_mode)
-        and getattr(value, "st_uid", -1) == 0
-        and logical.parent == Path(logical.anchor)
-    )
+    return _security_trusted_alias(path, value, platform=platform)
 
 
 def _assert_directory_chain(path: Path, *, allow_missing_tail: bool) -> None:
-    logical = _logical_absolute(path)
-    cursor = Path(logical.anchor)
-    for part in logical.parts[1:]:
-        cursor = cursor / part
-        try:
-            value = cursor.lstat()
-        except FileNotFoundError:
-            if allow_missing_tail:
-                return
-            raise ContractError("Skill path ancestor is missing")
-        alias = stat.S_ISLNK(value.st_mode) or _is_reparse(value)
-        if alias and _is_trusted_host_directory_alias(cursor, value):
-            try:
-                resolved_value = cursor.resolve(strict=True).stat()
-            except OSError as exc:
-                raise ContractError("trusted host directory mapping cannot be resolved") from exc
-            require(
-                stat.S_ISDIR(resolved_value.st_mode),
-                "trusted host directory mapping is not a directory",
-            )
-            continue
-        require(
-            stat.S_ISDIR(value.st_mode) and not alias,
-            "Skill path ancestor is not a physical directory",
-        )
+    _security_validate_chain(
+        path,
+        allow_missing_tail=allow_missing_tail,
+        error_code="Skill path ancestor is not a physical directory",
+        error_cls=ContractError,
+    )
 
 
 def _skill_files(root: Path) -> list[Path]:
@@ -443,7 +425,7 @@ def render_pack(obj: Any) -> str:
         "",
         "## 主动项目复盘入口",
         "",
-        "已可在任一目标 Git 工程的当前项目任务中发送 `$global-owner-scout 复盘当前项目`。Scout 会在深挖前自动投影隔离 worktree 执行，用户无需手工创建或重复指令。该入口无需 Host Enrollment；下方 Scheduled 项目发现仅用于信息展示或以后显式复测。",
+        "已可在任一目标 Git 工程的当前项目任务中发送 `$global-owner-scout 复盘当前项目`。交互式复盘直接在当前绑定项目任务中只读完成，无需新建聊天或 worktree；该入口无需 Host Enrollment；下方 Scheduled 项目发现仅用于信息展示或以后显式复测。",
         "",
         "## 本机项目概览",
         "",

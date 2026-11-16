@@ -45,6 +45,7 @@ ACTIVE_DOCUMENTS = (
     ROOT / "docs" / "decisions" / "0080-consumer-visible-skill-scope-reconciliation.zh.md",
     ROOT / "docs" / "decisions" / "0081-capacity-preflight-and-owner-delivery.zh.md",
     ROOT / "docs" / "decisions" / "0082-installed-memory-command-entry.zh.md",
+    ROOT / "docs" / "decisions" / "0083-multihost-capability-ladder.zh.md",
     ROOT / "specs" / "README.md",
     ROOT / "specs" / "agent-memory-core-v1.md",
     ROOT / "specs" / "public-distribution-v1.md",

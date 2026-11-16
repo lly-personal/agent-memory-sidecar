@@ -2,95 +2,30 @@
 
 ## Evidence posture
 
-Session content discovers leads; current project Owners, ADR/specs, Git, tests, runtime facts, and acceptance corroborate them. A
-summary is not proof. Missing Session access is a coverage limitation, not evidence that no learning exists. Keep fact, inference,
-and unproven claim separate.
+Session content discovers leads; current project Owners, ADR/specs, Git, tests, runtime facts, and acceptance corroborate them. Summaries are never proof. Missing Session access is a coverage limitation, not proof that no learning exists. Keep facts, inferences, and unproven claims separate.
 
 ## Phase 0: current-task context
 
-Before the first helper, capture the user-level Skill directory bytecode-cache baseline. Retain before/after evidence and
-attribute any difference: an attributable helper write still fails read-only validation. `-B` suppresses automatic generation
-but can read valid cached code, so source hashes or absence of an attributed write do not alone prove execution identity.
-If the initial baseline was missed, preserve the affected past window as unverified; a present observation starts a new window,
-never reconstructs the old one. Missing evidence alone does not establish privacy/integrity failure or helper mutation. Continue
-unaffected authorized reads and complete their actual validation; stop only affected unsafe operations or unsupported claims.
-Do not automatically grant pass/degraded or substitute this observation for the required coverage and result checks.
-Scout never deletes caches or resets the old baseline; Bootstrap owns cache-free atomic installation.
-
-Follow SKILL.md preflight before evidence reads: resolve the current native project, installed Skill, explicit output grant and
-an available Python 3 runtime. Use the absolute dispatcher with `-B` and `inspect-context --project-root <bound-project-root>`;
-helper cwd is never project authority. Keep the full snapshot hash before and after, including untracked contents. Interactive
-reviews use Local or the existing worktree without creating a new task. Scheduled experiments retain their isolated worktree.
-For interactive delivery, read the host-injected environment roots before declaring output unavailable; a path pattern alone never proves a grant.
-`inspect-output` checks the exact granted root without writes. Recheck at delivery. Missing binding/Git/output capability uses
-Terminal v1 before deep work; a changed snapshot invalidates stability without attributing an unproved mutation to Scout.
-Scheduled retains its verified inline/Inbox surface and has no artifact-root or file-preview prerequisite.
-
-Native-session candidate adapters are defined in contracts.md. Pi uses the current ExtensionContext, Claude the current
-native init stream programmatically or the ordinary Skill's distinct native substitution context; mechanically pass those to
-`inspect-native` before history. The latter also checks inherited execution cwd against the native startup project; do not
-change cwd to make a mismatch pass. A current, explicitly user-selected output root
-is also allowed; inspect the actual native request/selection, never grant from a model assertion or quoted path.
-For Pi/Claude review use Project v8/Pack v9 native scopes, preserve the original SDK records and expose unknown/error coverage.
-Do not fabricate Codex active/archived partitions, EOF or completed task histories. Current active-turn snapshots remain usable;
-the native turn observer does not require the whole chat to finish or prove business success. The Codex procedure below stays unchanged.
+- Before deep reads, run `python -B scripts/scout.py preflight-summary --host codex|pi|claude --purpose review|inspect` for deterministic contract versions and command order without reading files or Git.
+- Capture the user-level Skill directory bytecode-cache baseline before the first helper. Always pass `python -B`; attributable helper cache writes fail read-only validation, while missed initial baselines leave the past window unverified without blocking unaffected reads. Never delete caches or replace baselines.
+- Resolve native project binding, installed Skill, explicit external output grant (`filesystem.workspace_roots`, host output metadata, or explicit current-turn user selection), and Python 3 runtime once. Run `inspect-context --project-root <bound-project-root>` (never infer project from helper `cwd`) and `inspect-output --artifact-dir <granted-root> --protected-root <bound-project-root>` before deep work. Missing binding, Git eligibility, or output grant returns `Terminal v1` immediately.
+- Pi/Claude use `inspect-native` with live `ExtensionContext` / `system/init` / `claude_skill_substitution` (never `cd` to hide startup-vs-current Git root drift), Project v8 / Pack v9 (`degraded`, `observed_only` SDK scopes), and `observePiTurn`/`observeClaudeTurn` (active-turn snapshots remain usable).
+- Scheduled (paused) retains isolated worktree + inline/Inbox verification and needs no artifact root or file preview.
 
 ## Phase 1: identity and task census
 
-1. Derive identity and freeze the 30-day start/end from the current Desktop binding; never a prompt-supplied path or allowlist.
-   Native task cwd plus one matching same-host inventory Git root is sufficient when projectId is absent/null. A conflicting
-   non-null ID, ambiguous root or unproved worktree relation is not. Use this same evidence rule for task association below;
-   missing optional project membership metadata does not discard natural project work.
-2. Use native history with source `codex`, current host, limit 50; enumerate active and archived partitions separately. Follow
-   the returned `nextCursor` with unchanged host/source/archive selection until EOF or a proved window boundary. Stop at a
-   window boundary only when the history's ordering and all relevant entries on the page are older than the frozen start;
-   a pinned/recent list or one old item is not sufficient. Deduplicate task identity across pages before counting. Record
-   `index_pages_read` and `index_terminals.active/archived`; unavailable history remains bounded/degraded, not a complete census.
-3. Resume a yielded cell to its actual terminal result before another call; use bounded waits so the user is not left without
-   progress. Retain and diagnose rejected calls and local transfer/parse errors. If the same source and cursor can be recovered
-   within the original authorization and retry limits, correct the call and continue; unfinished work alone is not a failure.
-   An unrecovered cell, lost source provenance or unrecovered interruption is `execution_protocol_failed`; explicit terminal
-   index failure is `native_index_terminal_failure`. Never hide the original error or invent missing pages.
-4. Associate natural tasks by native project identity or proved worktree origin. Exclude dedicated Scout, test, Scheduled and
-   delegated tasks. In a mixed engineering/Scout task, retain natural work turns before the frozen invocation boundary and exclude
-   Scout-generated review/acceptance turns; never drop the whole current task because it also invokes Scout. Page selected tasks to the frozen boundary or EOF using `read_thread`; begin with one turn and bounded
-   output. Separate a rejected capacity request from a successful response with clipped fields. For a successful clipped page,
-   retain it and reread the same source/cursor with outputs included and a larger per-item allowance permitted by the current
-   native schema; reduce turns per page when needed to keep the aggregate return usable. A smaller per-item allowance cannot
-   recover clipped text. Compare stable item IDs and the actual truncation flags, retain both observations, and read the recovered
-   passages. On an explicit capacity error, retry the same cursor once with a smaller valid request; if it still fails, record
-   `native_thread_pages_terminal_failure` and the exact unread scope. A successful
-   page with fields still truncated after available native reads uses that same compatibility enum, with the actual successful
-   return and missing fields stated in `coverage/uncovered` and `limitations`, not a claimed native exception. Preserve earlier
-   failed attempts even after recovery. Do not change cursor, omit a failed page, or use transcript files.
-5. Count discovered, in-window, selected and fully read tasks. `complete` requires both history partitions to reach
-   `window_boundary/eof` plus every selected task read to boundary/EOF. `bounded` means history remains incomplete but selected
-   reads completed. `degraded` exposes explicit failures or unrecoverable selected-content truncation. Remaining pages, unfinished
-   synthesis or successfully imported bytes are work to continue, not evidence of an external blocker. Do not finalize merely
-   because a helper completed. Record an actual stop condition and its scope when execution cannot continue; do not invent a
-   reason for an earlier premature stop. The current active-turn snapshot is sufficient; later concurrent
-   updates are outside the frozen observation, not a reason to wait for the task to finish.
-6. No transcript parser, database, background queue, task polling service or automation memory substitutes for native evidence.
-
-Preserve each actual return object before printing it: in Codex host orchestration call
-`store("scout-native-page", result)` immediately after the real reader returns, then expose only the needed metadata.
-Do not print a whole mixed batch as its only retained copy. Use a native data-file writer or the existing
-dispatcher's `capture-native` below; do not embed large pages in executable JavaScript or split code to avoid
-host review-size limits. Pass a captured thread page to `import-history --input-file`; seal each page once,
-reuse its native_file/hash and preserve original cursors/truncation. Never transcribe raw history in model-written
-JSON chunks. Use `--input-file` for result validation/preparation and `describe-input` for current field requirements.
-For continuation, reuse the verified report and update only changed sources; do not restart its census.
+1. Derive `project_identity` (`enrollment.py inspect-project`) and freeze the 30-day window from Desktop binding (`projectId` or unique native `cwd` / worktree origin match against same-host inventory Git root; reject conflicting non-null IDs or ambiguous matches).
+2. Codex lists `list_threads(source=codex, limit=50)` across `active` and `archived` separately to the proved window boundary or EOF (`limit=50` is per-page, never a total cap). Stop early only when page ordering proves all relevant entries precede window start. Deduplicate task IDs and record `index_pages_read` + `index_terminals.active/archived`.
+3. Resume every yielded cell to termination before advancing. Retain recoverable call/transfer errors and retry within the same source, cursor, and authorization; unrecovered cells, lost provenance, or interruptions fail with `execution_protocol_failed`. Explicit index terminal failures record `native_index_terminal_failure`.
+4. Associate natural tasks by native identity or proved worktree origin; exclude dedicated Scout, test, Scheduled, and delegated tasks. Keep prior natural work turns in mixed engineering/Scout chats (exclude Scout-generated turns). Page selected tasks with `read_thread` starting at `turnLimit=1` and bounded output:
+   - **Clipped successful page**: retain it and re-read the same cursor with outputs included and a larger valid per-item allowance (reducing turns/page if needed). Compare stable item IDs/truncation flags and retain both observations. If fields stay unrecoverably clipped, record `native_thread_pages_terminal_failure` with the actual cause and unread scope (`degraded`), not a claimed native exception.
+   - **Explicit capacity error**: retry the same cursor once with a smaller valid request; preserve earlier failed attempts even after recovery; if still rejected, record `native_thread_pages_terminal_failure` and unread scope.
+5. `complete` requires both partitions at boundary/EOF and all selected tasks read without truncation; `bounded` means unfinished partition + all selected tasks read; `degraded` exposes explicit failures or unrecoverable truncation. Remaining pages or imported bytes are work to continue, not an external blocker. Never substitute transcript parsers, databases, or automation memory.
+6. Retain every raw return object immediately in host code (`store("scout-native-page", result)` or native data writer) before summarizing. Feed thread pages through `import-history --input-file`, validate via `--input-file`, and query `describe-input` for required fields. Never transcribe large JSON via model chunks or split executable code to evade host size limits.
 
 ### Mechanical native-object transfer
 
-Resolve `pythonExecutable`, `scoutScript`, `artifactRoot`, `projectRoot` and `commandShell` (`posix` or
-`powershell`) from the actual current runtime, loaded Skill, checked output grant and native binding; the agent
-resolves them, not the user. This Codex host-code example consumes the object already retained by `store`.
-The command contains only literal arguments; the complete JSON goes through the owned process's stdin as data,
-so object size does not become shell command size. `--input-line` accepts one UTF-8 JSON line without waiting
-for terminal EOF. It disables echo and terminal line-size clipping only for that input stage and restores the
-previous terminal mode on normal exit, Ctrl-C and catchable POSIX SIGTERM; it does not change host
-configuration or permissions. Forced termination cannot run restoration, so close the entire owned terminal.
+Resolve `pythonExecutable`, `scoutScript`, `artifactRoot`, `projectRoot`, and `commandShell` (`posix` or `powershell`) from current runtime, loaded Skill, output grant, and native binding. All JSON passes through owned stdin (`--input-line` disables echo/line clipping temporarily and restores on exit/Ctrl-C/SIGTERM; on forced termination close the owned terminal):
 
 ```javascript
 const page = load("scout-native-page");
@@ -124,307 +59,55 @@ if (result.exit_code !== undefined) store("scout-capture-session", null);
 text({...result, output});
 ```
 
-Read the command's actual completion and returned capture receipt before treating the source as sealed.
-Keep the stored object and owned session on transfer failure and correct the same operation within its original
-authorization; do not advance the source cursor, replace the object with a summary or invent a native failure.
-On cancellation interrupt only that owned session and observe closure. A host data/transport limit remains a
-limit: retain it, use an available native data writer, and do not split executable payloads to evade review.
-Missing capture capability is reported precisely, not inferred
-from a tool-name search. `capture-native` writes only an immutable raw object; a history index is not a
-project-filtered task history, and an error object does not become a successful history page. Thread pages still
-go through `import-history --input-file <raw_file>` with their original session and project. Pi/Claude can keep
-their existing native capture route. No additional reader, permissions, Store or completion flag is introduced.
-An interrupted durable write may be reused only when the existing immutable bytes match. A partial or conflicting
-file remains a blocker to reconcile with its original evidence; do not overwrite it or retry indefinitely.
-
-Acquisition and comprehension are different. A tool batch that fetches pages and prints only counts has not exposed their
-meaning to the analysis pass. Read or surface the selected bounded passages, including the user's correction, actual action
-and result; retain exact source references in the existing evidence inventory. Mark unread or only summarized content as
-such. Full pagination is a transport result, not proof of whole-project analytical depth.
+Verify actual completion and `raw_file` before sealing. Interrupted partial files mismatching bytes stay blocked (do not overwrite). Always read selected bounded passages for meaning (`capture-native` and counts never prove comprehension).
 
 ## Phase 2: project fact reconstruction
 
-Start from user outcomes, not a catalogue of normative clauses. Reconstruct the engineering map before choosing lessons:
-identify goals and boundaries, actors and real entry points, critical journeys, module/tool consumers, state ownership,
-environment differences, failure/recovery/revoke paths, and the maintenance/release/deployment chain. Follow the actual handoffs
-through code, interfaces and available runtime evidence. For each critical path, explain preconditions, input/output,
-authorization, state transitions and failure recovery. A module inventory or correct documentation does not prove this path works.
-
-Use `project_map.nodes/edges/journeys` and coverage dimensions suited to this project's goals and risks. A relation claim can
-record the handoff's prerequisites and input/output; journey recovery names the actual entry and authorization boundary.
-Compare intended and effective behavior across relevant environments; installation, enablement, execution and adoption remain
-separate claims. Label design, implementation, observation, inference and unknown explicitly. Keep counterevidence and missing
-links visible. Do not fabricate a complete graph or demand a fixed number of cells. Semantic coverage is checked against user
-outcomes and source material, not node counts. No new recommendations is compatible with a useful engineering map.
-
-This is a reusable capability across target projects and environments. The Sidecar repository owns its implementation, not
-the reviewed project's topology. Order journeys by the reader's main outcome, then supporting/recovery paths; the overview first explains overall responsibilities and key relationships, not merely the first journey. Derive every label, step, owner and environment from the target evidence. Do not copy the example project's
-memory lifecycle, release mechanism or path counts into other projects, or draw a sequence between unrelated journeys.
-
-Before arranging the view, outline how a reader can connect the goal and boundary to the main responsibilities, a concrete
-entry-to-result path, and its maintenance or recovery point. Distinguish structural containment/dependency, execution handoffs
-and state authority; a flat inventory with identical arrows does not explain all three. Choose the representation by the
-question: grouped structure for responsibility, an ordered path for handoffs, a state view for recovery, or a matrix for actual
-environment/evidence comparisons. Do not force every relation into one graph or require a fixed layer/node count. Overview,
-path and matrix keep the same object/source identities and reading context. The main explanation remains readable without
-interaction; selection reveals relevant detail instead of requiring the reader to assemble the whole system across tabs.
-
-The mental model is goal -> actor and task -> action -> system effect -> downstream feedback -> recovery. For user-facing
-fields and controls, explain what to enter, what the action changes, when it takes effect, what other entries observe, and
-what remains unchanged where that distinction resolves a real confusion. Reuse node summaries, typed edge claims and journey
-outcome/recovery; do not add a parallel scenario store. A path that only names modules is insufficient even if every link works.
-Show the consequence claims on the normal path, not only in an expert relationship tab. Distinguish promised behavior from
-observed behavior and unknowns in place. Legitimate architectural choices explain why to retain or change a boundary;
-prohibited shortcuts are counterexamples, not alternative solutions used to make the preferred option look inevitable.
-
-Use the current installed `visualize` contract when an inline explorable explanation helps the user. It owns transport and
-host interactions, while this Skill owns source interpretation. Choose an appropriate presentation; the existing overview renderer is one reusable option, not a universal format.
-Learn from the visual language and interaction of actual user-accepted presentations without assuming that the user approved
-their content structure. Compare hierarchy, spacing, control clarity, selection feedback and continuity in the current host.
-Choose the content structure separately from the actual reader question. The diagram is an optional view of the same facts. Keep the initial content coherent,
-progressively expose relationships, and preserve location and return. Do not require another tool or installation when the
-native surface is absent; use the same Markdown and current chat. Positive presentation feedback does not pass content depth.
-
-Before styling, prioritize the reader's questions and content/actions: what the project accomplishes, how its main journey
-works, how supporting capabilities connect, then the selected object's evidence, exceptions and maintenance. Use that priority
-to choose type hierarchy, alignment, proximity and visual emphasis in the existing template. Avoid equal-weight module grids
-or a permanent stack of overview, navigation, path and every detail. Progressive disclosure preserves context and return paths;
-it does not remove difficult relations from coverage. Public designer discussions and design systems can challenge this choice,
-but record the concrete transferred decision and its limits instead of copying a brand, adding a dependency or treating a source's
-reputation as acceptance. Keep source-backed design principles in the existing presentation contract, not a parallel style authority.
-
-Use the current host's presentation contract and choose capabilities by explanatory value. The existing renderer may be reused when it fits; a native alternative may be frozen through Delivery's visual-input. Text and static comparisons do not require interactive UI. Upstream templates or guideline servers are research
-inputs, not proof of host compatibility or a reason to add a renderer, client or MCP. Verify a concrete missing capability at its
-consumer before reuse; omit interactions and decorative structure that add no observable value. Keep semantic coverage, layout
-checks and user comprehension separate. Explicit design rejection remains a failed review, even when technical checks pass;
-preserve the unaffected evidence. The current [presentation contract](https://github.com/lly-personal/agent-memory-sidecar/blob/main/docs/specs/interface.md#project-scout-global_owner_scout_project_v7)
-and M1 evaluation own these requirements; do not create another design checklist or regenerate an immutable report to conceal a failure.
-
-For inspect, perform this current-design reconstruction only. Sessions are not applicable; still declare unavailable design,
-implementation or runtime evidence. Freeze the map without manufacturing events/cards or reading Global Owner. For review,
-continue the following source/causal phases and link real maintenance deltas to map objects. Project/Skill improvements survive
-existing global coverage; route repeatable methods to an existing Skill or Engineering Contract Review when appropriate.
-
-When reviewing reuse or drift, trace the natural task through its current routing Owner, actual tool call, required dependencies,
-and independent result consumer. Distinguish a selection failure from invocation, dependency, consumer-verification or maintenance
-drift. A document read, matching file count, tool name in prose or self-selected checklist does not prove execution. Preserve
-valid equivalent paths and scoped exploratory probes. An optional workflow evaluator may supply frozen case/host/version-bound
-traces and checks; inspect their actual evidence and unmeasured scope, not just the report verdict. Its absence does not block
-Scout. Do not start an evaluation, install a dependency, alter a model, or write target-project cases from this read-only review.
-User-requested capture/execution continues through that capability in the appropriate project scope. Use existing map sources,
-journeys and engineering cards; do not create another registry or a mandatory per-task review.
-
-
-Read the project instruction chain, L1/L2/L3 or equivalent Owners, current-status Owner, relevant ADR/specs, windowed Git changes,
-tests, failures, acceptance, and bound project snapshot. Recheck Session leads against these sources. Record each source's availability.
-
-Build the six-category `evidence_sources` inventory defined in contracts.md.
-Start from current Owners and follow their relevant references in bounded
-sections; record uncovered sections rather than treating truncated output as
-read. The 30-day limit applies to recent Sessions/Git, not still-active design
-knowledge. Explicitly inspect paired effective/ineffective paths and accepted
-decisions even when no recent Session mentions them.
-
-Before selecting detailed reads, inventory the headings and numbered normative
-clauses of current behavior Owners and the accepted/reversed decisions in the
-current-status Owner. Use that source index to plan bounded reads across the
-whole active knowledge surface; reading every ADR does not cover unread active
-axioms or later corrections. Read the full context of each selected clause,
-including its exception and linked acceptance or failure. Keep unread sections
-explicit; do not substitute an arbitrary prefix, recent entries or a keyword
-search for the current Owner's knowledge inventory.
-
-For an unqualified whole-project depth claim, read the complete active behavior
-axioms in bounded, non-truncated sections before selecting downstream examples.
-Give each normative clause an obligation/disposition or an exact coverage gap;
-headings alone do not cover compound clauses. The independent source pass uses
-the same full-axioms floor. Downstream implementation and history remain
-relevance-bounded. If that floor cannot be completed, retain useful candidates
-but report bounded discovery and keep the whole-project depth claim open.
+Reconstruct the engineering map (`project_map`: nodes, typed edges, connected directed journeys, coverage dimensions) before selecting lessons:
+- Start from user outcomes (`goal -> actor & task -> action -> system effect -> downstream feedback -> recovery`), separating design, implementation, observed, inferred, and unknown claims plus counterevidence. Sidecar owns Scout implementation only — derive all labels, steps, owners, and environments from target evidence.
+- Distinguish structural containment (`contains`), prerequisites/constraints (`depends_on`, `constrains`), execution handoffs (`handoff`), and state authority. Order journeys by main user outcome first, overviewing whole-system responsibilities before detail.
+- For reuse/drift questions, trace natural task -> routing Owner -> formal tool -> actual consumer without launching evaluation batches or modifying target files.
+- Choose presentation by explanatory fit (prose, tables, Mermaid, `visualize`, optional `assets/project-map.html`, or custom `--visual-input`), preserving native controls/contrast and keeping the core narrative legible without interaction. Presentation approval is independent of content depth. Follow the [presentation contract](https://github.com/lly-personal/agent-memory-sidecar/blob/main/docs/specs/interface.md#project-scout-global_owner_scout_project_v7).
+- **`inspect` ends here**: skip Sessions (`session_coverage=null`), Owner resolution, and Core preview; freeze `view_ready` or `degraded`.
+- **`review` reads the active knowledge floor**: build the six-category `evidence_sources` inventory (`sessions, owners, decisions, successes, failures, acceptance`). Inventory active behavior Owner headings/numbered clauses and accepted/reversed decisions first, then read full contexts in bounded non-truncated sections (the 30-day window never clips active knowledge). Whole-project depth requires covering the active behavior axioms floor; report unread gaps explicitly.
 
 ## Phase 3: contrastive causal review
 
-Before selecting recommendations, trace goals and quality requirements through responsibility boundaries, constraints,
-implementation, consumers, recovery and historical decisions. Examine effective designs as well as failures: what premise
-justified a boundary, what changed, which stable mechanism repeats, whether native capabilities can replace glue, and what can
-be removed while preserving the user outcome. Use typed relationships in the existing map, not a second inventory.
-
-Engineering advice is distinct from a rule candidate. Current source facts may support an E1 discussion hypothesis without a
-recent failure or accepted change. Present relevant retention, integration, abstraction, replacement and removal alternatives;
-substantial refactoring is a legitimate alternative, not a last resort admitted only after smaller options fail. Link parent and
-child advice when it helps separate decisions. Each layer explains affected and unaffected responsibilities, evidence,
-benefit hypothesis, migration cost, counterexamples, owner and validation conditions. Do not cap depth or manufacture layers.
-An opinion, a map click or a hypothesis never grants implementation authority. Reuse existing authorization when it already
-covers the maintenance; do not ask again merely because a proposal spans layers.
-
+Trace goals and constraints across boundaries, consumers, recovery, and decisions (comparing effective designs as well as failures). For engineering advice (including multi-layer refactoring/removal hypotheses, E1 allowed), compare retention, integration, replacement, and refactoring alternatives with benefit hypothesis, migration cost, counterexamples, owner, and validation conditions (`parent_card_id` optional, unbounded).
 
 For each high-signal event answer:
-
 - 用户反复纠正或解释了什么？
 - 哪个后续失败推翻了先前的成功判断？
 - 哪项设计或行为最终获得正式接受或真实验收？
 - 哪条更早存在的行为原则可以避免重复成本？
 - 哪些只有机制证据，哪些已经达到用户或产品结果？
 
-Prefer belief-before, observed contradiction, accepted change, and current boundary over generic lessons.
-Link every high-value event to its declared source refs. Compare failed and
-successful paths under matching conditions; do not infer causality from frequency
-or task summaries alone.
+Compare failed and successful paths under matching conditions; never infer causality from frequency alone.
 
 ## Phase 4: candidate exhaustion
 
-Search independently for repeated correction, failed recovery, premature success, Owner drift, acceptance-boundary mistakes,
-durable design decisions, and reusable analysis methods. Do not read global-owner wording until this inventory is complete. Do not
-cap candidates or manufacture cards. For rule candidates, E2 requires repetition, formal acceptance, or real acceptance; E3 requires independent
-evidence from at least two projects and names only opaque project refs.
+Independently scan for repeated corrections, failed recovery, premature success, Owner drift, acceptance mistakes, durable decisions, and reusable methods **before** reading Global Owner wording. Never cap candidates or invent cards. Rule candidates require E2 (repetition, formal acceptance, or real acceptance) or E3 (2+ independent projects via opaque refs).
 
 ## Phase 5: counterevidence and two projections
 
-For every rule candidate find conflict, legitimate exception, project-only constraint, stronger existing Owner, and harmful
-global interpretation. Require meaningful counterevidence and a concrete Skip boundary.
-
-Challenge each projected obligation with a legitimate successful path under
-different preconditions: if the intended result is already proved, is the
-prescribed action still necessary? Separate the accepted outcome from the
-project's chosen means, count or sequence. Narrow `When`, preserve a concrete
-`Skip`, or route the method to Project/Skill; do not turn one local procedure
-into a universal gate. Apply this check to each completed action: a logging
-exception cannot excuse a cleanup or committed-result obligation. A compound
-source with project-specific technology still needs a separate disposition for
-its portable behavior; do not inherit one route for every action in that clause.
-
-For a source-rich review spanning active Owners and accumulated decisions,
-reserve a fresh internal review context before freezing; do not wait for a user
-to identify an omission. Use an internal
-subagent when available, not another user-facing task. First give it only original
-sources and the source index/read gaps, never drafts, Global Owner wording or
-expected candidate answers. Freeze its own source-obligation inventory before
-providing draft observations/projections for comparison. This prevents the draft
-from defining the denominator of the independent check. It must audit independent
-source obligations and accepted/reversed paths, including partially represented
-ones, and challenge each projected obligation rather than attach one decorative
-counterexample to an entire compound card. Correct evidence-backed defects and
-recheck associations, privacy and semantic hashes before the final freeze.
-After the source inventory is frozen, give the reviewer the full map and exact card fields, not only draft summaries or an
-inaccessible tool-output reference. From its source-derived inventory, check the map's user outcomes, relevant operational and
-maintenance paths, result consumers and recovery against the actual journeys. Complete missing paths supported by available
-sources before freezing; when evidence cannot be obtained, retain the exact coverage gap. Do not import another project's
-release or installation stages into a project that has none. Read each typed edge as a sentence:
-for `depends_on`, the source needs the target. A producer-to-consumer execution handoff is a different relation. Check direction
-and conditions against source, not the label or a connected graph. For an already delivered map, resolve a relevant object
-through the ordinary recovery consumer when available; a new draft is reviewed directly without creating a provisional delivery.
-A successful recovery proves only the recorded context, not that the source-derived path is complete.
-Check each card's event, cost, before/after and strongest counterpoint against its sources. Bind intervention claims to the
-actual sender, affected turn and action: supervising-agent continuation is not observed human re-input. Unknown actor or causal
-effect stays unknown. Generic filler and circular references cannot replace those decision fields. Structural validation and
-artifact hashes do not perform these semantic checks. Correct supported defects before freezing a new result; retain original
-failures and distinguish unassisted, assisted and observer-only recovery. This extends the same review, without a second queue
-or another mandatory reviewer.
-Preserve earlier failed evaluation records; a correction is not retroactive
-blind discovery. If independent context is unavailable, record that coverage
-limitation instead of claiming a self-review is independent qualification.
-
-Create two projections from the same evidence:
-
-- Human Context: Simplified Chinese, familiar privacy-safe project vocabulary, concrete event/cost/recommendation/before-after and
-  strongest counterpoint.
-- Rule Projection: remove project names, paths, commands, product labels, local thresholds, identifiers, raw dialogue, and private
-  diagnostics; retain precise `When / Do / Skip` behavior.
-
-Route project architecture to Project Owner, repeatable methods to Skill, and only necessary cross-task behavior increments to
-global candidates. Cross-project usefulness alone does not make a whole procedure an always-on instruction. Separate the short
-decision obligation from its execution method and compare the obligation with the complete current Owner, including unmanaged
-principles. A method route names its actual entry, inputs, applicable task and retained action/exception; an absent or unverified
-entry remains a delivery gap. Keep every supported source obligation visible across these destinations, even when the resulting
-global set fits. Do not relocate a mandatory behavior merely to pass capacity. Weak or risky ideas may remain without persistence.
-
-For each destination compare the actual maintained implementation, not just the existence of a rule. A documented obligation can
-be fully covered globally while its project implementation or method still fails. Represent a supported residual maintenance delta
-as an existing `route_to_owner` Project Card with its concrete before/after and versioned Owner; use `route_supported` for its
-integration. Existing global coverage must not turn that card into ignore. If the target already satisfies the finding, retain
-the exact Owner evidence as an exclusion instead. Do not invent work from the number of observations. Before freezing, order
-actionable recommendations by evidenced user impact and dependencies; preserve that order afterward, with no candidate cap.
-
-For `make_skill`, name the versioned source Owner and whether the existing entry can absorb the method. Follow the
-[method handoff SOP](https://github.com/lly-personal/agent-memory-sidecar/blob/main/docs/specs/interface.md#按需方法的维护与交接) after an authorized maintenance request;
-the read-only Scout recommendation itself never installs a Skill or updates an Owner.
-
-Record each signal in `observations` with its event IDs and structured
-disposition. Separate the project implementation from the portable behavior;
-name exact Owner coverage or the missing evidence when excluding a signal.
-Single-project formal acceptance can support E2. Project ownership and absence
-of a second project are not automatic global-candidate exclusions. Account for
-every event and every card, including evidence-backed no-persistence decisions.
-An exact rule in the project Owner proves local coverage only. If its behavior
-has cross-project value, retain that portable projection for actual Global Owner
-comparison; do not exclude it here merely because the project already states it.
-
-Before freezing, perform a second omission check from the source index back to
-the observations. Revisit high-value normative clauses, accepted behavior
-changes and rejected paths whose independent obligations lack a matching
-disposition, including clauses already linked to a related observation. Preserve
-each distinct action, trigger, user cost and legitimate exception when merging
-or abstracting a compound clause; a similar topic is not semantic coverage.
-Record a justified disposition or the exact unread gap. This pass starts from source material, not
-from the model's existing event/card list. In a large Owner, an uncovered section
-that can contain reusable knowledge limits discovery qualification even when
-all declared events conserve. It does not require a card for every paragraph.
+- Challenge every rule candidate and projected obligation against legitimate successful paths under differing preconditions: separate accepted outcomes from one project's chosen means, narrow `When`, keep concrete `Skip`, and keep per-action exceptions distinct inside compound clauses.
+- **Independent source-first review (source-rich reviews)**: Before freezing, run an internal reviewer subagent (never a user-facing task). Pass ONLY original sources and the source index/read gaps first (never drafts, Global Owner wording, or candidate answers) so it freezes an independent obligation inventory. Then pass the full map and draft cards to audit whole-path omissions, typed edge directions (`depends_on` = dependent -> prerequisite), intervention attribution (supervising continuation != human re-input), and per-obligation counterevidence. Fix evidenced defects and recompute hashes; if unavailable, record that limitation without calling self-review independent.
+- **Two projections**:
+  - `human_context`: Simplified Chinese, privacy-safe project terms, concrete event/cost/recommendation/before-after/strongest counterpoint.
+  - `rule_payload` (rule candidates only): strip project names, paths, commands, local thresholds, IDs, raw dialogue, and private diagnostics; keep exact `When / Do / Skip`.
+- **Routing**: Route project architecture to `project_owner`, repeatable methods (with entry, inputs, task, exceptions) to `skill` (see [method handoff SOP](https://github.com/lly-personal/agent-memory-sidecar/blob/main/docs/specs/interface.md#按需方法的维护与交接)), and only necessary cross-task increments to `global_agents`. Compare actual maintained implementations: concrete project/Skill maintenance deltas get `route_to_owner` cards (`route_supported`) even if global rules cover the rule text.
+- Record all signals in `observations` and run a reverse omission check from the source index back to observations (checking partially covered compound clauses and keeping local-only rules distinct from cross-project behavior). Order actionable cards by evidenced impact and dependencies.
 
 ## Phase 6: freeze project semantics
 
-Freeze map and recommendations together. Recheck each critical journey against original implementation and observed handoffs,
-including recovery and environment differences; the independent pass must challenge whole-path omissions as well as obligations.
-Map `source_revision` is the read-only snapshot HEAD, and `observed_at` is the frozen observation time. Preserve exact source
-references and advice links. Static and interactive views must derive from these same fields.
-
-Create engineering or rule-candidate Project Cards with their appropriate fields, validate privacy/Chinese narrative/evidence refs, compute normalized evidence hash, then compute
-`project_claim_hash` over every semantic field. Validate the entire Project result before global comparison.
-Compute `normalized_evidence_hash` from the exact canonical `direct_evidence`
-array. Preserve the validated project object; integration adds previews only.
-Use the existing `scripts/validate_output.py --hash-project-card` helper on each completed Card after its evidence hash is
-set; `describe-input project` exposes that command. After integration, `--hash-review-pack` hashes the completed Pack.
-Both consume UTF-8 JSON on stdin with `python -B`; neither fills semantic fields nor repairs a wrong supplied hash during
-validation. Use the resulting object with `scout.py prepare-review --input-file`, then continue the existing delivery sequence.
-Zero cards require nonempty, evidenced dispositions; never fill a no-delta result
-with an empty inventory or claim exhaustive knowledge beyond the declared scope.
+Freeze `project_map` and `project_cards` together (`source_revision` = read-only HEAD, `observed_at` = freeze timestamp). Compute `normalized_evidence_hash` on `direct_evidence`, then hash each card via `python -B scripts/validate_output.py --hash-project-card` and validate the Project result (`scout.py validate-project --input-file ...`) before Global comparison. `no_material_delta` requires nonempty evidenced observations within declared scope.
 
 ## Phase 7: integration and task-scoped delivery
 
-For rule candidates only, run `python -B scripts/scout.py resolve-owner-parity`. Engineering-only reviews skip this phase of rule integration and retain null Owner/preview fields. With matched parity, read the active host-local global Owner and verify its bytes
-against the returned hash; the equal canonical hash proves identical canonical content without revealing its physical path. With
-drift or unavailable parity, mark Owner comparison incomplete and remove confirmation. Compare semantics when proved. Map each proposed trigger, obligation and exception to the complete Owner, including unmanaged
-principles. A differently worded conjunction of existing clauses is still covered. For `add`, identify the residual obligation
-and one concrete permitted failure that existing clauses would not prevent. If none exists, use `already_covered_exact`;
-uncertainty stays unproven rather than becoming an extra user choice. Do not copy an existing Skill procedure into global rules.
-Use official/first-party research only to support or challenge existing candidates. Add one integration preview per frozen rule candidate; engineering Review Cards use discuss with no rule actions or token. Recheck count/order conservation,
-privacy, and project read-only fingerprints. Prepare the draft Review Pack through `scripts/scout.py prepare-review` before validating
-or rendering it. For rule candidates, this binds single and combined confirmation actions to the actual installed Core planner; absence or failure of that
-receipt cannot be replaced with manually calculated capacity. Engineering-only prepare-review does not resolve Owner or call Core. Preserve candidates and revise exact consolidation/replacement/routing
-when needed, then repeat planning before confirmation. If that requires different Rule Projections or merged source observations,
-return to Phases 5–6 and create a new content-bound revision with every source obligation accounted for. Preserve the original
-facts, evidence and frozen artifacts; do not overwrite them or repeat an unchanged task census. Integration does not silently edit
-an existing frozen card. Validate Project and Review Pack objects through `scripts/scout.py`. Every Python helper uses `python -B`; never use
-a dynamic import or an inline import that can create `__pycache__`.
-
-If the resolver returns `unavailable`, remove confirmation and report the limitation. Never search upward, inspect the project-root
-`AGENTS.md` as a substitute, or guess a canonical path from the current checkout.
-
-For delivery, use the frozen projections and receipt sequence in SKILL.md and the [Delivery contract](https://github.com/lly-personal/agent-memory-sidecar/blob/main/specs/global-owner-scout-delivery-v1.md).
-The renderer provides a short overview and expands the first actionable recommendation in the same chat. Complete evidence is
-linked and opened only on request; absence of an open call is not an error. It puts actual decisions first and covered/no-change evidence in a reference index. No action is needed for covered
-cards; every source and card still conserves. A queued request is not proof of display. Technical completion and the result link
-stay in this task; no separate controller chat is required to finish the review.
-
-For recovery, use `recover-delivery` with the original native manifest and granted output root; `verify-final` remains the
-old-receipt locator adapter. Both verify the same immutable file, independently of presentation. Never regenerate provenance or rewrite the artifact. Exact human selections resume through
-the existing installed Agent Memory bundle handoff after artifact verification and Fresh Core preview. Preserve the queued
-observation; it neither grants authorization nor permanently blocks a later independently verified human selection.
-The optional paused Scheduled path retains `render-review --surface scheduled` and `verify-visible --surface scheduled`.
-
-For continuation from an already mechanically acquired Codex native page, the following host-code example selects one exact
-final without retyping it. Run it with Python `-B` and the acquired native file, selected source turn ID and a new input file
-under the current checked output grant as its three arguments. These values come from the current native metadata and output
-selection, not user setup or a guessed path. This reads no new history and does not establish the acquired file's provenance.
+- **Global integration (rule candidates only; engineering-only skips)**: Run `python -B scripts/scout.py resolve-owner-parity`. With `matched` parity, read host-local Owner and verify its byte hash (never guess/search canonical paths or fall back to project `AGENTS.md`). Map every trigger/obligation/exception against the full Owner (including unmanaged principles); reworded/recombined clauses stay `already_covered_exact`. Add one integration preview per rule candidate; engineering cards use `discuss` with no rule actions/token.
+- **Preview & validate**: Prepare the draft Review Pack through `python -B scripts/scout.py prepare-review` (binds single & combined Core `preview-bundle` receipts; preserves all cards when capacity fails so users can adjust via Phases 5–6 without repeating discovery), hash via `--hash-review-pack`, and validate via `scout.py validate-review-pack`.
+- **Preflight recheck & delivery**: Re-run `inspect-context --project-root <bound-project-root>` and check Phase 0 cache baseline. Deliver via `prepare-delivery --artifact-dir <granted-root> --protected-root <bound-root>` (`global_owner_scout_delivery_v2`). Default to `render-receipt not_requested` (brief overview, first actionable recommendation, complete-evidence link); open once only if requested. Never rewrite frozen artifacts or hand-write receipts; pre-manifest failures use `render-terminal` (`Terminal v1`). Scheduled keeps `render-review --surface scheduled` + `verify-visible --surface scheduled`.
+- **Continuation from native page**: Select one exact non-truncated final without retyping using `python -B` and `(native_page_file, turn_id, out_file)`:
 
 ```python
 import json
@@ -440,28 +123,15 @@ with Path(sys.argv[3]).open("xb") as output:
     output.write(final["text"].encode("utf-8"))
 ```
 
-Pass that file unchanged to the existing `scout.py verify-final --input-file` with the original `--artifact-root` and current
-native-bound `--project-root`. A missing, ambiguous or natively marked truncated final, or an existing input file fails without
-overwriting evidence. A valid receipt cannot prove that the surrounding final prose survived clipping; `verify-final` retains
-its artifact/receipt verification scope. This example proves only byte-preserving selection; original acquisition, helper
-execution and semantic acceptance remain separate.
+Pass `<out_file>` to `scout.py verify-final --input-file` with `--artifact-root` and `--project-root` (or prefer `recover-delivery` with the native manifest). Valid receipts never prove unclipped surrounding prose.
 
-Recheck the Phase 0 Skill/cache baseline at delivery. Retain attribution and execution-identity limits with their actual
-window; preserve independently supported artifacts. Do not turn an unverified past window into a privacy failure or a pass.
+## Terminal meanings
 
-Terminal meanings:
-
-- `interactive_entry_blocked`: preflight could not prove the project binding, or Git eligibility;
-  no deep review ran and no authorization is inferred.
-- `ok`: at least one card plus complete/bounded coverage.
-- `degraded`: material coverage gap; supported cards remain visible and the run does not count.
-- `no_material_delta`: complete/bounded census and no evidenced engineering or qualified rule-candidate delta.
-- `failed`: execution protocol, privacy, integrity, mutation, required-source, render, or read-only failure; no cards.
-- `output_budget_exceeded`: not every card fits; no partial cards.
-- A native `queued` result leaves display unobserved; recovery returns `artifact_verified` only. Preserve actual host observations separately from chat copy, and infer no approval.
-- `interactive_host_blocked`: no safe task output root before artifact creation; no partial cards or confirmation.
-
-Artifact creation or integrity failure uses the existing failure contract in [contracts.md](contracts.md#manifest-free-terminal).
-After the artifact is verified, delivery observations follow the
-[Interactive Delivery contract](contracts.md#interactive-delivery): not requesting a preview is valid, and a queued or failed preview
-does not block discussion of the verified advice. Neither observation proves display or grants authorization.
+- `interactive_entry_blocked`: preflight failed project binding or Git eligibility (`Terminal v1`, zero reads).
+- `interactive_host_blocked`: no safe external task output root (`Terminal v1`, zero partial cards/confirmation).
+- `ok`: at least one card + `complete|bounded` coverage.
+- `degraded`: coverage gap (missing/failed/unrecoverably clipped Session or non-Session source gap); supported cards stay visible, Scheduled run does not count.
+- `no_material_delta`: `complete|bounded` census with zero evidenced engineering or rule-candidate deltas.
+- `failed`: `execution_protocol_failed`, privacy, integrity, mutation, required-source, render, or read-only failure (`Terminal v1`, zero cards).
+- `output_budget_exceeded`: pack exceeds budget (`Terminal v1`, zero partial cards).
+- Native `queued` preserves `surface_pending` (`artifact_verified` on recovery, `confirmation_eligible=false`); report display separately and never infer approval.

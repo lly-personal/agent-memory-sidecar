@@ -6,20 +6,25 @@ import hashlib
 import json
 import os
 import shutil
-import sqlite3
 import stat
-import subprocess
 import tempfile
 import uuid
-from contextlib import closing, ExitStack
+from contextlib import ExitStack
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from .database import CORE_SCHEMA_SHA256, CORE_SCHEMA_VERSION, CoreDatabase, _schema_fingerprint
+from .database import CoreDatabase, read_global_instruction_binding
 from .errors import CoreError
-from .file_security import logical_absolute, prepare_store_parent, secure_store_location, validate_store_identity, hold_physical_directory
+from .file_security import (
+    assert_physical_regular_file,
+    hold_physical_directory,
+    logical_absolute,
+    prepare_store_parent,
+    run_safe_git,
+    secure_store_location,
+)
 from .installation import InstallationRegistry
 from .instructions import InstructionRepository, assert_physical_directory, atomic_write, read_document, read_document_bytes
 
@@ -39,17 +44,14 @@ def _json(value: Any) -> bytes:
 
 
 def _git(root: Path, *args: str) -> bytes:
-    env = {key: value for key, value in os.environ.items()
-           if key not in {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"}}
-    env.update(GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
-    try:
-        result = subprocess.run(["git", "-C", str(root), *args], capture_output=True, env=env, timeout=GIT_OBSERVATION_SECONDS)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise CoreError("instruction_source_unavailable", "Git source operation did not complete") from exc
-    if result.returncode:
-        # Git stderr can contain credentials and private remote URLs.
-        raise CoreError("instruction_source_unavailable", "Git source operation failed")
-    return result.stdout
+    return run_safe_git(
+        root,
+        *args,
+        cwd=root,
+        timeout=GIT_OBSERVATION_SECONDS,
+        error_code="instruction_source_unavailable",
+        error_message="Git source operation failed",
+    ).stdout
 
 
 def _origin(root: Path) -> str:
@@ -89,22 +91,10 @@ def _store(home: Path) -> Path:
 
 
 def _binding(home: Path) -> dict[str, Any] | None:
-    path = _store(home)
-    if not path.exists():
-        return None
-    validate_store_identity(path, allow_missing=False)
-    try:
-        with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as conn:
-            if _schema_fingerprint(conn) != CORE_SCHEMA_SHA256:
-                raise CoreError("instruction_binding_unavailable", "Existing Store requires its supported migration path")
-            schema = conn.execute("SELECT schema_version, schema_sha256 FROM core_schema WHERE singleton=1").fetchone()
-            if schema != (CORE_SCHEMA_VERSION, CORE_SCHEMA_SHA256):
-                raise CoreError("instruction_binding_unavailable", "Existing Store schema does not match this release")
-            conn.row_factory = sqlite3.Row
-            row = conn.execute("SELECT * FROM global_instruction_binding WHERE singleton=1").fetchone()
-            return dict(row) if row else None
-    except sqlite3.DatabaseError as exc:
-        raise CoreError("instruction_binding_unavailable", "Existing Store requires its supported migration path") from exc
+    return read_global_instruction_binding(
+        _store(home),
+        error_code="instruction_binding_unavailable",
+    )
 
 
 def _set_binding(home: Path, value: dict[str, Any] | None, *, require_existing: bool = False) -> None:
@@ -312,7 +302,16 @@ def _apply(state: Path, snapshot_root: Path, stage: Path, data: bytes, targets: 
         snapshot_root.rmdir()
         shutil.copytree(stage, snapshot_root)
         snapshot_created = True
-    stores_existed = {name: _store(home).exists() for name, home in targets.items()}
+    stores_existed = {
+        name: assert_physical_regular_file(
+            _store(home),
+            allow_missing=True,
+            allow_missing_parent=True,
+            unsafe_code="store_unsafe",
+        )
+        is not None
+        for name, home in targets.items()
+    }
     recovery = {"contract_version": CONTRACT, "targets": {name: {
         "home": str(home), "before": base64.b64encode(before[name]).decode() if before[name] is not None else None,
         "binding": bindings[name], "store_existed": stores_existed[name],

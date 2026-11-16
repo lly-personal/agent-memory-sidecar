@@ -12,7 +12,12 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
-from resolve_owner_parity import CORE_STATE_DIR, is_physical_directory, is_physical_file, resolve
+_SCRIPT_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+
+from resolve_owner_parity import CORE_STATE_DIR, resolve
+from scout_security import is_physical_directory, is_physical_file, safe_artifact_bytes
 from validate_output import (
     ContractError, expected_action_policy, review_bundle, review_pack_hash,
     validate_review_pack, validate_selection_preview,
@@ -31,7 +36,9 @@ def installed_core(codex_home: Path) -> tuple[Path, str]:
         raise ContractError("core_preview_unavailable")
     path = Path(row[1])
     digest = str(row[2]).removeprefix("sha256:")
-    if not path.is_absolute() or not is_physical_file(path) or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+    if not path.is_absolute() or not is_physical_file(path):
+        raise ContractError("core_preview_identity_mismatch")
+    if hashlib.sha256(safe_artifact_bytes(path)).hexdigest() != digest:
         raise ContractError("core_preview_identity_mismatch")
     return path, digest
 

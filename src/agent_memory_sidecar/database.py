@@ -3,12 +3,13 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 from .errors import CoreError
 from .file_security import (
+    assert_physical_regular_file,
     logical_absolute,
     prepare_store_parent,
     secure_store_location,
@@ -151,6 +152,48 @@ def _schema_fingerprint(connection: sqlite3.Connection) -> str:
 CORE_SCHEMA_SHA256 = (
     "f2153ec69335cbbac5bbab4330b4e213109c0bebcc8c56366b58fccb870c3c74"
 )
+
+
+def read_global_instruction_binding(
+    path: Path | str,
+    *,
+    error_code: str = "instruction_binding_unavailable",
+) -> dict[str, Any] | None:
+    target = logical_absolute(path)
+    stat_result = assert_physical_regular_file(
+        target,
+        allow_missing=True,
+        allow_missing_parent=True,
+        unsafe_code="store_unsafe",
+        unsafe_message="Core Store must be one regular, non-link file",
+    )
+    if stat_result is None:
+        return None
+    try:
+        with closing(sqlite3.connect(target.as_uri() + "?mode=ro", uri=True)) as conn:
+            if _schema_fingerprint(conn) != CORE_SCHEMA_SHA256:
+                raise CoreError(
+                    error_code,
+                    "Existing Store requires its supported migration path",
+                )
+            schema = conn.execute(
+                "SELECT schema_version, schema_sha256 FROM core_schema WHERE singleton=1"
+            ).fetchone()
+            if schema != (CORE_SCHEMA_VERSION, CORE_SCHEMA_SHA256):
+                raise CoreError(
+                    error_code,
+                    "Existing Store schema does not match this release",
+                )
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM global_instruction_binding WHERE singleton=1"
+            ).fetchone()
+            return dict(row) if row else None
+    except sqlite3.DatabaseError as exc:
+        raise CoreError(
+            error_code,
+            "Existing Store requires its supported migration path",
+        ) from exc
 
 
 class CoreDatabase:

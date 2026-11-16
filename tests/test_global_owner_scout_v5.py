@@ -956,20 +956,36 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             )
             self.assertEqual("ok", json.loads(result.stdout)["status"])
 
-    def test_installed_v4_contract_remains_accepted_during_migration(self) -> None:
-        command = (
-            "import json,sys; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert(0,sys.argv[1]); "
-            "import validate_output_v4 as old; print(json.dumps(old.valid_review_pack(),ensure_ascii=False))"
+    def test_retired_v4_adapter_and_contracts_rejected(self) -> None:
+        self.assertFalse((SCOUT_SCRIPTS / "validate_output_v4.py").exists())
+        self.assertFalse((SCOUT_SCRIPTS / "render_review_v4.py").exists())
+        self.assertFalse((ROOT / "docs" / "qdr" / "0001-scout-v4-compatibility-adapter.md").exists())
+        legacy_project = json.dumps({"contract_version": "global_owner_scout_project_v3"}, ensure_ascii=False)
+        res_proj = subprocess.run(
+            [sys.executable, "-B", str(SCOUT_VALIDATOR), "--mode", "project_scout"],
+            input=legacy_project,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
         )
-        legacy = subprocess.run(
-            [sys.executable, "-c", command, str(SCOUT_SCRIPTS)], capture_output=True,
-            text=True, encoding="utf-8", check=True
-        ).stdout
-        validated = subprocess.run(
-            [sys.executable, str(SCOUT_VALIDATOR), "--mode", "review_pack"], input=legacy,
-            capture_output=True, text=True, encoding="utf-8", check=True,
+        self.assertNotEqual(0, res_proj.returncode)
+        legacy_pack = json.dumps({"contract_version": "global_owner_scout_review_pack_v2"}, ensure_ascii=False)
+        res_pack = subprocess.run(
+            [sys.executable, "-B", str(SCOUT_VALIDATOR), "--mode", "review_pack"],
+            input=legacy_pack,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
         )
-        self.assertEqual("global_owner_scout_review_pack_v2", json.loads(validated.stdout)["contract_version"])
+        self.assertNotEqual(0, res_pack.returncode)
+        res_render = subprocess.run(
+            [sys.executable, "-B", str(SCOUT_RENDERER), "--surface", "scheduled"],
+            input=legacy_pack,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        self.assertNotEqual(0, res_render.returncode)
 
     def test_content_identity_is_path_independent_and_remote_sensitive(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

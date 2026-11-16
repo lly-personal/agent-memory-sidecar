@@ -8,38 +8,57 @@ import hashlib
 import io
 import json
 import os
-import re
-import subprocess
 import stat
 import sys
 from pathlib import Path
 from typing import Any
 
+_SCRIPT_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+
 from prepare_delivery import (
+    DELIVERY_CONTRACT,
+    SURFACE_COPY,
+    TERMINAL_CONTRACT,
     prepare_delivery,
     recover_delivery,
     render_blocked_receipt,
     render_delivery_receipt,
-    SURFACE_COPY,
     render_terminal_receipt,
     validate_delivery_manifest,
-    validate_output_root,
-    safe_artifact_bytes,
     verify_final_receipt,
 )
 from render_review import render_review_pack
 from project_map import resolve_selection
 from prepare_review import prepare_review
 from resolve_owner_parity import resolve
+from scout_security import (
+    GIT_ENV,
+    GIT_ID_RE,
+    git_output,
+    resolve_git_path,
+    safe_artifact_bytes,
+    validate_output_root,
+)
 from utf8_stdio import configure_utf8_stdio, native_line_input
-from validate_output import ContractError, validate_project, validate_review_pack, describe_input
+from validate_output import (
+    ContractError,
+    NATIVE_PROJECT_CONTRACT,
+    NATIVE_REVIEW_PACK_CONTRACT,
+    PROJECT_CONTRACT,
+    REVIEW_PACK_CONTRACT,
+    SKILL_VERSION,
+    describe_input,
+    validate_project,
+    validate_review_pack,
+)
 from verify_visible_output import verify_visible_output
 from history_import import capture_native, history_output_root, import_history
 
 
 PREFLIGHT_CONTRACT = "global_owner_scout_preflight_v1"
-GIT_ID_RE = re.compile(r"^[0-9a-f]{40,64}$")
-GIT_ENV = {"GIT_OPTIONAL_LOCKS": "0", "GIT_TERMINAL_PROMPT": "0"}
+PREFLIGHT_SUMMARY_CONTRACT = "global_owner_scout_preflight_summary_v1"
 
 
 def require(condition: bool, message: str) -> None:
@@ -62,51 +81,73 @@ def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def git_output(cwd: Path, *args: str) -> bytes:
-    env = os.environ.copy()
-    env.update(GIT_ENV)
-    # Windows executable lookup includes cwd; never execute a reviewed project's
-    # git.exe (or a PATH entry/symlink into that checkout) during read-only probes.
-    workspace = cwd.resolve(strict=True)
-    for ancestor in (workspace, *workspace.parents):
-        try:
-            (ancestor / '.git').lstat()
-        except FileNotFoundError:
-            continue
-        workspace = ancestor
-        break
-    executable = None
-    for directory in os.get_exec_path():
-        folder = Path(directory.strip('"') if os.name == 'nt' else directory)
-        if not folder.is_absolute():
-            continue
-        try:
-            candidate = (folder / ('git.exe' if os.name == 'nt' else 'git')).resolve(strict=True)
-        except (FileNotFoundError, NotADirectoryError):
-            continue
-        if not candidate.is_relative_to(workspace) and candidate.is_file() and os.access(candidate, os.X_OK):
-            executable = str(candidate)
-            break
-    require(executable is not None, 'git_context_executable_unavailable')
-    try:
-        result = subprocess.run(
-            [executable, "--no-pager", "-c", "core.fsmonitor=false", *args],
-            cwd=cwd,
-            capture_output=True,
-            check=False,
-            env=env,
-        )
-    except OSError as exc:
-        raise ContractError("git_context_unavailable") from exc
-    require(result.returncode == 0, "git_context_unavailable")
-    return result.stdout
+def build_preflight_summary(host: str, purpose: str) -> dict[str, Any]:
+    require(host in {"codex", "pi", "claude"}, "unsupported host")
+    require(purpose in {"review", "inspect"}, "unsupported purpose")
+    native_host = host in {"pi", "claude"}
+    project_contract = NATIVE_PROJECT_CONTRACT if native_host else PROJECT_CONTRACT
+    review_pack_contract = NATIVE_REVIEW_PACK_CONTRACT if native_host else REVIEW_PACK_CONTRACT
+    describe_kinds = ["native-project", "native-review"] if native_host else ["project", "review"]
 
+    if host == "codex":
+        entry_steps = ["enrollment.py inspect-project", "inspect-context", "inspect-output"]
+        history_steps = ["capture-native", "import-history"] if purpose == "review" else []
+    elif host == "pi":
+        entry_steps = ["global_owner_scout_context", "inspect-native", "inspect-output"]
+        history_steps = ["capture_current"] if purpose == "review" else []
+    else:
+        entry_steps = ["claude_native.mjs context", "inspect-native", "inspect-output"]
+        history_steps = ["claude_native.mjs capture"] if purpose == "review" else []
 
-def resolve_git_path(cwd: Path, value: bytes) -> Path:
-    text = value.decode("utf-8", errors="strict").strip()
-    require(bool(text), "git_context_unavailable")
-    candidate = Path(text)
-    return (candidate if candidate.is_absolute() else cwd / candidate).resolve(strict=True)
+    if purpose == "review":
+        review_steps = [
+            f"describe-input {describe_kinds[0]}",
+            "validate-project",
+            "resolve-owner-parity",
+            f"describe-input {describe_kinds[1]}",
+            "validate-review-pack",
+            "prepare-review",
+            "prepare-delivery",
+            "render-receipt",
+        ]
+        purpose_rule = "fail_closed_native_history_capture"
+    else:
+        review_steps = [
+            f"describe-input {describe_kinds[0]}",
+            "validate-project",
+            f"describe-input {describe_kinds[1]}",
+            "validate-review-pack",
+            "prepare-delivery",
+            "render-receipt",
+        ]
+        purpose_rule = "skip_history_census_and_owner_resolution"
+
+    return {
+        "contract_version": PREFLIGHT_SUMMARY_CONTRACT,
+        "skill_version": SKILL_VERSION,
+        "host": host,
+        "purpose": purpose,
+        "project_contract": project_contract,
+        "review_pack_contract": review_pack_contract,
+        "delivery_contract": DELIVERY_CONTRACT,
+        "terminal_contract": TERMINAL_CONTRACT,
+        "describe_input_kinds": describe_kinds,
+        "evidence_window_kind": "manual_30d" if purpose == "review" else "current",
+        "command_order": [*entry_steps, *history_steps, *review_steps],
+        "blocking_rules": [
+            "project_binding_required",
+            "explicit_external_output_root_required",
+            "read_only_snapshot_invariant",
+            purpose_rule,
+            "terminal_v1_on_preflight_or_protocol_failure",
+        ],
+        "privacy_rules": [
+            "no_project_writes_or_proposals",
+            "no_raw_history_transcription",
+            "use_python_dash_B",
+            "separate_delivery_from_display_and_adoption",
+        ],
+    }
 
 
 def inspect_git_context(cwd: Path) -> dict[str, Any]:
@@ -203,6 +244,9 @@ def main() -> int:
     history.add_argument('--session-id', required=True)
     history.add_argument('--artifact-dir', type=Path, required=True)
     history.add_argument('--protected-root', action='append', type=Path, required=True)
+    summary = commands.add_parser("preflight-summary", help="Return deterministic contract and command-order orientation without reading files or Git.")
+    summary.add_argument("--host", choices=("codex", "pi", "claude"), default="codex")
+    summary.add_argument("--purpose", choices=("review", "inspect"), default="review")
     description = commands.add_parser('describe-input')
     description.add_argument('kind', choices=('project', 'review', 'native-project', 'native-review'))
     context = commands.add_parser("inspect-context")
@@ -246,7 +290,9 @@ def main() -> int:
         return load_stdin_json(args.input_file)
 
     try:
-        if args.command == 'capture-native':
+        if args.command == 'preflight-summary':
+            print(json.dumps(build_preflight_summary(args.host, args.purpose), ensure_ascii=False, separators=(',', ':')))
+        elif args.command == 'capture-native':
             if args.input_line:
                 history_output_root(args.artifact_dir, args.protected_root)
                 with native_line_input():
