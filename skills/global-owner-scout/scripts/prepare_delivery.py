@@ -12,9 +12,21 @@ import stat
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
+
+_SCRIPT_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
 
 from render_review import extract_conversation_brief, render_review_pack
+from scout_security import (
+    FILE_ATTRIBUTE_REPARSE_POINT,
+    is_reparse,
+    is_within,
+    safe_artifact_bytes,
+    safe_existing_directory,
+    validate_output_root,
+)
 from utf8_stdio import configure_utf8_stdio
 from validate_output import ContractError, valid_project, valid_review_pack
 from verify_visible_output import verify_visible_output
@@ -37,7 +49,6 @@ SURFACE_COPY = {
     "open_queued": "文件打开请求仍在排队；可继续讨论以上建议，无需重复复盘或切换窗口。",
     "open_failed": "文件预览未成功；已验证的建议和文件链接仍可使用，展示情况未证。",
 }
-FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 TERMINAL_REASON_MAPPINGS = {
     "project_binding_unavailable": (
         "interactive_entry_blocked",
@@ -162,53 +173,6 @@ def render_terminal_receipt(value: dict[str, Any]) -> str:
         f"`project_state={value['project_state']}`；`confirmation_eligible=false`；"
         f"`terminal_result_sha256={terminal_result_sha256(value)}`。\n"
     )
-
-
-def is_reparse(stat_result: os.stat_result) -> bool:
-    return bool(getattr(stat_result, "st_file_attributes", 0) & FILE_ATTRIBUTE_REPARSE_POINT)
-
-
-def is_within(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-        return True
-    except ValueError:
-        return False
-
-
-def safe_existing_directory(value: Path, *, label: str) -> Path:
-    require(value.is_absolute(), f"{label} must be an absolute path")
-    try:
-        raw_stat = value.lstat()
-        resolved = value.resolve(strict=True)
-    except OSError as exc:
-        raise ContractError(f"{label} is unavailable: {exc}") from exc
-    require(not value.is_symlink() and not is_reparse(raw_stat), f"{label} must not be a link or reparse point")
-    require(stat.S_ISDIR(raw_stat.st_mode), f"{label} must be an existing directory")
-    return resolved
-
-
-def validate_output_root(artifact_dir: Path, protected_roots: Iterable[Path]) -> Path:
-    resolved_dir = safe_existing_directory(artifact_dir, label="artifact-dir")
-    roots = [safe_existing_directory(root, label="protected-root") for root in protected_roots]
-    require(bool(roots), "at least one protected-root is required")
-    for root in roots:
-        require(not is_within(resolved_dir, root), "artifact-dir must be outside every protected-root")
-    return resolved_dir
-
-
-def safe_artifact_bytes(path: Path) -> bytes:
-    try:
-        result = path.lstat()
-    except OSError as exc:
-        raise ContractError(f"artifact is unavailable: {exc}") from exc
-    require(stat.S_ISREG(result.st_mode), "artifact must be a regular file")
-    require(not path.is_symlink() and not is_reparse(result), "artifact must not be a link or reparse point")
-    require(result.st_nlink == 1, "artifact must have exactly one hard link")
-    try:
-        return path.read_bytes()
-    except OSError as exc:
-        raise ContractError(f"artifact cannot be read: {exc}") from exc
 
 
 def make_artifact_read_only(path: Path) -> None:

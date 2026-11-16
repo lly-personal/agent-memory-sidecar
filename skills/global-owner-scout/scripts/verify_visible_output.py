@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify exact Global Owner Scout v5.6 renderer or artifact Markdown bytes."""
+"""Verify exact Global Owner Scout 5.19.8 renderer or artifact Markdown bytes."""
 
 from __future__ import annotations
 
@@ -8,7 +8,12 @@ import hashlib
 import json
 import re
 import sys
+from pathlib import Path
 from typing import Any
+
+_SCRIPT_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
 
 from utf8_stdio import configure_utf8_stdio
 

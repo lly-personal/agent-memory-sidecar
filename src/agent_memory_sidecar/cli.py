@@ -28,6 +28,8 @@ class ResultParser(argparse.ArgumentParser):
             "argument {rule,setup,doctor,instructions}: invalid choice:"
         ):
             message = "unknown command; expected rule, setup, doctor, or instructions"
+        elif message.startswith("argument {rule,doctor}: invalid choice:"):
+            message = "unknown command; expected rule or doctor"
         raise CoreError("invalid_request", message)
 
 

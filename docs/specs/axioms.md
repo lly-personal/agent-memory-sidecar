@@ -79,6 +79,10 @@ SDDL 文本表现形式代替权限语义。
 - 稳定核心：显式授权、作用域校验、规则部署、查看、编辑和撤销。
 - 实验能力：Ambient discovery 与单卡建议；不阻塞稳定核心发布。
 - 可选分发：私有 Git 传播完整 global `AGENTS.md`；本机 target 才决定本机行为。按需同步覆盖已接入的 Codex、Pi 和 Claude Code；Claude 须显式接入并投影为用户级 `CLAUDE.md`。同一源、同一提交、完整字节物化，各宿主分别保留本机 binding；文件一致不证明 Claude 的解析和实际会话一致。该能力不安装 Pi/Claude Hook、不迁移 Scout、不证明新会话采用。详见[全局规范同步契约](../../specs/global-instruction-sync-v1.md)。
+- 多宿主三阶能力阶梯（[ADR 0083](../decisions/0083-multihost-capability-ladder.zh.md)）：
+  - **L1（Instruction Sync）**：Codex、Pi、Claude Code 均支持只读/物化规范同步；
+  - **L2（Read-Only Scout）**：Codex 支持完整 `review/inspect`，Pi/Claude 为只读受限源候选（无确认动作）；
+  - **L3（Rule Approval & Mutation）**：仅 Codex 开放；Pi 与 Claude Code 在通过正式 ADR 批准“不可伪造的宿主原生确认原语”前严禁实现任何规则写入代码或宿主 Hook，且明令禁止用关键词/自然语言匹配替代授权。
 - 公开分发：只从白名单导出 Core 与版本化 Plugin/Skill；私有 Owner 是可选后端，不随源码或发行物公开。
 - 公开演进：首发验收前私有工程仓库是唯一研发权威；明确切换后公开 `main` 接管全部公开研发与发行，私有工程仓库
   冻结归档。公开候选期不得解释为双 owner 或长期镜像。
@@ -104,7 +108,7 @@ Global Owner Scout 是用户显式触发的只读项目复盘，不是 Core 的�
 `$global-owner-scout 复盘当前项目` 后，同一任务完成预检、30 天取证、审阅文件和结果链接；默认不创建新聊天或
 worktree，用户已选的 worktree 原地沿用。前后完整项目指纹必须一致，包括未跟踪文件内容；并发变化只能按证据
 归因，不能直接指称 Scout 写入。复盘不创建 proposal token、不修改 Store、Owner、Git 或外部系统，唯一输出写入
-是当前宿主显式授予且位于项目外的不可变 artifact。Scheduled 仍是独立暂停的隔离实验。
+是当前宿主显式授予且位于项目外的不可变 artifact。Scheduled 实验保持独立暂停（`PAUSED / 0 of 14`），与日常交互式复盘及 Core 验收解耦。
 
 该实验的正式激活集合由每台主机动态发现和人工确认，不由共享源携带固定项目名单。Project/global Owner、已提交
 Skill 和工程事实属于 Git 可移植层；Codex `projectId`、绝对路径、Scheduled Task、运行计数与未确认 Review Pack

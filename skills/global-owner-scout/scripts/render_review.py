@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a validated Global Owner Scout v5.9 Review Pack as deterministic Chinese Markdown."""
+"""Render a validated Global Owner Scout 5.19.8 Review Pack as deterministic Chinese Markdown."""
 
 from __future__ import annotations
 
@@ -7,7 +7,12 @@ import argparse
 import hashlib
 import json
 import sys
+from pathlib import Path
 from typing import Any, Iterable
+
+_SCRIPT_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
 
 from utf8_stdio import configure_utf8_stdio
 
@@ -650,7 +655,7 @@ def run_self_test() -> None:
     assert "bundle_action_count=1" in twenty_four
     tests += 1
 
-    print(json.dumps({"status": "ok", "tests": tests, "renderer": "global_owner_scout_review_pack_v6"}, separators=(",", ":")))
+    print(json.dumps({"status": "ok", "tests": tests, "renderer": "global_owner_scout_review_pack_v8"}, separators=(",", ":")))
 
 
 def load_stdin_json() -> Any:
@@ -673,13 +678,7 @@ def main() -> int:
         if args.surface is None:
             raise ContractError("--surface is required")
         pack = load_stdin_json()
-        if isinstance(pack, dict) and pack.get("contract_version") == "global_owner_scout_review_pack_v2":
-            if args.surface != "scheduled":
-                raise ContractError("legacy v2 Review Pack only supports the scheduled surface")
-            from render_review_v4 import render_review_pack as render_legacy
-            print(render_legacy(pack), end="")
-        else:
-            print(render_review_pack(pack, surface=args.surface), end="")
+        print(render_review_pack(pack, surface=args.surface), end="")
         return 0
     except (ContractError, AssertionError) as exc:
         print(json.dumps({"status": "error", "message": str(exc)}, ensure_ascii=False, separators=(",", ":")), file=sys.stderr)

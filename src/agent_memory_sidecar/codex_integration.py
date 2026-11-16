@@ -12,6 +12,13 @@ from typing import Any
 
 from .database import CORE_SCHEMA_SHA256, CoreDatabase, schema_manifest
 from .errors import CoreError
+from .file_security import (
+    assert_physical_directory_chain,
+    assert_physical_regular_file,
+    logical_absolute,
+    read_physical_regular_bytes,
+    run_safe_git,
+)
 from .identity import ProjectIdentity
 from .installation import InstallationRegistry
 from .instructions import InstructionRepository, atomic_write, read_document
@@ -38,11 +45,7 @@ from .skill import (
 
 def codex_home() -> Path:
     configured = os.environ.get("CODEX_HOME")
-    return (
-        Path(configured).expanduser().resolve()
-        if configured
-        else (Path.home() / ".codex").resolve()
-    )
+    return logical_absolute(configured if configured else Path.home() / ".codex")
 
 
 def store_path() -> Path:
@@ -70,7 +73,15 @@ def setup(
             "an explicit global source is required for rebinding",
         )
     target_store = store_path()
-    existed = target_store.exists()
+    existed = (
+        assert_physical_regular_file(
+            target_store,
+            allow_missing=True,
+            allow_missing_parent=True,
+            unsafe_code="store_unsafe",
+        )
+        is not None
+    )
     if existed:
         try:
             with CoreDatabase(target_store) as db:
@@ -119,6 +130,12 @@ def setup(
         ),
         allow_source_rebind=allow_global_source_rebind,
     )
+    artifact_existed, artifact_bytes = read_physical_regular_bytes(
+        artifact_path,
+        allow_missing_parent=True,
+        unsafe_code="store_unsafe",
+        unsafe_message="runtime artifact must be one regular, non-link file",
+    )
     plan = {
         "schema": schema_manifest(),
         "store": str(target_store),
@@ -128,8 +145,8 @@ def setup(
             "path": str(artifact_path),
             "action": (
                 "noop"
-                if artifact_path.exists()
-                and hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+                if artifact_existed
+                and hashlib.sha256(artifact_bytes).hexdigest()
                 == artifact.sha256
                 else "install"
             ),
@@ -173,11 +190,19 @@ def setup(
         )
         if global_plan and global_plan["materialize"]:
             target_path = Path(str(global_plan["target_path"]))
-            old_target = target_path.read_bytes() if target_path.exists() else None
-            atomic_write(
+            old_existed, old_bytes = read_physical_regular_bytes(
                 target_path,
-                Path(str(global_plan["source_path"])).read_bytes(),
+                unsafe_code="instruction_target_unsafe",
+                unavailable_code="instruction_file_unreadable",
             )
+            old_target = old_bytes if old_existed else None
+            _src_existed, src_bytes = read_physical_regular_bytes(
+                Path(str(global_plan["source_path"])),
+                allow_missing_parent=False,
+                unsafe_code="global_source_unsafe",
+                unavailable_code="global_source_missing",
+            )
+            atomic_write(target_path, src_bytes)
         if current_sidecar_sha != hook_sha:
             _write_hooks(desired_hook_bytes)
         skill_snapshot = snapshot_skill(root=skill_plan.path.parent)
@@ -276,11 +301,20 @@ def doctor(*, identity: ProjectIdentity) -> dict[str, Any]:
             runtime_root()
             / f"agent-memory-{runtime.artifact_sha256[:16]}.pyz"
         ).resolve(strict=False)
+        try:
+            artifact_ok, artifact_bytes = read_physical_regular_bytes(
+                artifact,
+                allow_missing_parent=False,
+                unsafe_code="store_unsafe",
+            )
+            artifact_sha = hashlib.sha256(artifact_bytes).hexdigest() if artifact_ok else ""
+        except CoreError:
+            artifact_ok = False
+            artifact_sha = ""
         if (
             artifact.resolve(strict=False) != expected_artifact
-            or not artifact.exists()
-            or hashlib.sha256(artifact.read_bytes()).hexdigest()
-            != runtime.artifact_sha256
+            or not artifact_ok
+            or artifact_sha != runtime.artifact_sha256
         ):
             errors.append(
                 {
@@ -367,16 +401,28 @@ def doctor(*, identity: ProjectIdentity) -> dict[str, Any]:
             identity=identity,
         )
         try:
-            source_bytes = source.read_bytes()
-            target_bytes = target.read_bytes()
-            source_sha = hashlib.sha256(source_bytes).hexdigest()
-            target_sha = hashlib.sha256(target_bytes).hexdigest()
-            parity = (
-                source_bytes == target_bytes
-                and source_sha == binding.source_file_sha256
-                and target_sha == binding.target_file_sha256
+            source_ok, source_bytes = read_physical_regular_bytes(
+                source,
+                allow_missing_parent=False,
+                unsafe_code="global_source_unsafe",
             )
-        except OSError:
+            target_ok, target_bytes = read_physical_regular_bytes(
+                target,
+                allow_missing_parent=False,
+                unsafe_code="instruction_target_unsafe",
+            )
+            if not source_ok or not target_ok:
+                parity = False
+                source_sha = target_sha = ""
+            else:
+                source_sha = hashlib.sha256(source_bytes).hexdigest()
+                target_sha = hashlib.sha256(target_bytes).hexdigest()
+                parity = (
+                    source_bytes == target_bytes
+                    and source_sha == binding.source_file_sha256
+                    and target_sha == binding.target_file_sha256
+                )
+        except (OSError, CoreError):
             parity = False
             source_sha = target_sha = ""
         global_report = {
@@ -431,7 +477,15 @@ def _global_materialization_plan(
     if source_root is None:
         return None
     source = source_root / "global" / "AGENTS.md"
-    if not source.exists():
+    if (
+        assert_physical_regular_file(
+            source,
+            allow_missing=True,
+            allow_missing_parent=True,
+            unsafe_code="global_source_unsafe",
+        )
+        is None
+    ):
         raise CoreError(
             "global_source_missing",
             "global source must contain global/AGENTS.md",
@@ -495,11 +549,20 @@ def _global_materialization_plan(
 
 def _read_hooks() -> tuple[dict[str, Any], bytes | None]:
     path = hooks_path()
-    if not path.exists():
-        return {}, None
     try:
-        data = path.read_bytes()
+        existed, data = read_physical_regular_bytes(
+            path,
+            allow_missing_parent=True,
+            unsafe_code="hook_config_invalid",
+            unsafe_message="Codex hooks.json must be one regular, non-link file",
+            unavailable_code="hook_config_invalid",
+            unavailable_message="Codex hooks.json is unreadable or invalid",
+        )
+        if not existed:
+            return {}, None
         value = json.loads(data.decode("utf-8"))
+    except CoreError:
+        raise
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise CoreError(
             "hook_config_invalid",
@@ -575,28 +638,29 @@ def _restore_registry(
 
 def _git_identity(root: Path) -> tuple[str | None, bool]:
     try:
-        commit = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
+        assert_physical_directory_chain(
+            root,
+            allow_missing_tail=False,
+            unsafe_code="global_source_unready",
         )
-        status = subprocess.run(
-            ["git", "status", "--porcelain"],
+        commit = run_safe_git(
+            root,
+            "rev-parse",
+            "HEAD",
             cwd=root,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
+            error_code="global_source_unready",
         )
-    except OSError:
+        status = run_safe_git(
+            root,
+            "status",
+            "--porcelain",
+            cwd=root,
+            error_code="global_source_unready",
+        )
+    except CoreError:
         return None, False
-    value = commit.stdout.strip() if commit.returncode == 0 else ""
-    return (value or None), status.returncode == 0 and not status.stdout.strip()
+    value = commit.stdout.decode("utf-8", errors="replace").strip()
+    return (value or None), not status.stdout.decode("utf-8", errors="replace").strip()
 
 
 def _package_root() -> Path:

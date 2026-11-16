@@ -316,7 +316,18 @@ proposal body、before 文档和规则正文始终留在实际 instruction targe
 统一入口先完成原有 Release Resolver；指令分发调用 verified portable 内 Core wheel，完整 Codex 能力安装仍走
 Workstation Reconcile。Pi 原生 package manifest 暴露同一 Bootstrap Anchor 与可选 Engineering Contract Review，
 Claude Code 原生 Plugin 读取相同 Skill 目录；方法分发不引入第二实现，也不授予 Desktop-bound Scout 资格。
-详见[同步契约](../../specs/global-instruction-sync-v1.md)。本机部署与另一设备、刷新加载、行为采用分开验收。
+详见[同步契约](../../specs/global-instruction-sync-v1.md)与[多宿主能力阶梯 ADR](../decisions/0083-multihost-capability-ladder.zh.md)。本机部署与另一设备、刷新加载、行为采用分开验收。
+
+### 多宿主三阶能力阶梯（ADR Gate）
+
+| 阶梯 | 能力 | Codex | Pi | Claude Code |
+| --- | --- | --- | --- | --- |
+| **L1** | 全局规范同步（`instructions sync`） | 已支持 | 已支持 | 已支持（显式接入 `CLAUDE.md`） |
+| **L2** | 只读 Scout / 工程审阅 | 已支持（v7/v8） | 候选（v8/v9，只读） | 候选（v8/v9，只读） |
+| **L3** | 规则审批与受控写入 | 已支持（CLI + Hooks） | **阻断（须先通过 ADR）** | **阻断（须先通过 ADR）** |
+
+- Pi 与 Claude Code 进入 L3 前必须由正式 ADR 批准“不可伪造的宿主原生确认原语”；禁止任何未经批准的写入代码、Hook 或关键词/自然语言匹配确认。
+- Scheduled 实验（`PAUSED / 0 of 14`）与日常交互式验收独立解耦，`global_owner_scout_host_profile_v1` 仍保留用于可选实验持久化。
 
 ## Scope 与 Desktop
 

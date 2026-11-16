@@ -5,66 +5,27 @@ import hashlib
 import json
 import os
 import stat
-from contextlib import contextmanager
+import sys
 from pathlib import Path
 from typing import Any
 
-from prepare_delivery import (is_reparse, safe_artifact_bytes, validate_output_root,
-                              write_immutable_artifact)
+_SCRIPT_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+
+from prepare_delivery import write_immutable_artifact
+from scout_security import (
+    is_reparse,
+    pinned_directory,
+    safe_artifact_bytes,
+    validate_output_root,
+)
 from validate_output import ContractError
 
 
 def require(value: bool, reason: str) -> None:
     if not value:
         raise ContractError(reason)
-
-
-@contextmanager
-def pinned_directory(root: Path):
-    before = root.stat()
-    handles = []
-    descriptor = None
-    if os.name == 'nt':
-        import ctypes
-        from ctypes import wintypes
-        kernel = ctypes.WinDLL('kernel32', use_last_error=True)
-        create = kernel.CreateFileW
-        create.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
-                           wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
-        create.restype = wintypes.HANDLE
-        close = kernel.CloseHandle
-        close.argtypes = [wintypes.HANDLE]
-        close.restype = wintypes.BOOL
-    try:
-        if os.name == 'nt':
-            # Deny WRITE and DELETE sharing: prevent rename and in-place reparse mutation.
-            # must fail until both artifacts and readback are complete. No privilege change.
-            for directory in reversed([root, *root.parents]):
-                handle = create(str(directory), 0x80000000, 0x1, None, 3, 0x02000000 | 0x00200000, None)
-                if handle == ctypes.c_void_p(-1).value:
-                    raise ctypes.WinError(ctypes.get_last_error())
-                handles.append(handle)
-                observed = directory.lstat()
-                require(stat.S_ISDIR(observed.st_mode) and not is_reparse(observed), 'history_output_changed')
-        else:
-            descriptor = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-            opened = os.fstat(descriptor)
-            require((opened.st_dev, opened.st_ino) == (before.st_dev, before.st_ino), 'history_output_changed')
-        current = root.lstat()
-        require(not is_reparse(current) and not stat.S_ISLNK(current.st_mode)
-                and (current.st_dev, current.st_ino) == (before.st_dev, before.st_ino), 'history_output_changed')
-        require(root.resolve(strict=True) == root, 'history_output_ancestor_changed')
-        yield descriptor
-        current = root.lstat()
-        require(not is_reparse(current) and not stat.S_ISLNK(current.st_mode)
-                and (current.st_dev, current.st_ino) == (before.st_dev, before.st_ino), 'history_output_changed')
-        require(root.resolve(strict=True) == root, 'history_output_ancestor_changed')
-    finally:
-        if descriptor is not None:
-            os.close(descriptor)
-        if os.name == 'nt':
-            for handle in reversed(handles):
-                close(handle)
 
 
 def write_native_artifact(root: Path, descriptor: int | None, name: str, data: bytes) -> None:
@@ -89,17 +50,11 @@ def write_native_artifact(root: Path, descriptor: int | None, name: str, data: b
 
 
 def history_output_root(artifact_dir: Path, protected_roots: list[Path]) -> Path:
-    root = validate_output_root(artifact_dir, protected_roots)
-    # Reject aliased ancestors too: resolving a path must not silently change the grant.
-    for ancestor in [artifact_dir, *artifact_dir.parents]:
-        observed = ancestor.lstat()
-        # Same existing L1 policy as Core file_security: OS-owned POSIX top-level
-        # mappings are trusted; user-controlled links and Windows reparse points are not.
-        trusted = (os.name == 'posix' and stat.S_ISLNK(observed.st_mode)
-                   and observed.st_uid == 0 and ancestor.parent == Path(ancestor.anchor)
-                   and ancestor != artifact_dir)
-        require(trusted or not ancestor.is_symlink() and not is_reparse(observed), 'history_output_ancestor_alias')
-    return root
+    return validate_output_root(
+        artifact_dir,
+        protected_roots,
+        ancestor_error='history_output_ancestor_alias',
+    )
 
 
 def capture_native(value: Any, *, artifact_dir: Path, protected_roots: list[Path]) -> dict[str, Any]:

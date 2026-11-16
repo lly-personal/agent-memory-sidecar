@@ -3,15 +3,88 @@ from __future__ import annotations
 import os
 import re
 import stat
+import subprocess
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
 from .errors import CoreError
 
+_LOCK_TIMEOUT_SECONDS = 5.0
+_GIT_ENV_STRIP = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")
+
 
 def logical_absolute(path: Path | str) -> Path:
     return Path(os.path.abspath(os.fspath(Path(path).expanduser())))
+
+
+def safe_git_executable(workspace: Path | str | None = None) -> str | None:
+    resolved_workspace: Path | None = None
+    if workspace is not None:
+        try:
+            candidate_ws = logical_absolute(workspace).resolve(strict=True)
+            for ancestor in (candidate_ws, *candidate_ws.parents):
+                try:
+                    (ancestor / ".git").lstat()
+                except FileNotFoundError:
+                    continue
+                resolved_workspace = ancestor
+                break
+            else:
+                resolved_workspace = candidate_ws
+        except OSError:
+            resolved_workspace = logical_absolute(workspace)
+    git_name = "git.exe" if os.name == "nt" else "git"
+    for directory in os.get_exec_path():
+        folder = Path(directory.strip('"') if os.name == "nt" else directory)
+        if not folder.is_absolute():
+            continue
+        try:
+            candidate = (folder / git_name).resolve(strict=True)
+        except (FileNotFoundError, NotADirectoryError, OSError):
+            continue
+        if (
+            resolved_workspace is not None
+            and candidate.is_relative_to(resolved_workspace)
+        ):
+            continue
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
+
+
+def run_safe_git(
+    root: Path,
+    *args: str,
+    cwd: Path | None = None,
+    timeout: int = 60,
+    error_code: str = "git_unavailable",
+    error_message: str = "Git operation failed",
+) -> subprocess.CompletedProcess[bytes]:
+    executable = safe_git_executable(workspace=cwd or root)
+    if executable is None:
+        raise CoreError(error_code, error_message)
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in _GIT_ENV_STRIP
+    }
+    env.update(GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
+    try:
+        result = subprocess.run(
+            [executable, "-C", str(root), *args],
+            cwd=cwd or root,
+            capture_output=True,
+            env=env,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise CoreError(error_code, error_message) from exc
+    if result.returncode != 0:
+        raise CoreError(error_code, error_message)
+    return result
 
 
 @contextmanager
@@ -176,19 +249,37 @@ def _is_trusted_host_directory_alias(
     )
 
 
-def _validate_physical_directory_chain(path: Path) -> None:
+def assert_physical_directory_chain(
+    path: Path | str,
+    *,
+    allow_missing_tail: bool = False,
+    missing_code: str = "store_unsafe",
+    unsafe_code: str = "store_unsafe",
+    missing_message: str = "Core Store ancestor metadata is unavailable",
+    unsafe_message: str = "Core Store ancestor must be a physical directory",
+    unavailable_message: str = "Core Store ancestor metadata is unavailable",
+) -> os.stat_result | None:
     logical = logical_absolute(path)
     cursor = Path(logical.anchor)
+    value: os.stat_result | None = None
+    if not logical.parts[1:]:
+        try:
+            value = cursor.lstat()
+        except OSError as exc:
+            raise CoreError(unsafe_code, unavailable_message, path=str(cursor)) from exc
+        if not stat.S_ISDIR(value.st_mode) or stat.S_ISLNK(value.st_mode) or _is_reparse_point(value):
+            raise CoreError(unsafe_code, unsafe_message, path=str(cursor))
+        return value
     for part in logical.parts[1:]:
         cursor = cursor / part
         try:
             value = cursor.lstat()
+        except FileNotFoundError as exc:
+            if allow_missing_tail:
+                return None
+            raise CoreError(missing_code, missing_message, path=str(cursor)) from exc
         except OSError as exc:
-            raise CoreError(
-                "store_unsafe",
-                "Core Store ancestor metadata is unavailable",
-                path=str(cursor),
-            ) from exc
+            raise CoreError(unsafe_code, unavailable_message, path=str(cursor)) from exc
         alias = stat.S_ISLNK(value.st_mode) or _is_reparse_point(value)
         if alias and _is_trusted_host_directory_alias(cursor, value):
             try:
@@ -196,23 +287,203 @@ def _validate_physical_directory_chain(path: Path) -> None:
                 resolved_value = resolved.stat()
             except OSError as exc:
                 raise CoreError(
-                    "store_unsafe",
+                    unsafe_code,
                     "trusted host directory mapping cannot be resolved",
                     path=str(cursor),
                 ) from exc
             if not stat.S_ISDIR(resolved_value.st_mode):
                 raise CoreError(
-                    "store_unsafe",
+                    unsafe_code,
                     "trusted host directory mapping is not a directory",
                     path=str(cursor),
                 )
+            value = resolved_value
             continue
         if not stat.S_ISDIR(value.st_mode) or alias:
-            raise CoreError(
-                "store_unsafe",
-                "Core Store ancestor must be a physical directory",
-                path=str(cursor),
-            )
+            raise CoreError(unsafe_code, unsafe_message, path=str(cursor))
+    return value
+
+
+def _validate_physical_directory_chain(path: Path) -> None:
+    assert_physical_directory_chain(path, allow_missing_tail=False)
+
+
+def assert_physical_regular_file(
+    path: Path | str,
+    *,
+    allow_missing: bool = True,
+    allow_missing_parent: bool | None = None,
+    directory_fd: int | None = None,
+    missing_code: str = "store_unavailable",
+    missing_message: str = "Core Store does not exist",
+    parent_missing_code: str | None = None,
+    parent_missing_message: str = "physical parent directory does not exist",
+    unsafe_code: str = "store_unsafe",
+    unsafe_message: str = "file must be one regular, non-link file",
+    unavailable_code: str | None = None,
+    unavailable_message: str = "file metadata cannot be read",
+) -> os.stat_result | None:
+    logical = logical_absolute(path)
+    missing_parent_allowed = allow_missing if allow_missing_parent is None else allow_missing_parent
+    if directory_fd is None:
+        parent = assert_physical_directory_chain(
+            logical.parent,
+            allow_missing_tail=missing_parent_allowed,
+            missing_code=parent_missing_code or unsafe_code,
+            unsafe_code=unsafe_code,
+            missing_message=parent_missing_message,
+            unsafe_message=unsafe_message,
+            unavailable_message=unavailable_message,
+        )
+        if parent is None:
+            return None
+    try:
+        value = (
+            logical.lstat()
+            if directory_fd is None
+            else os.stat(logical.name, dir_fd=directory_fd, follow_symlinks=False)
+        )
+    except FileNotFoundError as exc:
+        if allow_missing:
+            return None
+        raise CoreError(missing_code, missing_message, path=str(logical)) from exc
+    except OSError as exc:
+        raise CoreError(
+            unavailable_code or unsafe_code,
+            unavailable_message,
+            path=str(logical),
+        ) from exc
+    if (
+        not stat.S_ISREG(value.st_mode)
+        or stat.S_ISLNK(value.st_mode)
+        or _is_reparse_point(value)
+        or value.st_nlink != 1
+    ):
+        raise CoreError(
+            unsafe_code,
+            unsafe_message,
+            path=str(logical),
+            link_count=value.st_nlink,
+        )
+    return value
+
+
+def read_physical_regular_bytes(
+    path: Path | str,
+    *,
+    directory_fd: int | None = None,
+    allow_missing_parent: bool = True,
+    parent_missing_code: str | None = None,
+    parent_missing_message: str = "physical parent directory does not exist",
+    unsafe_code: str = "store_unsafe",
+    unsafe_message: str = "file must be one regular, non-link file",
+    unavailable_code: str | None = None,
+    unavailable_message: str = "file cannot be read",
+) -> tuple[bool, bytes]:
+    logical = logical_absolute(path)
+    before = assert_physical_regular_file(
+        logical,
+        allow_missing=True,
+        allow_missing_parent=allow_missing_parent,
+        directory_fd=directory_fd,
+        parent_missing_code=parent_missing_code,
+        parent_missing_message=parent_missing_message,
+        unsafe_code=unsafe_code,
+        unsafe_message=unsafe_message,
+        unavailable_code=unavailable_code,
+        unavailable_message=unavailable_message,
+    )
+    if before is None:
+        return False, b""
+    try:
+        if directory_fd is None:
+            no_follow = getattr(os, "O_NOFOLLOW", 0)
+            if no_follow:
+                fd = os.open(logical, os.O_RDONLY | no_follow)
+                handle = os.fdopen(fd, "rb")
+            else:
+                handle = logical.open("rb")
+        else:
+            no_follow = getattr(os, "O_NOFOLLOW", 0)
+            fd = os.open(logical.name, os.O_RDONLY | no_follow, dir_fd=directory_fd)
+            handle = os.fdopen(fd, "rb")
+        with handle:
+            opened = os.fstat(handle.fileno())
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_nlink != 1
+                or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
+            ):
+                raise CoreError(
+                    unsafe_code,
+                    "file changed while it was opened",
+                    path=str(logical),
+                )
+            data = handle.read()
+    except OSError as exc:
+        raise CoreError(
+            unavailable_code or unsafe_code,
+            unavailable_message,
+            path=str(logical),
+        ) from exc
+    after = assert_physical_regular_file(
+        logical,
+        allow_missing=False,
+        allow_missing_parent=False,
+        directory_fd=directory_fd,
+        missing_code=unsafe_code,
+        missing_message="file disappeared while it was read",
+        unsafe_code=unsafe_code,
+        unsafe_message=unsafe_message,
+        unavailable_code=unavailable_code,
+        unavailable_message=unavailable_message,
+    )
+    assert after is not None
+    if (after.st_dev, after.st_ino) != (before.st_dev, before.st_ino):
+        raise CoreError(
+            unsafe_code,
+            "file changed while it was read",
+            path=str(logical),
+        )
+    return True, data
+
+
+def acquire_file_lock(
+    handle: object,
+    *,
+    timeout_seconds: float = _LOCK_TIMEOUT_SECONDS,
+    timeout_code: str = "instruction_lock_timeout",
+    timeout_message: str = "timed out waiting for instruction target lock",
+) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0)  # type: ignore[attr-defined]
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)  # type: ignore[attr-defined]
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore[attr-defined]
+            return
+        except OSError as exc:
+            if time.monotonic() >= deadline:
+                raise CoreError(timeout_code, timeout_message) from exc
+            time.sleep(0.05)
+
+
+def release_file_lock(handle: object) -> None:
+    if os.name == "nt":
+        import msvcrt
+
+        handle.seek(0)  # type: ignore[attr-defined]
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)  # type: ignore[attr-defined]
+    else:
+        import fcntl
+
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)  # type: ignore[attr-defined]
 
 
 def prepare_store_parent(path: Path | str) -> Path:

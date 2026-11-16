@@ -9,7 +9,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .errors import CoreError
-from .file_security import _is_trusted_host_directory_alias, logical_absolute
+from .file_security import (
+    assert_physical_directory_chain,
+    assert_physical_regular_file,
+    logical_absolute,
+    read_physical_regular_bytes,
+)
 
 
 SKILL_NAME = "agent-memory"
@@ -49,57 +54,16 @@ def default_user_skill_root() -> Path:
     return Path.home() / ".agents" / "skills"
 
 
-def _is_reparse_point(value: os.stat_result) -> bool:
-    return bool(
-        getattr(value, "st_file_attributes", 0)
-        & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+def _assert_skill_directory_chain(path: Path, *, allow_missing_tail: bool) -> os.stat_result | None:
+    return assert_physical_directory_chain(
+        path,
+        allow_missing_tail=allow_missing_tail,
+        missing_code="skill_target_unsafe",
+        unsafe_code="skill_target_unsafe",
+        missing_message="Skill directory is missing",
+        unsafe_message="Skill directory contains a filesystem alias",
+        unavailable_message="Skill directory metadata is unavailable",
     )
-
-
-def _assert_skill_directory_chain(path: Path, *, allow_missing_tail: bool) -> None:
-    logical = logical_absolute(path)
-    cursor = Path(logical.anchor)
-    for part in logical.parts[1:]:
-        cursor = cursor / part
-        try:
-            value = cursor.lstat()
-        except FileNotFoundError:
-            if allow_missing_tail:
-                return
-            raise CoreError(
-                "skill_target_unsafe",
-                "Skill directory is missing",
-                path=str(cursor),
-            )
-        except OSError as exc:
-            raise CoreError(
-                "skill_target_unsafe",
-                "Skill directory metadata is unavailable",
-                path=str(cursor),
-            ) from exc
-        alias = stat.S_ISLNK(value.st_mode) or _is_reparse_point(value)
-        if alias and _is_trusted_host_directory_alias(cursor, value):
-            try:
-                resolved_value = cursor.resolve(strict=True).stat()
-            except OSError as exc:
-                raise CoreError(
-                    "skill_target_unsafe",
-                    "trusted host directory mapping cannot be resolved",
-                    path=str(cursor),
-                ) from exc
-            if not stat.S_ISDIR(resolved_value.st_mode):
-                raise CoreError(
-                    "skill_target_unsafe",
-                    "trusted host directory mapping is not a directory",
-                    path=str(cursor),
-                )
-            continue
-        if not stat.S_ISDIR(value.st_mode) or alias:
-            raise CoreError(
-                "skill_target_unsafe",
-                "Skill directory contains a filesystem alias",
-                path=str(cursor),
-            )
 
 
 def _skill_tree_files(path: Path) -> list[Path]:
@@ -128,25 +92,15 @@ def _skill_tree_files(path: Path) -> list[Path]:
             )
         for name in sorted(file_names):
             item = current / name
-            try:
-                value = item.lstat()
-            except OSError as exc:
-                raise CoreError(
-                    "skill_target_unsafe",
-                    "Skill file metadata is unavailable",
-                    path=str(item),
-                ) from exc
-            if (
-                not stat.S_ISREG(value.st_mode)
-                or stat.S_ISLNK(value.st_mode)
-                or _is_reparse_point(value)
-                or value.st_nlink != 1
-            ):
-                raise CoreError(
-                    "skill_target_unsafe",
-                    "Skill tree contains an unsafe file",
-                    path=str(item),
-                )
+            assert_physical_regular_file(
+                item,
+                allow_missing=False,
+                allow_missing_parent=False,
+                missing_code="skill_target_unsafe",
+                unsafe_code="skill_target_unsafe",
+                unsafe_message="Skill tree contains an unsafe file",
+                unavailable_message="Skill file metadata is unavailable",
+            )
             files.append(item)
     return files
 
@@ -154,28 +108,7 @@ def _skill_tree_files(path: Path) -> list[Path]:
 def _physical_skill_directory_exists(path: Path) -> bool:
     logical = logical_absolute(path)
     _assert_skill_directory_chain(logical.parent, allow_missing_tail=False)
-    try:
-        value = logical.lstat()
-    except FileNotFoundError:
-        return False
-    except OSError as exc:
-        raise CoreError(
-            "skill_target_unsafe",
-            "Skill directory metadata is unavailable",
-            path=str(logical),
-        ) from exc
-    if (
-        not stat.S_ISDIR(value.st_mode)
-        or stat.S_ISLNK(value.st_mode)
-        or _is_reparse_point(value)
-    ):
-        raise CoreError(
-            "skill_target_unsafe",
-            "Skill directory is not physical",
-            path=str(logical),
-        )
-    _assert_skill_directory_chain(logical, allow_missing_tail=False)
-    return True
+    return _assert_skill_directory_chain(logical, allow_missing_tail=True) is not None
 
 
 def build_skill_files() -> dict[str, str]:
@@ -211,19 +144,26 @@ def skill_package_sha256(files: dict[str, str] | None = None) -> str:
 
 def installed_skill_sha256(path: Path) -> str | None:
     logical = logical_absolute(path)
-    _assert_skill_directory_chain(logical.parent, allow_missing_tail=True)
-    if not logical.parent.exists():
+    if _assert_skill_directory_chain(logical.parent, allow_missing_tail=True) is None:
         return None
     if not _physical_skill_directory_exists(logical):
         return None
     expected = build_skill_files()
-    try:
-        values = {
-            relative: (logical / relative).read_text(encoding="utf-8")
-            for relative in expected
-        }
-    except OSError:
-        return None
+    values: dict[str, str] = {}
+    for relative in expected:
+        existed, data = read_physical_regular_bytes(
+            logical / relative,
+            allow_missing_parent=True,
+            unsafe_code="skill_target_unsafe",
+            unsafe_message="Skill tree contains an unsafe file",
+            unavailable_message="Skill file cannot be read",
+        )
+        if not existed:
+            return None
+        try:
+            values[relative] = data.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
     if set(
         item.relative_to(logical).as_posix()
         for item in _skill_tree_files(logical)

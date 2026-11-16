@@ -56,7 +56,8 @@ The Python wheel/sdist contain Core only. Plugin, Bootstrap, and Scout ship in t
 the release manifest, package metadata, Plugin manifest, Skill contracts, archive names, and installed-runtime smoke agree.
 In v0.3.12, Scout 5.8 replaces Project/Review Pack v4 with v5 discovery provenance and
 dispositions; v4 payloads are not accepted as v5 and must be regenerated from evidence. Delivery v1 is unchanged. Bootstrap 2.2.1
-materializes the matching Scout version. The existing frozen Skill 4 compatibility lane remains governed by its QDR.
+materializes the matching Scout version. The former frozen Skill 4 compatibility adapter (`QDR 0001`) has been retired:
+frozen v4 tasks are no longer resumable, and current entrypoints reject `global_owner_scout_project_v3` and `global_owner_scout_review_pack_v2`.
 The v0.3.13 and v0.3.14 lanes keep Project v5 and Delivery v1. Review Pack v6 requires the exact installed Core selection preview;
 v5 packs must be re-prepared against fresh Owner bytes before offering confirmation. Scout 5.9 needs Core preview support.
 Core 0.3.14 fixes UTF-8 input for Chinese previews on Windows when Python UTF-8 mode is disabled.
@@ -142,3 +143,14 @@ Scout 5.19.6 moves the existing cache baseline to Phase 0 and distinguishes a mi
 Scout 5.19.7 separates successful clipped-field recovery from rejected native requests and extends the existing source-first review to map semantics, source-derived paths and intervention attribution. Plugin 1.11.8 and Bootstrap 2.5.10 carry the same method with Core 0.6.12. Result schemas, runtime algorithms, permissions and models are unchanged. Semantic samples and controlled review do not qualify complete natural handoff.
 
 Scout 5.19.8 reads Windows terminal frames through CR or LF without requiring EOF and advertises the existing Card/Pack hash helpers through `describe-input`. Plugin 1.11.9 and Bootstrap 2.5.11 synchronize these changes for Core 0.6.13. Project v7, Review Pack v8 and Delivery v2 remain compatible; hashes do not establish source correctness or natural adoption.
+
+## Multi-Host Capability Ladder & L3 ADR Gate
+
+| Level | Capability | Codex | Pi | Claude Code |
+|---|---|---|---|---|
+| **Level 1** | On-demand global instruction sync (`instructions sync`) | Active (`~/.codex/AGENTS.md`) | Active (`AGENTS.md` + registry) | Active (explicit opt-in `~/.claude/CLAUDE.md` + registry) |
+| **Level 2** | Read-only Scout / engineering review | Active (Project v7 / Pack v8) | Candidate (Project v8 / Pack v9, `observed_only`) | Candidate (Project v8 / Pack v9, `observed_only`) |
+| **Level 3** | Rule approval & `AGENTS.md` mutation | Active (Core CLI + Hooks) | **Blocked pending ADR** | **Blocked pending ADR** |
+
+- **Mandatory ADR Gate before Level 3 for Pi / Claude Code**: No Pi/Claude rule-write path, proposal/confirm store, or confirmation Hook may be introduced until a new accepted ADR defines an unforgeable host-native confirmation primitive bound to runtime identity. Keyword/natural-language matching or model self-reporting is explicitly forbidden.
+- **Scheduled Decoupling**: Scheduled automation remains `PAUSED / 0 of 14` and is decoupled from daily interactive Scout or Core acceptance.
