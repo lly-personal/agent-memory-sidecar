@@ -175,8 +175,8 @@ from workstation_observer import (
     run_json,
 )
 
-BOOTSTRAP_VERSION = "2.5.11"
-SCOUT_VERSION = "5.19.8"
+BOOTSTRAP_VERSION = "2.5.12"
+SCOUT_VERSION = "5.19.9"
 assert BOOTSTRAP_VERSION == _contracts.BOOTSTRAP_VERSION
 assert SCOUT_VERSION == _contracts.SCOUT_VERSION
 

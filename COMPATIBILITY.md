@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.6.14 | 0.6.14 | 1.11.10 | 2.5.12 | 5.19.9 | v8 | 3.11–3.13 |
 | v0.6.13 | 0.6.13 | 1.11.9 | 2.5.11 | 5.19.8 | v8 | 3.11–3.13 |
 | v0.6.12 | 0.6.12 | 1.11.8 | 2.5.10 | 5.19.7 | v8 | 3.11–3.13 |
 | v0.6.11 | 0.6.11 | 1.11.7 | 2.5.9 | 5.19.6 | v8 | 3.11–3.13 |
@@ -143,6 +144,8 @@ Scout 5.19.6 moves the existing cache baseline to Phase 0 and distinguishes a mi
 Scout 5.19.7 separates successful clipped-field recovery from rejected native requests and extends the existing source-first review to map semantics, source-derived paths and intervention attribution. Plugin 1.11.8 and Bootstrap 2.5.10 carry the same method with Core 0.6.12. Result schemas, runtime algorithms, permissions and models are unchanged. Semantic samples and controlled review do not qualify complete natural handoff.
 
 Scout 5.19.8 reads Windows terminal frames through CR or LF without requiring EOF and advertises the existing Card/Pack hash helpers through `describe-input`. Plugin 1.11.9 and Bootstrap 2.5.11 synchronize these changes for Core 0.6.13. Project v7, Review Pack v8 and Delivery v2 remain compatible; hashes do not establish source correctness or natural adoption.
+
+Scout 5.19.9 removes the retired v4 compatibility scripts, adds deterministic zero-read `preflight-summary`, slims its Skill and reference prose, and consolidates physical security checks alongside Core 0.6.14 and Bootstrap 2.5.12. Plugin 1.11.10 carries the updated bundle, and ADR 0083 records the Codex, Pi, and Claude Code multi-host capability ladder and L3 confirmation gate. Active Project v7/v8, Review Pack v8/v9, and Delivery v2 contracts remain compatible; natural handoff and adoption remain separately observed.
 
 ## Multi-Host Capability Ladder & L3 ADR Gate
 

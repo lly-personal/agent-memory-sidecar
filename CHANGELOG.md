@@ -3,6 +3,12 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.14 (2026-11-16)
+
+- Retire the legacy Scout v4 compatibility adapters (`render_review_v4.py`, `validate_output_v4.py`, `QDR-0001`), consolidate physical file and path security primitives across Core, Bootstrap, and Scout, and decompose large Core, Bootstrap, and Scout modules while preserving existing facade imports.
+- Add `scout.py preflight-summary --host ... --purpose ...` for zero-read deterministic orientation, slim Scout guidance documents, and record ADR 0083 defining the Codex, Pi, and Claude Code multi-host capability ladder and L3 confirmation gate.
+- Components: Core 0.6.14, Plugin 1.11.10, Bootstrap 2.5.12, and Scout 5.19.9; existing active Project v7/v8, Review Pack v8/v9, and Delivery v2 wire contracts remain compatible, while complete natural handoff and adoption remain separate evidence.
+
 ## 0.6.13 (2026-11-15)
 
 - Receive native JSON through a Windows terminal as soon as CR or LF arrives, without waiting for EOF or clipping long Unicode input.

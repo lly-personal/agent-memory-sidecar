@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic identity, validation, installation, and rendering for Bootstrap 2.5.11."""
+"""Deterministic identity, validation, installation, and rendering for Bootstrap 2.5.12."""
 
 from __future__ import annotations
 
@@ -33,8 +33,8 @@ from bootstrap_security import (
 
 PACK_VERSION = "global_owner_scout_enrollment_pack_v1"
 PROFILE_VERSION = "global_owner_scout_host_profile_v1"
-BOOTSTRAP_VERSION = "2.5.11"
-SCOUT_VERSION = "5.19.8"
+BOOTSTRAP_VERSION = "2.5.12"
+SCOUT_VERSION = "5.19.9"
 PACK_FIELDS = {
     "contract_version", "status", "display_locale", "bootstrap_version", "generated_at",
     "portable_layer", "discovery", "projects", "recommended_project_refs",
@@ -474,7 +474,7 @@ def validate_prompt(text: str) -> None:
     nonempty(text, "prompt", 4000)
     for pattern in FORBIDDEN_PROMPT:
         require(pattern.search(text) is None, "v5 Scheduled Prompt contains a fixed project binding")
-    required = ["global-owner-scout", "project_scout", "5.19.8", "72", "global_owner_scout_project_v7", "global_owner_scout_review_pack_v8", "gpt-5.6-sol", "medium"]
+    required = ["global-owner-scout", "project_scout", "5.19.9", "72", "global_owner_scout_project_v7", "global_owner_scout_review_pack_v8", "gpt-5.6-sol", "medium"]
     for token in required:
         require(token in text, f"v5 Scheduled Prompt missing {token}")
 
@@ -519,7 +519,7 @@ def self_test() -> None:
         raise AssertionError("fixed prompt accepted")
     except ContractError:
         pass
-    good_prompt = "Use $global-owner-scout mode project_scout Skill 5.19.8 rolling 72 hours global_owner_scout_project_v7 global_owner_scout_review_pack_v8 gpt-5.6-sol medium read-only"
+    good_prompt = "Use $global-owner-scout mode project_scout Skill 5.19.9 rolling 72 hours global_owner_scout_project_v7 global_owner_scout_review_pack_v8 gpt-5.6-sol medium read-only"
     validate_prompt(good_prompt)
     profile = {"contract_version": PROFILE_VERSION, "profile_version": "1.0.0", "updated_at": now, "scout_skill_version": SCOUT_VERSION, "entries": [], "profile_hash": ""}
     profile["profile_hash"] = object_hash(profile, "profile_hash")
