@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify exact Global Owner Scout 5.19.8 renderer or artifact Markdown bytes."""
+"""Verify exact Global Owner Scout 5.19.9 renderer or artifact Markdown bytes."""
 
 from __future__ import annotations
 
