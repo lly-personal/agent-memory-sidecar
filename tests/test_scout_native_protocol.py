@@ -63,6 +63,25 @@ await assert.rejects(tool.execute('capture',{operation:'capture_current',artifac
                                  cwd=project, env=env, capture_output=True, text=True, encoding='utf-8')
             self.assertEqual(run.returncode, 0, run.stderr)
 
+            with tempfile.TemporaryDirectory() as broken_tmp:
+                broken_bin = Path(broken_tmp).resolve()
+                broken_py = broken_bin / ('python.exe' if os.name == 'nt' else 'python3')
+                broken_py.write_text('corrupted shim outside workspace', encoding='utf-8')
+                if os.name != 'nt':
+                    broken_py.chmod(0o755)
+                probe_script = '''
+import assert from 'node:assert/strict';
+import {pathToFileURL} from 'node:url';
+const {resolvePython}=await import(pathToFileURL(process.argv[1]));
+const meta=await resolvePython(process.cwd());
+assert.equal(meta.version[0],3);
+assert.ok(meta.version[1]>=11);
+'''
+                env_broken = dict(os.environ, PATH=str(broken_bin)+os.pathsep+os.environ['PATH'])
+                run_broken = subprocess.run([node, '--input-type=module', '-e', probe_script, str(SCRIPTS/'native_runtime.mjs')],
+                                            cwd=project, env=env_broken, capture_output=True, text=True, encoding='utf-8')
+                self.assertEqual(run_broken.returncode, 0, run_broken.stderr)
+
     def test_native_capture_seals_nonempty_snapshot_and_returns_compact_receipt(self):
         node = shutil.which('node')
         if not node: self.skipTest('Node unavailable')

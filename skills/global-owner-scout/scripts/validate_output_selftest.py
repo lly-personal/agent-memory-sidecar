@@ -485,6 +485,21 @@ def run_self_test() -> None:
     expect_invalid(invalid, vo.validate_project, "English-only user narrative")
     tests += 1
 
+    valid_tech = copy.deepcopy(fixtures[0])
+    valid_tech["project_cards"][0]["pain"] = (
+        "静态盘点入口已定位。`skills/lly-workflow-eval/scripts/lib/resources-pi.mjs` -> "
+        "`inspectPiCallerSkillsDetails` (`pi_caller_skill_patterns_unobserved`)"
+    )
+    valid_tech["project_cards"][0]["project_claim_hash"] = vo.project_claim_hash(valid_tech["project_cards"][0])
+    vo.validate_project(valid_tech)
+    tests += 1
+
+    invalid = copy.deepcopy(fixtures[0])
+    invalid["project_cards"][0]["human_context"]["concrete_before"] = "`skills/lly-workflow-eval/scripts/lib/resources-pi.mjs`"
+    invalid["project_cards"][0]["project_claim_hash"] = vo.project_claim_hash(invalid["project_cards"][0])
+    expect_invalid(invalid, vo.validate_project, "pure-code human_context without Han")
+    tests += 1
+
     invalid = copy.deepcopy(fixtures[0])
     invalid["project_cards"][0]["human_context"]["evidence_refs"] = ["event:missing"]
     invalid["project_cards"][0]["project_claim_hash"] = vo.project_claim_hash(invalid["project_cards"][0])

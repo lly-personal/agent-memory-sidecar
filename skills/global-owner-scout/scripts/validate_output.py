@@ -105,7 +105,9 @@ COMMAND_RE = re.compile(
 )
 RAW_MARKERS = ("<codex_delegation>", "<response-annotations>", "BEGIN PRIVATE KEY", "turn_context", "response_item")
 HAN_RE = re.compile(r"[\u3400-\u9fff]")
-LONG_SENTENCE_SPLIT_RE = re.compile(r"(?:[。！？!?]\s*|\.\s+|\n+)")
+LONG_SENTENCE_SPLIT_RE = re.compile(r"(?:[。！？!?；]\s*|\.\s+|\n+)")
+INLINE_CODE_SPAN_RE = re.compile(r"`[^`\n]+`")
+TECHNICAL_TOKEN_RE = re.compile(r"(?:\b\S*(?:[/_\\]|::|--|->)\S*\b|\b[a-z]+(?:[A-Z][a-z0-9]+)+\b)")
 LANGUAGE_EXEMPT_PATH_PARTS = (
     ".selection_preview.",
     ".kind",
@@ -178,14 +180,19 @@ def require_string(value: Any, path: str, *, allow_empty: bool = False) -> str:
     return value
 
 
-def validate_zh_cn_text(value: Any, path: str, *, max_chars: int | None = None) -> str:
+def validate_zh_cn_text(value: Any, path: str, *, max_chars: int | None = None, require_han: bool = False) -> str:
     text = require_string(value, path)
     if max_chars is not None:
         require(len(text) <= max_chars, f"{path} must be <= {max_chars} characters")
+    if require_han:
+        require(bool(HAN_RE.search(text)), f"{path} must contain Simplified Chinese text")
     for sentence in LONG_SENTENCE_SPLIT_RE.split(text):
         sentence = sentence.strip()
-        if len(sentence) > 40:
-            require(bool(HAN_RE.search(sentence)), f"{path} contains an English-only sentence longer than 40 characters")
+        if not sentence or HAN_RE.search(sentence):
+            continue
+        prose = re.sub(r"\s+", " ", TECHNICAL_TOKEN_RE.sub(" ", INLINE_CODE_SPAN_RE.sub(" ", sentence))).strip()
+        if len(prose) > 40:
+            require(False, f"{path} contains an English-only sentence longer than 40 characters")
     return text
 
 
@@ -524,8 +531,8 @@ def validate_human_context(value: Any, path: str, direct_evidence: list[dict[str
     }
     require_exact_keys(obj, fields, path)
     require(obj["display_locale"] == DISPLAY_LOCALE, f"{path}.display_locale must be {DISPLAY_LOCALE}")
-    validate_zh_cn_text(obj["decision_title"], f"{path}.decision_title", max_chars=60)
-    story = validate_zh_cn_text(obj["project_story"], f"{path}.project_story")
+    validate_zh_cn_text(obj["decision_title"], f"{path}.decision_title", max_chars=60, require_han=True)
+    story = validate_zh_cn_text(obj["project_story"], f"{path}.project_story", require_han=True)
     paragraphs = [paragraph.strip() for paragraph in re.split(r"\n\s*\n", story) if paragraph.strip()]
     require(1 <= len(paragraphs) <= 3, f"{path}.project_story must contain 1 to 3 paragraphs")
     for index, paragraph in enumerate(paragraphs):
@@ -537,7 +544,7 @@ def validate_human_context(value: Any, path: str, direct_evidence: list[dict[str
         "concrete_after",
         "strongest_counterpoint",
     ):
-        validate_zh_cn_text(obj[field], f"{path}.{field}", max_chars=240)
+        validate_zh_cn_text(obj[field], f"{path}.{field}", max_chars=240, require_han=True)
     refs = require_list(obj["evidence_refs"], f"{path}.evidence_refs", nonempty=True)
     direct_refs = {item["ref"] for item in direct_evidence}
     for index, ref in enumerate(refs):
@@ -1225,7 +1232,7 @@ def validate_review_pack(value: Any, *, require_preview: bool = True) -> dict[st
         card = project_cards[index]
         if card.get("kind") == "engineering":
             require(item["recommended_action"] == "discuss" and item["allowed_actions"] == [] and item["integration_preview"] is None and item["selection_token"] is None, f"{path}: engineering advice cannot grant rule actions")
-            validate_zh_cn_text(item["recommended_action_reason"], f"{path}.recommended_action_reason", max_chars=240)
+            validate_zh_cn_text(item["recommended_action_reason"], f"{path}.recommended_action_reason", max_chars=240, require_han=True)
             require_string(item["expected_behavior_change"], f"{path}.expected_behavior_change")
             continue
         relation = item["integration_preview"]["global_relation"]
@@ -1233,7 +1240,7 @@ def validate_review_pack(value: Any, *, require_preview: bool = True) -> dict[st
                  if require_preview or obj["selection_preview"] is not None else True)
         recommended, expected_actions = expected_action_policy(card, parity["status"], relation, ready)
         require(item["recommended_action"] == recommended, f"{path}.recommended_action violates owner routing")
-        validate_zh_cn_text(item["recommended_action_reason"], f"{path}.recommended_action_reason", max_chars=240)
+        validate_zh_cn_text(item["recommended_action_reason"], f"{path}.recommended_action_reason", max_chars=240, require_han=True)
         validate_integration_preview(item["integration_preview"], f"{path}.integration_preview")
         require_string(item["expected_behavior_change"], f"{path}.expected_behavior_change")
         require(
