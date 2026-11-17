@@ -3,6 +3,11 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.15 (2026-11-17)
+
+- Decouple Scout cross-host environment sniffing (`PI_ACP_SESSION`, `T3CODE_*`, `CODEX_THREAD_ID`) from explicit state handles (`--state`), relax backticked code/path token length checks in Chinese user-facing prose while keeping natural-prose English runs constrained, and restore broken-symlink physical scan isolation on Windows.
+- Components: Core 0.6.15, Plugin 1.11.11, Bootstrap 2.5.13, and Scout 5.19.10; active Project v7/v8, Review Pack v8/v9, and Delivery v2 contracts remain compatible, while complete natural handoff and adoption remain separate evidence.
+
 ## 0.6.14 (2026-11-16)
 
 - Retire the legacy Scout v4 compatibility adapters (`render_review_v4.py`, `validate_output_v4.py`, `QDR-0001`), consolidate physical file and path security primitives across Core, Bootstrap, and Scout, and decompose large Core, Bootstrap, and Scout modules while preserving existing facade imports.
