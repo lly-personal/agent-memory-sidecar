@@ -52,7 +52,7 @@
 - Always `coverage=degraded`, `status=degraded`, `fully_read_task_count=0`, `discovery_methods=native_scoped_sources_observed`; never fabricate Codex partitions (`active/archived`). Supports engineering advice only (`allowed_actions=[]`, no Codex-bound rule confirmation).
 - **Pre-history `inspect-native`**: Wrap live ExtensionContext (Pi), live `system/init` (Claude programmatic), or live `source_kind=claude_skill_substitution` (`cwd, project_dir, session_id, skill_dir, plugin_root`) inside `global_owner_scout_native_context_v1`. Never `cd` to mask startup vs. current Git tree drift (`binding_scope=native_skill_substitution_git`). Returns `global_owner_scout_native_binding_v1`.
 - **Host adapters**:
-  - Pi registers `global_owner_scout_context` + shared Scout Skill; `capture_current` validates `artifact_dir`, resolves Python 3.11+ outside the workspace (`-E -s -B`), and calls the immutable importer.
+  - Pi registers `global_owner_scout_context` + shared Scout Skill; `capture_current` validates `artifact_dir`, resolves Python 3.11+ outside the workspace (`-E -s -B`, skipping broken shims/WindowsApps stubs and falling back to `py.exe -3` on Windows PATH when needed), and calls the immutable importer.
   - Claude marketplace exposes shared Scout + two sibling methods via `/agent-memory-sidecar:global-owner-scout`. `claude_native.mjs context|capture` keeps caller session separate from `--source-session-id` and requires pre-deployed pinned SDK `0.3.322` (`prepare_claude_runtime.mjs`, `npm ci --ignore-scripts --omit=optional`). `--help` works read-only without Python/SDK.
   - `observePiTurn(before, events, after)` and `observeClaudeTurn(init, events)` emit `global_owner_scout_native_turn_v1` (observation only; an active-turn snapshot stays usable without waiting for chat termination).
 - **Output grants & binding**: Output roots come only from current host task metadata or explicit current-turn user selection (`inspect-output` verifies physical containment, not consent). Native binding uses same-host inventory (`projectId` or unique native `cwd` / worktree origin match); shell cwd/labels/prompt paths never bind.
@@ -63,7 +63,7 @@
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators excluding their own hash field (`project_claim_hash`, `review_pack_hash`).
 - Evidence refs allow owner sections, ADRs, tests, commits, or event classes; forbid absolute paths, raw dialogue, full commands, accounts, tokens, raw remotes, project IDs, automation IDs, or diagnostic bodies.
 - E1 supports clearly labelled engineering hypotheses only (never rule candidates). Show every E2/E3 card (no cap/truncation); order actionable advice by evidenced impact and dependencies before freezing.
-- Human Context uses concrete Simplified Chinese; Rule Projection is abstract and Owner-ready.
+- Human Context uses concrete Simplified Chinese (inline backtick spans and path/symbol tokens do not count toward the >40-char English-prose check, while Human Context and action reasons must contain Simplified Chinese); Rule Projection is abstract and Owner-ready.
 - `global_owner_scout_preflight_v1` exact fields (zero paths): `contract_version, git_repository, execution_context, head, status_sha256, staged_diff_sha256, unstaged_diff_sha256, untracked_files_sha256, context_snapshot_sha256`. Run `python -B scripts/scout.py inspect-context --project-root <bound-project-root>` before deep reads.
 
 ## Project result
