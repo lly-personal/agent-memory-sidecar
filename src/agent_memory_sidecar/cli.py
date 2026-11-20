@@ -12,7 +12,7 @@ from .database import CoreDatabase
 from .errors import CoreError
 from .file_security import logical_absolute
 from .identity import resolve_identity
-from .instruction_sync import synchronize, unenroll_claude
+from .instruction_sync import synchronize, unenroll_antigravity, unenroll_claude
 from .proposal import RuleBundle, RuleProposal
 from .rule_service import RuleService
 from .rule_preview import preview_bundle, preview_rule
@@ -134,8 +134,11 @@ def build_parser(*, daily_only: bool = False) -> argparse.ArgumentParser:
         sync.add_argument("--codex-home", type=Path)
         sync.add_argument("--pi-agent-dir", type=Path)
         sync.add_argument("--claude-home", type=Path)
+        sync.add_argument("--antigravity-home", type=Path)
         sync.add_argument("--unenroll-claude", action="store_true",
                           help="Preview or apply removal of the exact managed Claude projection and enrollment.")
+        sync.add_argument("--unenroll-antigravity", action="store_true",
+                          help="Preview or apply removal of the exact managed Antigravity projection and enrollment.")
         sync.add_argument("--state-dir", type=Path)
         sync.add_argument("--apply", action="store_true")
         sync.add_argument("--plan-hash")
@@ -412,12 +415,20 @@ def cmd_proposal_discard(args: argparse.Namespace) -> _OperationResult:
 
 
 def cmd_instruction_sync(args: argparse.Namespace) -> dict[str, Any]:
+    if args.unenroll_claude and args.unenroll_antigravity:
+        raise CoreError("invalid_request", "Cannot combine Claude and Antigravity exit options")
     if args.unenroll_claude:
-        if args.source is not None or args.codex_home is not None or args.pi_agent_dir is not None or args.adopt_existing:
+        if args.source is not None or args.codex_home is not None or args.pi_agent_dir is not None or args.antigravity_home is not None or args.adopt_existing:
             raise CoreError("invalid_request", "Claude exit cannot be combined with source, other host, or adoption options")
         return unenroll_claude(claude_home=args.claude_home, state_dir=args.state_dir,
                               apply=args.apply, plan_hash=args.plan_hash)
-    return synchronize(source=args.source, codex_home=args.codex_home, pi_agent_dir=args.pi_agent_dir, claude_home=args.claude_home,
+    if args.unenroll_antigravity:
+        if args.source is not None or args.codex_home is not None or args.pi_agent_dir is not None or args.claude_home is not None or args.adopt_existing:
+            raise CoreError("invalid_request", "Antigravity exit cannot be combined with source, other host, or adoption options")
+        return unenroll_antigravity(antigravity_home=args.antigravity_home, state_dir=args.state_dir,
+                                    apply=args.apply, plan_hash=args.plan_hash)
+    return synchronize(source=args.source, codex_home=args.codex_home, pi_agent_dir=args.pi_agent_dir,
+                       claude_home=args.claude_home, antigravity_home=args.antigravity_home,
                        state_dir=args.state_dir, apply=args.apply, plan_hash=args.plan_hash,
                        adopt_existing=args.adopt_existing)
 
