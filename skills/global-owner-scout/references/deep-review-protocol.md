@@ -6,10 +6,10 @@ Session content discovers leads; current project Owners, ADR/specs, Git, tests, 
 
 ## Phase 0: current-task context
 
-- Before deep reads, run `python -B scripts/scout.py preflight-summary --host codex|pi|claude --purpose review|inspect` for deterministic contract versions and command order without reading files or Git.
+- Before deep reads, run `python -B scripts/scout.py preflight-summary --host codex|pi|claude|antigravity --purpose review|inspect` for deterministic contract versions and command order without reading files or Git.
 - Capture the user-level Skill directory bytecode-cache baseline before the first helper. Always pass `python -B`; attributable helper cache writes fail read-only validation, while missed initial baselines leave the past window unverified without blocking unaffected reads. Never delete caches or replace baselines.
 - Resolve native project binding, installed Skill, explicit external output grant (`filesystem.workspace_roots`, host output metadata, or explicit current-turn user selection), and Python 3 runtime once. Run `inspect-context --project-root <bound-project-root>` (never infer project from helper `cwd`) and `inspect-output --artifact-dir <granted-root> --protected-root <bound-project-root>` before deep work. Missing binding, Git eligibility, or output grant returns `Terminal v1` immediately.
-- Pi/Claude use `inspect-native` with live `ExtensionContext` / `system/init` / `claude_skill_substitution` (never `cd` to hide startup-vs-current Git root drift), Project v8 / Pack v9 (`degraded`, `observed_only` SDK scopes), and `observePiTurn`/`observeClaudeTurn` (active-turn snapshots remain usable).
+- Pi/Claude/Antigravity use `inspect-native` with live `ExtensionContext` / `system/init` / `claude_skill_substitution` / `antigravity_runtime_info` (never `cd` to hide startup-vs-current Git root drift), Project v8 / Pack v9 (`degraded`, `observed_only` native scopes), and `observePiTurn`/`observeClaudeTurn` where applicable (active-turn snapshots remain usable).
 - Scheduled (paused) retains isolated worktree + inline/Inbox verification and needs no artifact root or file preview.
 
 ## Phase 1: identity and task census

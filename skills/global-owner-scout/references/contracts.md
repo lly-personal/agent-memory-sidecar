@@ -2,7 +2,7 @@
 
 ## Current project-map contracts
 
-- **Orientation & schemas**: `python -B scripts/scout.py preflight-summary --host codex|pi|claude --purpose review|inspect` returns `global_owner_scout_preflight_summary_v1` with contract versions and command order without reading files or Git. Use `describe-input project|review` (Codex v7/v8) or `native-project|native-review` (Pi/Claude v8/v9) before authoring JSON; `python -B scripts/validate_output.py --hash-project-card` / `--hash-review-pack` compute derived hashes from stdin without validating or synthesizing fields.
+- **Orientation & schemas**: `python -B scripts/scout.py preflight-summary --host codex|pi|claude|antigravity --purpose review|inspect` returns `global_owner_scout_preflight_summary_v1` with contract versions and command order without reading files or Git. Use `describe-input project|review` (Codex v7/v8) or `native-project|native-review` (Pi/Claude/Antigravity v8/v9) before authoring JSON; `python -B scripts/validate_output.py --hash-project-card` / `--hash-review-pack` compute derived hashes from stdin without validating or synthesizing fields.
 - **Native capture & import**: `capture-native` freezes one complete returned JSON object (including index/error/truncation fields) as private immutable raw bytes (`raw_file/sha256`); it grants no source, identity, call-success, or coverage qualification. `import-history` consumes one actual `read_thread` response (or `raw_file` when eligible) plus independently resolved project/session identity and seals a content-addressed export + index (`global_owner_scout_history_page_v1`), preserving cursors and truncation without claiming comprehension or full chat coverage. Both pin output directory identity (Windows denies ancestor write/delete sharing; POSIX uses directory descriptors) so concurrent redirection cannot write into protected projects. Missing containment blocks without fallback.
 - **Versions**: Active results use Project v7 (`global_owner_scout_project_v7`), Review Pack v8 (`global_owner_scout_review_pack_v8`), and Delivery v2 (`global_owner_scout_delivery_v2`). Historical Project v5/v6 and Review Pack v6/v7 stay readable without regeneration.
 - **Edges & claims**: v7 edges add `kind` (`contains`, `depends_on`, `constrains`, `implements`, `handoff`, `evolves`). Containment is acyclic (multi-parent shared ownership allowed); `depends_on` points dependent -> prerequisite; `constrains` points constraint -> limited target. Structural validation proves reference resolution and connected directed journeys, not semantic truth or intervention attribution (checked by Phase 5).
@@ -43,14 +43,23 @@
   ```
   Called by `exportClaudeSessionPage(sdk, {project_root, session_id, offset, limit})` after validating absolute root, nonempty `session_id`, nonnegative `offset`, positive `limit`. Emits v2 index (`message_ids, record_count, page_request`) without inventing cursors/EOF.
 
+- **Antigravity (`global_owner_scout_native_transcript_v1`)**:
+  ```text
+  contract_version = global_owner_scout_native_transcript_v1
+  native_host = antigravity
+  session = {id, cwd, transcript_kind: "transcript_full"|"transcript"}
+  steps = unmodified JSONL step objects from <appDataDir>/brain/<id>/.system_generated/logs/
+  ```
+  Exported read-only by `scripts/antigravity_native.py capture` after validating write containment before reading any transcript file. Emits v2 index (`step_indices, record_count, transcript_kind`).
+
 ## Common rules
 
 ### Native-session hosts (candidate)
 
-- Pi and Claude use `global_owner_scout_project_v8` + `global_owner_scout_review_pack_v9`.
-- `session_coverage` exact keys: `native_host` (`pi|claude`), `scopes` (`kind`: `project_sessions|session_messages`, `coverage`: `observed_only|unknown|failed`, `record_count, evidence_refs`), `discovered_task_count, selected_task_count, fully_read_task_count, status, discovery_methods`.
+- Pi, Claude, and Antigravity use `global_owner_scout_project_v8` + `global_owner_scout_review_pack_v9`.
+- `session_coverage` exact keys: `native_host` (`pi|claude|antigravity`), `scopes` (`kind`: `project_sessions|session_messages`, `coverage`: `observed_only|unknown|failed`, `record_count, evidence_refs`), `discovered_task_count, selected_task_count, fully_read_task_count, status, discovery_methods`.
 - Always `coverage=degraded`, `status=degraded`, `fully_read_task_count=0`, `discovery_methods=native_scoped_sources_observed`; never fabricate Codex partitions (`active/archived`). Supports engineering advice only (`allowed_actions=[]`, no Codex-bound rule confirmation).
-- **Pre-history `inspect-native`**: Wrap live ExtensionContext (Pi), live `system/init` (Claude programmatic), or live `source_kind=claude_skill_substitution` (`cwd, project_dir, session_id, skill_dir, plugin_root`) inside `global_owner_scout_native_context_v1`. Never `cd` to mask startup vs. current Git tree drift (`binding_scope=native_skill_substitution_git`). Returns `global_owner_scout_native_binding_v1`.
+- **Pre-history `inspect-native`**: Wrap live ExtensionContext (Pi), live `system/init` (Claude programmatic), live `source_kind=claude_skill_substitution` (`cwd, project_dir, session_id, skill_dir, plugin_root`), or live `source_kind=antigravity_runtime_info` (`cwd, project_dir, session_id, app_data_dir`) inside `global_owner_scout_native_context_v1`. Never `cd` to mask startup vs. current Git tree drift (`binding_scope=native_skill_substitution_git` / `native_runtime_info_git`). Returns `global_owner_scout_native_binding_v1`.
 - **Host adapters**:
   - Pi registers `global_owner_scout_context` + shared Scout Skill; `capture_current` validates `artifact_dir`, resolves Python 3.11+ outside the workspace (`-E -s -B`, skipping broken shims/WindowsApps stubs and falling back to `py.exe -3` on Windows PATH when needed), and calls the immutable importer.
   - Claude marketplace exposes shared Scout + two sibling methods via `/agent-memory-sidecar:global-owner-scout`. `claude_native.mjs context|capture` keeps caller session separate from `--source-session-id` and requires pre-deployed pinned SDK `0.3.322` (`prepare_claude_runtime.mjs`, `npm ci --ignore-scripts --omit=optional`). `--help` works read-only without Python/SDK.

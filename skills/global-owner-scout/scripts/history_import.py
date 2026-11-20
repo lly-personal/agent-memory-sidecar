@@ -88,6 +88,7 @@ def import_history(value: Any, *, project_root: Path, session_id: str,
     require(isinstance(value, dict), 'native_history_object_required')
     pi_source = value.get('contract_version') == 'global_owner_scout_native_session_v1'
     claude_source = value.get('contract_version') == 'global_owner_scout_native_page_v1'
+    antigravity_source = value.get('contract_version') == 'global_owner_scout_native_transcript_v1'
     if pi_source:
         require(set(value) == {'contract_version', 'native_host', 'session', 'entries'}
                 and value.get('native_host') == 'pi', 'native_history_source_unsupported')
@@ -118,6 +119,18 @@ def import_history(value: Any, *, project_root: Path, session_id: str,
                 and type(page['offset']) is int and page['offset'] >= 0
                 and type(page['limit']) is int and page['limit'] > 0
                 and page['includeSystemMessages'] is True, 'native_history_page_request_invalid')
+    elif antigravity_source:
+        require(set(value) == {'contract_version', 'native_host', 'session', 'steps'}
+                and value.get('native_host') == 'antigravity', 'native_history_source_unsupported')
+        thread = value['session']
+        require(isinstance(thread, dict) and thread.get('transcript_kind') in {'transcript_full', 'transcript'},
+                'native_history_session_header_unsupported')
+        steps = value['steps']
+        require(isinstance(steps, list) and all(isinstance(step, dict)
+                and type(step.get('step_index')) is int and step['step_index'] >= 0
+                and isinstance(step.get('type'), str) and bool(step['type']) for step in steps),
+                'native_history_step_shape_invalid')
+        require(len({step['step_index'] for step in steps}) == len(steps), 'native_history_duplicate_step')
     else:
         require(value.get('schemaVersion') == 1, 'native_history_schema_unsupported')
         thread = value.get('thread')
@@ -136,7 +149,9 @@ def import_history(value: Any, *, project_root: Path, session_id: str,
         if isinstance(item, dict):
             for key, child in item.items():
                 here = f'{location}.{key}'
-                if (key == 'truncated' or key.endswith('Truncated')) and child is True:
+                if ((key == 'truncated' or key.endswith('Truncated')) and child is True) or (
+                    key == 'truncated_fields' and isinstance(child, list) and bool(child)
+                ):
                     truncations.append(here)
                 visit(child, here)
         elif isinstance(item, list):
@@ -162,6 +177,12 @@ def import_history(value: Any, *, project_root: Path, session_id: str,
                      page_request=value['page_request'],
                      evidence_scope='one scoped Claude SDK message page; project binding, history completeness, '
                                     'task termination, Desktop association and full Scout qualification remain unverified')
+    elif antigravity_source:
+        index.update(contract_version='global_owner_scout_history_page_v2', native_host='antigravity',
+                     step_indices=[step['step_index'] for step in steps], record_count=len(steps),
+                     transcript_kind=thread['transcript_kind'],
+                     evidence_scope='one Antigravity native transcript snapshot; project binding, project-history completeness, '
+                                    'task termination and full Scout qualification remain unverified')
     else:
         index.update(contract_version='global_owner_scout_history_page_v1', page=value.get('page'),
                      turn_ids=[t.get('id') for t in turns], item_count=sum(len(t['items']) for t in turns),
