@@ -26,13 +26,107 @@ from .file_security import (
     secure_store_location,
 )
 from .installation import InstallationRegistry
+from .instruction_document import MANAGED_BLOCK_START
 from .instructions import InstructionRepository, assert_physical_directory, atomic_write, read_document, read_document_bytes
 
 CONTRACT = "global_instruction_sync_v1"
 OWNER_FILE = "global/AGENTS.md"
-HOST_ENV = {"codex": "CODEX_HOME", "pi": "PI_CODING_AGENT_DIR", "claude": "CLAUDE_CONFIG_DIR"}
+HOST_ENV = {
+    "codex": "CODEX_HOME",
+    "pi": "PI_CODING_AGENT_DIR",
+    "claude": "CLAUDE_CONFIG_DIR",
+    "antigravity": "GEMINI_HOME",
+}
 HOST_FILE = {"codex": "AGENTS.md", "pi": "AGENTS.md", "claude": "CLAUDE.md"}
+OPT_IN_HOSTS = frozenset({"claude", "antigravity"})
+OVERRIDE_HOSTS = frozenset({"codex", "pi"})
+ANTIGRAVITY_RULE_MAX_BYTES = 24_000
+ANTIGRAVITY_RULE_HEADER = "---\ntrigger: always_on\n---\n\n"
+ANTIGRAVITY_EMPTY_RULES_BODY = "<!-- No confirmed collaboration rules yet -->\n"
+ANTIGRAVITY_FILES = (
+    "config/rules/01-global-charter.md",
+    "config/rules/02-confirmed-rules.md",
+)
 GIT_OBSERVATION_SECONDS = 60
+
+
+def _project_antigravity_rules(data: bytes) -> dict[str, bytes]:
+    """Deterministically split global AGENTS.md into <=24,000 B Antigravity always_on rules."""
+    text = data.decode("utf-8")
+    idx = text.find(MANAGED_BLOCK_START)
+    if idx != -1:
+        head = text[:idx].rstrip("\n")
+        tail = text[idx:].lstrip("\n")
+        part1_body = (head + "\n") if head else ""
+        part2_body = tail if (not tail or tail.endswith("\n")) else (tail + "\n")
+    else:
+        part1_body = text if text.endswith("\n") else (text + "\n")
+        part2_body = ANTIGRAVITY_EMPTY_RULES_BODY
+    files = {
+        ANTIGRAVITY_FILES[0]: (ANTIGRAVITY_RULE_HEADER + part1_body).encode("utf-8"),
+        ANTIGRAVITY_FILES[1]: (ANTIGRAVITY_RULE_HEADER + part2_body).encode("utf-8"),
+    }
+    for rel, raw in files.items():
+        if len(raw) > ANTIGRAVITY_RULE_MAX_BYTES:
+            raise CoreError(
+                "antigravity_rule_size_exceeded",
+                "Antigravity rule projection exceeds the 24,000-byte per-file limit",
+                host="antigravity",
+                rule_file=rel,
+                actual_bytes=len(raw),
+                max_bytes=ANTIGRAVITY_RULE_MAX_BYTES,
+            )
+    return files
+
+
+def _host_relpaths(name: str) -> tuple[str, ...]:
+    return ANTIGRAVITY_FILES if name == "antigravity" else (HOST_FILE[name],)
+
+
+def _desired_files(name: str, data: bytes) -> dict[str, bytes]:
+    if name == "antigravity":
+        return _project_antigravity_rules(data)
+    return {HOST_FILE[name]: data}
+
+
+def _assert_host_subdirs(home: Path, name: str) -> None:
+    assert_physical_directory(home, allow_missing=True)
+    if name == "antigravity":
+        assert_physical_directory(home / "config", allow_missing=True)
+        assert_physical_directory(home / "config" / "rules", allow_missing=True)
+
+
+def _read_host_files(home: Path, name: str) -> dict[str, bytes | None]:
+    _assert_host_subdirs(home, name)
+    return {rel: _bytes(home / rel) for rel in _host_relpaths(name)}
+
+
+def _host_state_hash(name: str, files: dict[str, bytes | None]) -> str | None:
+    if all(raw is None for raw in files.values()):
+        return None
+    if name != "antigravity":
+        raw = files[HOST_FILE[name]]
+        return _hash(raw) if raw is not None else None
+    manifest = {rel: (_hash(raw) if raw is not None else None) for rel, raw in sorted(files.items())}
+    return _hash(_json(manifest))
+
+
+def _host_has_content(files: dict[str, bytes | None]) -> bool:
+    return any(raw for raw in files.values())
+
+
+def _host_matches(current: dict[str, bytes | None], desired: dict[str, bytes]) -> bool:
+    return all(current.get(rel) == raw for rel, raw in desired.items())
+
+
+def _encode_recovery_before(name: str, current: dict[str, bytes | None]) -> Any:
+    if name != "antigravity":
+        raw = current[HOST_FILE[name]]
+        return base64.b64encode(raw).decode() if raw is not None else None
+    return {
+        rel: (base64.b64encode(raw).decode() if raw is not None else None)
+        for rel, raw in sorted(current.items())
+    }
 
 
 def _hash(data: bytes) -> str:
@@ -142,28 +236,37 @@ def _distinct_hosts(targets: dict[str, Path]) -> None:
 
 
 def _targets(codex_home: Path | None, pi_agent_dir: Path | None, claude_home: Path | None,
-             saved: dict[str, Any]) -> dict[str, Path]:
-    explicit = {name: path for name, path in {"codex": codex_home, "pi": pi_agent_dir, "claude": claude_home}.items() if path is not None}
+             antigravity_home: Path | None, saved: dict[str, Any]) -> dict[str, Path]:
+    explicit = {
+        name: path
+        for name, path in {
+            "codex": codex_home,
+            "pi": pi_agent_dir,
+            "claude": claude_home,
+            "antigravity": antigravity_home,
+        }.items()
+        if path is not None
+    }
     targets = {name: logical_absolute(path) for name, path in saved.get("targets", {}).items()}
     if set(targets) - set(HOST_ENV):
         raise CoreError("instruction_sync_state_invalid", "Unknown host binding")
     defaults = {"codex": Path.home() / ".codex", "pi": Path.home() / ".pi" / "agent"}
     for name in HOST_ENV:
-        if name == "claude" and name not in explicit and name not in targets:
+        if name in OPT_IN_HOSTS and name not in explicit and name not in targets:
             continue
         observed = explicit.get(name)
         configured = os.environ.get(HOST_ENV[name])
-        if (name == "claude" and observed is not None and configured
+        if (name in OPT_IN_HOSTS and observed is not None and configured
                 and logical_absolute(observed) != logical_absolute(configured)):
-            raise CoreError("instruction_target_rebind_required", "Explicit Claude directory differs from the active host context", host=name)
+            raise CoreError("instruction_target_rebind_required", f"Explicit {name} directory differs from the active host context", host=name)
         if observed is None and configured:
             observed = Path(configured)
         if observed is not None:
             observed = logical_absolute(observed)
             if name in targets and targets[name] != observed:
                 raise CoreError("instruction_target_rebind_required", "Existing host directory differs; review the binding before changing it", host=name)
-            if name == "claude" and name not in targets and not observed.is_dir():
-                raise CoreError("instruction_targets_missing", "Claude enrollment requires an existing observed host directory", host=name)
+            if name in OPT_IN_HOSTS and name not in targets and not observed.is_dir():
+                raise CoreError("instruction_targets_missing", f"{name} enrollment requires an existing observed host directory", host=name)
             targets[name] = observed
         elif name not in targets and not explicit and name in defaults and defaults[name].is_dir():
             targets[name] = logical_absolute(defaults[name])
@@ -174,7 +277,8 @@ def _targets(codex_home: Path | None, pi_agent_dir: Path | None, claude_home: Pa
 
 
 def synchronize(*, source: Path | None = None, codex_home: Path | None = None,
-                pi_agent_dir: Path | None = None, claude_home: Path | None = None, state_dir: Path | None = None,
+                pi_agent_dir: Path | None = None, claude_home: Path | None = None,
+                antigravity_home: Path | None = None, state_dir: Path | None = None,
                 apply: bool = False, plan_hash: str | None = None,
                 adopt_existing: list[str] | None = None) -> dict[str, Any]:
     state = logical_absolute(state_dir or Path.home() / ".agents" / "agent-memory")
@@ -185,7 +289,7 @@ def synchronize(*, source: Path | None = None, codex_home: Path | None = None,
     config_path = state / "instruction-sync.json"
     config_before = _bytes(config_path)
     saved = _record(config_path) or {}
-    targets = _targets(codex_home, pi_agent_dir, claude_home, saved)
+    targets = _targets(codex_home, pi_agent_dir, claude_home, antigravity_home, saved)
     bindings = {name: _binding(home) for name, home in targets.items()}
     accepted: dict[str, str] = {}
     for selection in adopt_existing or []:
@@ -233,23 +337,33 @@ def synchronize(*, source: Path | None = None, codex_home: Path | None = None,
             raise CoreError("instruction_source_unpublished", "Local source is not an ancestor of published main") from exc
         digest = _hash(data)
         snapshot_root = state / "sources" / source_identity / commit
-        before: dict[str, bytes | None] = {}
+        desired_by_host: dict[str, dict[str, bytes]] = {name: _desired_files(name, data) for name in targets}
+        before: dict[str, dict[str, bytes | None]] = {}
         rows = []
         for name, home in targets.items():
-            assert_physical_directory(home, allow_missing=True)
-            target = home / HOST_FILE[name]
-            if name != "claude" and _bytes(home / "AGENTS.override.md") is not None:
+            if name in OVERRIDE_HOSTS and _bytes(home / "AGENTS.override.md") is not None:
                 raise CoreError("instruction_target_shadowed", "Host override prevents global instruction qualification", host=name)
-            current = _bytes(target)
+            current = _read_host_files(home, name)
+            desired = desired_by_host[name]
             before[name] = current
+            before_hash = _host_state_hash(name, current)
             binding = bindings[name]
-            if name in accepted and (current is None or _hash(current) != accepted[name]):
+            if name in accepted and (before_hash is None or before_hash != accepted[name]):
                 raise CoreError("instruction_sync_stale_plan", "Reviewed first-enrollment content changed", host=name)
-            if (current and current != data and name not in accepted
-                    and (binding is None or _hash(current) != binding["target_file_sha256"])):
+            if (_host_has_content(current) and not _host_matches(current, desired) and name not in accepted
+                    and (binding is None or before_hash != binding["target_file_sha256"])):
                 raise CoreError("global_instruction_drift", "Local instructions differ from the last deployment; no target changed", host=name)
-            rows.append({"host": name, "target": str(target), "before_sha256": _hash(current) if current is not None else None,
-                         "action": "noop" if current == data else "update", "binding": binding})
+            row_entry: dict[str, Any] = {
+                "host": name,
+                "target": str(home / "config" / "rules") if name == "antigravity" else str(home / HOST_FILE[name]),
+                "before_sha256": before_hash,
+                "action": "noop" if _host_matches(current, desired) else "update",
+                "binding": binding,
+            }
+            if name == "antigravity":
+                row_entry["targets"] = [str(home / rel) for rel in ANTIGRAVITY_FILES]
+                row_entry["target_sha256"] = _host_state_hash(name, desired)
+            rows.append(row_entry)
         desired_config = {"contract_version": CONTRACT, "source_identity": source_identity,
                           "source_root": str(snapshot_root), "targets": {key: str(value) for key, value in targets.items()}}
         plan = {"contract_version": CONTRACT, "source_identity": source_identity, "source_commit": commit,
@@ -265,25 +379,31 @@ def synchronize(*, source: Path | None = None, codex_home: Path | None = None,
             return {**receipt, "status": "planned"}
         if not plan_hash or plan_hash != computed_hash:
             raise CoreError("instruction_sync_stale_plan", "Preview changed; inspect the fresh plan before applying")
-        paths = [config_path, journal, *(home / HOST_FILE[name] for name, home in targets.items()),
-                 *(Path(row["source_root"]) / OWNER_FILE for row in bindings.values() if row)]
+        paths = [
+            config_path,
+            journal,
+            *(home / rel for name, home in targets.items() for rel in _host_relpaths(name)),
+            *(Path(row["source_root"]) / OWNER_FILE for row in bindings.values() if row),
+        ]
         repository = InstructionRepository()
         with repository.lock_paths(paths):
             if _bytes(journal) is not None or _bytes(config_path) != config_before:
                 raise CoreError("instruction_sync_stale_plan", "Synchronization state changed while waiting for the lock")
             for name, home in targets.items():
-                if (_bytes(home / HOST_FILE[name]) != before[name] or _binding(home) != bindings[name]
-                        or (name != "claude" and _bytes(home / "AGENTS.override.md") is not None)):
+                if (_read_host_files(home, name) != before[name] or _binding(home) != bindings[name]
+                        or (name in OVERRIDE_HOSTS and _bytes(home / "AGENTS.override.md") is not None)):
                     raise CoreError("instruction_sync_stale_plan", "Host changed while waiting for the lock", host=name)
             for row in bindings.values():
                 if row:
                     _clean(Path(row["source_root"]))
-            _apply(state, snapshot_root, stage, data, targets, before, bindings, desired_config, config_before)
+            _apply(state, snapshot_root, stage, data, desired_by_host, targets, before, bindings, desired_config, config_before)
         return {**receipt, "applied": True, "status": "reload_required"}
 
 
-def _apply(state: Path, snapshot_root: Path, stage: Path, data: bytes, targets: dict[str, Path],
-           before: dict[str, bytes | None], bindings: dict[str, Any], config: dict[str, Any], config_before: bytes | None) -> None:
+def _apply(state: Path, snapshot_root: Path, stage: Path, data: bytes,
+           desired_by_host: dict[str, dict[str, bytes]], targets: dict[str, Path],
+           before: dict[str, dict[str, bytes | None]], bindings: dict[str, Any],
+           config: dict[str, Any], config_before: bytes | None) -> None:
     journal = state / "instruction-sync-recovery.json"
     config_path = state / "instruction-sync.json"
     prepare_store_parent(journal)
@@ -313,7 +433,7 @@ def _apply(state: Path, snapshot_root: Path, stage: Path, data: bytes, targets: 
         for name, home in targets.items()
     }
     recovery = {"contract_version": CONTRACT, "targets": {name: {
-        "home": str(home), "before": base64.b64encode(before[name]).decode() if before[name] is not None else None,
+        "home": str(home), "before": _encode_recovery_before(name, before[name]),
         "binding": bindings[name], "store_existed": stores_existed[name],
     } for name, home in targets.items()}, "config_before": base64.b64encode(config_before).decode() if config_before is not None else None,
         "after_sha256": digest}
@@ -321,21 +441,24 @@ def _apply(state: Path, snapshot_root: Path, stage: Path, data: bytes, targets: 
     touched: list[str] = []
     try:
         for name, home in targets.items():
-            target = home / HOST_FILE[name]
-            if (_bytes(target) != before[name] or _binding(home) != bindings[name]
-                    or (name != "claude" and _bytes(home / "AGENTS.override.md") is not None)):
+            desired = desired_by_host[name]
+            target_hash = _host_state_hash(name, desired)
+            if (_read_host_files(home, name) != before[name] or _binding(home) != bindings[name]
+                    or (name in OVERRIDE_HOSTS and _bytes(home / "AGENTS.override.md") is not None)):
                 raise CoreError("instruction_sync_stale_plan", "Host changed before its write", host=name)
-            prepare_store_parent(target)
             touched.append(name)
-            if before[name] != data:
-                atomic_write(target, data)
+            for rel, raw in desired.items():
+                target = home / rel
+                prepare_store_parent(target)
+                if before[name][rel] != raw:
+                    atomic_write(target, raw)
             row = {"source_root": str(snapshot_root), "source_commit": snapshot_root.name,
-                   "source_file_sha256": digest, "target_file_sha256": digest,
+                   "source_file_sha256": digest, "target_file_sha256": target_hash,
                    "updated_at": datetime.now(UTC).isoformat()}
             previous = bindings[name]
             if previous is None or any(previous[key] != row[key] for key in row if key != "updated_at"):
                 _set_binding(home, row)
-            if _bytes(target) != data or _binding(home)["target_file_sha256"] != digest:
+            if not _host_matches(_read_host_files(home, name), desired) or _binding(home)["target_file_sha256"] != target_hash:
                 raise CoreError("instruction_sync_readback_failed", "Target or binding readback differs", host=name)
         if _bytes(config_path) != _json(config):
             atomic_write(config_path, _json(config))
@@ -345,14 +468,18 @@ def _apply(state: Path, snapshot_root: Path, stage: Path, data: bytes, targets: 
         errors = []
         for name in reversed(touched):
             home = targets[name]
-            target = home / HOST_FILE[name]
+            desired = desired_by_host[name]
             try:
-                if _bytes(target) not in (before[name], data):
-                    raise CoreError("instruction_sync_recovery_required", "Concurrent edit retained during rollback", host=name)
-                if before[name] is None:
-                    target.unlink(missing_ok=True)
-                else:
-                    atomic_write(target, before[name])
+                for rel, raw in desired.items():
+                    target = home / rel
+                    if _bytes(target) not in (before[name][rel], raw):
+                        raise CoreError("instruction_sync_recovery_required", "Concurrent edit retained during rollback", host=name)
+                for rel in desired:
+                    target = home / rel
+                    if before[name][rel] is None:
+                        target.unlink(missing_ok=True)
+                    else:
+                        atomic_write(target, before[name][rel])
                 if stores_existed[name]:
                     _set_binding(home, bindings[name])
                 else:
@@ -567,4 +694,162 @@ def unenroll_claude(*, claude_home: Path | None = None, state_dir: Path | None =
                 os.unlink(relative(state_fd, journal), dir_fd=state_fd)
             except OSError as exc:
                 raise CoreError("instruction_sync_cleanup_required", "Claude exit committed; journal cleanup remains", operation_committed=True) from exc
+    return {**receipt, "status": "unenrolled", "applied": True}
+
+
+
+def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Path | None = None,
+                         apply: bool = False, plan_hash: str | None = None) -> dict[str, Any]:
+    """Remove only an exact managed Antigravity 2-file rule projection."""
+    state = logical_absolute(state_dir or Path.home() / ".agents" / "agent-memory")
+    assert_physical_directory(state, allow_missing=True)
+    journal, config_path = state / "instruction-sync-recovery.json", state / "instruction-sync.json"
+    if _bytes(journal) is not None:
+        raise CoreError("instruction_sync_recovery_required", "An interrupted transaction requires reviewed recovery")
+    config_before = _bytes(config_path)
+    saved = _record(config_path) or {}
+    targets = saved.get("targets", {})
+    if not isinstance(targets, dict) or set(targets) - set(HOST_ENV):
+        raise CoreError("instruction_sync_state_invalid", "Unknown host binding")
+    if "antigravity" not in targets:
+        raise CoreError("instruction_host_not_enrolled", "Antigravity is not enrolled; no files were removed")
+    home = logical_absolute(targets["antigravity"])
+    _distinct_hosts({name: logical_absolute(path) for name, path in targets.items()})
+    for observed in (antigravity_home, os.environ.get(HOST_ENV["antigravity"])):
+        if observed and logical_absolute(observed) != home:
+            raise CoreError("instruction_target_rebind_required", "Antigravity directory differs from the saved enrollment", host="antigravity")
+    assert_physical_directory(home)
+    before_files = _read_host_files(home, "antigravity")
+    before_hash = _host_state_hash("antigravity", before_files)
+    binding = _binding(home)
+    if (binding is None or not saved.get("source_root")
+            or logical_absolute(binding["source_root"]) != logical_absolute(saved["source_root"])):
+        raise CoreError("instruction_binding_unavailable", "Antigravity enrollment and source binding do not match")
+    if any(raw is None for raw in before_files.values()) or before_hash != binding["target_file_sha256"]:
+        raise CoreError("global_instruction_drift", "Antigravity instructions differ from their bound deployment; nothing was removed", host="antigravity")
+    store_stat = _store(home).stat()
+    target_paths = {rel: home / rel for rel in ANTIGRAVITY_FILES}
+    target_stats = {rel: path.lstat() for rel, path in target_paths.items()}
+    config_after = _json({**saved, "targets": {name: path for name, path in targets.items() if name != "antigravity"}})
+    plan = {
+        "contract_version": "global_instruction_unenroll_v1",
+        "host": "antigravity",
+        "home": str(home),
+        "config_before_sha256": _hash(config_before),
+        "before_sha256": before_hash,
+        "binding": binding,
+        "store_identity": [store_stat.st_dev, store_stat.st_ino],
+        "target_identities": {rel: [st.st_dev, st.st_ino] for rel, st in sorted(target_stats.items())},
+    }
+    computed_hash = _hash(_json(plan))
+    receipt = {
+        "contract_version": plan["contract_version"],
+        "host": "antigravity",
+        "plan_hash": computed_hash,
+        "remaining_hosts": sorted(set(targets) - {"antigravity"}),
+        "applied": False,
+        "adoption": "unverified",
+    }
+    if not apply:
+        return {**receipt, "status": "planned"}
+    if not plan_hash or plan_hash != computed_hash:
+        raise CoreError("instruction_sync_stale_plan", "Exit preview changed; inspect a fresh plan before applying")
+
+    with InstructionRepository().lock_paths([config_path, journal, *target_paths.values()]):
+        if (_bytes(journal) is not None or _bytes(config_path) != config_before
+                or _read_host_files(home, "antigravity") != before_files or _binding(home) != binding
+                or not os.path.samestat(store_stat, _store(home).stat())):
+            raise CoreError("instruction_sync_stale_plan", "Antigravity enrollment changed while waiting for the lock")
+        prepare_store_parent(journal)
+        secure_store_location(journal, allow_missing=True)
+        with CoreDatabase(_store(home)) as db:
+            if not os.path.samestat(store_stat, _store(home).stat()) or _connection_binding(db) != binding:
+                raise CoreError("instruction_sync_stale_plan", "Antigravity Store changed while opening")
+            stage = home / (".agent-memory-exit-" + uuid.uuid4().hex)
+            stage.mkdir(mode=0o700)
+            captured = {rel: stage / f"rule-{idx}.md" for idx, rel in enumerate(ANTIGRAVITY_FILES)}
+            recovery = {
+                "contract_version": plan["contract_version"],
+                "targets": {
+                    "antigravity": {
+                        "home": str(home),
+                        "before": _encode_recovery_before("antigravity", before_files),
+                        "binding": binding,
+                        "store_existed": True,
+                        "capture_directory": str(stage),
+                    }
+                },
+                "config_before": base64.b64encode(config_before).decode(),
+                "after_sha256": None,
+            }
+            atomic_write(journal, _json(recovery))
+            moved: list[str] = []
+            binding_started = config_started = False
+            try:
+                for rel in ANTIGRAVITY_FILES:
+                    src_path = target_paths[rel]
+                    dst_path = captured[rel]
+                    secure_store_location(dst_path, allow_missing=True)
+                    os.replace(src_path, dst_path)
+                    moved.append(rel)
+                    st = dst_path.lstat()
+                    if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1
+                            or not os.path.samestat(target_stats[rel], st)
+                            or dst_path.read_bytes() != before_files[rel]):
+                        raise CoreError("instruction_sync_recovery_required", "A changed instruction was captured and retained", capture_directory=str(stage))
+                if not os.path.samestat(store_stat, _store(home).stat()):
+                    raise CoreError("instruction_sync_stale_plan", "Antigravity binding changed before removal")
+                _replace_exit_binding(db, binding, None)
+                binding_started = True
+                if _bytes(config_path) != config_before:
+                    raise CoreError("instruction_sync_stale_plan", "Enrollment changed before removal")
+                config_started = True
+                atomic_write(config_path, config_after)
+                if (any(p.exists() for p in target_paths.values())
+                        or _connection_binding(db) is not None
+                        or _bytes(config_path) != config_after
+                        or not os.path.samestat(store_stat, _store(home).stat())):
+                    raise CoreError("instruction_sync_readback_failed", "Antigravity exit readback differs")
+            except BaseException as failure:
+                errors = []
+                try:
+                    current_cfg = _bytes(config_path)
+                    if config_started and current_cfg == config_after:
+                        atomic_write(config_path, config_before)
+                    elif current_cfg != config_before:
+                        errors.append("source_binding")
+                except Exception:
+                    errors.append("source_binding")
+                try:
+                    if not os.path.samestat(store_stat, _store(home).stat()):
+                        raise CoreError("instruction_binding_unavailable", "Antigravity Store was replaced")
+                    current_binding = _connection_binding(db)
+                    if binding_started and current_binding is None:
+                        _replace_exit_binding(db, None, binding)
+                    elif current_binding != binding:
+                        errors.append("antigravity_binding")
+                except Exception:
+                    errors.append("antigravity_binding")
+                for rel in reversed(moved):
+                    try:
+                        dst_path = captured[rel]
+                        src_path = target_paths[rel]
+                        if dst_path.exists() and not src_path.exists():
+                            os.replace(dst_path, src_path)
+                        elif not src_path.exists():
+                            errors.append(rel)
+                    except Exception:
+                        errors.append(rel)
+                if errors:
+                    raise CoreError("instruction_sync_recovery_required", "Exit recovery material retained", hosts=errors,
+                                    capture_directory=str(stage)) from failure
+                shutil.rmtree(stage, ignore_errors=True)
+                journal.unlink(missing_ok=True)
+                raise
+            try:
+                shutil.rmtree(stage)
+                journal.unlink()
+            except OSError as exc:
+                raise CoreError("instruction_sync_cleanup_required", "Antigravity exit committed; cleanup remains", operation_committed=True,
+                                capture_directory=str(stage)) from exc
     return {**receipt, "status": "unenrolled", "applied": True}

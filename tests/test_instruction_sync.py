@@ -43,7 +43,7 @@ class InstructionSyncTests(unittest.TestCase):
         self.git(self.source, "remote", "add", "origin", str(self.remote))
         self.git(self.source, "push", "-u", "origin", "main")
         env = patch.dict(os.environ, {"CODEX_HOME": str(self.codex), "PI_CODING_AGENT_DIR": str(self.pi),
-                                      "CLAUDE_CONFIG_DIR": ""})
+                                      "CLAUDE_CONFIG_DIR": "", "GEMINI_HOME": ""})
         env.start()
         self.addCleanup(env.stop)
         self.kw = dict(source=self.source, codex_home=self.codex, pi_agent_dir=self.pi, state_dir=self.state)
@@ -904,6 +904,113 @@ class InstructionSyncTests(unittest.TestCase):
         self.assertEqual(updated, (self.codex / "AGENTS.md").read_bytes())
         self.assertFalse((self.pi / "hooks.json").exists())
 
+    def test_antigravity_requires_explicit_enrollment_and_splits_managed_block(self):
+        ag = self.root / "antigravity"
+        ag.mkdir()
+        body = (
+            b"# Charter\nUse evidence.\n\n"
+            b"<!-- agent-memory:confirmed-rules:start -->\n"
+            b"## Confirmed collaboration rules\n\n### rule_bb2cd7a163dc\n- When: When verifying.\n- Do: Verify through the real entrypoint.\n- Skip: Skip when synthetic.\n"
+            b"<!-- agent-memory:confirmed-rules:end -->\n"
+        )
+        self.publish(body)
+        with patch.dict(os.environ, {"GEMINI_HOME": str(ag)}):
+            first = self.deploy()
+        self.assertEqual(["codex", "pi"], [h["host"] for h in first["hosts"]])
+        self.assertFalse((ag / "config" / "rules").exists())
+
+        enrolled = self.deploy(antigravity_home=ag)
+        self.assertEqual(["codex", "pi", "antigravity"], [h["host"] for h in enrolled["hosts"]])
+        r1 = (ag / "config" / "rules" / "01-global-charter.md").read_bytes()
+        r2 = (ag / "config" / "rules" / "02-confirmed-rules.md").read_bytes()
+        self.assertTrue(r1.startswith(b"---\ntrigger: always_on\n---\n\n# Charter\n"))
+        self.assertTrue(r2.startswith(b"---\ntrigger: always_on\n---\n\n<!-- agent-memory:confirmed-rules:start -->\n"))
+        self.assertLessEqual(len(r1), sync.ANTIGRAVITY_RULE_MAX_BYTES)
+        self.assertLessEqual(len(r2), sync.ANTIGRAVITY_RULE_MAX_BYTES)
+
+        repeat = sync.synchronize(state_dir=self.state)
+        self.assertEqual(
+            [{"host": "antigravity", "action": "noop"}, {"host": "codex", "action": "noop"}, {"host": "pi", "action": "noop"}],
+            repeat["hosts"],
+        )
+
+    def test_antigravity_24kb_hard_gate_fails_closed_before_writing_any_host(self):
+        ag = self.root / "antigravity"
+        ag.mkdir()
+        oversized = (b"# Charter\n" + (b"x" * 24_100) + b"\n")
+        self.publish(oversized)
+        with self.assertRaises(CoreError) as raised:
+            sync.synchronize(**self.kw, antigravity_home=ag)
+        self.assertEqual("antigravity_rule_size_exceeded", raised.exception.code)
+        self.assertFalse((self.codex / "AGENTS.md").exists())
+        self.assertFalse((ag / "config" / "rules" / "01-global-charter.md").exists())
+
+    def test_antigravity_drift_adopt_existing_and_env_mismatch(self):
+        ag = self.root / "antigravity"
+        rules_dir = ag / "config" / "rules"
+        rules_dir.mkdir(parents=True)
+        (rules_dir / "01-global-charter.md").write_bytes(b"custom charter\n")
+        (rules_dir / "02-confirmed-rules.md").write_bytes(b"custom rules\n")
+
+        self.assert_error("global_instruction_drift", antigravity_home=ag)
+
+        current = sync._read_host_files(ag, "antigravity")
+        digest = sync._host_state_hash("antigravity", current)
+        adopted = self.deploy(antigravity_home=ag, adopt_existing=[f"antigravity={digest}"])
+        self.assertTrue(adopted["applied"])
+
+        # Editing either rule file triggers drift failure
+        (rules_dir / "02-confirmed-rules.md").write_bytes(b"drifted\n")
+        self.assert_error("global_instruction_drift")
+
+        # Mismatched GEMINI_HOME blocks enrollment/sync
+        other = self.root / "other-gemini"
+        other.mkdir()
+        with patch.dict(os.environ, {"GEMINI_HOME": str(other)}):
+            self.assert_error("instruction_target_rebind_required", antigravity_home=ag)
+
+    def test_antigravity_unenroll_cli_preview_apply_and_drift_block(self):
+        ag = self.root / "antigravity"
+        ag.mkdir()
+        self.deploy(antigravity_home=ag)
+
+        # CLI preview
+        out = io.StringIO()
+        with redirect_stdout(out):
+            rc = cli.main(["instructions", "sync", "--unenroll-antigravity", "--antigravity-home", str(ag), "--state-dir", str(self.state)])
+        self.assertEqual(0, rc)
+        envelope = json.loads(out.getvalue())
+        self.assertEqual("ok", envelope["status"])
+        preview = envelope["data"]
+        self.assertEqual("planned", preview["status"])
+        self.assertEqual("antigravity", preview["host"])
+        self.assertEqual(["codex", "pi"], preview["remaining_hosts"])
+
+        # Combined options rejected
+        with self.assertRaises(CoreError) as raised:
+            cli.cmd_instruction_sync(
+                cli.build_parser().parse_args(["instructions", "sync", "--unenroll-antigravity", "--source", str(self.source)])
+            )
+        self.assertEqual("invalid_request", raised.exception.code)
+
+        # Drift blocks unenroll
+        r2_path = ag / "config" / "rules" / "02-confirmed-rules.md"
+        saved_r2 = r2_path.read_bytes()
+        r2_path.write_bytes(b"edited locally\n")
+        with self.assertRaises(CoreError) as raised:
+            sync.unenroll_antigravity(antigravity_home=ag, state_dir=self.state)
+        self.assertEqual("global_instruction_drift", raised.exception.code)
+        r2_path.write_bytes(saved_r2)
+
+        # Apply exit
+        applied = sync.unenroll_antigravity(antigravity_home=ag, state_dir=self.state, apply=True, plan_hash=preview["plan_hash"])
+        self.assertEqual("unenrolled", applied["status"])
+        self.assertTrue(applied["applied"])
+        self.assertFalse((ag / "config" / "rules" / "01-global-charter.md").exists())
+        self.assertFalse((ag / "config" / "rules" / "02-confirmed-rules.md").exists())
+        self.assertIsNone(sync._binding(ag))
+        self.assertTrue((self.codex / "AGENTS.md").exists())
+        self.assertTrue((self.pi / "AGENTS.md").exists())
 
 if __name__ == "__main__":
     unittest.main()
