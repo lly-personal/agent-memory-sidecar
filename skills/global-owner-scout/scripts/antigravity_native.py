@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import stat
 import sys
 from pathlib import Path
 from typing import Any
@@ -44,18 +45,35 @@ def _valid_abs_dir(value: Any, error: str) -> str:
     return value
 
 
+def _assert_physical_dir_chain(root: Path, parts: tuple[str, ...]) -> Path:
+    current = root
+    for part in parts:
+        current = current / part
+        try:
+            st = current.lstat()
+        except OSError as exc:
+            raise ContractError("antigravity_transcript_missing") from exc
+        _require(not is_reparse(st) and stat.S_ISDIR(st.st_mode), "antigravity_transcript_not_regular")
+    return current
+
+
 def _load_transcript_steps(app_data_dir: Path, source_session_id: str) -> tuple[str, list[dict[str, Any]]]:
-    logs_dir = app_data_dir.resolve(strict=True) / "brain" / source_session_id / ".system_generated" / "logs"
-    _require(logs_dir.is_dir() and not is_reparse(logs_dir), "antigravity_transcript_missing")
+    base = app_data_dir.resolve(strict=True)
+    logs_dir = _assert_physical_dir_chain(base, ("brain", source_session_id, ".system_generated", "logs"))
     selected_kind: str | None = None
     selected_path: Path | None = None
     for kind, filename in (("transcript_full", "transcript_full.jsonl"), ("transcript", "transcript.jsonl")):
         candidate = logs_dir / filename
-        if candidate.exists() or is_reparse(candidate):
-            _require(candidate.is_file() and not is_reparse(candidate), "antigravity_transcript_not_regular")
-            selected_kind = kind
-            selected_path = candidate
-            break
+        try:
+            st = candidate.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise ContractError("antigravity_transcript_not_regular") from exc
+        _require(not is_reparse(st) and stat.S_ISREG(st.st_mode) and st.st_nlink == 1, "antigravity_transcript_not_regular")
+        selected_kind = kind
+        selected_path = candidate
+        break
     _require(selected_kind is not None and selected_path is not None, "antigravity_transcript_missing")
     raw_text = safe_artifact_bytes(selected_path).decode("utf-8-sig")
     steps: list[dict[str, Any]] = []
@@ -106,6 +124,9 @@ def invoke_antigravity(
     )
     selected_source = source_session_id if source_session_id is not None else session_id
     _valid_session_id(selected_source, "antigravity_source_session_id_invalid")
+    # Antigravity local JSONL transcripts do not carry an independent per-session cwd;
+    # restrict capture to the currently bound session so historical sessions cannot be misattributed.
+    _require(selected_source == session_id, "antigravity_historical_project_binding_unverified")
 
     bound_project = Path(binding["project_root"])
     app_data_path = Path(app_data_dir)
@@ -157,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
         description=(
             "Antigravity native adapter for Global Owner Scout.\n"
             "context requires current native --session-id, --project-root and --app-data-dir.\n"
-            "capture also requires --artifact-dir (and optional --source-session-id).\n"
+            "capture also requires --artifact-dir (restricted to current bound session-id).\n"
             "Prepare native results: scout.py describe-input native-project|native-review\n"
             "Help reads no project or transcript and grants no output access."
         ),
