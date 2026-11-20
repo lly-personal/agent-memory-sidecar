@@ -784,6 +784,7 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
             }
             atomic_write(journal, _json(recovery))
             moved: list[str] = []
+            verified_moved: set[str] = set()
             binding_started = config_started = False
             try:
                 for rel in ANTIGRAVITY_FILES:
@@ -797,6 +798,7 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
                             or not os.path.samestat(target_stats[rel], st)
                             or dst_path.read_bytes() != before_files[rel]):
                         raise CoreError("instruction_sync_recovery_required", "A changed instruction was captured and retained", capture_directory=str(stage))
+                    verified_moved.add(rel)
                 if not os.path.samestat(store_stat, _store(home).stat()):
                     raise CoreError("instruction_sync_stale_plan", "Antigravity binding changed before removal")
                 _replace_exit_binding(db, binding, None)
@@ -834,8 +836,12 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
                     try:
                         dst_path = captured[rel]
                         src_path = target_paths[rel]
-                        if dst_path.exists() and not src_path.exists():
-                            os.replace(dst_path, src_path)
+                        if rel not in verified_moved:
+                            errors.append(rel)
+                        elif dst_path.exists():
+                            # Non-overwriting restore: preserve any concurrently recreated user file and retain capture.
+                            os.link(dst_path, src_path)
+                            dst_path.unlink()
                         elif not src_path.exists():
                             errors.append(rel)
                     except Exception:

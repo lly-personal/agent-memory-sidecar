@@ -114,14 +114,27 @@ class AntigravityEntryTests(unittest.TestCase):
             {'step_index': 0, 'source': 'USER_EXPLICIT', 'type': 'USER_INPUT', 'status': 'DONE', 'content': '复盘当前项目'},
             {'step_index': 1, 'source': 'MODEL', 'type': 'PLANNER_RESPONSE', 'status': 'DONE', 'content': '已开始', 'truncated_fields': ['content']},
         ]
+        # Different historical session ID must be rejected because local transcripts lack independent cwd proof.
         self._write_transcript('hist-99', steps, filename='transcript.jsonl')
+        with self.assertRaisesRegex(ContractError, 'antigravity_historical_project_binding_unverified'):
+            invoke_antigravity(
+                operation='capture',
+                session_id='conv-123',
+                project_root=str(self.project),
+                app_data_dir=str(self.app_data),
+                artifact_dir=str(self.output),
+                source_session_id='hist-99',
+                cwd=str(self.project),
+            )
+
+        # Current bound session succeeds and seals transcript.
+        self._write_transcript('conv-123', steps, filename='transcript.jsonl')
         first = invoke_antigravity(
             operation='capture',
             session_id='conv-123',
             project_root=str(self.project),
             app_data_dir=str(self.app_data),
             artifact_dir=str(self.output),
-            source_session_id='hist-99',
             cwd=str(self.project),
         )
         cap = first['capture']
@@ -129,7 +142,7 @@ class AntigravityEntryTests(unittest.TestCase):
         self.assertEqual(cap['native_host'], 'antigravity')
         self.assertEqual(cap['record_count'], 2)
         self.assertEqual(cap['truncation_paths'], ['$.steps[1].truncated_fields'])
-        self.assertEqual(first['source_session_id'], 'hist-99')
+        self.assertEqual(first['source_session_id'], 'conv-123')
         self.assertEqual(first['transcript_kind'], 'transcript')
         raw = json.loads(Path(cap['native_file']).read_text(encoding='utf-8'))
         self.assertEqual(raw['steps'], steps)
@@ -140,10 +153,36 @@ class AntigravityEntryTests(unittest.TestCase):
             project_root=str(self.project),
             app_data_dir=str(self.app_data),
             artifact_dir=str(self.output),
-            source_session_id='hist-99',
             cwd=str(self.project),
         )
         self.assertEqual(second['capture']['status'], 'reused')
+
+    def test_capture_rejects_reparse_point_in_transcript_directory_chain(self):
+        external = self.root / 'external-logs'
+        external.mkdir()
+        (external / 'transcript_full.jsonl').write_text(
+            json.dumps({'step_index': 0, 'type': 'USER_INPUT'}) + '\n', encoding='utf-8'
+        )
+        parent = self.app_data / 'brain' / 'conv-link' / '.system_generated'
+        parent.mkdir(parents=True)
+        link = parent / 'logs'
+        try:
+            if os.name == 'nt':
+                import _winapi
+                _winapi.CreateJunction(str(external), str(link))
+            else:
+                link.symlink_to(external, target_is_directory=True)
+        except OSError:
+            self.skipTest('directory link creation unavailable')
+        with self.assertRaisesRegex(ContractError, 'antigravity_transcript_not_regular'):
+            invoke_antigravity(
+                operation='capture',
+                session_id='conv-link',
+                project_root=str(self.project),
+                app_data_dir=str(self.app_data),
+                artifact_dir=str(self.output),
+                cwd=str(self.project),
+            )
 
 
 if __name__ == '__main__':
