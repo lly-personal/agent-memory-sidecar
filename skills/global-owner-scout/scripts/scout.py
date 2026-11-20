@@ -82,9 +82,9 @@ def sha256_bytes(value: bytes) -> str:
 
 
 def build_preflight_summary(host: str, purpose: str) -> dict[str, Any]:
-    require(host in {"codex", "pi", "claude"}, "unsupported host")
+    require(host in {"codex", "pi", "claude", "antigravity"}, "unsupported host")
     require(purpose in {"review", "inspect"}, "unsupported purpose")
-    native_host = host in {"pi", "claude"}
+    native_host = host in {"pi", "claude", "antigravity"}
     project_contract = NATIVE_PROJECT_CONTRACT if native_host else PROJECT_CONTRACT
     review_pack_contract = NATIVE_REVIEW_PACK_CONTRACT if native_host else REVIEW_PACK_CONTRACT
     describe_kinds = ["native-project", "native-review"] if native_host else ["project", "review"]
@@ -95,6 +95,9 @@ def build_preflight_summary(host: str, purpose: str) -> dict[str, Any]:
     elif host == "pi":
         entry_steps = ["global_owner_scout_context", "inspect-native", "inspect-output"]
         history_steps = ["capture_current"] if purpose == "review" else []
+    elif host == "antigravity":
+        entry_steps = ["antigravity_native.py context", "inspect-native", "inspect-output"]
+        history_steps = ["antigravity_native.py capture"] if purpose == "review" else []
     else:
         entry_steps = ["claude_native.mjs context", "inspect-native", "inspect-output"]
         history_steps = ["claude_native.mjs capture"] if purpose == "review" else []
@@ -210,23 +213,30 @@ def inspect_native_context(value: Any, project_root: Path | None = None) -> dict
             require(skill == Path(__file__).resolve().parents[1] and skill.is_relative_to(plugin), 'native_context_skill_mismatch')
         else:
             require(context.get('type') == 'system' and context.get('subtype') == 'init', 'native_context_mismatch')
+    elif host == 'antigravity':
+        require(set(context) == {'source_kind', 'cwd', 'project_dir', 'session_id', 'app_data_dir'}, 'native_context_invalid')
+        require(context.get('source_kind') == 'antigravity_runtime_info', 'native_context_mismatch')
+        require(all(isinstance(context[k], str) and Path(context[k]).is_absolute()
+                    for k in ('project_dir', 'app_data_dir')), 'native_context_mismatch')
     else:
         raise ContractError('native_context_host_unsupported')
     require(isinstance(context.get('session_id'), str) and bool(context['session_id'])
             and isinstance(context.get('cwd'), str) and Path(context['cwd']).is_absolute(), 'native_context_mismatch')
     cwd = Path(context['cwd']).resolve(strict=True)
     native_root = resolve_git_path(cwd, git_output(cwd, 'rev-parse', '--show-toplevel'))
-    if context.get('source_kind') == 'claude_skill_substitution':
+    if context.get('source_kind') in {'claude_skill_substitution', 'antigravity_runtime_info'}:
         startup = Path(context['project_dir']).resolve(strict=True)
         require(native_root == resolve_git_path(startup, git_output(startup, 'rev-parse', '--show-toplevel')),
                 'native_context_startup_execution_mismatch')
     require(project_root is None or native_root == project_root.resolve(strict=True), 'native_context_project_mismatch')
+    scope = ('native_skill_substitution_git' if context.get('source_kind') == 'claude_skill_substitution'
+             else 'native_runtime_info_git' if context.get('source_kind') == 'antigravity_runtime_info'
+             else 'native_current_session_git')
     return dict(contract_version='global_owner_scout_native_binding_v1', native_host=host,
                 project_root=str(native_root),
                 source_sha256=sha256_bytes(canonical_json(value)),
                 session_ref_sha256=sha256_bytes(context['session_id'].encode('utf-8')),
-                binding_scope=('native_skill_substitution_git' if context.get('source_kind') == 'claude_skill_substitution'
-                               else 'native_current_session_git'), git_snapshot=inspect_git_context(native_root))
+                binding_scope=scope, git_snapshot=inspect_git_context(native_root))
 
 
 def main() -> int:
@@ -239,13 +249,13 @@ def main() -> int:
     capture_input = capture.add_mutually_exclusive_group()
     capture_input.add_argument('--input-file', type=Path)
     capture_input.add_argument('--input-line', action='store_true', help='Receive one UTF-8 JSON line without waiting for terminal EOF.')
-    history = commands.add_parser('import-history', help='Freeze native Codex, Pi or Claude source objects without model transcription.')
+    history = commands.add_parser('import-history', help='Freeze native Codex, Pi, Claude or Antigravity source objects without model transcription.')
     history.add_argument('--project-root', type=Path, required=True)
     history.add_argument('--session-id', required=True)
     history.add_argument('--artifact-dir', type=Path, required=True)
     history.add_argument('--protected-root', action='append', type=Path, required=True)
     summary = commands.add_parser("preflight-summary", help="Return deterministic contract and command-order orientation without reading files or Git.")
-    summary.add_argument("--host", choices=("codex", "pi", "claude"), default="codex")
+    summary.add_argument("--host", choices=("codex", "pi", "claude", "antigravity"), default="codex")
     summary.add_argument("--purpose", choices=("review", "inspect"), default="review")
     description = commands.add_parser('describe-input')
     description.add_argument('kind', choices=('project', 'review', 'native-project', 'native-review'))

@@ -352,7 +352,7 @@ def validate_evidence_refs(value: Any, path: str, *, nonempty: bool = True) -> N
 def validate_native_session_coverage(value: Any, path: str, project_status: str) -> None:
     obj = require_object(value, path)
     require_exact_keys(obj, NATIVE_COVERAGE_KEYS, path)
-    require(require_string(obj['native_host'], f'{path}.native_host') in {'pi', 'claude'}, f'{path} native host invalid')
+    require(require_string(obj['native_host'], f'{path}.native_host') in {'pi', 'claude', 'antigravity'}, f'{path} native host invalid')
     discovered = require_int(obj['discovered_task_count'], f'{path}.discovered_task_count')
     selected = require_int(obj['selected_task_count'], f'{path}.selected_task_count')
     read = require_int(obj['fully_read_task_count'], f'{path}.fully_read_task_count')

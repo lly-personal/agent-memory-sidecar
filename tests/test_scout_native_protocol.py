@@ -112,7 +112,7 @@ assert.ok(result.details.python.sha256);
             self.assertEqual(run.returncode,0,run.stderr)
 
     def test_native_review_uses_real_delivery_and_recovery_without_codex_partitions(self):
-        for host in ('pi', 'claude'):
+        for host in ('pi', 'claude', 'antigravity'):
             pack = native_pack(host)
             v.validate_review_pack(pack)
             with self.subTest(host=host), tempfile.TemporaryDirectory(prefix="receipt's 数据 () ") as tmp:
