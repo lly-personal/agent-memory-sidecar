@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.6.16 | 0.6.16 | 1.11.12 | 2.5.14 | 5.19.11 | v8 | 3.11–3.13 |
 | v0.6.15 | 0.6.15 | 1.11.11 | 2.5.13 | 5.19.10 | v8 | 3.11–3.13 |
 | v0.6.14 | 0.6.14 | 1.11.10 | 2.5.12 | 5.19.9 | v8 | 3.11–3.13 |
 | v0.6.13 | 0.6.13 | 1.11.9 | 2.5.11 | 5.19.8 | v8 | 3.11–3.13 |
@@ -149,6 +150,8 @@ Scout 5.19.8 reads Windows terminal frames through CR or LF without requiring EO
 Scout 5.19.9 removes the retired v4 compatibility scripts, adds deterministic zero-read `preflight-summary`, slims its Skill and reference prose, and consolidates physical security checks alongside Core 0.6.14 and Bootstrap 2.5.12. Plugin 1.11.10 carries the updated bundle, and ADR 0083 records the Codex, Pi, and Claude Code multi-host capability ladder and L3 confirmation gate. Active Project v7/v8, Review Pack v8/v9, and Delivery v2 contracts remain compatible; natural handoff and adoption remain separately observed.
 
 Scout 5.19.10 decouples cross-host environment variable sniffing from explicit `--state` handles, permits long backticked file paths and CLI flags inside Chinese user-facing prose without relaxing natural-prose English ratio checks, and hardens broken-symlink physical scan isolation on Windows alongside Core 0.6.15, Plugin 1.11.11, and Bootstrap 2.5.13. Active Project v7/v8, Review Pack v8/v9, and Delivery v2 contracts remain compatible; natural handoff and adoption remain separately observed.
+
+Scout 5.19.11 adds the read-only Antigravity L2 native lane (`scripts/antigravity_native.py`) with hardened transcript path-chain and session-scope verification alongside Core 0.6.16 (Antigravity L1 two-file `<= 24 KB` rule projection and `--unenroll-antigravity` exit rollback), Plugin 1.11.12, and Bootstrap 2.5.14. Active Project v7/v8, Review Pack v8/v9, and Delivery v2 contracts remain compatible; natural handoff and adoption remain separately observed.
 
 ## Multi-Host Capability Ladder & L3 ADR Gate
 
