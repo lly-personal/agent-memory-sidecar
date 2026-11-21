@@ -3,6 +3,11 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.6.16 (2026-11-21)
+
+- Add Antigravity L1 two-file global instruction projection (`01-global-charter.md` + `02-confirmed-rules.md`) with a hard `<= 24,000` byte gate and exact `--unenroll-antigravity` exit rollback, add `CLAUDE.md` (`@AGENTS.md`) multi-host repository entrypoint, and add the read-only Antigravity L2 native Scout lane (`scripts/antigravity_native.py`) with hardened transcript path-chain and session-scope checks (PR #88–#91).
+- Components: Core 0.6.16, Plugin 1.11.12, Bootstrap 2.5.14, and Scout 5.19.11; active Project v7/v8, Review Pack v8/v9, and Delivery v2 contracts remain compatible, while complete natural handoff and adoption remain separate evidence.
+
 ## 0.6.15 (2026-11-17)
 
 - Decouple Scout cross-host environment sniffing (`PI_ACP_SESSION`, `T3CODE_*`, `CODEX_THREAD_ID`) from explicit state handles (`--state`), relax backticked code/path token length checks in Chinese user-facing prose while keeping natural-prose English runs constrained, and restore broken-symlink physical scan isolation on Windows.
