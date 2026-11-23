@@ -5,6 +5,7 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -41,7 +42,10 @@ def remove_readonly_tree(path: Path | str) -> None:
             pass
         func(failed_path)
 
-    shutil.rmtree(target, onexc=_clear_readonly)
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(target, onexc=_clear_readonly)
+    else:
+        shutil.rmtree(target, onerror=_clear_readonly)
 
 
 def safe_git_executable(workspace: Path | str | None = None) -> str | None:
