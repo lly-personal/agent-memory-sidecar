@@ -65,8 +65,7 @@ The marker is repository evidence, not authorization by itself. Release tooling 
 - the recorded initial release commit is an ancestor of current public `HEAD`;
 - the engineering source commit and initial snapshot digest are well formed.
 
-Before this marker exists, release tooling requires the original export receipt and exact seeded snapshot. After it exists, future
-releases build directly from public Git history; they do not require a refreshed private export receipt.
+Historical pre-cutover seeding required the original export receipt on the initial release tag (`v0.3.0`). Once `public_active` is established, steady-state release tooling on `main` requires tracked `PUBLIC_AUTHORITY.json`, rejects any unexpected `PUBLIC_EXPORT_RECEIPT.json`, and builds directly from public Git history without a private export receipt.
 
 ## Publication workflow
 
@@ -111,7 +110,7 @@ After `public_active`:
 
 ## Acceptance
 
-- Tests prove that an unmarked seed requires an exact export receipt and that tracked snapshot drift fails closed.
+- Tests prove that missing `PUBLIC_AUTHORITY.json` or an unexpected legacy `PUBLIC_EXPORT_RECEIPT.json` fails closed on `main`.
 - Tests prove that a valid `public_active` marker permits later public commits only when its initial release is an ancestor.
 - Tests reject wrong repository identity, malformed provenance, untracked markers, missing tags, and non-ancestor release commits.
 - The release workflow is public-only, uploads and verifies a complete draft, and cannot publish. The separately authorized admin

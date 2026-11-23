@@ -48,6 +48,7 @@ ACTIVE_DOCUMENTS = (
     ROOT / "docs" / "decisions" / "0083-multihost-capability-ladder.zh.md",
     ROOT / "specs" / "README.md",
     ROOT / "specs" / "agent-memory-core-v1.md",
+    ROOT / "specs" / "global-instruction-sync-v1.md",
     ROOT / "specs" / "public-distribution-v1.md",
     ROOT / "specs" / "public-authority-cutover-v1.md",
     ROOT / "specs" / "source-authority-cutover-v2.md",

@@ -60,7 +60,7 @@ class PublicDistributionTests(unittest.TestCase):
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
         self.assertEqual(
-            {"core": "0.7.1", "plugin": "1.12.1", "bootstrap": "2.6.0", "scout": "5.20.0"},
+            {"core": "0.7.2", "plugin": "1.12.2", "bootstrap": "2.6.1", "scout": "5.20.1"},
             facts,
         )
         self.assertFalse((ROOT / "scripts" / "build_public_export.py").exists())
@@ -176,6 +176,46 @@ class PublicDistributionTests(unittest.TestCase):
                     commit=active_commit,
                 )
             marker["repository"] = repository_url
+            marker["initial_public_release"]["ref"] = "v9.9.9"
+            marker["initial_public_release"]["commit"] = "f" * 40
+            marker_path.write_text(json.dumps(marker), encoding="utf-8")
+            with self.assertRaises(self.release.ReleaseError):
+                self.release.resolve_release_authority(
+                    root=public_root,
+                    repository_url=repository_url,
+                    source_ref="v0.3.1",
+                    commit=active_commit,
+                )
+
+            # Unexpected legacy PUBLIC_EXPORT_RECEIPT.json fails closed under public_active.
+            marker["initial_public_release"]["ref"] = "v0.3.0"
+            marker["initial_public_release"]["commit"] = initial_commit
+            marker_path.write_text(json.dumps(marker), encoding="utf-8")
+            (public_root / "PUBLIC_EXPORT_RECEIPT.json").write_text("{}", encoding="utf-8")
+            with self.assertRaisesRegex(
+                self.release.ReleaseError,
+                "release_legacy_export_receipt_forbidden",
+            ):
+                self.release.resolve_release_authority(
+                    root=public_root,
+                    repository_url=repository_url,
+                    source_ref="v0.3.1",
+                    commit=active_commit,
+                )
+            (public_root / "PUBLIC_EXPORT_RECEIPT.json").unlink()
+
+            # Missing PUBLIC_AUTHORITY.json fails closed (seed export retired on main).
+            marker_path.unlink()
+            with self.assertRaisesRegex(
+                self.release.ReleaseError,
+                "release_authority_marker_missing",
+            ):
+                self.release.resolve_release_authority(
+                    root=public_root,
+                    repository_url=repository_url,
+                    source_ref="v0.3.1",
+                    commit=active_commit,
+                )
             marker["initial_public_release"]["ref"] = "v9.9.9"
             marker["initial_public_release"]["commit"] = "f" * 40
             marker_path.write_text(json.dumps(marker), encoding="utf-8")
@@ -372,18 +412,16 @@ class PublicDistributionTests(unittest.TestCase):
             for command in commands:
                 subprocess.run(command, cwd=public_root, check=True, capture_output=True)
 
-            if (public_root / "PUBLIC_AUTHORITY.json").is_file():
-                commit, _ = self.release.validate_release_source(root=public_root)
-                authority = self.release.resolve_release_authority(
-                    root=public_root,
-                    repository_url=repository_url,
-                    source_ref=source_ref,
-                    commit=commit,
-                )
-                self.assertEqual("public_active", authority["authority_epoch"])
-                receipt = {"source_commit": authority["engineering_source_commit"]}
-            elif receipt is None:
-                receipt = json.loads((public_root / "PUBLIC_EXPORT_RECEIPT.json").read_text(encoding="utf-8"))
+            self.assertTrue((public_root / "PUBLIC_AUTHORITY.json").is_file())
+            commit, _ = self.release.validate_release_source(root=public_root)
+            authority = self.release.resolve_release_authority(
+                root=public_root,
+                repository_url=repository_url,
+                source_ref=source_ref,
+                commit=commit,
+            )
+            self.assertEqual("public_active", authority["authority_epoch"])
+            receipt = {"source_commit": authority["engineering_source_commit"]}
 
             release_root = public_root / "dist" / "release"
             manifest = self.release.build(

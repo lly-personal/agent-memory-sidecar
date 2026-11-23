@@ -186,6 +186,61 @@ class AntigravityEntryTests(unittest.TestCase):
                 cwd=str(self.project),
             )
 
+    def test_capture_allows_exact_native_session_dir_and_rejects_subpaths_before_git_snapshot(self):
+        from unittest import mock
+        import antigravity_native
+
+        session_id = 'conv-native-dir'
+        steps = [
+            {'step_index': 0, 'source': 'USER_EXPLICIT', 'type': 'USER_INPUT', 'status': 'DONE', 'content': '看懂工程全貌'},
+        ]
+        self._write_transcript(session_id, steps, filename='transcript_full.jsonl')
+        brain_dir = self.app_data / 'brain'
+        session_dir = brain_dir / session_id
+        other_session_dir = brain_dir / 'other-session'
+        other_session_dir.mkdir(parents=True)
+        nested_sub = session_dir / 'scratch'
+        nested_sub.mkdir(parents=True)
+        sys_gen = session_dir / '.system_generated'
+
+        # Reject app_data root, brain root, sibling session, .system_generated, and any nested subdir
+        # BEFORE running inspect_git_context (no untracked file reads prior to output authorization).
+        for bad_out in (self.app_data, brain_dir, other_session_dir, sys_gen, nested_sub):
+            with mock.patch.object(antigravity_native, 'inspect_git_context', side_effect=AssertionError('must not scan untracked files before output auth')):
+                with self.assertRaisesRegex(ContractError, 'outside every protected-root'):
+                    invoke_antigravity(
+                        operation='capture',
+                        session_id=session_id,
+                        project_root=str(self.project),
+                        app_data_dir=str(self.app_data),
+                        artifact_dir=str(bad_out),
+                        cwd=str(self.project),
+                    )
+
+        # Exact host-granted <appDataDir>/brain/<session-id> succeeds and verifies readback.
+        first = invoke_antigravity(
+            operation='capture',
+            session_id=session_id,
+            project_root=str(self.project),
+            app_data_dir=str(self.app_data),
+            artifact_dir=str(session_dir),
+            cwd=str(self.project),
+        )
+        self.assertEqual(first['capture']['status'], 'imported')
+        self.assertEqual(Path(first['capture']['native_file']).parent, session_dir)
+        self.assertTrue(Path(first['capture']['index_path']).is_file())
+        self.assertIn('git_snapshot', first['native_binding'])
+
+        second = invoke_antigravity(
+            operation='capture',
+            session_id=session_id,
+            project_root=str(self.project),
+            app_data_dir=str(self.app_data),
+            artifact_dir=str(session_dir),
+            cwd=str(self.project),
+        )
+        self.assertEqual(second['capture']['status'], 'reused')
+
 
 if __name__ == '__main__':
     unittest.main()

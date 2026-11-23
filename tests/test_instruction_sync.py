@@ -1012,5 +1012,55 @@ class InstructionSyncTests(unittest.TestCase):
         self.assertTrue((self.codex / "AGENTS.md").exists())
         self.assertTrue((self.pi / "AGENTS.md").exists())
 
+    def test_deep_state_dir_sync_and_readonly_snapshot_and_journal_rollback(self):
+        # Pad state_dir so snapshot_root (~220-235 chars) pushes inner .git/objects/pack/* past
+        # Windows MAX_PATH (260) regardless of TEMP length, exercising core.longpaths + win_long_path.
+        pad_needed = max(12, 118 - len(str(self.root)))
+        pad_seg = ("deep_" + "x" * max(0, pad_needed - 5))[:pad_needed]
+        deep_state = self.root / pad_seg / "state"
+        deep_codex = self.root / "deep_codex"
+        deep_pi = self.root / "deep_pi"
+        opts = dict(source=self.source, codex_home=deep_codex, pi_agent_dir=deep_pi, state_dir=deep_state)
+
+        plan = sync.synchronize(**opts)
+        applied = sync.synchronize(**opts, apply=True, plan_hash=plan["plan_hash"])
+        self.assertTrue(applied["applied"])
+        repeat = sync.synchronize(**opts)
+        self.assertEqual(["noop", "noop"], [h["action"] for h in repeat["hosts"]])
+
+        # Simulate mid-apply failure after creating snapshot_root + codex Store + -journal sidecar.
+        fail_state = self.root / "rollback_state"
+        fail_codex = self.root / "rollback_codex"
+        fail_pi = self.root / "rollback_pi"
+        fail_opts = dict(source=self.source, codex_home=fail_codex, pi_agent_dir=fail_pi, state_dir=fail_state)
+        plan2 = sync.synchronize(**fail_opts)
+        orig_set_binding = sync._set_binding
+
+        def fail_on_pi(home, row):
+            if home == fail_codex:
+                orig_set_binding(home, row)
+                return
+            # Leave empty SQLite sidecar files on codex after commit to confirm rollback cleans them.
+            for suffix in ("-journal", "-wal", "-shm"):
+                (fail_codex / "agent-memory-sidecar" / f"memory.sqlite{suffix}").write_bytes(b"")
+            raise OSError("injected pi binding failure")
+
+        with patch.object(sync, "_set_binding", side_effect=fail_on_pi):
+            with self.assertRaises(OSError):
+                sync.synchronize(**fail_opts, apply=True, plan_hash=plan2["plan_hash"])
+        self.assertFalse((fail_codex / "AGENTS.md").exists())
+        self.assertFalse((fail_codex / "agent-memory-sidecar" / "memory.sqlite").exists())
+        self.assertFalse((fail_codex / "agent-memory-sidecar" / "memory.sqlite-journal").exists())
+        self.assertFalse((fail_state / "instruction-sync-recovery.json").exists())
+
+        # Host-accurate error message when Antigravity binding changes before exit removal.
+        ag = self.root / "antigravity_msg"
+        ag.mkdir()
+        self.deploy(antigravity_home=ag)
+        with CoreDatabase(sync._store(ag)) as db:
+            with self.assertRaisesRegex(CoreError, "Antigravity binding changed before removal"):
+                sync._replace_exit_binding(db, {"stale": True}, None, host="antigravity")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -17,8 +17,15 @@ if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 
 from history_import import import_history
-from scout import inspect_native_context
-from scout_security import is_reparse, safe_artifact_bytes, validate_output_root
+from scout import inspect_git_context, inspect_native_context
+from scout_security import (
+    is_reparse,
+    is_within,
+    pinned_directory,
+    safe_artifact_bytes,
+    safe_existing_directory,
+    validate_output_root,
+)
 from utf8_stdio import configure_utf8_stdio
 from validate_output import ContractError
 
@@ -58,24 +65,25 @@ def _assert_physical_dir_chain(root: Path, parts: tuple[str, ...]) -> Path:
 
 
 def _load_transcript_steps(app_data_dir: Path, source_session_id: str) -> tuple[str, list[dict[str, Any]]]:
-    base = app_data_dir.resolve(strict=True)
+    base = safe_existing_directory(app_data_dir, label="app-data-dir")
     logs_dir = _assert_physical_dir_chain(base, ("brain", source_session_id, ".system_generated", "logs"))
     selected_kind: str | None = None
     selected_path: Path | None = None
-    for kind, filename in (("transcript_full", "transcript_full.jsonl"), ("transcript", "transcript.jsonl")):
-        candidate = logs_dir / filename
-        try:
-            st = candidate.lstat()
-        except FileNotFoundError:
-            continue
-        except OSError as exc:
-            raise ContractError("antigravity_transcript_not_regular") from exc
-        _require(not is_reparse(st) and stat.S_ISREG(st.st_mode) and st.st_nlink == 1, "antigravity_transcript_not_regular")
-        selected_kind = kind
-        selected_path = candidate
-        break
-    _require(selected_kind is not None and selected_path is not None, "antigravity_transcript_missing")
-    raw_text = safe_artifact_bytes(selected_path).decode("utf-8-sig")
+    with pinned_directory(logs_dir):
+        for kind, filename in (("transcript_full", "transcript_full.jsonl"), ("transcript", "transcript.jsonl")):
+            candidate = logs_dir / filename
+            try:
+                st = candidate.lstat()
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                raise ContractError("antigravity_transcript_not_regular") from exc
+            _require(not is_reparse(st) and stat.S_ISREG(st.st_mode) and st.st_nlink == 1, "antigravity_transcript_not_regular")
+            selected_kind = kind
+            selected_path = candidate
+            break
+        _require(selected_kind is not None and selected_path is not None, "antigravity_transcript_missing")
+        raw_text = safe_artifact_bytes(selected_path).decode("utf-8-sig")
     steps: list[dict[str, Any]] = []
     for line in raw_text.splitlines():
         stripped = line.strip()
@@ -85,6 +93,25 @@ def _load_transcript_steps(app_data_dir: Path, source_session_id: str) -> tuple[
         _require(isinstance(item, dict), "antigravity_transcript_step_invalid")
         steps.append(item)
     return selected_kind, steps
+
+
+def _resolve_session_artifact_exemption(
+    artifact_dir: Path,
+    *,
+    app_data_path: Path,
+    session_id: str,
+) -> dict[Path, Path]:
+    resolved_dir = safe_existing_directory(artifact_dir, label="artifact-dir")
+    if not is_within(resolved_dir, app_data_path):
+        return {}
+    try:
+        session_dir = _assert_physical_dir_chain(app_data_path, ("brain", session_id))
+        resolved_session_dir = safe_existing_directory(session_dir, label="artifact-dir")
+    except ContractError:
+        return {}
+    if resolved_dir == resolved_session_dir:
+        return {app_data_path: resolved_session_dir}
+    return {}
 
 
 def invoke_antigravity(
@@ -101,6 +128,7 @@ def invoke_antigravity(
     _valid_session_id(session_id, "antigravity_native_runtime_info_required")
     _valid_abs_dir(project_root, "antigravity_native_runtime_info_required")
     _valid_abs_dir(app_data_dir, "antigravity_native_runtime_info_required")
+    app_data_path = safe_existing_directory(Path(app_data_dir), label="app-data-dir")
     effective_cwd = cwd if cwd is not None else os.getcwd()
     native = {
         "contract_version": "global_owner_scout_native_context_v1",
@@ -113,10 +141,9 @@ def invoke_antigravity(
             "app_data_dir": app_data_dir,
         },
     }
-    binding = inspect_native_context(native)
-    result: dict[str, Any] = {"native_context": native, "native_binding": binding}
     if operation == "context":
-        return result
+        binding = inspect_native_context(native)
+        return {"native_context": native, "native_binding": binding}
 
     _require(
         isinstance(artifact_dir, str) and bool(artifact_dir) and Path(artifact_dir).is_absolute(),
@@ -128,11 +155,22 @@ def invoke_antigravity(
     # restrict capture to the currently bound session so historical sessions cannot be misattributed.
     _require(selected_source == session_id, "antigravity_historical_project_binding_unverified")
 
+    # Bind git root lightly before checking output boundary so untracked project files
+    # are never read prior to output authorization.
+    binding = inspect_native_context(native, include_snapshot=False)
     bound_project = Path(binding["project_root"])
-    app_data_path = Path(app_data_dir)
     protected_roots = [bound_project, SKILL_ROOT, app_data_path]
-    # Check every write boundary before reading any transcript bytes.
-    validate_output_root(Path(artifact_dir), protected_roots)
+    exempt_exact_roots = _resolve_session_artifact_exemption(
+        Path(artifact_dir),
+        app_data_path=app_data_path,
+        session_id=session_id,
+    )
+    # Check every write boundary before reading any transcript or untracked project bytes.
+    validate_output_root(
+        Path(artifact_dir),
+        protected_roots,
+        exempt_exact_roots=exempt_exact_roots,
+    )
 
     transcript_kind, steps = _load_transcript_steps(app_data_path, selected_source)
     payload = {
@@ -151,7 +189,10 @@ def invoke_antigravity(
         session_id=selected_source,
         artifact_dir=Path(artifact_dir),
         protected_roots=protected_roots,
+        exempt_exact_roots=exempt_exact_roots,
     )
+    binding["git_snapshot"] = inspect_git_context(bound_project)
+    result: dict[str, Any] = {"native_context": native, "native_binding": binding}
     result["capture"] = {
         key: captured[key]
         for key in (

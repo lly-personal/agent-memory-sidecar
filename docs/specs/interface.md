@@ -4,7 +4,7 @@
 - Owner layer: project_docs
 - Applies when: 实现或验收规则、proposal、状态、CLI、失败反馈和迁移操作。
 - Avoid when: 判断产品公理或组件所有权；读取 [L1](axioms.md)与 [L2](topology.md)。
-- Last verified: 2026-09-01
+- Last verified: 2026-11-24
 - Evidence: 用户批准的条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[确定性 Release 发布 ADR](../decisions/0077-deterministic-release-promotion.zh.md)、[真实读回工作站调和 ADR](../decisions/0078-workstation-reconcile-v2-observed-state.zh.md)
 - Extended by: [项目任务前门与确定性终态 ADR](../decisions/0079-project-session-front-door-and-scout-terminal-contract.zh.md)、[消费者可见 Skill 范围 ADR](../decisions/0080-consumer-visible-skill-scope-reconciliation.zh.md)
 
@@ -306,12 +306,12 @@ generated-output artifact，但不得写入 Store、文件 Inbox、项目文件�
 [global-instruction-sync-v1](../../specs/global-instruction-sync-v1.md)，不是 Pi 的完整 Core/Scout 安装。
 Anchor 先验证 immutable Release，再从 verified portable 的 Core wheel 调用 `instructions sync`：预览返回
 `plan_hash`，apply 重算准确计划后才执行。参数与 token 由 Agent 处理，不要求用户重复输入路径。
-`--source`、`--codex-home`、`--pi-agent-dir`、`--claude-home` 只用于首次明确绑定或已有实际上下文；后续使用本机绑定。Claude 必须显式接入，并写入其用户级 `CLAUDE.md`，文件读回不证明项目 `AGENTS.md` 或有效会话加载。部署和配置持久化仍需单独授权。旧版不认识 Claude 绑定；降级前用支持该操作的 verified portable 入口预览并获准执行 `--unenroll-claude`，读回规则文件已移除、绑定已清除且其余宿主保留后再降级。退出返回 `global_instruction_unenroll_v1 / unenrolled`，不改规范源、不取远端；漂移、冲突或中断均保留准确阻碍。完整退出与回退条件沿同一同步契约维护。
+`--source`、`--codex-home`、`--pi-agent-dir`、`--claude-home`、`--antigravity-home` 只用于首次明确绑定或已有实际上下文；后续使用本机绑定。Claude 必须显式接入并写入其用户级 `CLAUDE.md`，Antigravity 必须显式接入并拆分为两份 `<=24,000 B` 的 `always_on` 规则文件；文件读回不证明项目 `AGENTS.md` 或有效会话加载。部署和配置持久化仍需单独授权。旧版不认识 Claude/Antigravity 绑定；降级前用支持该操作的 verified portable 入口预览并获准执行 `--unenroll-claude` 或 `--unenroll-antigravity`，读回规则文件已移除、绑定已清除且其余宿主保留后再降级。退出返回 `global_instruction_unenroll_v1 / unenrolled`，不改规范源、不取远端；漂移、冲突或中断均保留准确阻碍。完整退出与回退条件沿同一同步契约维护。
 新设备首次私有源选择与 Git 认证不可省略，也不能写入公开发行物。
 
 状态包含 `planned`、`reload_required`；后者仅表示本机文件与绑定回读成功，其他设备和采用始终单列未验证。
 同一设备显式授权发布并同步时复用此链，不新增复制脚本。完整 Codex 能力安装仍遵循下一节的独立契约。
-跨宿主能力遵循 [ADR 0083](../decisions/0083-multihost-capability-ladder.zh.md)：Pi 与 Claude Code 当前仅覆盖 L1（全局规范同步）与 L2（只读 Scout 工程审阅），未通过正式 ADR 批准“不可伪造的宿主原生确认原语”前不得开放 L3（规则审批/写入）或 Hook，且明令禁止关键词/自然语言匹配替代授权。
+跨宿主能力遵循 [ADR 0083](../decisions/0083-multihost-capability-ladder.zh.md)：Pi、Claude Code 与 Antigravity 当前仅覆盖 L1（全局规范同步）与 L2（只读 Scout 工程审阅），未通过正式 ADR 批准“不可伪造的宿主原生确认原语”前不得开放 L3（规则审批/写入）或 Hook，且明令禁止关键词/自然语言匹配替代授权。
 
 ### Workstation Bootstrap 与 Host Enrollment
 
@@ -333,7 +333,7 @@ metadata 缺失必须保留可区分 detail，外层失败仍固定为 `release_
 Bootstrap 工作站调和，并安装 Bootstrap/Scout；不得要求 project ID、项目名单或资源配置，不得在当前任务把新安装
 Skill 冒充已加载。原生 Skill 支持自动发现；未显示或宿主明确要求时才提示刷新。source/host 物化与已请求的只读检查在当前任务完成，不能推导自动加载。
 
-`agent-memory-workstation-bootstrap` Skill 2.6.0 提供三个显式模式：
+`agent-memory-workstation-bootstrap` Skill 2.6.1 提供三个显式模式：
 
 - `inspect`：从 Resolver 已验证的 Release/source manifest 与 portable 组件构造唯一 `DesiredBundleIdentity`，再真实读取
   Marketplace/Plugin/source/runtime/Skills。fresh/同 identity 直接同步并部署；只有既有 Sidecar 或 Marketplace identity 变化时
@@ -506,7 +506,7 @@ $global-owner-scout 复盘当前项目
 原生任务的 `projectId` 可缺失或为 null；同主机原生任务 `cwd` 与项目清单中的唯一 Git 根一致，或有已证 worktree
 归属时，仍可确定目标。非空编号与目录冲突、多重匹配或原生上下文缺失才阻断；单独 shell cwd、名称或提示词路径不构成绑定。
 会话普查使用相同关联规则，不能因可选成员编号为空而漏掉自然任务。
-通过已安装 Skill 的绝对 `scripts/scout.py` 路径可先执行只读 `preflight-summary --host codex|pi|claude --purpose review|inspect` 获取 `global_owner_scout_preflight_summary_v1` 契约索引（零文件与零 Git 读取），再执行 `inspect-context --project-root <bound-project-root>`；`-B` 禁止字节码写入。
+通过已安装 Skill 的绝对 `scripts/scout.py` 路径可先执行只读 `preflight-summary --host codex|pi|claude|antigravity --purpose review|inspect` 获取 `global_owner_scout_preflight_summary_v1` 契约索引（零文件与零 Git 读取），再执行 `inspect-context --project-root <bound-project-root>`；`-B` 禁止字节码写入。
 Local 或已有 worktree 均原地完成只读复盘，不强制新建聊天或执行快照。用户不用重复调用或处理内部调度。
 先检查 `environment_context.filesystem.workspace_roots` 和明确的宿主输出元数据，再运行 `inspect-output`；
 不能因一个工具没给目录就宣布没有授权，也不能根据熟悉的路径模式构造输出位置。
@@ -932,11 +932,10 @@ Core wheel/sdist、portable bundle、SBOM、checksums、可重建性和实际消
 Core wheel/sdist 与 portable Plugin/Skill bundle 分开验证，并由 release manifest 记录各自文件名、字节数和 SHA-256。
 公开仓库、tag、Release、PyPI 与安全设置不是 exporter 操作。
 
-首发 seed 没有 `PUBLIC_AUTHORITY.json`，release builder 必须逐字节验证 `PUBLIC_EXPORT_RECEIPT.json` 登记的全部 tracked
-snapshot。权威切换后的公开仓库跟踪 `agent_memory_public_authority_v1`：顶层精确包含
+公开仓库处于 `public_active` 后，release builder 必须要求跟踪的 `PUBLIC_AUTHORITY.json`（`agent_memory_public_authority_v1`），顶层精确包含
 `contract_version, status, repository, engineering_source_commit, initial_public_release, activated_at`；
-`initial_public_release` 精确包含 `ref, commit, snapshot_sha256`。只有 repository identity、UTC 时间、tracked marker、
-初始 tag/commit 和初始 commit→当前 HEAD 祖先关系全部成立，builder 才允许后续公开原生提交不再匹配旧 export snapshot。
+`initial_public_release` 精确包含 `ref, commit, snapshot_sha256`，且出现遗留 `PUBLIC_EXPORT_RECEIPT.json` 或缺失 marker 时失败关闭。只有 repository identity、UTC 时间、tracked marker、
+初始 tag/commit 和初始 commit→当前 HEAD 祖先关系全部成立，builder 才允许构建公开原生发行物。历史首发 seed 构建逻辑仅归档在初始 tag（`v0.3.0`）。
 marker 不进入 Core Store、不授权切换，也不改变行为 owner。
 
 公开工程权威固定为 `private_engineering -> public_candidate -> public_active`。前两期唯一 owner 都是私有工程仓库；
@@ -965,8 +964,8 @@ workflow 失败可幂等重试；任何要求新 commit 的修复都必须删除
 
 `agent_memory_public_release_manifest_v1.source` 顶层精确包含
 `repository, ref, commit, authority_epoch, engineering_source_commit, initial_public_release, authority_activated_at`；
-`initial_public_release` 精确包含 `ref, commit, snapshot_sha256`。seed release 使用
-`authority_epoch=private_engineering` 且 activation 为 `null`；后续公开原生 release 使用 `public_active` 与 marker UTC 时间。
+`initial_public_release` 精确包含 `ref, commit, snapshot_sha256`。当前 `main` 上的公开原生 release 固定使用
+`authority_epoch=public_active` 与 marker UTC 时间。
 
 ## 验收
 

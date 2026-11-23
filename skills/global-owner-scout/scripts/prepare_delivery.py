@@ -28,7 +28,7 @@ from scout_security import (
     validate_output_root,
 )
 from utf8_stdio import configure_utf8_stdio
-from validate_output import ContractError, valid_project, valid_review_pack
+from validate_output import ContractError, valid_project, valid_review_pack, validate_review_pack
 from verify_visible_output import verify_visible_output
 
 
@@ -317,15 +317,21 @@ def prepare_delivery(pack: dict[str, Any], *, artifact_dir: Path, protected_root
         visual_text = safe_artifact_bytes(visual_input).decode('utf-8')
         require(bool(visual_text.strip()), "visual-input must not be empty")
         require(pack['project_result'].get('project_map') is not None, "visual-input requires bound project context")
+    if visual_text is None and pack.get('project_result', {}).get('project_map') is not None:
+        from project_map import map_context, render_visual
+        validated = validate_review_pack(pack)
+        visual_text = render_visual(map_context(validated), validated['review_pack_hash'])
     rendered = render_review_pack(pack, surface="interactive", visual=visual_text)
     rendered_bytes = rendered.encode("utf-8")
     visible = verify_visible_output(rendered, surface="interactive")
     artifact_name = f"global-owner-scout-review-pack-{visible['review_pack_hash'][:16]}.md"
     artifact_path = output_root / artifact_name
     if visible["project_map_bundle"]:
-        from project_map import render_visual
         bundle = visible["project_map_bundle"]
-        visual = (render_visual(bundle["context"], visible["review_pack_hash"]) if visual_text is None else visual_text).encode("utf-8")
+        if visual_text is None:
+            from project_map import render_visual
+            visual_text = render_visual(bundle["context"], visible["review_pack_hash"])
+        visual = visual_text.encode("utf-8")
         require(sha256_bytes(visual) == bundle["visual"]["visual_sha256"], "visual does not match frozen map")
         write_immutable_artifact(output_root / bundle["visual"]["visual_name"], visual)
     write_immutable_artifact(artifact_path, rendered_bytes)

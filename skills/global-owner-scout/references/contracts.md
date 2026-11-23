@@ -68,7 +68,7 @@
 
 ### Versions, hashing & privacy
 
-- Skill `5.20.0`; Project result `global_owner_scout_project_v7`; Review Pack `global_owner_scout_review_pack_v8`; Delivery `global_owner_scout_delivery_v2`; manifest-free terminal `global_owner_scout_terminal_v1`; user locale `zh-CN`.
+- Skill `5.20.1`; Project result `global_owner_scout_project_v7`; Review Pack `global_owner_scout_review_pack_v8`; Delivery `global_owner_scout_delivery_v2`; manifest-free terminal `global_owner_scout_terminal_v1`; user locale `zh-CN`.
 - Canonical hashes use UTF-8 JSON with sorted keys and compact separators excluding their own hash field (`project_claim_hash`, `review_pack_hash`).
 - Evidence refs allow owner sections, ADRs, tests, commits, or event classes; forbid absolute paths, raw dialogue, full commands, accounts, tokens, raw remotes, project IDs, automation IDs, or diagnostic bodies.
 - E1 supports clearly labelled engineering hypotheses only (never rule candidates). Show every E2/E3 card (no cap/truncation); order actionable advice by evidenced impact and dependencies before freezing.

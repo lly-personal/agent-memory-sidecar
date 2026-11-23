@@ -251,10 +251,29 @@ def run_git(
         if key not in _GIT_ENV_STRIP
     }
     env.update(GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
+    command = [executable]
+    if os.name == "nt":
+        command.extend(["-c", "core.longpaths=true"])
+    effective_cwd = cwd
+    if (
+        os.name == "nt"
+        and cwd is not None
+        and len(os.path.abspath(os.fspath(cwd))) >= 240
+    ):
+        command.extend(["-C", str(cwd)])
+        effective_cwd = next(
+            (
+                parent
+                for parent in cwd.parents
+                if len(os.path.abspath(os.fspath(parent))) < 240 and parent.is_dir()
+            ),
+            Path(cwd.anchor) if cwd.anchor else None,
+        )
+    command.extend(args)
     try:
         result = subprocess.run(
-            [executable, *args],
-            cwd=cwd,
+            command,
+            cwd=effective_cwd,
             env=env,
             capture_output=True,
             text=True,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate Global Owner Scout 5.20.0 project results and Review Packs."""
+"""Validate Global Owner Scout 5.20.1 project results and Review Packs."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ if _SCRIPT_DIR not in sys.path:
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.20.0"
+SKILL_VERSION = "5.20.1"
 PROJECT_CONTRACT = "global_owner_scout_project_v7"
 NATIVE_PROJECT_CONTRACT = "global_owner_scout_project_v8"
 MAP_PROJECT_CONTRACT = "global_owner_scout_project_v6"
@@ -1197,9 +1197,14 @@ def validate_review_pack(value: Any, *, require_preview: bool = True) -> dict[st
     if project.get('purpose') == 'inspect':
         require(obj['owner_parity'] is None and not obj['review_cards'] and obj['selection_preview'] is None, 'inspection cannot use Owner integration or approval')
         parity = None
-    elif project["contract_version"] in {NATIVE_PROJECT_CONTRACT, PROJECT_CONTRACT} and all(c.get("kind") == "engineering" for c in project["project_cards"]):
+    elif project["contract_version"] == NATIVE_PROJECT_CONTRACT:
+        require(obj["owner_parity"] is None, "native review does not require Global Owner")
+        parity = None
+    elif project["contract_version"] == PROJECT_CONTRACT and bool(project["project_cards"]) and all(c.get("kind") == "engineering" for c in project["project_cards"]):
         require(obj["owner_parity"] is None, "engineering advice does not require Global Owner")
         parity = None
+    elif project["contract_version"] == PROJECT_CONTRACT and not project["project_cards"]:
+        parity = validate_owner_parity(obj["owner_parity"], "$.owner_parity") if obj["owner_parity"] is not None else None
     else:
         parity = validate_owner_parity(obj["owner_parity"], "$.owner_parity")
     cards = require_list(obj["review_cards"], "$.review_cards")
@@ -1300,7 +1305,7 @@ def load_stdin_json() -> Any:
 
 def main() -> int:
     configure_utf8_stdio()
-    parser = argparse.ArgumentParser(description="Validate Global Owner Scout 5.20.0 JSON contracts from stdin.")
+    parser = argparse.ArgumentParser(description="Validate Global Owner Scout 5.20.1 JSON contracts from stdin.")
     parser.add_argument("--mode", choices=("project_scout", "review_pack"))
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--hash-project-card", action="store_true")
