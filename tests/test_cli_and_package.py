@@ -872,6 +872,58 @@ class CliAndPackageTests(unittest.TestCase):
         self.assertNotIn("scripts/agent_memory_sidecar/instruction_sync.py", files)
         self.assertIn("scripts/agent_memory_sidecar/cli.py", files)
 
+    def test_setup_migrates_hash_verified_legacy_shared_skill_and_doctor_flags_stale_copy(self) -> None:
+        from agent_memory_sidecar.skill import skill_tree_sha256
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            codex = root / "codex"
+            legacy_root = root / "legacy-agents-skills"
+            project.mkdir()
+            codex.mkdir()
+            legacy_root.mkdir()
+            identity = resolve_identity(project)
+
+            # Simulate prior v0.6.16 install in ~/.agents/skills/agent-memory
+            legacy_plan = install_skill(root=legacy_root)
+            legacy_dir = legacy_plan.path
+            legacy_sha = skill_tree_sha256(legacy_dir)
+            self.assertIsNotNone(legacy_sha)
+
+            with (
+                patch.dict(os.environ, {"CODEX_HOME": str(codex)}),
+                patch("agent_memory_sidecar.codex_integration._default_codex_home_active", return_value=True),
+                patch("agent_memory_sidecar.codex_integration.legacy_shared_skill_root", return_value=legacy_root),
+            ):
+                # Install initial state pretending v0.6.16 bound the legacy skill hash
+                with patch("agent_memory_sidecar.skill.default_user_skill_root", return_value=legacy_root):
+                    setup(apply=True, identity=identity)
+                # Now simulate v0.7.0 where default_user_skill_root is $CODEX_HOME/skills:
+                # doctor reports legacy_shared_skill_present before setup --apply migrates it
+                report_before = doctor(identity=identity)
+                self.assertEqual("error", report_before["status"])
+                self.assertIn("legacy_shared_skill_present", [e["code"] for e in report_before["errors"]])
+
+                # setup --apply migrates hash-verified legacy copy cleanly and passes doctor
+                applied = setup(apply=True, identity=identity)
+                self.assertEqual("ok", applied["status"])
+                self.assertFalse(legacy_dir.exists())
+                self.assertTrue((codex / "skills" / "agent-memory" / "SKILL.md").is_file())
+                self.assertEqual("ok", doctor(identity=identity)["status"])
+
+                # Unmatched / user-modified legacy copy is NEVER silently deleted; doctor flags it
+                legacy_dir.mkdir(parents=True)
+                (legacy_dir / "SKILL.md").write_text("# custom\n", encoding="utf-8")
+                (legacy_dir / "scripts").mkdir()
+                (legacy_dir / "scripts" / "agent-memory.py").write_text(
+                    "from agent_memory_sidecar.cli import main\nmain(daily_only=True)\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaises(CoreError):
+                    setup(apply=True, identity=identity)
+                self.assertTrue(legacy_dir.exists())
+
     def test_skill_install_recovers_an_interrupted_previous_swap(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

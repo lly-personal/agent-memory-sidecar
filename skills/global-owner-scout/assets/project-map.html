@@ -239,37 +239,63 @@ function drawGraph(){
  const svg=panel.querySelector('svg'),bounds=panel.getBoundingClientRect();
  if(!bounds.width||!bounds.height)return;
  const boxes=new Map([...panel.querySelectorAll('[data-graph-node]')].map(el=>[el.dataset.graphNode,el.getBoundingClientRect()]));
+ const rectFor=r=>({l:r.left-bounds.left,r:r.right-bounds.left,t:r.top-bounds.top,b:r.bottom-bounds.top,h:r.height,w:r.width});
+ const rects=new Map([...boxes.entries()].map(([k,v])=>[k,rectFor(v)]));
  const marker=root.id+'-arrow';
  svg.setAttribute('viewBox',`0 0 ${bounds.width} ${bounds.height}`);
  const groups=graphData(node(state.node)).groups.filter(g=>g.from!==g.to);
+ const blocksH=(fromId,toId,xMin,xMax,yMid)=>{
+  for(const [id,c] of rects.entries()){
+   if(id===fromId||id===toId)continue;
+   if(c.r>xMin+2&&c.l<xMax-2&&c.b>yMid-14&&c.t<yMid+14)return true;
+  }
+  return false;
+ };
+ const blocksV=(fromId,toId,yMin,yMax,xMid)=>{
+  for(const [id,c] of rects.entries()){
+   if(id===fromId||id===toId)continue;
+   if(c.b>yMin+2&&c.t<yMax-2&&c.r>xMid-14&&c.l<xMid+14)return true;
+  }
+  return false;
+ };
  let paths='';
  for(const [index,g] of groups.entries()){
-  const a=boxes.get(g.from),b=boxes.get(g.to);if(!a||!b)continue;
-  const al=a.left-bounds.left,ar=a.right-bounds.left,at=a.top-bounds.top,ab=a.bottom-bounds.top;
-  const bl=b.left-bounds.left,br=b.right-bounds.left,bt=b.top-bounds.top,bb=b.bottom-bounds.top;
-  const acx=(al+ar)/2,acy=(at+ab)/2,bcx=(bl+br)/2,bcy=(bt+bb)/2;
-  const jitter=((index%5)-2)*5;
+  const a=rects.get(g.from),b=rects.get(g.to);if(!a||!b)continue;
+  const acx=(a.l+a.r)/2,acy=(a.t+a.b)/2,bcx=(b.l+b.r)/2,bcy=(b.t+b.b)/2;
+  const jitter=((index%5)-2)*4;
+  const laneLift=10+((index%5)*5);
   let d='';
-  if(Math.abs(acy-bcy)<Math.max(a.height,b.height)*0.55){
-   if(ar<=bl-4){
-    const mx=(ar+bl)/2+jitter*0.4;
-    d=`M ${ar} ${acy+jitter} L ${mx} ${acy+jitter} L ${mx} ${bcy+jitter} L ${bl-2} ${bcy+jitter}`;
-   }else if(br<=al-4){
-    const mx=(br+al)/2+jitter*0.4;
-    d=`M ${al} ${acy+jitter} L ${mx} ${acy+jitter} L ${mx} ${bcy+jitter} L ${br+2} ${bcy+jitter}`;
+  if(Math.abs(acy-bcy)<Math.max(a.h,b.h)*0.55){
+   const yLine=(acy+bcy)/2+jitter;
+   if(a.r<=b.l-4&&!blocksH(g.from,g.to,a.r,b.l,yLine)){
+    const mx=(a.r+b.l)/2+jitter*0.4;
+    d=`M ${a.r} ${acy+jitter} L ${mx} ${acy+jitter} L ${mx} ${bcy+jitter} L ${b.l-2} ${bcy+jitter}`;
+   }else if(b.r<=a.l-4&&!blocksH(g.from,g.to,b.r,a.l,yLine)){
+    const mx=(b.r+a.l)/2+jitter*0.4;
+    d=`M ${a.l} ${acy+jitter} L ${mx} ${acy+jitter} L ${mx} ${bcy+jitter} L ${b.r+2} ${bcy+jitter}`;
    }else{
-    const lift=Math.min(at,bt)-12-((index%4)*6);
-    d=`M ${acx} ${at} L ${acx} ${lift} L ${bcx} ${lift} L ${bcx} ${bt-2}`;
+    const lift=Math.max(4,Math.min(a.t,b.t)-laneLift);
+    d=`M ${acx+jitter} ${a.t} L ${acx+jitter} ${lift} L ${bcx+jitter} ${lift} L ${bcx+jitter} ${b.t-2}`;
    }
-  }else if(ab<=bt-4){
-   const my=(ab+bt)/2+jitter*0.6;
-   d=`M ${acx+jitter} ${ab} L ${acx+jitter} ${my} L ${bcx+jitter} ${my} L ${bcx+jitter} ${bt-2}`;
-  }else if(bb<=at-4){
-   const my=(bb+at)/2+jitter*0.6;
-   d=`M ${acx+jitter} ${at} L ${acx+jitter} ${my} L ${bcx+jitter} ${my} L ${bcx+jitter} ${bb+2}`;
+  }else if(a.b<=b.t-4){
+   if(!blocksV(g.from,g.to,a.b,b.t,(acx+bcx)/2)){
+    const my=(a.b+b.t)/2+jitter*0.5;
+    d=`M ${acx+jitter} ${a.b} L ${acx+jitter} ${my} L ${bcx+jitter} ${my} L ${bcx+jitter} ${b.t-2}`;
+   }else{
+    const outer=bounds.width-6-((index%4)*5);
+    d=`M ${a.r} ${acy+jitter} L ${outer} ${acy+jitter} L ${outer} ${bcy+jitter} L ${b.r+2} ${bcy+jitter}`;
+   }
+  }else if(b.b<=a.t-4){
+   if(!blocksV(g.from,g.to,b.b,a.t,(acx+bcx)/2)){
+    const my=(b.b+a.t)/2+jitter*0.5;
+    d=`M ${acx+jitter} ${a.t} L ${acx+jitter} ${my} L ${bcx+jitter} ${my} L ${bcx+jitter} ${b.b+2}`;
+   }else{
+    const outer=6+((index%4)*5);
+    d=`M ${a.l} ${acy+jitter} L ${outer} ${acy+jitter} L ${outer} ${bcy+jitter} L ${b.l-2} ${bcy+jitter}`;
+   }
   }else{
-   const my=(acy+bcy)/2;
-   d=`M ${acx} ${ab} L ${acx} ${my} L ${bcx} ${my} L ${bcx} ${bt-2}`;
+   const lift=Math.max(4,Math.min(a.t,b.t)-laneLift);
+   d=`M ${acx} ${a.t} L ${acx} ${lift} L ${bcx} ${lift} L ${bcx} ${b.t-2}`;
   }
   paths+=`<path data-graph-link="${esc(g.type)}" d="${d}" marker-end="url(#${marker})"><title>${esc(node(g.from).title+' → '+node(g.to).title+'：'+g.kind)}</title></path>`;
  }

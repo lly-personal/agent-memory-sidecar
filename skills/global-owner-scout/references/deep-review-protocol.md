@@ -100,7 +100,7 @@ Independently scan for repeated corrections, failed recovery, premature success,
 
 ## Phase 6: freeze project semantics
 
-Freeze `project_map` and `project_cards` together (`source_revision` = read-only HEAD, `observed_at` = freeze timestamp). Run `python -B scripts/scout.py seal-project --input-file <draft-project.json> --output-file <sealed-project.json>` to compute `normalized_evidence_hash` and `project_claim_hash` on every card and validate the Project result before Global comparison. `no_material_delta` requires nonempty evidenced observations within declared scope.
+Freeze `project_map` and `project_cards` together (`source_revision` = read-only HEAD, `observed_at` = freeze timestamp). Run `python -B scripts/scout.py seal-project --input-file <draft-project.json>` (or add `--output-file <new-file-in-granted-root> --artifact-dir <granted-root> --protected-root <bound-root>` for exclusive creation) to compute `normalized_evidence_hash` and `project_claim_hash` on every card and validate the Project result before Global comparison. `no_material_delta` requires nonempty evidenced observations within declared scope.
 
 ## Phase 7: integration and task-scoped delivery
 

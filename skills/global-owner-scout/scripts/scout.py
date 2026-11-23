@@ -52,8 +52,10 @@ from validate_output import (
     SKILL_VERSION,
     canonical_hash,
     describe_input,
+    expected_action_policy,
     project_claim_hash,
     review_pack_hash,
+    selection_token,
     validate_project,
     validate_review_pack,
 )
@@ -249,6 +251,35 @@ def inspect_native_context(value: Any, project_root: Path | None = None) -> dict
                 binding_scope=scope, git_snapshot=inspect_git_context(native_root))
 
 
+def _write_exclusive_json(path: Path, payload: bytes, *, artifact_dir: Path, protected_roots: list[Path]) -> Path:
+    out_root = validate_output_root(artifact_dir, protected_roots)
+    require(path.is_absolute(), "--output-file must be absolute")
+    try:
+        parent = path.parent.resolve(strict=True)
+    except OSError as exc:
+        raise ContractError(f"output parent unavailable: {exc}") from exc
+    require(parent == out_root, "--output-file must be a direct child of --artifact-dir")
+    require(not path.exists() and not path.is_symlink(), "--output-file already exists")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_BINARY"):
+        flags |= os.O_BINARY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd: int | None = None
+    try:
+        fd = os.open(path, flags, 0o600)
+        with os.fdopen(fd, "wb", closefd=True) as stream:
+            fd = None
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except OSError as exc:
+        if fd is not None:
+            os.close(fd)
+        raise ContractError(f"output file creation failed: {exc}") from exc
+    return path
+
+
 def seal_project_payload(value: Any) -> dict[str, Any]:
     require(isinstance(value, dict), "project payload must be an object")
     project = copy.deepcopy(value)
@@ -267,7 +298,7 @@ def seal_delivery_payload(
     *,
     artifact_dir: Path,
     protected_roots: list[Path],
-    host: str = "codex",
+    host: str | None = None,
     outcome: str = "not_requested",
     with_visual: bool = False,
     text_only: bool = False,
@@ -276,8 +307,9 @@ def seal_delivery_payload(
     codex_home: Path | None = None,
 ) -> dict[str, Any]:
     require(isinstance(value, dict), "review pack payload must be an object")
-    require(host in {"codex", "pi", "claude", "antigravity"}, "unsupported host")
+    require(host in {None, "codex", "pi", "claude", "antigravity"}, "unsupported host")
     pack = copy.deepcopy(value)
+    effective_host = host or "codex"
     if isinstance(pack.get("project_result"), dict):
         sealed_project = seal_project_payload(pack["project_result"])
         pack["project_result"] = sealed_project
@@ -287,8 +319,47 @@ def seal_delivery_payload(
             for pcard, rcard in zip(project_cards, review_cards):
                 if isinstance(rcard, dict) and not rcard.get("project_claim_hash"):
                     rcard["project_claim_hash"] = pcard["project_claim_hash"]
+    if effective_host in {"pi", "claude", "antigravity"}:
+        require(pack.get("contract_version") == NATIVE_REVIEW_PACK_CONTRACT, "native host requires native Review Pack v9")
+        project = pack.get("project_result") or {}
+        require(project.get("contract_version") == NATIVE_PROJECT_CONTRACT, "native host requires native Project v8")
+        if project.get("purpose") != "inspect":
+            cov = project.get("session_coverage")
+            require(isinstance(cov, dict) and cov.get("native_host") == effective_host, "native review pack native_host does not match --host")
+    else:
+        require(pack.get("contract_version") != NATIVE_REVIEW_PACK_CONTRACT, "codex host cannot deliver native Review Pack v9")
+        parity = pack.get("owner_parity")
+        if (
+            isinstance(parity, dict)
+            and parity.get("status") == "matched"
+            and isinstance(parity.get("canonical_source_hash"), str)
+            and pack.get("selection_preview") is None
+            and pack.get("project_result", {}).get("purpose") != "inspect"
+        ):
+            project_cards = pack.get("project_result", {}).get("project_cards", [])
+            review_cards = pack.get("review_cards", [])
+            if isinstance(review_cards, list) and len(review_cards) == len(project_cards):
+                for pcard, rcard in zip(project_cards, review_cards):
+                    if (
+                        isinstance(pcard, dict)
+                        and isinstance(rcard, dict)
+                        and pcard.get("kind") != "engineering"
+                        and rcard.get("selection_token") is None
+                        and isinstance(rcard.get("integration_preview"), dict)
+                    ):
+                        relation = rcard["integration_preview"].get("global_relation")
+                        supersedes = rcard["integration_preview"].get("supersedes")
+                        _, expected_actions = expected_action_policy(pcard, parity["status"], relation, True)
+                        if "confirm" in expected_actions and isinstance(supersedes, list):
+                            rcard["selection_token"] = selection_token(
+                                card_id=pcard["card_id"],
+                                project_claim_hash=pcard["project_claim_hash"],
+                                proposal=pcard["rule_payload"],
+                                supersedes=supersedes,
+                                target_before_sha256=parity["canonical_source_hash"],
+                            )
     pack["review_pack_hash"] = review_pack_hash(pack)
-    if host == "codex" and pack.get("owner_parity") is not None and pack.get("project_result", {}).get("purpose") != "inspect":
+    if effective_host == "codex" and pack.get("owner_parity") is not None and pack.get("project_result", {}).get("purpose") != "inspect":
         home = codex_home
         if home is None:
             configured = os.environ.get("CODEX_HOME")
@@ -349,6 +420,8 @@ def main() -> int:
     commands.add_parser("validate-project")
     seal_proj = commands.add_parser("seal-project", help="Compute card hashes and validate a Project JSON payload in one step.")
     seal_proj.add_argument("--output-file", type=Path)
+    seal_proj.add_argument("--artifact-dir", type=Path)
+    seal_proj.add_argument("--protected-root", action="append", type=Path)
     commands.add_parser("validate-review-pack")
     preview = commands.add_parser("prepare-review")
     preview.add_argument("--select-card", action="append")
@@ -364,7 +437,7 @@ def main() -> int:
     seal_deliv = commands.add_parser("seal-delivery", help="Hash, preview (Codex rule packs), validate, deliver, and render receipt in one step.")
     seal_deliv.add_argument("--artifact-dir", type=Path, required=True)
     seal_deliv.add_argument("--protected-root", action="append", type=Path, required=True)
-    seal_deliv.add_argument("--host", choices=("codex", "pi", "claude", "antigravity"), default="codex")
+    seal_deliv.add_argument("--host", choices=("codex", "pi", "claude", "antigravity"), default=None)
     seal_deliv.add_argument("--outcome", choices=tuple(SURFACE_COPY), default="not_requested")
     seal_deliv.add_argument("--with-visual", action="store_true")
     seal_deliv.add_argument("--text-only", action="store_true")
@@ -374,7 +447,7 @@ def main() -> int:
     receipt.add_argument("outcome", choices=tuple(SURFACE_COPY))
     receipt.add_argument("--artifact-path", type=Path)
     receipt.add_argument("--artifact-root", type=Path)
-    receipt.add_argument("--host", choices=("codex", "pi", "claude", "antigravity"), default="codex")
+    receipt.add_argument("--host", choices=("codex", "pi", "claude", "antigravity"), default=None)
     receipt.add_argument("--with-visual", action="store_true")
     receipt.add_argument("--text-only", action="store_true")
     commands.add_parser("render-terminal")
@@ -437,7 +510,14 @@ def main() -> int:
             sealed = seal_project_payload(load_input())
             serialized = json.dumps(sealed, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
             if args.output_file is not None:
-                args.output_file.write_text(serialized + "\n", encoding="utf-8")
+                require(args.artifact_dir is not None, "--artifact-dir is required with --output-file")
+                require(bool(args.protected_root), "--protected-root is required with --output-file")
+                _write_exclusive_json(
+                    args.output_file,
+                    (serialized + "\n").encode("utf-8"),
+                    artifact_dir=args.artifact_dir,
+                    protected_roots=args.protected_root,
+                )
                 print(json.dumps({"status": "ok", "mode": "project_scout", "contract_version": sealed["contract_version"],
                                   "output_file": str(args.output_file)}, ensure_ascii=False, separators=(",", ":")))
             else:

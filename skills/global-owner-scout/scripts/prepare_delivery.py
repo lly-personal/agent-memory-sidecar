@@ -392,19 +392,20 @@ def render_delivery_receipt(
     artifact_root: Path,
     outcome: str,
     text_only: bool = False,
-    host: str = "codex",
+    host: str | None = None,
     with_visual: bool = False,
 ) -> str:
     manifest = validate_delivery_manifest(manifest)
     data = validate_manifest_artifact(manifest, artifact_path=artifact_path, artifact_root=artifact_root)
     require(outcome in SURFACE_COPY, "unknown file surface outcome")
-    require(host in {"codex", "pi", "claude", "antigravity"}, "unknown receipt host")
+    require(host in {None, "codex", "pi", "claude", "antigravity"}, "unknown receipt host")
     body = data.decode("utf-8")
     brief = extract_conversation_brief(body)
     has_recovery_bundle = bool(verify_visible_output(body, surface="interactive")["recovery_bundle"])
+    host_allows_confirmation = host in {None, "codex"}
     if brief is None and outcome in {"open_succeeded", "open_queued"}:
         copy = OPENED_COPY if outcome == "open_succeeded" else QUEUED_COPY
-        eligible = outcome == "open_succeeded" and has_recovery_bundle
+        eligible = host_allows_confirmation and outcome == "open_succeeded" and has_recovery_bundle
         return (
             "# Global Owner Scout · 完整审阅包\n\n"
             f"[打开完整审阅包](<{markdown_path(artifact_path)}>)\n\n"
@@ -416,7 +417,7 @@ def render_delivery_receipt(
         )
     if brief is None:
         brief = "原报告已校验。此历史文件没有首项摘要，可在当前对话依据原文件继续讨论；现有规则未改变。"
-    eligible = outcome == "open_succeeded" and has_recovery_bundle
+    eligible = host_allows_confirmation and outcome == "open_succeeded" and has_recovery_bundle
     receipt = (
         "# Global Owner Scout · 复盘结论与建议\n\n"
         f"{brief}\n\n[完整依据](<{markdown_path(artifact_path)}>)\n\n"
@@ -601,7 +602,7 @@ def main() -> int:
     parser.add_argument("--artifact-dir", type=Path)
     parser.add_argument("--protected-root", action="append", type=Path, default=[])
     parser.add_argument("--render-receipt", choices=tuple(SURFACE_COPY))
-    parser.add_argument("--host", choices=("codex", "pi", "claude", "antigravity"), default="codex")
+    parser.add_argument("--host", choices=("codex", "pi", "claude", "antigravity"), default=None)
     parser.add_argument("--with-visual", action="store_true")
     parser.add_argument("--text-only", action="store_true")
     parser.add_argument("--render-terminal", action="store_true")

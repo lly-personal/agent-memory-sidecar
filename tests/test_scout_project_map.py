@@ -375,6 +375,7 @@ class ScoutProjectMapTests(unittest.TestCase):
                                                         outcome='not_requested')
             self.assertNotIn('visualize', default_receipt)
             for host, with_visual, text_only, expected_token in (
+                (None, True, False, False),
                 ('codex', True, False, True),
                 ('codex', True, True, False),
                 ('codex', False, False, False),
