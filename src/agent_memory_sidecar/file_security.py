@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import stat
 import subprocess
 import time
@@ -17,6 +18,30 @@ _GIT_ENV_STRIP = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"
 
 def logical_absolute(path: Path | str) -> Path:
     return Path(os.path.abspath(os.fspath(Path(path).expanduser())))
+
+
+def win_long_path(path: Path | str) -> str:
+    raw = os.path.abspath(os.fspath(path))
+    if os.name != "nt" or raw.startswith("\\\\?\\") or len(raw) < 240:
+        return raw
+    if raw.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + raw[2:]
+    return "\\\\?\\" + raw
+
+
+def remove_readonly_tree(path: Path | str) -> None:
+    target = win_long_path(path)
+    if not os.path.lexists(target):
+        return
+
+    def _clear_readonly(func, failed_path: str, _exc: BaseException) -> None:
+        try:
+            os.chmod(failed_path, stat.S_IWRITE | stat.S_IREAD)
+        except OSError:
+            pass
+        func(failed_path)
+
+    shutil.rmtree(target, onexc=_clear_readonly)
 
 
 def safe_git_executable(workspace: Path | str | None = None) -> str | None:
@@ -71,19 +96,44 @@ def run_safe_git(
         if key not in _GIT_ENV_STRIP
     }
     env.update(GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
+    command = [executable]
+    if os.name == "nt":
+        command.extend(["-c", "core.longpaths=true"])
+    command.extend(["-C", str(root), *args])
+    effective_cwd: Path | None = cwd or root
+    if (
+        os.name == "nt"
+        and effective_cwd is not None
+        and len(os.path.abspath(os.fspath(effective_cwd))) >= 240
+    ):
+        effective_cwd = next(
+            (
+                parent
+                for parent in effective_cwd.parents
+                if len(os.path.abspath(os.fspath(parent))) < 240 and parent.is_dir()
+            ),
+            Path(effective_cwd.anchor) if effective_cwd.anchor else None,
+        )
     try:
         result = subprocess.run(
-            [executable, "-C", str(root), *args],
-            cwd=cwd or root,
+            command,
+            cwd=effective_cwd,
             capture_output=True,
             env=env,
             timeout=timeout,
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise CoreError(error_code, error_message) from exc
+        raise CoreError(error_code, error_message, git_reason="execution_error") from exc
     if result.returncode != 0:
-        raise CoreError(error_code, error_message)
+        stderr_text = (result.stderr or b"").decode("utf-8", errors="replace")
+        reason = "filename_too_long" if "Filename too long" in stderr_text else "nonzero_exit"
+        raise CoreError(
+            error_code,
+            error_message,
+            git_reason=reason,
+            git_exit_code=result.returncode,
+        )
     return result
 
 
@@ -191,7 +241,7 @@ def _hold_windows_directory_chain(directory: Path) -> Iterator[None]:
             # access does not pin against rename. Opening the reparse point itself
             # lets the handle check reject links and junctions.
             handle = kernel32.CreateFileW(
-                str(cursor), 0x01 | 0x80, 0x01 | 0x02, None,
+                win_long_path(cursor), 0x01 | 0x80, 0x01 | 0x02, None,
                 3, 0x02000000 | 0x00200000, None,
             )
             if handle == ctypes.c_void_p(-1).value:
@@ -748,7 +798,7 @@ def _secure_windows(path: Path, *, directory: bool) -> None:
         _windows_error("create a private Store security descriptor", path)
     try:
         flags = 0x00000004 | 0x80000000
-        if not advapi32.SetFileSecurityW(str(path), flags, descriptor):
+        if not advapi32.SetFileSecurityW(win_long_path(path), flags, descriptor):
             _windows_error("apply the private Store ACL", path)
     finally:
         kernel32.LocalFree(ctypes.cast(descriptor, wintypes.HLOCAL))
@@ -806,10 +856,11 @@ def _windows_dacl_sddl(path: Path, *, advapi32: object, kernel32: object) -> str
 
     required = wintypes.DWORD()
     flags = 0x00000004
-    advapi32.GetFileSecurityW(str(path), flags, None, 0, ctypes.byref(required))
+    long_target = win_long_path(path)
+    advapi32.GetFileSecurityW(long_target, flags, None, 0, ctypes.byref(required))
     buffer = ctypes.create_string_buffer(required.value)
     if not advapi32.GetFileSecurityW(
-        str(path), flags, buffer, required, ctypes.byref(required)
+        long_target, flags, buffer, required, ctypes.byref(required)
     ):
         _windows_error("verify the private Store ACL", path)
     sddl_pointer = wintypes.LPWSTR()

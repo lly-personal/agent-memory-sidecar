@@ -22,8 +22,10 @@ from .file_security import (
     hold_physical_directory,
     logical_absolute,
     prepare_store_parent,
+    remove_readonly_tree,
     run_safe_git,
     secure_store_location,
+    win_long_path,
 )
 from .installation import InstallationRegistry
 from .instruction_document import MANAGED_BLOCK_START
@@ -210,10 +212,11 @@ def _connection_binding(db: CoreDatabase) -> dict[str, Any] | None:
 
 
 def _replace_exit_binding(db: CoreDatabase, expected: dict[str, Any] | None,
-                          value: dict[str, Any] | None) -> None:
+                          value: dict[str, Any] | None, *, host: str = "claude") -> None:
     with db.transaction():
         if _connection_binding(db) != expected:
-            raise CoreError("instruction_sync_stale_plan", "Claude binding changed before removal")
+            label = "Antigravity" if host == "antigravity" else host.capitalize()
+            raise CoreError("instruction_sync_stale_plan", f"{label} binding changed before removal")
         db.conn.execute("DELETE FROM global_instruction_binding WHERE singleton=1")
         if value is not None:
             InstallationRegistry(db).bind_global(**{key: value[key] for key in (
@@ -420,7 +423,13 @@ def _apply(state: Path, snapshot_root: Path, stage: Path, data: bytes,
         # Remove only the empty directory created for the staging destination.
         (snapshot_root / "global").rmdir()
         snapshot_root.rmdir()
-        shutil.copytree(stage, snapshot_root)
+        temp_snapshot = snapshot_root.parent / f".stage-{snapshot_root.name}-{uuid.uuid4().hex}"
+        try:
+            shutil.copytree(win_long_path(stage), win_long_path(temp_snapshot))
+            os.replace(win_long_path(temp_snapshot), win_long_path(snapshot_root))
+        except BaseException:
+            remove_readonly_tree(temp_snapshot)
+            raise
         snapshot_created = True
     stores_existed = {
         name: assert_physical_regular_file(
@@ -439,6 +448,10 @@ def _apply(state: Path, snapshot_root: Path, stage: Path, data: bytes,
         "after_sha256": digest}
     atomic_write(journal, _json(recovery))
     touched: list[str] = []
+    written_files: dict[str, list[str]] = {}
+    written_bindings: dict[str, dict[str, Any]] = {}
+    config_written = False
+    desired_config_bytes = _json(config)
     try:
         for name, home in targets.items():
             desired = desired_by_host[name]
@@ -447,57 +460,79 @@ def _apply(state: Path, snapshot_root: Path, stage: Path, data: bytes,
                     or (name in OVERRIDE_HOSTS and _bytes(home / "AGENTS.override.md") is not None)):
                 raise CoreError("instruction_sync_stale_plan", "Host changed before its write", host=name)
             touched.append(name)
+            written_files[name] = []
             for rel, raw in desired.items():
                 target = home / rel
                 prepare_store_parent(target)
                 if before[name][rel] != raw:
+                    written_files[name].append(rel)
                     atomic_write(target, raw)
             row = {"source_root": str(snapshot_root), "source_commit": snapshot_root.name,
                    "source_file_sha256": digest, "target_file_sha256": target_hash,
                    "updated_at": datetime.now(UTC).isoformat()}
             previous = bindings[name]
             if previous is None or any(previous[key] != row[key] for key in row if key != "updated_at"):
+                written_bindings[name] = row
                 _set_binding(home, row)
             if not _host_matches(_read_host_files(home, name), desired) or _binding(home)["target_file_sha256"] != target_hash:
                 raise CoreError("instruction_sync_readback_failed", "Target or binding readback differs", host=name)
-        if _bytes(config_path) != _json(config):
-            atomic_write(config_path, _json(config))
-        if _bytes(config_path) != _json(config):
+        if _bytes(config_path) != desired_config_bytes:
+            atomic_write(config_path, desired_config_bytes)
+            config_written = True
+        if _bytes(config_path) != desired_config_bytes:
             raise CoreError("instruction_sync_readback_failed", "Local source binding readback differs")
     except BaseException as failure:
+        binding_keys = ("source_root", "source_commit", "source_file_sha256", "target_file_sha256", "updated_at")
+        def _same_binding(left: dict[str, Any] | None, right: dict[str, Any] | None) -> bool:
+            if left is None or right is None:
+                return left is right
+            return all(left.get(k) == right.get(k) for k in binding_keys)
         errors = []
         for name in reversed(touched):
             home = targets[name]
             desired = desired_by_host[name]
             try:
-                for rel, raw in desired.items():
+                for rel in written_files.get(name, []):
+                    raw = desired[rel]
                     target = home / rel
                     if _bytes(target) not in (before[name][rel], raw):
                         raise CoreError("instruction_sync_recovery_required", "Concurrent edit retained during rollback", host=name)
-                for rel in desired:
+                for rel in reversed(written_files.get(name, [])):
                     target = home / rel
                     if before[name][rel] is None:
                         target.unlink(missing_ok=True)
                     else:
                         atomic_write(target, before[name][rel])
-                if stores_existed[name]:
-                    _set_binding(home, bindings[name])
-                else:
-                    _store(home).unlink(missing_ok=True)
+                if name in written_bindings:
+                    current_binding = _binding(home)
+                    if not (_same_binding(current_binding, bindings[name]) or _same_binding(current_binding, written_bindings[name])):
+                        raise CoreError("instruction_sync_recovery_required", "Concurrent Store binding retained during rollback", host=name)
+                    if stores_existed[name]:
+                        if not _same_binding(current_binding, bindings[name]):
+                            _set_binding(home, bindings[name])
+                    else:
+                        store_file = _store(home)
+                        store_file.unlink(missing_ok=True)
+                        for suffix in ("-journal", "-wal", "-shm"):
+                            store_file.with_name(store_file.name + suffix).unlink(missing_ok=True)
             except Exception:
                 errors.append(name)
         try:
-            if config_before is None:
-                config_path.unlink(missing_ok=True)
-            else:
-                atomic_write(config_path, config_before)
+            if config_written:
+                current_config = _bytes(config_path)
+                if current_config not in (config_before, desired_config_bytes):
+                    errors.append("source_binding")
+                elif config_before is None:
+                    config_path.unlink(missing_ok=True)
+                else:
+                    atomic_write(config_path, config_before)
         except Exception:
             errors.append("source_binding")
         if errors:
             raise CoreError("instruction_sync_recovery_required", "Rollback incomplete; preserve recovery data and inspect affected hosts", hosts=errors) from failure
         journal.unlink()
         if snapshot_created:
-            shutil.rmtree(snapshot_root)
+            remove_readonly_tree(snapshot_root)
         raise
     # Commit already completed. A cleanup failure is not a rollback or an unchanged result.
     try:
@@ -755,6 +790,7 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
     if not plan_hash or plan_hash != computed_hash:
         raise CoreError("instruction_sync_stale_plan", "Exit preview changed; inspect a fresh plan before applying")
 
+    rules_dir = home / "config" / "rules"
     with InstructionRepository().lock_paths([config_path, journal, *target_paths.values()]):
         if (_bytes(journal) is not None or _bytes(config_path) != config_before
                 or _read_host_files(home, "antigravity") != before_files or _binding(home) != binding
@@ -762,12 +798,44 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
             raise CoreError("instruction_sync_stale_plan", "Antigravity enrollment changed while waiting for the lock")
         prepare_store_parent(journal)
         secure_store_location(journal, allow_missing=True)
-        with CoreDatabase(_store(home)) as db:
+        with (
+            hold_physical_directory(home),
+            hold_physical_directory(rules_dir),
+            hold_physical_directory(state) as state_fd,
+            CoreDatabase(_store(home)) as db,
+        ):
+            def selected_state_exists() -> bool:
+                try:
+                    return state_fd is None or os.path.samestat(os.fstat(state_fd), state.stat())
+                except OSError:
+                    return False
+
             if not os.path.samestat(store_stat, _store(home).stat()) or _connection_binding(db) != binding:
                 raise CoreError("instruction_sync_stale_plan", "Antigravity Store changed while opening")
+            if _bytes(config_path, directory_fd=state_fd) != config_before or _bytes(journal, directory_fd=state_fd) is not None:
+                raise CoreError("instruction_sync_stale_plan", "State changed while opening")
             stage = home / (".agent-memory-exit-" + uuid.uuid4().hex)
             stage.mkdir(mode=0o700)
             captured = {rel: stage / f"rule-{idx}.md" for idx, rel in enumerate(ANTIGRAVITY_FILES)}
+
+            def approved_capture(rel: str) -> bool:
+                dst_path = captured[rel]
+                try:
+                    st = dst_path.lstat()
+                except FileNotFoundError:
+                    return False
+                if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1
+                        or not os.path.samestat(target_stats[rel], st)):
+                    return False
+                flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+                descriptor = os.open(dst_path, flags)
+                with os.fdopen(descriptor, "rb") as stream:
+                    opened = os.fstat(stream.fileno())
+                    return (
+                        os.path.samestat(target_stats[rel], opened)
+                        and stream.read(len(before_files[rel]) + 1) == before_files[rel]
+                    )
+
             recovery = {
                 "contract_version": plan["contract_version"],
                 "targets": {
@@ -782,78 +850,89 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
                 "config_before": base64.b64encode(config_before).decode(),
                 "after_sha256": None,
             }
-            atomic_write(journal, _json(recovery))
-            moved: list[str] = []
-            verified_moved: set[str] = set()
-            binding_started = config_started = False
-            try:
-                for rel in ANTIGRAVITY_FILES:
-                    src_path = target_paths[rel]
-                    dst_path = captured[rel]
-                    secure_store_location(dst_path, allow_missing=True)
-                    os.replace(src_path, dst_path)
-                    moved.append(rel)
-                    st = dst_path.lstat()
-                    if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1
-                            or not os.path.samestat(target_stats[rel], st)
-                            or dst_path.read_bytes() != before_files[rel]):
-                        raise CoreError("instruction_sync_recovery_required", "A changed instruction was captured and retained", capture_directory=str(stage))
-                    verified_moved.add(rel)
-                if not os.path.samestat(store_stat, _store(home).stat()):
-                    raise CoreError("instruction_sync_stale_plan", "Antigravity binding changed before removal")
-                _replace_exit_binding(db, binding, None)
-                binding_started = True
-                if _bytes(config_path) != config_before:
-                    raise CoreError("instruction_sync_stale_plan", "Enrollment changed before removal")
-                config_started = True
-                atomic_write(config_path, config_after)
-                if (any(p.exists() for p in target_paths.values())
-                        or _connection_binding(db) is not None
-                        or _bytes(config_path) != config_after
-                        or not os.path.samestat(store_stat, _store(home).stat())):
-                    raise CoreError("instruction_sync_readback_failed", "Antigravity exit readback differs")
-            except BaseException as failure:
-                errors = []
+            with hold_physical_directory(stage):
+                atomic_write(journal, _json(recovery), directory_fd=state_fd)
+                moved: list[str] = []
+                binding_started = config_started = False
                 try:
-                    current_cfg = _bytes(config_path)
-                    if config_started and current_cfg == config_after:
-                        atomic_write(config_path, config_before)
-                    elif current_cfg != config_before:
-                        errors.append("source_binding")
-                except Exception:
-                    errors.append("source_binding")
-                try:
-                    if not os.path.samestat(store_stat, _store(home).stat()):
-                        raise CoreError("instruction_binding_unavailable", "Antigravity Store was replaced")
-                    current_binding = _connection_binding(db)
-                    if binding_started and current_binding is None:
-                        _replace_exit_binding(db, None, binding)
-                    elif current_binding != binding:
-                        errors.append("antigravity_binding")
-                except Exception:
-                    errors.append("antigravity_binding")
-                for rel in reversed(moved):
-                    try:
-                        dst_path = captured[rel]
+                    for rel in ANTIGRAVITY_FILES:
                         src_path = target_paths[rel]
-                        if rel not in verified_moved:
-                            errors.append(rel)
-                        elif dst_path.exists():
-                            # Non-overwriting restore: preserve any concurrently recreated user file and retain capture.
-                            os.link(dst_path, src_path)
-                            dst_path.unlink()
-                        elif not src_path.exists():
-                            errors.append(rel)
+                        dst_path = captured[rel]
+                        secure_store_location(dst_path, allow_missing=True)
+                        os.replace(src_path, dst_path)
+                        moved.append(rel)
+                        if not approved_capture(rel):
+                            raise CoreError("instruction_sync_recovery_required", "A changed instruction was captured and retained", capture_directory=str(stage))
+                    if not os.path.samestat(store_stat, _store(home).stat()):
+                        raise CoreError("instruction_sync_stale_plan", "Antigravity binding changed before removal")
+                    _replace_exit_binding(db, binding, None, host="antigravity")
+                    binding_started = True
+                    if _bytes(config_path, directory_fd=state_fd) != config_before:
+                        raise CoreError("instruction_sync_stale_plan", "Enrollment changed before removal")
+                    config_started = True
+                    atomic_write(config_path, config_after, directory_fd=state_fd)
+                    if (any(p.exists() for p in target_paths.values())
+                            or _connection_binding(db) is not None
+                            or _bytes(config_path, directory_fd=state_fd) != config_after
+                            or not os.path.samestat(store_stat, _store(home).stat())):
+                        raise CoreError("instruction_sync_readback_failed", "Antigravity exit readback differs")
+                    if not selected_state_exists():
+                        raise CoreError("instruction_sync_stale_plan", "Selected state directory moved; recovery retained")
+                except BaseException as failure:
+                    errors = []
+                    try:
+                        current_cfg = _bytes(config_path, directory_fd=state_fd)
+                        if config_started and current_cfg == config_after:
+                            atomic_write(config_path, config_before, directory_fd=state_fd)
+                        elif current_cfg != config_before:
+                            errors.append("source_binding")
                     except Exception:
-                        errors.append(rel)
-                if errors:
-                    raise CoreError("instruction_sync_recovery_required", "Exit recovery material retained", hosts=errors,
-                                    capture_directory=str(stage)) from failure
-                shutil.rmtree(stage, ignore_errors=True)
-                journal.unlink(missing_ok=True)
-                raise
+                        errors.append("source_binding")
+                    try:
+                        if not os.path.samestat(store_stat, _store(home).stat()):
+                            raise CoreError("instruction_binding_unavailable", "Antigravity Store was replaced")
+                        current_binding = _connection_binding(db)
+                        if binding_started and current_binding is None:
+                            _replace_exit_binding(db, None, binding, host="antigravity")
+                        elif current_binding != binding:
+                            errors.append("antigravity_binding")
+                    except Exception:
+                        errors.append("antigravity_binding")
+                    for rel in reversed(moved):
+                        try:
+                            dst_path = captured[rel]
+                            src_path = target_paths[rel]
+                            if dst_path.exists():
+                                if not approved_capture(rel):
+                                    raise CoreError("instruction_sync_recovery_required", "Changed capture retained")
+                                # Non-overwriting restore: preserve any concurrently recreated user file and retain capture.
+                                os.link(dst_path, src_path)
+                                dst_path.unlink()
+                            elif not src_path.exists():
+                                errors.append(rel)
+                        except Exception:
+                            errors.append(rel)
+                    if errors:
+                        raise CoreError("instruction_sync_recovery_required", "Exit recovery material retained", hosts=errors,
+                                        capture_directory=str(stage)) from failure
+                    if not selected_state_exists():
+                        raise CoreError("instruction_sync_recovery_required", "Selected state directory moved; inspect retained journal") from failure
+                    try:
+                        journal.unlink()
+                    except OSError as exc:
+                        raise CoreError("instruction_sync_recovery_required", "Exit rolled back; journal cleanup remains", operation_committed=False) from exc
+                    raise
+                # Enrollment removal is committed. Re-verify each captured file before unlinking.
+                try:
+                    for rel in ANTIGRAVITY_FILES:
+                        if not approved_capture(rel):
+                            raise OSError("instruction capture changed after commit")
+                        captured[rel].unlink()
+                except OSError as exc:
+                    raise CoreError("instruction_sync_cleanup_required", "Antigravity exit committed; capture retained", operation_committed=True,
+                                    capture_directory=str(stage)) from exc
             try:
-                shutil.rmtree(stage)
+                stage.rmdir()
                 journal.unlink()
             except OSError as exc:
                 raise CoreError("instruction_sync_cleanup_required", "Antigravity exit committed; cleanup remains", operation_committed=True,

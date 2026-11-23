@@ -17,12 +17,16 @@
   --at-accent-fg:#ffffff;
   font-family:var(--at-font);
   font-size:var(--at-space);
+  font-variant-numeric:tabular-nums;
   line-height:1.6;
   color:var(--at-fg);
   background:transparent;
   max-width:960px;
   margin:0 auto;
   box-sizing:border-box;
+}
+@media (prefers-reduced-motion:reduce){
+  #__SCOUT_ROOT__ *{transition:none!important}
 }
 @media (prefers-color-scheme:dark){
   #__SCOUT_ROOT__{
@@ -67,15 +71,17 @@
   cursor:pointer;
   transition:background .12s ease,border-color .12s ease,color .12s ease;
 }
-#__SCOUT_ROOT__ .btn:hover{border-color:var(--at-border-strong);background:var(--at-surface-subtle)}
 #__SCOUT_ROOT__ .btn:focus-visible{outline:2px solid var(--at-accent);outline-offset:2px}
 #__SCOUT_ROOT__ .btn:disabled{opacity:.55;cursor:not-allowed}
 #__SCOUT_ROOT__ .btn-ghost{border-color:transparent;background:transparent;padding:.24em .48em;color:var(--at-fg)}
-#__SCOUT_ROOT__ .btn-ghost:hover{background:var(--at-surface-subtle);border-color:var(--at-border)}
 #__SCOUT_ROOT__ .btn-primary{background:var(--at-accent);border-color:var(--at-accent);color:var(--at-accent-fg);font-weight:560;padding:.45em .95em}
-#__SCOUT_ROOT__ .btn-primary:hover{filter:brightness(1.06);background:var(--at-accent);border-color:var(--at-accent)}
-#__SCOUT_ROOT__ .at-link{color:var(--at-accent);padding-left:0;padding-right:.35em}
-#__SCOUT_ROOT__ .at-link:hover{background:var(--at-accent-soft);padding-left:.4em;border-color:transparent}
+#__SCOUT_ROOT__ .at-link{color:var(--at-accent);padding:.14em .32em;margin-left:-.32em;border-radius:6px}
+@media (hover:hover){
+  #__SCOUT_ROOT__ .btn:hover{border-color:var(--at-border-strong);background:var(--at-surface-subtle)}
+  #__SCOUT_ROOT__ .btn-ghost:hover{background:var(--at-surface-subtle);border-color:var(--at-border)}
+  #__SCOUT_ROOT__ .btn-primary:hover{filter:brightness(1.06);background:var(--at-accent);border-color:var(--at-accent)}
+  #__SCOUT_ROOT__ .at-link:hover{background:var(--at-accent-soft);border-color:transparent}
+}
 #__SCOUT_ROOT__ .form-select{
   font:inherit;
   font-size:.9em;
@@ -133,12 +139,13 @@
 #__SCOUT_ROOT__ .table th,#__SCOUT_ROOT__ .table td{text-align:left;vertical-align:top;padding:.55em .75em;border-bottom:1px solid var(--at-border)}
 #__SCOUT_ROOT__ .table th{font-weight:600;color:var(--at-muted);background:var(--at-surface-subtle)}
 #__SCOUT_ROOT__ .table tr:last-child td{border-bottom:none}
-#__SCOUT_ROOT__ .at-network{position:relative;margin:var(--at-space) 0;padding:.4em;border:1px solid var(--at-border);border-radius:12px;background:var(--at-surface);isolation:isolate}
+#__SCOUT_ROOT__ .at-network{position:relative;margin:var(--at-space) 0;padding:.4em;border-radius:12px;background:var(--at-surface-subtle);isolation:isolate}
 #__SCOUT_ROOT__ .at-network-grid{position:relative;z-index:2;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13.5em),1fr));gap:2.6em 2.2em;padding:1.9em 1.75em}
-#__SCOUT_ROOT__ .at-network-node{min-width:0;display:grid;align-content:start;justify-items:start;gap:.35em;padding:.75em .9em;border:1px solid var(--at-border-strong);border-radius:10px;background:var(--at-surface-subtle)}
+#__SCOUT_ROOT__ .at-network-node{min-width:0;display:grid;align-content:start;justify-items:start;gap:.35em;padding:.75em .9em;border:1px solid var(--at-border);border-radius:10px;background:var(--at-surface)}
 #__SCOUT_ROOT__ .at-network svg{position:absolute;inset:0;z-index:1;width:100%;height:100%;overflow:visible;pointer-events:none;color:var(--at-muted)}
-#__SCOUT_ROOT__ .at-network path{stroke:currentColor;stroke-opacity:.7;stroke-width:1.5;fill:none}
-#__SCOUT_ROOT__ .at-network marker path{fill:currentColor;fill-opacity:.8;stroke:none}
+#__SCOUT_ROOT__ .at-network path{stroke:currentColor;stroke-opacity:.82;stroke-width:1.6;fill:none}
+#__SCOUT_ROOT__ .at-network marker path{fill:currentColor;fill-opacity:.9;stroke:none}
+#__SCOUT_ROOT__ .at-network .at-edge-label{font-size:11px;fill:var(--at-fg);paint-order:stroke;stroke:var(--at-surface-subtle);stroke-width:4px;stroke-linejoin:round}
 #__SCOUT_ROOT__ .at-status{margin-top:var(--at-half);color:var(--at-muted)}
 </style>
 <nav class="at-breadcrumb" aria-label="当前位置"></nav>
@@ -233,7 +240,7 @@ function graphData(n){const visible=graphNodes(n),scope=new Set([n.id,...data.no
  for(const g of groups)for(const id of [g.from,g.to])if(!visible.some(n=>n.id===id))visible.push(node(id));
  return {visible,groups,types,type};
 }
-function renderGraph(n){const g=graphData(n);return `<div class="at-sectionhead"><h2>如何协同</h2>${g.types.length?`<select class="form-select" id="atlas-relation" aria-label="选择关系类型">${g.types.map(t=>`<option value="${esc(t)}" ${t===g.type?'selected':''}>${esc(source.relation_labels[t])}</option>`).join('')}</select>`:''}</div><p class="at-small text-small text-muted">先看当前分工，按需展开内部能力；箭头表示所选关系方向，完整交接说明见下方列表。</p>${state.expanded.length?'<button type="button" class="btn btn-ghost at-link" data-action="collapse">收起展开，回到当前分工</button>':''}<div class="at-network"><svg aria-hidden="true"></svg><div class="at-network-grid">${g.visible.map(x=>`<section class="at-network-node" data-graph-node="${esc(x.id)}">${button(x.id,x.title)}<p class="at-small text-small text-muted">${esc(x.summary)}</p>${children(x.id).length?`<button type="button" class="btn" data-expand="${esc(x.id)}">展开内部能力</button>`:''}</section>`).join('')}</div></div><div class="at-network-summary">${groupDetails(g.groups)||'<p class="text-muted">尚无这部分的协作关系证据。结构分工仍可查看，不补造连线。</p>'}</div>`;}
+function renderGraph(n){const g=graphData(n);return `<div class="at-sectionhead"><h2>如何协同</h2>${g.types.length?`<select class="form-select" id="atlas-relation" aria-label="选择关系类型">${g.types.map(t=>`<option value="${esc(t)}" ${t===g.type?'selected':''}>${esc(source.relation_labels[t])}</option>`).join('')}</select>`:''}</div><p class="at-small text-small text-muted">先看当前分工，按需展开内部能力；箭头表示所选关系方向，完整交接说明见下方列表。</p>${state.expanded.length?'<button type="button" class="btn btn-ghost at-link" data-action="collapse">收起展开，回到当前分工</button>':''}<div class="at-network"><svg aria-hidden="true"></svg><div class="at-network-grid">${g.visible.map(x=>`<section class="at-network-node" data-graph-node="${esc(x.id)}">${button(x.id,x.title)}<p class="at-small text-small text-muted">${esc(x.summary)}</p>${children(x.id).length?`<button type="button" class="btn btn-ghost at-link" data-expand="${esc(x.id)}">展开内部能力 ↘</button>`:''}</section>`).join('')}</div></div><div class="at-network-summary">${groupDetails(g.groups)||'<p class="text-muted">尚无这部分的协作关系证据。结构分工仍可查看，不补造连线。</p>'}</div>`;}
 function drawGraph(){
  const panel=qs('.at-network');if(!panel)return;
  const svg=panel.querySelector('svg'),bounds=panel.getBoundingClientRect();
@@ -309,7 +316,9 @@ function drawGraph(){
    const lift=Math.max(4,Math.min(ra.t,rb.t)-laneLift);
    pts=[[ax,a.t],[ax,lift],[bx,lift],[bx,b.t-2]];
   }
-  paths+=`<path data-graph-link="${esc(g.type)}" d="${toPath(pts)}" marker-end="url(#${marker})"><title>${esc(node(g.from).title+' → '+node(g.to).title+'：'+g.kind)}</title></path>`;
+  const mid=pts[Math.floor(pts.length/2)],prev=pts[Math.max(0,Math.floor(pts.length/2)-1)];
+  const lx=(mid[0]+prev[0])/2,ly=(mid[1]+prev[1])/2-5;
+  paths+=`<path data-graph-link="${esc(g.type)}" d="${toPath(pts)}" marker-end="url(#${marker})"><title>${esc(node(g.from).title+' → '+node(g.to).title+'：'+g.kind)}</title></path><text class="at-edge-label" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle">${esc(g.kind)}${g.edges.length>1?'('+g.edges.length+')':''}</text>`;
  }
  svg.innerHTML=`<defs><marker id="${marker}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M 0 0 L 7 3.5 L 0 7 Z"/></marker></defs>`+paths;
 }
@@ -330,11 +339,16 @@ function render(){
  qs('.at-breadcrumb').hidden=n.id===p.root&&!history.length;
  qs('.at-header').innerHTML=`<h1>${esc(n.title)}</h1><p>${esc(n.summary)}</p><details><summary class="at-small text-small text-muted">本次依据与范围</summary><div class="at-meta text-small text-muted"><span>来源 ${esc(p.revision.slice(0,7))}</span><span>·</span><span>读取于 ${esc(p.observed_at)}</span><span>·</span><span>${source.purpose==='inspect'?'当前设计查看 · 未做近期复盘':'深度复盘 · 覆盖边界见依据'}</span></div></details>`;
  const tab=([id,label])=>`<button type="button" class="btn btn-ghost cursor-interaction" data-view="${id}" aria-pressed="${state.view===id}">${label}</button>`;
- qs('.at-lenses').innerHTML=views.slice(0,3).map(tab).join('')+'<span class="at-tab-sep" aria-hidden="true"></span>'+views.slice(3).map(tab).join('');
+ const visibleViews=views.filter(([id])=>id!=='evolution'||p.evolution.length>0||state.view==='evolution');
+ qs('.at-lenses').innerHTML=visibleViews.map(tab).join('');
  const renderers={structure:renderStructure,path:renderPath,graph:renderGraph,relations:renderRelations,evolution:renderEvolution,evidence:renderEvidence,advice:renderAdvice};qs('.at-content').innerHTML=renderers[state.view](n);
  if(state.view==='graph'){drawGraph();graphObserver=new ResizeObserver(drawGraph);graphObserver.observe(qs('.at-network'));}
  const first=p.advice.find(a=>a.parent===null&&adviceMatches(a,n.id)),teaser=qs('.at-advice-teaser');teaser.hidden=state.view==='advice'||state.view==='graph';
- teaser.innerHTML=first?`<span class="at-small text-small text-muted">关联建议</span><button type="button" class="btn btn-ghost at-link cursor-interaction" data-advice="${esc(first.id)}">${esc(first.title)} ↗</button><p>${esc(first.benefit)}</p>`:`<p class="at-small text-small text-muted">当前无独立改动建议。${esc(n.keep)}</p>`;status('');
+ teaser.innerHTML=first?`<span class="at-small text-small text-muted">关联建议</span><button type="button" class="btn btn-ghost at-link cursor-interaction" data-advice="${esc(first.id)}">${esc(first.title)} ↗</button><p>${esc(first.benefit)}</p>`:`<p class="at-small text-small text-muted">当前无独立改动建议。${esc(n.keep)}</p>`;
+ const activeLabel=advice(state.advice)?.title||(state.edge?map.edges.find(e=>e.id===state.edge)?.label:n.title)||p.name;
+ const shortLabel=activeLabel.length>18?activeLabel.slice(0,18)+'…':activeLabel;
+ qs('[data-action="discuss"]').textContent=`讨论「${shortLabel}」`;
+ status('');
 }
 root.addEventListener('click',async e=>{
  const b=e.target.closest('button');if(!b||!root.contains(b))return;

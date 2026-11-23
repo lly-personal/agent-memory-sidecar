@@ -97,7 +97,7 @@ For normal Codex Desktop use, register the immutable repository Marketplace,
 install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.6.16
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.7.2
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -117,8 +117,8 @@ Plugin, Pi package and Claude Code Plugin expose that same directory; their inst
 For Pi or local Claude Code, install the tagged source through the host's native manager:
 
 ```sh
-pi install git:github.com/lly-personal/agent-memory-sidecar@v0.6.16
-claude plugin marketplace add https://github.com/lly-personal/agent-memory-sidecar.git#v0.6.16
+pi install git:github.com/lly-personal/agent-memory-sidecar@v0.7.2
+claude plugin marketplace add https://github.com/lly-personal/agent-memory-sidecar.git#v0.7.2
 claude plugin install agent-memory-sidecar@agent-memory --scope user
 ```
 
@@ -197,7 +197,7 @@ For Core-only CLI use, install the wheel from the same Release, then preview and
 apply setup:
 
 ```powershell
-python -m pip install .\agent_memory_sidecar-0.5.4-py3-none-any.whl
+python -m pip install .\agent_memory_sidecar-0.7.2-py3-none-any.whl
 agent-memory --help
 agent-memory setup
 agent-memory setup --apply
@@ -210,7 +210,7 @@ and Doctor remain available; global publication and Scout Owner parity are
 explicitly unavailable. Owner-integrated installations provide a separate clean
 Git checkout and bind it explicitly.
 
-Workstation Bootstrap 2.3.1 accepts `agent_memory_source_manifest_v1`. Release
+Workstation Bootstrap 2.6.1 accepts `agent_memory_source_manifest_v1`. Release
 manifests bind each source to both a ref and a full commit SHA; an optional
 `canonical_owner` is `null` in the public profile. On an existing host that means “the release does not distribute an Owner”, not
 “detach the current Owner”: a clean managed Owner is preserved only when Core is bound to that exact root and commit. Floating branches are a

@@ -203,7 +203,12 @@ def inspect_git_context(cwd: Path) -> dict[str, Any]:
     return snapshot
 
 
-def inspect_native_context(value: Any, project_root: Path | None = None) -> dict[str, Any]:
+def inspect_native_context(
+    value: Any,
+    project_root: Path | None = None,
+    *,
+    include_snapshot: bool = True,
+) -> dict[str, Any]:
     require(isinstance(value, dict) and set(value) == {'contract_version', 'native_host', 'context'}
             and value['contract_version'] == 'global_owner_scout_native_context_v1', 'native_context_invalid')
     host, context = value['native_host'], value['context']
@@ -244,11 +249,14 @@ def inspect_native_context(value: Any, project_root: Path | None = None) -> dict
     scope = ('native_skill_substitution_git' if context.get('source_kind') == 'claude_skill_substitution'
              else 'native_runtime_info_git' if context.get('source_kind') == 'antigravity_runtime_info'
              else 'native_current_session_git')
-    return dict(contract_version='global_owner_scout_native_binding_v1', native_host=host,
-                project_root=str(native_root),
-                source_sha256=sha256_bytes(canonical_json(value)),
-                session_ref_sha256=sha256_bytes(context['session_id'].encode('utf-8')),
-                binding_scope=scope, git_snapshot=inspect_git_context(native_root))
+    result = dict(contract_version='global_owner_scout_native_binding_v1', native_host=host,
+                  project_root=str(native_root),
+                  source_sha256=sha256_bytes(canonical_json(value)),
+                  session_ref_sha256=sha256_bytes(context['session_id'].encode('utf-8')),
+                  binding_scope=scope)
+    if include_snapshot:
+        result['git_snapshot'] = inspect_git_context(native_root)
+    return result
 
 
 def _write_exclusive_json(path: Path, payload: bytes, *, artifact_dir: Path, protected_roots: list[Path]) -> Path:
@@ -382,7 +390,16 @@ def seal_delivery_payload(
                                 target_before_sha256=parity["canonical_source_hash"],
                             )
     pack["review_pack_hash"] = review_pack_hash(pack)
-    if effective_host == "codex" and pack.get("owner_parity") is not None and pack.get("project_result", {}).get("purpose") != "inspect":
+    has_rule_cards = any(
+        isinstance(card, dict) and card.get("kind") != "engineering"
+        for card in pack.get("project_result", {}).get("project_cards", [])
+    )
+    if (
+        effective_host == "codex"
+        and pack.get("owner_parity") is not None
+        and pack.get("project_result", {}).get("purpose") != "inspect"
+        and has_rule_cards
+    ):
         home = codex_home
         if home is None:
             configured = os.environ.get("CODEX_HOME")

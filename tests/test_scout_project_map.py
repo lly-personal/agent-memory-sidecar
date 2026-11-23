@@ -554,6 +554,123 @@ class ScoutProjectMapTests(unittest.TestCase):
         self.assertIn('<details>\n<summary>展开完整核对依据</summary>\n\n### 完整核对依据', rendered_rule)
         self.assertEqual('ok', verify_visible_output(rendered_rule, surface='interactive')['status'])
 
+    def test_zero_card_host_branching_causal_brief_and_single_visual_render(self):
+        import copy
+        import prepare_delivery as d
+        import project_map
+        import scout
+        from render_review import render_conversation_brief
+
+        # 1. Causal first-answer: mutating edge kind and factual claim changes chat brief text.
+        base_pack = layered_pack()
+        mutated_pack = copy.deepcopy(base_pack)
+        edge = mutated_pack['project_result']['project_map']['edges'][0]
+        edge['kind'] = 'depends_on'
+        edge['claims'][0]['statement'] = '只有核对完最新状态后，下游才会放行。'
+        mutated_pack['review_pack_hash'] = v.review_pack_hash(mutated_pack)
+        brief_a = render_conversation_brief(base_pack)
+        brief_b = render_conversation_brief(mutated_pack)
+        self.assertNotEqual(brief_a, brief_b)
+        self.assertIn('只有核对完最新状态后，下游才会放行。', brief_b)
+
+        # 2. Single render_visual() invocation during prepare_delivery under Delivery v2.
+        orig_render = project_map.render_visual
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with mock.patch.object(project_map, 'render_visual', wraps=orig_render) as spy:
+                manifest, artifact = d.prepare_delivery(base_pack, artifact_dir=root, protected_roots=[SCRIPTS])
+                self.assertEqual(1, spy.call_count)
+                self.assertEqual('verified', d.visual_result(manifest, root)['visual_status'])
+                self.assertTrue(artifact.is_file())
+
+        # 3. Zero-card Codex Project v7 accepts both valid owner_parity and None,
+        #    and seal_delivery_payload skips prepare_review when zero rule cards exist.
+        sample_parity = v.valid_review_pack(v.valid_project(card_count=1))['owner_parity']
+
+        def make_zero_card(src_pack, *, status, parity, native=False):
+            p = copy.deepcopy(src_pack)
+            p['status'] = status
+            p['project_result']['status'] = status
+            p['project_result']['project_cards'] = []
+            p['project_result']['observations'] = [
+                {
+                    **obs,
+                    'evidence_level': 'E1',
+                    'disposition': {
+                        'kind': 'insufficient_evidence',
+                        'reason': '已核查当前范围，未见需新增规则的独立证据。',
+                        'card_ids': [],
+                        'owner_refs': [],
+                        'local_scope': '当前项目范围。',
+                        'portable_delta': '无独立通用行为增量。',
+                    },
+                }
+                if obs['disposition']['kind'] == 'candidate'
+                else obs
+                for obs in p['project_result']['observations']
+            ]
+            pm = p['project_result'].get('project_map')
+            if pm is not None:
+                for col in ('nodes', 'edges', 'journeys'):
+                    for item in pm.get(col, []):
+                        item['card_ids'] = []
+            p['review_cards'] = []
+            p['owner_parity'] = parity
+            p['selection_preview'] = None
+            if status in {'failed', 'output_budget_exceeded'}:
+                p['project_result']['project_map'] = None
+            if status in {'degraded', 'failed', 'output_budget_exceeded'}:
+                p['project_result']['limitations'] = ['本次仅取得部分或未完成记录，未生成新增规则候选。']
+                p['limitations'] = list(p['project_result']['limitations'])
+            if native:
+                p['contract_version'] = v.NATIVE_REVIEW_PACK_CONTRACT
+                p['project_result']['contract_version'] = v.NATIVE_PROJECT_CONTRACT
+                p['project_result']['session_coverage'] = {
+                    'status': 'degraded',
+                    'native_host': 'antigravity',
+                    'discovered_task_count': 1,
+                    'selected_task_count': 1,
+                    'fully_read_task_count': 0,
+                    'discovery_methods': ['native_scoped_sources_observed'],
+                    'scopes': [{
+                        'kind': 'session_messages',
+                        'coverage': 'observed_only',
+                        'record_count': 1,
+                        'evidence_refs': ['session:reviewed'],
+                    }],
+                }
+                for src in p['project_result']['evidence_sources']:
+                    if src['kind'] == 'sessions':
+                        src['status'] = 'degraded'
+                        src['uncovered'] = ['完整历史仍未知，仅读取当前原生会话摘要。']
+            p['review_pack_hash'] = v.review_pack_hash(p)
+            return p
+
+        for status, parity in (
+            ('no_material_delta', sample_parity),
+            ('no_material_delta', None),
+            ('failed', None),
+            ('output_budget_exceeded', None),
+            ('degraded', None),
+        ):
+            p = make_zero_card(base_pack, status=status, parity=parity)
+            validated = v.validate_review_pack(p)
+            self.assertEqual(status, validated['status'])
+            if status in {'no_material_delta', 'degraded'}:
+                with tempfile.TemporaryDirectory() as tmp:
+                    out = Path(tmp)
+                    with mock.patch.object(scout, 'prepare_review', side_effect=AssertionError('must skip prepare_review without rule cards')):
+                        sealed = scout.seal_delivery_payload(p, artifact_dir=out, protected_roots=[SCRIPTS], host='codex')
+                        self.assertEqual('ok', sealed['status'])
+
+        # 4. Native Project v8 / Pack v9 zero-card degraded requires owner_parity=None and rejects non-None parity.
+        native_pack = make_zero_card(base_pack, status='degraded', parity=None, native=True)
+        self.assertEqual('degraded', v.validate_review_pack(native_pack)['status'])
+
+        bad_native = make_zero_card(base_pack, status='degraded', parity=sample_parity, native=True)
+        with self.assertRaisesRegex(v.ContractError, 'native review does not require Global Owner'):
+            v.validate_review_pack(bad_native)
+
 
 if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == '--browser-fixtures':

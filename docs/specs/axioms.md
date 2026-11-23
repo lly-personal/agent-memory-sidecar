@@ -4,7 +4,7 @@
 - Owner layer: project_docs
 - Applies when: 设计、评审或变更 Agent Memory 的产品目标、行为权威、授权、隐私、证据或发布边界。
 - Avoid when: 只执行普通项目工作或不改变机制语义的机械修改。
-- Last verified: 2026-09-01
+- Last verified: 2026-11-24
 - Evidence: 用户批准的 Agent Memory Core v1 与条件可见终态闭环设计、[Core v1 ADR](../decisions/0057-agent-memory-core-v1.zh.md)、[Runtime storage policy ADR](../decisions/0058-persistent-runtime-journal.zh.md)、[有界规则集演化 ADR](../decisions/0059-bounded-behavior-set-evolution.zh.md)、[周期性 Global Owner Scout ADR](../decisions/0060-periodic-global-owner-scout.zh.md)、[直接可见审阅包 ADR](../decisions/0063-direct-visible-owner-review-packs.zh.md)、[中文双投影审阅包 ADR](../decisions/0064-chinese-contextual-dual-projection-review-packs.zh.md)、[主机感知动态项目注册 ADR](../decisions/0065-host-aware-project-enrollment.zh.md)、[执行与可见输出完整性 ADR](../decisions/0066-scout-execution-and-visible-output-integrity.zh.md)、[生产执行源激活门禁 ADR](../decisions/0067-scout-production-source-activation-gate.zh.md)、[用户主动触发主路径 ADR](../decisions/0068-interactive-project-scout-primary.zh.md)、[跨设备冷启动连续性 ADR](../decisions/0069-cross-device-cold-start-continuity.zh.md)、[原子规则包 ADR](../decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[所见即所签与物理 containment ADR](../decisions/0071-wysiwys-review-pack-bundles-and-physical-target-containment.zh.md)、[白名单公开分发 ADR](../decisions/0072-allowlisted-public-distribution-lane.zh.md)、[公开工程权威切换 ADR](../decisions/0073-public-engineering-authority-cutover.zh.md)、[统一工作站调和 ADR](../decisions/0075-unified-workstation-reconcile.zh.md)、[任务级 Review Pack 交付 ADR](../decisions/0076-task-scoped-review-pack-delivery.zh.md)、[真实读回工作站调和 ADR](../decisions/0078-workstation-reconcile-v2-observed-state.zh.md)、[项目任务前门与确定性终态 ADR](../decisions/0079-project-session-front-door-and-scout-terminal-contract.zh.md)、[消费者可见 Skill 范围 ADR](../decisions/0080-consumer-visible-skill-scope-reconciliation.zh.md)
 
 ## 产品定义
@@ -78,11 +78,11 @@ SDDL 文本表现形式代替权限语义。
 
 - 稳定核心：显式授权、作用域校验、规则部署、查看、编辑和撤销。
 - 实验能力：Ambient discovery 与单卡建议；不阻塞稳定核心发布。
-- 可选分发：私有 Git 传播完整 global `AGENTS.md`；本机 target 才决定本机行为。按需同步覆盖已接入的 Codex、Pi 和 Claude Code；Claude 须显式接入并投影为用户级 `CLAUDE.md`。同一源、同一提交、完整字节物化，各宿主分别保留本机 binding；文件一致不证明 Claude 的解析和实际会话一致。该能力不安装 Pi/Claude Hook、不迁移 Scout、不证明新会话采用。详见[全局规范同步契约](../../specs/global-instruction-sync-v1.md)。
+- 可选分发：私有 Git 传播完整 global `AGENTS.md`；本机 target 才决定本机行为。按需同步覆盖已接入的 Codex、Pi、Claude Code 和 Antigravity；Claude 须显式接入并投影为用户级 `CLAUDE.md`，Antigravity 须显式接入并确定性拆分为两份 `<=24,000 B` 的 `always_on` 规则文件。同一源、同一提交、完整字节物化，各宿主分别保留本机 binding；文件一致不证明各宿主的解析和实际会话一致。该能力不安装 Pi/Claude/Antigravity Hook、不迁移 Scout、不证明新会话采用。详见[全局规范同步契约](../../specs/global-instruction-sync-v1.md)。
 - 多宿主三阶能力阶梯（[ADR 0083](../decisions/0083-multihost-capability-ladder.zh.md)）：
-  - **L1（Instruction Sync）**：Codex、Pi、Claude Code 均支持只读/物化规范同步；
-  - **L2（Read-Only Scout）**：Codex 支持完整 `review/inspect`，Pi/Claude 为只读受限源候选（无确认动作）；
-  - **L3（Rule Approval & Mutation）**：仅 Codex 开放；Pi 与 Claude Code 在通过正式 ADR 批准“不可伪造的宿主原生确认原语”前严禁实现任何规则写入代码或宿主 Hook，且明令禁止用关键词/自然语言匹配替代授权。
+  - **L1（Instruction Sync）**：Codex、Pi、Claude Code 与 Antigravity 均支持只读/物化规范同步；
+  - **L2（Read-Only Scout）**：Codex 支持完整 `review/inspect`，Pi、Claude Code 与 Antigravity 为只读受限源候选（无确认动作）；
+  - **L3（Rule Approval & Mutation）**：仅 Codex 开放；Pi、Claude Code 与 Antigravity 在通过正式 ADR 批准“不可伪造的宿主原生确认原语”前严禁实现任何规则写入代码或宿主 Hook，且明令禁止用关键词/自然语言匹配替代授权。
 - 公开分发：只从白名单导出 Core 与版本化 Plugin/Skill；私有 Owner 是可选后端，不随源码或发行物公开。
 - 公开演进：首发验收前私有工程仓库是唯一研发权威；明确切换后公开 `main` 接管全部公开研发与发行，私有工程仓库
   冻结归档。公开候选期不得解释为双 owner 或长期镜像。

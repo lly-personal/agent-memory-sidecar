@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -387,6 +388,30 @@ def doctor(*, identity: ProjectIdentity) -> dict[str, Any]:
                     "message": "runtime command does not match the bound identity",
                 }
             )
+        hook_interp = _recorded_hook_interpreter(current_hooks)
+        if hook_interp is not None:
+            interp_ok = False
+            if Path(hook_interp).is_file():
+                try:
+                    probe = subprocess.run(
+                        [hook_interp, "--version"],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                        check=False,
+                    )
+                    interp_ok = probe.returncode == 0
+                except (OSError, subprocess.TimeoutExpired):
+                    interp_ok = False
+            if not interp_ok:
+                errors.append(
+                    {
+                        "code": "hook_interpreter_missing",
+                        "message": "recorded Hook Python interpreter is missing or unusable; rerun setup --apply or workstation-reconcile",
+                        "interpreter": hook_interp,
+                        "remediation": "rerun setup --apply or workstation-reconcile",
+                    }
+                )
         installed_skill = installed_skill_sha256(
             plan_skill_install().path
         )
@@ -692,6 +717,42 @@ def _git_identity(root: Path) -> tuple[str | None, bool]:
         return None, False
     value = commit.stdout.decode("utf-8", errors="replace").strip()
     return (value or None), not status.stdout.decode("utf-8", errors="replace").strip()
+
+
+def _recorded_hook_interpreter(hooks_document: dict[str, Any] | None) -> str | None:
+    if not isinstance(hooks_document, dict):
+        return None
+    hooks = hooks_document.get("hooks")
+    if not isinstance(hooks, dict):
+        return None
+    field = "commandWindows" if os.name == "nt" else "command"
+    for event_name in ("UserPromptSubmit", "SessionStart"):
+        entries = hooks.get(event_name)
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            commands = entry.get("hooks")
+            if not isinstance(commands, list):
+                continue
+            for item in commands:
+                if not isinstance(item, dict) or item.get("type") != "command":
+                    continue
+                raw = item.get(field) or item.get("command")
+                if not isinstance(raw, str) or "runtime-hook" not in raw:
+                    continue
+                try:
+                    tokens = shlex.split(raw, posix=(os.name != "nt"))
+                except ValueError:
+                    return ""
+                if not tokens:
+                    return ""
+                exe = tokens[0]
+                if os.name == "nt" and len(exe) >= 2 and exe[0] == exe[-1] == '"':
+                    exe = exe[1:-1]
+                return exe
+    return None
 
 
 def _package_root() -> Path:

@@ -983,3 +983,43 @@ class CliAndPackageTests(unittest.TestCase):
                 install_skill(root=alias / "existing")
             self.assertEqual("skill_target_unsafe", raised.exception.code)
             self.assertFalse((target_root / "agent-memory").exists())
+
+    def test_doctor_reports_missing_recorded_hook_interpreter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            codex = root / "codex"
+            project.mkdir()
+            codex.mkdir()
+            identity = resolve_identity(project)
+            with patch.dict(os.environ, {"CODEX_HOME": str(codex)}):
+                applied = setup(apply=True, identity=identity)
+                self.assertEqual("ok", applied["status"])
+                hooks_path = codex / "hooks.json"
+                hooks_data = json.loads(hooks_path.read_text(encoding="utf-8"))
+                missing_python = str(root / "deleted-venv" / "python.exe")
+                replaced = 0
+                for event_groups in hooks_data.get("hooks", {}).values():
+                    for group in event_groups:
+                        for entry in group.get("hooks", []):
+                            for key in ("commandWindows", "command"):
+                                cmd = entry.get(key, "")
+                                if isinstance(cmd, str) and "runtime-hook" in cmd:
+                                    idx = cmd.find(" ")
+                                    if cmd.startswith('"'):
+                                        end_q = cmd.find('"', 1)
+                                        if end_q > 1:
+                                            entry[key] = f'"{missing_python}"' + cmd[end_q + 1:]
+                                            replaced += 1
+                                    elif idx > 0:
+                                        entry[key] = missing_python + cmd[idx:]
+                                        replaced += 1
+                self.assertGreaterEqual(replaced, 1)
+                hooks_path.write_text(json.dumps(hooks_data, indent=2), encoding="utf-8")
+                report = doctor(identity=identity)
+                self.assertEqual("error", report["status"])
+                codes = [e["code"] for e in report["errors"]]
+                self.assertIn("hook_interpreter_missing", codes)
+                missing_err = next(e for e in report["errors"] if e["code"] == "hook_interpreter_missing")
+                self.assertEqual(missing_python, missing_err["interpreter"])
+                self.assertIn("reconcile", missing_err["remediation"].lower())

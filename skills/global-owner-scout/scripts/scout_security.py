@@ -100,6 +100,7 @@ def validate_output_root(
     protected_roots: Iterable[Path],
     *,
     ancestor_error: str | None = None,
+    exempt_exact_roots: dict[Path, Path] | None = None,
 ) -> Path:
     resolved_dir = safe_existing_directory(
         artifact_dir,
@@ -115,8 +116,29 @@ def validate_output_root(
         for root in protected_roots
     ]
     require(bool(roots), "at least one protected-root is required")
+    resolved_exempt: dict[Path, Path] = {}
+    if exempt_exact_roots:
+        for protected_root, allowed_exact in exempt_exact_roots.items():
+            resolved_protected = safe_existing_directory(
+                protected_root,
+                label="protected-root",
+                ancestor_error=ancestor_error,
+            )
+            resolved_allowed = safe_existing_directory(
+                allowed_exact,
+                label="artifact-dir",
+                ancestor_error=ancestor_error,
+            )
+            require(
+                resolved_allowed != resolved_protected and is_within(resolved_allowed, resolved_protected),
+                "artifact-dir must be outside every protected-root",
+            )
+            resolved_exempt[resolved_protected] = resolved_allowed
     for root in roots:
-        require(not is_within(resolved_dir, root), "artifact-dir must be outside every protected-root")
+        if is_within(resolved_dir, root):
+            if root in resolved_exempt and resolved_dir == resolved_exempt[root]:
+                continue
+            require(False, "artifact-dir must be outside every protected-root")
     return resolved_dir
 
 

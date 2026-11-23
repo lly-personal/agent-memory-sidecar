@@ -1,6 +1,9 @@
 # Agent Memory Core v1 Operator 参考
 
-- Status: active
+> [!NOTE]
+> 本文档为历史早期参考快照（`Last verified: 2026-08-22`），其中旧版本号（如 `v0.3.11` / `Bootstrap 2.2.0` / `Scout 5.6`）已被后续版本取代。日常使用、当前兼容矩阵与正式工作站同步请改用 [README.md](../README.md)、[user-guide.zh.md](user-guide.zh.md)、[workstation-reconcile.zh.md](sops/workstation-reconcile.zh.md) 与 [COMPATIBILITY.md](../COMPATIBILITY.md)。
+
+- Status: active (legacy snapshot; see note above)
 - Owner layer: project_docs
 - Last verified: 2026-08-22
 - Evidence: [Core v1 contract](../specs/agent-memory-core-v1.md)、[ADR 0057](decisions/0057-agent-memory-core-v1.zh.md)、[ADR 0059](decisions/0059-bounded-behavior-set-evolution.zh.md)、[ADR 0076](decisions/0076-task-scoped-review-pack-delivery.zh.md)、[Public distribution v1](../specs/public-distribution-v1.md)、[Public authority cutover v1](../specs/public-authority-cutover-v1.md)

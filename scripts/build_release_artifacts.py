@@ -23,7 +23,6 @@ from typing import Any, Iterable
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = "agent_memory_public_release_manifest_v1"
 SOURCE_CONTRACT = "agent_memory_source_manifest_v1"
-EXPORT_CONTRACT = "public_source_export_v1"
 AUTHORITY_CONTRACT = "agent_memory_public_authority_v1"
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA64 = re.compile(r"^[0-9a-f]{64}$")
@@ -213,56 +212,6 @@ def validate_tracked_noise(*, root: Path) -> None:
         )
 
 
-def validate_export_receipt(
-    *,
-    root: Path,
-    repository_url: str,
-    require_snapshot_match: bool = True,
-) -> dict[str, Any]:
-    path = root / "PUBLIC_EXPORT_RECEIPT.json"
-    require(path.is_file(), "release_export_receipt_missing")
-    _assert_physical(root, path, regular_file=True)
-    try:
-        receipt = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise ReleaseError("release_export_receipt_invalid") from exc
-    require(
-        isinstance(receipt, dict)
-        and receipt.get("contract_version") == EXPORT_CONTRACT
-        and receipt.get("status") == "public_repository_commit_required"
-        and SHA40.fullmatch(str(receipt.get("source_commit", ""))) is not None
-        and str(receipt.get("repository", "")).rstrip("/").casefold() == repository_url.rstrip("/").casefold()
-        and isinstance(receipt.get("files"), list),
-        "release_export_receipt_invalid",
-    )
-    expected: list[dict[str, Any]] = []
-    for item in receipt["files"]:
-        require(isinstance(item, dict) and set(item) == {"path", "bytes", "sha256"}, "release_export_receipt_invalid")
-        relative = Path(str(item["path"]))
-        require(
-            not relative.is_absolute()
-            and str(relative) not in {"", "."}
-            and ".." not in relative.parts
-            and isinstance(item["bytes"], int)
-            and item["bytes"] >= 0
-            and SHA64.fullmatch(str(item["sha256"])) is not None,
-            "release_export_receipt_invalid",
-        )
-        if require_snapshot_match:
-            file = root / relative
-            _assert_physical(root, file, regular_file=True)
-            require(file.stat().st_size == item["bytes"] and digest(file) == item["sha256"], "release_export_snapshot_drift")
-        expected.append(item)
-    require(receipt.get("file_count") == len(expected), "release_export_receipt_invalid")
-    require(hashlib.sha256(canonical(expected)).hexdigest() == receipt.get("source_snapshot_sha256"), "release_export_receipt_invalid")
-    listed = {str(item["path"]) for item in expected}
-    require(len(listed) == len(expected), "release_export_receipt_invalid")
-    if require_snapshot_match:
-        tracked = set(filter(None, git(["ls-files"], root=root).splitlines()))
-        require(tracked == listed | {"PUBLIC_EXPORT_RECEIPT.json"}, "release_export_snapshot_unregistered")
-    return receipt
-
-
 def resolve_release_authority(
     *,
     root: Path,
@@ -272,20 +221,10 @@ def resolve_release_authority(
 ) -> dict[str, Any]:
     require(SHA40.fullmatch(commit) is not None, "release_source_commit_invalid")
     marker_path = root / "PUBLIC_AUTHORITY.json"
-    if not marker_path.exists():
-        receipt = validate_export_receipt(root=root, repository_url=repository_url)
-        return {
-            "authority_epoch": "private_engineering",
-            "engineering_source_commit": receipt["source_commit"],
-            "initial_public_release": {
-                "ref": source_ref,
-                "commit": commit,
-                "snapshot_sha256": receipt["source_snapshot_sha256"],
-            },
-            "activated_at": None,
-        }
-
+    require(marker_path.is_file(), "release_authority_marker_missing")
     _assert_physical(root, marker_path, regular_file=True)
+    receipt_path = root / "PUBLIC_EXPORT_RECEIPT.json"
+    require(not receipt_path.exists() and not receipt_path.is_symlink(), "release_legacy_export_receipt_forbidden")
     try:
         marker = json.loads(marker_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
@@ -341,18 +280,6 @@ def resolve_release_authority(
         git(["merge-base", "--is-ancestor", initial_commit, commit], root=root)
     except ReleaseError as exc:
         raise ReleaseError("release_authority_ancestry_invalid") from exc
-    receipt_path = root / "PUBLIC_EXPORT_RECEIPT.json"
-    if receipt_path.exists():
-        receipt = validate_export_receipt(
-            root=root,
-            repository_url=repository_url,
-            require_snapshot_match=False,
-        )
-        require(
-            receipt["source_commit"] == marker["engineering_source_commit"]
-            and receipt["source_snapshot_sha256"] == initial["snapshot_sha256"],
-            "release_authority_provenance_mismatch",
-        )
     return {
         "authority_epoch": "public_active",
         "engineering_source_commit": marker["engineering_source_commit"],

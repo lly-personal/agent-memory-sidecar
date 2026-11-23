@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a validated Global Owner Scout 5.20.0 Review Pack as deterministic Chinese Markdown."""
+"""Render a validated Global Owner Scout 5.20.1 Review Pack as deterministic Chinese Markdown."""
 
 from __future__ import annotations
 
@@ -72,14 +72,28 @@ def render_conversation_brief(pack: dict[str, Any]) -> str:
     project = pack['project_result']
     overview = []
     if m := project.get('project_map'):
+        from project_map import RELATIONS
         overview = ['**工程全貌：' + m['title'] + '**', m['goal'], '范围：' + m['boundary']]
         if m['journeys']:
             j = m['journeys'][0]
             nodes = {n['id']: n['label'] for n in m['nodes']}
             edges = {e['id']: e for e in m['edges']}
-            steps = [nodes[j['entry']], *(nodes[edges[e]['target']] for e in j['edge_ids'])]
-            overview.extend([j['label'] + '：' + ' → '.join(steps) + '。' + j['outcome'],
-                             '异常与恢复：' + j['recovery']])
+            chain = [nodes[j['entry']], *[nodes[edges[eid]['target']] for eid in j['edge_ids']]]
+            handoffs = []
+            for eid in j['edge_ids']:
+                edge = edges[eid]
+                rel = RELATIONS.get(edge.get('kind'), '')
+                detail = edge['label']
+                if rel and rel not in detail:
+                    detail = f"{rel}：{detail}"
+                claim_hint = edge['claims'][0]['statement'] if edge.get('claims') else ''
+                step_desc = f"{detail}；{claim_hint}" if claim_hint and claim_hint != edge['label'] else detail
+                handoffs.append(f"{nodes[edge['source']]} → {nodes[edge['target']]}（{step_desc}）")
+            overview.extend([
+                j['label'] + '：' + ' → '.join(chain) + '。' + j['outcome'],
+                *(["关键交接：" + "；".join(handoffs)] if handoffs else []),
+                '异常与恢复：' + j['recovery'],
+            ])
     if project.get('purpose') == 'inspect':
         return '\n\n'.join([*overview,
             '本次只查看当前设计，未执行近期协作复盘或规则预演。可选择总览、路径或矩阵，围绕具体环节继续讨论。'])

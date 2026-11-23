@@ -49,11 +49,17 @@ def write_native_artifact(root: Path, descriptor: int | None, name: str, data: b
             require(stream.read() == data and os.fstat(stream.fileno()).st_nlink == 1, 'history_artifact_readback_failed')
 
 
-def history_output_root(artifact_dir: Path, protected_roots: list[Path]) -> Path:
+def history_output_root(
+    artifact_dir: Path,
+    protected_roots: list[Path],
+    *,
+    exempt_exact_roots: dict[Path, Path] | None = None,
+) -> Path:
     return validate_output_root(
         artifact_dir,
         protected_roots,
         ancestor_error='history_output_ancestor_alias',
+        exempt_exact_roots=exempt_exact_roots,
     )
 
 
@@ -76,8 +82,9 @@ def capture_native(value: Any, *, artifact_dir: Path, protected_roots: list[Path
 
 
 def import_history(value: Any, *, project_root: Path, session_id: str,
-                   artifact_dir: Path, protected_roots: list[Path]) -> dict[str, Any]:
-    root = history_output_root(artifact_dir, [project_root, *protected_roots])
+                   artifact_dir: Path, protected_roots: list[Path],
+                   exempt_exact_roots: dict[Path, Path] | None = None) -> dict[str, Any]:
+    root = history_output_root(artifact_dir, [project_root, *protected_roots], exempt_exact_roots=exempt_exact_roots)
     require(isinstance(value, dict), 'native_history_object_required')
     if 'content' in value:
         require(value.get('isError') is not True, 'native_history_tool_failed')
@@ -188,10 +195,11 @@ def import_history(value: Any, *, project_root: Path, session_id: str,
                      turn_ids=[t.get('id') for t in turns], item_count=sum(len(t['items']) for t in turns),
                      evidence_scope='one acquired native page; not full-chat or comprehension proof')
     index_file = root / f'native-history-{digest}.index.json'
+    index_bytes = json.dumps(index, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')
     with pinned_directory(root) as descriptor:
         write_native_artifact(root, descriptor, native_file.name, data)
-        write_native_artifact(root, descriptor, index_file.name, json.dumps(index, ensure_ascii=False,
-            sort_keys=True, separators=(',', ':')).encode('utf-8'))
+        write_native_artifact(root, descriptor, index_file.name, index_bytes)
         if descriptor is None:
             require(hashlib.sha256(safe_artifact_bytes(native_file)).hexdigest() == digest, 'native_history_readback_failed')
+            require(safe_artifact_bytes(index_file) == index_bytes, 'native_history_readback_failed')
     return dict(index, status='reused' if existed else 'imported', index_path=str(index_file))

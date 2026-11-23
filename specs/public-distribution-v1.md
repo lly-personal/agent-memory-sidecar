@@ -80,12 +80,12 @@ For GitHub API metadata only, the Resolver may use an explicit `GITHUB_TOKEN`/`G
 authentication before falling back to the anonymous public quota. It never persists or renders that token; rate limiting and invalid
 authentication remain distinguishable failure details under `release_resolution_blocked`.
 
-The export stage is a bootstrap and provenance mechanism, not an ongoing mirror. Authority epochs, the one-time cutover gate, and
+The export stage is a historical bootstrap and provenance mechanism, not an ongoing mirror. Authority epochs, the one-time cutover gate, and
 steady-state public development are owned by `public-authority-cutover-v1.md`:
 
-- before cutover, the public repository is a candidate and an exact export receipt is required for a release build;
-- after cutover, tracked `PUBLIC_AUTHORITY.json` must validate as `agent_memory_public_authority_v1`, the initial public release
-  must remain an ancestor of `HEAD`, and later releases build directly from public Git history;
+- historical pre-cutover seeding is preserved on the initial release tag (`v0.3.0`) and is no longer supported by current `main` release builders;
+- in steady-state `public_active`, tracked `PUBLIC_AUTHORITY.json` is required and must validate as `agent_memory_public_authority_v1`, the initial public release
+  must remain an ancestor of `HEAD`, any unexpected `PUBLIC_EXPORT_RECEIPT.json` fails closed, and later releases build directly from public Git history;
 - the private engineering repository must not export or synchronize later public product changes after cutover.
 
 Repository seeding, release publication, installation qualification, and authority activation are distinct facts. A public
