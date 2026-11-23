@@ -3,6 +3,12 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.7.1 (2026-11-23)
+
+- Fix Windows Codex sandbox `Access is denied` on installed `$CODEX_HOME/skills/agent-memory`: replace `tempfile.mkdtemp()` staging in `src/agent_memory_sidecar/skill.py` with exclusive `os.mkdir()` so Python 3.12+ preserves inherited parent ACLs (including `CodexSandboxUsers:(I)(OI)(CI)(RX)`) instead of applying a protected owner-only DACL, and add a Windows `icacls` inheritance regression test.
+- Align stale `Bootstrap 2.4.2` version references in `docs/specs/topology.md` and `docs/specs/interface.md` to `2.6.0`.
+- Components: Core 0.7.1, Plugin 1.12.1, Bootstrap 2.6.0, and Scout 5.20.0.
+
 ## 0.7.0 (2026-11-23)
 
 - Isolate Codex-only `agent-memory` Skill installation to `$CODEX_HOME/skills`, exclude `core_cutover.py` and `instruction_sync.py` from its daily Skill bundle (lazy-imported in `cli.py`), replace four-column pipe receipts with concise plain-Chinese outcomes, retire `scripts/build_public_export.py` and `specs/public-export-allowlist-v1.json`, and update Anchor/Bootstrap docs for Antigravity L1.

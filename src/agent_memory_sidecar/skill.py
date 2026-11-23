@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import os
+import secrets
 import shutil
 import stat
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -105,22 +105,39 @@ def looks_like_sidecar_skill(path: Path) -> bool:
         return False
 
 
+def _create_staging_dir(parent: Path, *, prefix: str) -> Path:
+    """Create a sibling staging directory inheriting parent ACLs/umask.
+
+    Avoids ``tempfile.mkdtemp()`` because Python 3.12+ applies a protected
+    owner-only DACL on Windows that strips inherited ``CodexSandboxUsers`` read
+    permissions when swapped into ``$CODEX_HOME/skills/agent-memory``.
+    """
+    for _ in range(64):
+        candidate = parent / f"{prefix}{secrets.token_hex(8)}"
+        try:
+            os.mkdir(candidate)
+            return candidate
+        except FileExistsError:
+            continue
+    raise CoreError(
+        "skill_target_unsafe",
+        "Skill staging directory cannot be created exclusively",
+        path=str(parent),
+    )
+
+
 def stage_legacy_skill_removal(path: Path) -> SkillSnapshot:
     logical = logical_absolute(path)
     _assert_skill_directory_chain(logical.parent, allow_missing_tail=False)
     if not _physical_skill_directory_exists(logical):
-        backup_root = Path(
-            tempfile.mkdtemp(
-                prefix=f".{SKILL_NAME}.legacy-migration.",
-                dir=logical.parent,
-            )
+        backup_root = _create_staging_dir(
+            logical.parent,
+            prefix=f".{SKILL_NAME}.legacy-migration.",
         )
         return SkillSnapshot(logical, False, backup_root, backup_root / SKILL_NAME)
-    backup_root = Path(
-        tempfile.mkdtemp(
-            prefix=f".{SKILL_NAME}.legacy-migration.",
-            dir=logical.parent,
-        )
+    backup_root = _create_staging_dir(
+        logical.parent,
+        prefix=f".{SKILL_NAME}.legacy-migration.",
     )
     backup_path = backup_root / SKILL_NAME
     snapshot = SkillSnapshot(logical, True, backup_root, backup_path)
@@ -269,11 +286,9 @@ def snapshot_skill(*, root: Path | None = None) -> SkillSnapshot:
     path = plan_skill_install(root=root).path
     path.parent.mkdir(parents=True, exist_ok=True)
     _assert_skill_directory_chain(path.parent, allow_missing_tail=False)
-    backup_root = Path(
-        tempfile.mkdtemp(
-            prefix=f".{SKILL_NAME}.setup-snapshot.",
-            dir=path.parent,
-        )
+    backup_root = _create_staging_dir(
+        path.parent,
+        prefix=f".{SKILL_NAME}.setup-snapshot.",
     )
     backup_path = backup_root / SKILL_NAME
     existed = _physical_skill_directory_exists(path)
@@ -308,11 +323,9 @@ def install_skill(*, root: Path | None = None) -> SkillPlan:
             shutil.rmtree(backup)
         else:
             os.replace(backup, plan.path)
-    stage: Path | None = Path(
-        tempfile.mkdtemp(
-            prefix=f".{SKILL_NAME}.",
-            dir=plan.path.parent,
-        )
+    stage: Path | None = _create_staging_dir(
+        plan.path.parent,
+        prefix=f".{SKILL_NAME}.",
     )
     _physical_skill_directory_exists(stage)
     installed_new = False
