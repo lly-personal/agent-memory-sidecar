@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.7.0 (2026-11-23)
+
+- Isolate Codex-only `agent-memory` Skill installation to `$CODEX_HOME/skills`, exclude `core_cutover.py` and `instruction_sync.py` from its daily Skill bundle (lazy-imported in `cli.py`), replace four-column pipe receipts with concise plain-Chinese outcomes, retire `scripts/build_public_export.py` and `specs/public-export-allowlist-v1.json`, and update Anchor/Bootstrap docs for Antigravity L1.
+- Fix Scout cross-host and boundary defects: omit Codex-only `resolve-owner-parity` and `prepare-review` from `preflight-summary` for `pi`/`claude`/`antigravity`, gate Codex PUA `\ue200visualize` tokens to `--host codex --with-visual` (defaulting to lightweight Markdown + standard Mermaid), require an actual `recovery_bundle` for legacy `open_succeeded` confirmation eligibility, and validate `evidence_window` before reading `kind`.
+- Redesign Scout presentation and workflow ergonomics: emit standard Mermaid `flowchart LR` maps in Markdown, collapse `### 完整核对依据` and technical receipt/deployment hashes inside `<details>`, add concrete Chinese recovery steps to every Terminal v1 receipt, redesign `assets/project-map.html` with self-contained CSS token fallbacks, left-aligned layout, card-bordered SVG connector routing, and clean single-bar view tabs, add composite `scout.py seal-project` and `seal-delivery` commands, and add the 4-journey Anti-Snowball Freeze Gate to `COMPATIBILITY.md`.
+- Components: Core 0.7.0, Plugin 1.12.0, Bootstrap 2.6.0, and Scout 5.20.0; active Project v7/v8, Review Pack v8/v9, and Delivery v2 contracts remain compatible, while natural UX acceptance and later adoption remain separate evidence.
+
 ## 0.6.16 (2026-11-21)
 
 - Add Antigravity L1 two-file global instruction projection (`01-global-charter.md` + `02-confirmed-rules.md`) with a hard `<= 24,000` byte gate and exact `--unenroll-antigravity` exit rollback, add `CLAUDE.md` (`@AGENTS.md`) multi-host repository entrypoint, and add the read-only Antigravity L2 native Scout lane (`scripts/antigravity_native.py`) with hardened transcript path-chain and session-scope checks (PR #88–#91).

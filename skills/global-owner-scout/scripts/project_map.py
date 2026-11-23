@@ -223,16 +223,45 @@ def recover_map(body):
     return value
 
 
+def _mermaid_label(value: str, *, limit: int = 44) -> str:
+    cleaned = re.sub(r"[\r\n\t]+", " ", str(value)).strip()
+    for bad, rep in (('"', "'"), ("`", "'"), ("<", "‹"), (">", "›"), ("|", "／"), ("[", "("), ("]", ")")):
+        cleaned = cleaned.replace(bad, rep)
+    if len(cleaned) > limit:
+        cleaned = cleaned[: limit - 1].rstrip() + "…"
+    return cleaned or "未命名"
+
+
+def mermaid_map(m: dict, *, layered: bool = False) -> list[str]:
+    node_ids = {n["id"]: f"n{idx}" for idx, n in enumerate(m["nodes"])}
+    lines = ["```mermaid", "flowchart LR"]
+    for n in m["nodes"]:
+        nid = node_ids[n["id"]]
+        lines.append(f'    {nid}["{_mermaid_label(n["label"])}"]')
+    for edge in m["edges"]:
+        src = node_ids[edge["source"]]
+        dst = node_ids[edge["target"]]
+        kind = edge.get("kind") if layered else None
+        relation = RELATIONS.get(kind, "") if kind else ""
+        label_text = f"{relation}：{edge['label']}" if relation and kind != "contains" else (relation or edge["label"])
+        arrow = "-.->" if kind == "contains" else "-->"
+        lines.append(f'    {src} {arrow}|"{_mermaid_label(label_text, limit=36)}"| {dst}')
+    lines.append("```")
+    return lines
+
+
 def markdown_map(pack, *, visual=None):
     m = pack['project_result']['project_map']
+    layered = pack['project_result'].get('contract_version') in {'global_owner_scout_project_v7', 'global_owner_scout_project_v8'}
     def text(value): return html.escape(value, quote=False).replace('|', '&#124;').replace('\n', '<br>')
     lines = ['## 工程全貌', '', text(m['goal']), '', '范围：' + text(m['boundary']), '',
              f"来源版本：`{m['source_revision']}`；观察时间：{text(m['observed_at'])}。", '',
+             *mermaid_map(m, layered=layered), '',
              '| 能力或参与者 | 职责 | 维护归属 | 依据 |', '| --- | --- | --- | --- |']
     for n in m['nodes']:
         lines.append('| ' + ' | '.join(text(x) for x in (n['label'], n['summary'], n['owner'], '、'.join(n['evidence_refs']))) + ' |')
     nodes = {n['id']: n for n in m['nodes']}; edges = {e['id']: e for e in m['edges']}
-    if pack['project_result'].get('contract_version') in {'global_owner_scout_project_v7', 'global_owner_scout_project_v8'}:
+    if layered:
         lines += ['', '### 结构、依赖与演进', '', '| 起点 | 关系 | 终点 | 说明 | 依据 |', '| --- | --- | --- | --- | --- |']
         for edge in m['edges']:
             lines.append('| ' + ' | '.join(text(x) for x in (nodes[edge['source']]['label'], RELATIONS[edge['kind']], nodes[edge['target']]['label'], edge['label'], '、'.join(edge['evidence_refs']))) + ' |')

@@ -7,12 +7,12 @@ description: Understand a project's goals, actors, scenarios and real workflows 
 
 ## Contract
 
-- Skill version: `5.19.11`
+- Skill version: `5.20.0`
 - Project result: `global_owner_scout_project_v7` (`native`: `global_owner_scout_project_v8`)
 - User review: `global_owner_scout_review_pack_v8` (`native`: `global_owner_scout_review_pack_v9`)
 - Delivery manifest: `global_owner_scout_delivery_v2`; Manifest-free terminal: `global_owner_scout_terminal_v1`; Preflight snapshot: `global_owner_scout_preflight_v1`
 - Mode: `project_scout`; interactive-only `central_review` remains optional.
-- Fast orientation: run `python -B scripts/scout.py preflight-summary --host codex|pi|claude|antigravity --purpose review|inspect` (deterministic JSON; reads zero files or Git).
+- Fast orientation: run `python -B scripts/scout.py preflight-summary --host codex|pi|claude|antigravity --purpose review|inspect` (deterministic JSON; reads zero files or Git). Prefer the 3-step fast path (`preflight` + context/capture → `seal-project` → `seal-delivery --host <host>`) over manual per-card hashing and chained delivery calls.
 - For a new review, read [references/contracts.md](references/contracts.md) and execute [references/deep-review-protocol.md](references/deep-review-protocol.md) completely. For follow-up, use Recovery and continuation below. Batch independent reads when supported and reuse acquired content.
 
 This Skill creates **project-read-only** review drafts. It never creates proposals, approval refs, Owner mutations, project files, database rows, commits, pushes, or external writes. Its only writes are immutable review artifacts and captured native inputs under the current task's explicit host-granted or explicitly user-selected output root outside the reviewed project and unrelated state roots.
@@ -37,7 +37,7 @@ This Skill creates **project-read-only** review drafts. It never creates proposa
 - **Purpose split**:
   - `inspect` (“看懂当前工程全貌” / “梳理当前工程的角色、场景和操作流程”): reuse an identifiable current map if unchanged, else reconstruct the Phase 2 map; skip census, candidate search, Owner parity, and Core preview; freeze `view_ready` or `degraded`.
   - `review` (“复盘当前工程”): execute all 7 phases in `deep-review-protocol.md`, reconstructing the whole system before candidate selection. Both purposes explain the full system even with zero recommendations. Reuse/drift questions trace natural task -> routing Owner -> formal tool -> actual consumer without launching workflow-eval batches or editing cases.
-- **Presentation**: Choose plain prose, tables, Mermaid, or the installed `visualize` Skill based on the project and question. `assets/project-map.html` is reusable when it fits; custom native views go through `prepare-delivery --visual-input`. For text/static answers, pass `--text-only` to `render-receipt`. Include the full generated receipt verbatim in the final reply (a standalone receipt link cannot substitute); never rewrite a frozen report to change presentation or auto-open a browser/preview.
+- **Presentation**: Default to lightweight Markdown with the built-in standard Mermaid architecture map and collapsible audit details (works cleanly across all 4 hosts with zero Codex PUA tokens). Pass `--host <host>` to `seal-delivery` / `render-receipt`; add `--with-visual` only on Codex when an interactive drill-down widget genuinely adds value (`assets/project-map.html` or `--visual-input`). Non-Codex hosts (`pi`, `claude`, `antigravity`) never emit Codex `\ue200visualize` tokens. Include the generated receipt verbatim in the final reply (technical verification hashes are folded inside `<details>`); never rewrite a frozen report to change presentation or auto-open a browser/preview.
 
 ## Mode: `project_scout`
 
@@ -54,10 +54,10 @@ Implicit selection applies only to continuing an identifiable delivered Scout re
    - Keep source facts, inferred obligations, and Global Owner comparison separate. For source-rich reviews, run an internal independent reviewer subagent per Phase 5 (never a new user task), auditing source-derived map paths, typed edge directions, and intervention attribution.
    - Compare candidates against the complete active Global Owner (including unmanaged principles) by trigger, action, and `Skip` boundary. Concrete project/Skill maintenance deltas get engineering/route cards with exact source Owners (`project_only`/`skill_only` only when no actionable delta remains); never turn every observation into a task.
 4. **Freeze, preview & verify read-only state**:
-   - Validate Project v7/v8 and its map. Only rule candidates call `resolve-owner-parity` and verify host-local Owner bytes against the returned hash (never search/guess canonical paths). Call `prepare-review` to bind installed Core single/combined `preview-bundle` receipts, then validate the final Review Pack unchanged. Inspect and engineering-only reviews keep `owner_parity` and `selection_preview` `null`.
+   - Use `scout.py seal-project` to compute `normalized_evidence_hash` + `project_claim_hash` and validate Project v7/v8 in one step. Only Codex rule candidates call `resolve-owner-parity` and verify host-local Owner bytes against the returned hash (never search/guess canonical paths). Inspect and native/engineering-only reviews keep `owner_parity` and `selection_preview` `null`.
    - Re-run `inspect-context --project-root <bound-root>` and compare full snapshots. Mismatches invalidate stability claims; privacy, integrity, or read-only failures emit `Terminal v1` with zero partial cards.
 5. **Delivery**:
-   - Pass the validated pack to `prepare-delivery --artifact-dir <granted-root> --protected-root <bound-root>`, creating immutable Markdown + HTML (Delivery v2). Default to `render-receipt not_requested` (overview, first actionable item, evidence link) without opening files automatically. Open once only on explicit user request, pre-rendering `open_succeeded`/`open_queued`/`open_failed` receipts with exact `--artifact-path`/`--artifact-root`. Pre-manifest failures always use `render-terminal`, never `render-receipt`.
+   - Use `scout.py seal-delivery --artifact-dir <granted-root> --protected-root <bound-root> --host <host>` (default `not_requested`, lightweight Markdown + Mermaid; add `--with-visual` only on Codex when interactive drill-down is needed) to hash, preview (Codex rule packs), validate, write immutable artifacts, and render the clean Chinese receipt in one step. Open once only on explicit user request (`--outcome open_succeeded|open_queued|open_failed`). Pre-manifest failures always use `render-terminal`, never `render-receipt`.
 6. **Scheduled (optional, paused)**: Keeps inline `render-review --surface scheduled` + `verify-visible`, one Inbox wrapper, isolated worktree, and bounded automation memory (`PAUSED / 0 of 14`).
 
 ## Recovery and continuation

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a validated Global Owner Scout 5.19.11 Review Pack as deterministic Chinese Markdown."""
+"""Render a validated Global Owner Scout 5.20.0 Review Pack as deterministic Chinese Markdown."""
 
 from __future__ import annotations
 
@@ -281,6 +281,9 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
         lines.append(f"- **组合确认标识**：`{card['card_id']}@{review['selection_token']}`；仅上方完整组合通过预演，此项不能单独确认。")
     lines.extend([
         "",
+        "<details>",
+        "<summary>展开完整核对依据</summary>",
+        "",
         "### 完整核对依据",
         "",
         f"`{card['card_id']}` · `{card['classification']} / {card['evidence_level']} / {support['count']} 个项目` · Owner `{card['owner_recommendation']}`",
@@ -359,6 +362,8 @@ def render_card(card: dict[str, Any], review: dict[str, Any], ordinal: int) -> l
             *bullet_lines((fact(f"反例 {index}", item) for index, item in enumerate(card["anti_examples"], 1)), prefix="  - "),
             "- 尚未证明：",
             *bullet_lines(card["unproven"], prefix="  - "),
+            "",
+            "</details>",
         ]
     )
     return lines

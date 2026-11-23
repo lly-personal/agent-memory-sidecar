@@ -1,33 +1,145 @@
 <article id="__SCOUT_ROOT__" aria-label="工程全貌与复盘">
 <style>
-#__SCOUT_ROOT__{--at-space:var(--font-size-base);--at-half:calc(var(--at-space) * .5);--at-quarter:calc(var(--at-space) * .25);color:var(--foreground);background:transparent}
+#__SCOUT_ROOT__{
+  --at-font:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --at-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --at-space:var(--font-size-base,14px);
+  --at-half:calc(var(--at-space) * .5);
+  --at-quarter:calc(var(--at-space) * .25);
+  --at-fg:var(--foreground,#18181b);
+  --at-muted:var(--muted-foreground,#52525b);
+  --at-surface:#ffffff;
+  --at-surface-subtle:#f4f4f5;
+  --at-border:rgba(24,24,27,.12);
+  --at-border-strong:rgba(24,24,27,.22);
+  --at-accent:#2563eb;
+  --at-accent-soft:rgba(37,99,235,.10);
+  --at-accent-fg:#ffffff;
+  font-family:var(--at-font);
+  font-size:var(--at-space);
+  line-height:1.6;
+  color:var(--at-fg);
+  background:transparent;
+  max-width:960px;
+  margin:0 auto;
+  box-sizing:border-box;
+}
+@media (prefers-color-scheme:dark){
+  #__SCOUT_ROOT__{
+    --at-fg:var(--foreground,#f4f4f5);
+    --at-muted:var(--muted-foreground,#a1a1aa);
+    --at-surface:rgba(255,255,255,.035);
+    --at-surface-subtle:rgba(255,255,255,.06);
+    --at-border:rgba(255,255,255,.12);
+    --at-border-strong:rgba(255,255,255,.24);
+    --at-accent:#60a5fa;
+    --at-accent-soft:rgba(96,165,250,.15);
+    --at-accent-fg:#09090b;
+  }
+}
+#__SCOUT_ROOT__ *,#__SCOUT_ROOT__ *::before,#__SCOUT_ROOT__ *::after{box-sizing:border-box}
 #__SCOUT_ROOT__ [hidden]{display:none!important}
-#__SCOUT_ROOT__ .at-breadcrumb,#__SCOUT_ROOT__ .at-lenses,#__SCOUT_ROOT__ .at-route,#__SCOUT_ROOT__ .at-advice-path,#__SCOUT_ROOT__ .at-meta,#__SCOUT_ROOT__ .at-footer{display:flex;align-items:center;flex-wrap:wrap;gap:var(--at-half)}
-#__SCOUT_ROOT__ .at-breadcrumb,#__SCOUT_ROOT__ .at-header,#__SCOUT_ROOT__ .at-lenses,#__SCOUT_ROOT__ .at-intent,#__SCOUT_ROOT__ .at-journey-preview,#__SCOUT_ROOT__ .at-sectionhead{margin-bottom:var(--at-space)}
-#__SCOUT_ROOT__ .at-header{display:grid;gap:var(--at-half);padding-right:calc(var(--at-space) * 6.5)}
-#__SCOUT_ROOT__ .at-header p{max-width:72ch}
+#__SCOUT_ROOT__ h1{font-size:1.35em;line-height:1.3;font-weight:650;margin:0;letter-spacing:-.015em}
+#__SCOUT_ROOT__ h2{font-size:1.08em;line-height:1.35;font-weight:620;margin:0}
+#__SCOUT_ROOT__ h3{font-size:.96em;line-height:1.4;font-weight:600;margin:0}
+#__SCOUT_ROOT__ p{margin:0;overflow-wrap:anywhere}
+#__SCOUT_ROOT__ code{font-family:var(--at-mono);font-size:.88em;padding:.1em .35em;border-radius:5px;background:var(--at-surface-subtle);overflow-wrap:anywhere}
+#__SCOUT_ROOT__ .text-small,#__SCOUT_ROOT__ .at-small{font-size:.86em;line-height:1.5}
+#__SCOUT_ROOT__ .text-muted{color:var(--at-muted)}
+#__SCOUT_ROOT__ .btn{
+  appearance:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:.35em;
+  width:auto;
+  max-width:100%;
+  text-align:left;
+  font:inherit;
+  font-size:.92em;
+  font-weight:520;
+  line-height:1.35;
+  padding:.38em .72em;
+  border-radius:7px;
+  border:1px solid var(--at-border);
+  background:var(--at-surface);
+  color:var(--at-fg);
+  cursor:pointer;
+  transition:background .12s ease,border-color .12s ease,color .12s ease;
+}
+#__SCOUT_ROOT__ .btn:hover{border-color:var(--at-border-strong);background:var(--at-surface-subtle)}
+#__SCOUT_ROOT__ .btn:focus-visible{outline:2px solid var(--at-accent);outline-offset:2px}
+#__SCOUT_ROOT__ .btn:disabled{opacity:.55;cursor:not-allowed}
+#__SCOUT_ROOT__ .btn-ghost{border-color:transparent;background:transparent;padding:.24em .48em;color:var(--at-fg)}
+#__SCOUT_ROOT__ .btn-ghost:hover{background:var(--at-surface-subtle);border-color:var(--at-border)}
+#__SCOUT_ROOT__ .btn-primary{background:var(--at-accent);border-color:var(--at-accent);color:var(--at-accent-fg);font-weight:560;padding:.45em .95em}
+#__SCOUT_ROOT__ .btn-primary:hover{filter:brightness(1.06);background:var(--at-accent);border-color:var(--at-accent)}
+#__SCOUT_ROOT__ .at-link{color:var(--at-accent);padding-left:0;padding-right:.35em}
+#__SCOUT_ROOT__ .at-link:hover{background:var(--at-accent-soft);padding-left:.4em;border-color:transparent}
+#__SCOUT_ROOT__ .form-select{
+  font:inherit;
+  font-size:.9em;
+  padding:.34em .7em;
+  border-radius:7px;
+  border:1px solid var(--at-border-strong);
+  background:var(--at-surface);
+  color:var(--at-fg);
+  max-width:100%;
+}
+#__SCOUT_ROOT__ details{border:1px solid var(--at-border);border-radius:8px;padding:.55em .8em;background:var(--at-surface)}
+#__SCOUT_ROOT__ details>summary{cursor:pointer;font-weight:540;list-style-position:inside}
+#__SCOUT_ROOT__ details[open]>summary{margin-bottom:.5em}
+#__SCOUT_ROOT__ .at-breadcrumb,#__SCOUT_ROOT__ .at-route,#__SCOUT_ROOT__ .at-advice-path,#__SCOUT_ROOT__ .at-meta,#__SCOUT_ROOT__ .at-footer{display:flex;align-items:center;flex-wrap:wrap;gap:var(--at-half)}
+#__SCOUT_ROOT__ .at-lenses{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:.35em;
+  padding:.35em;
+  border:1px solid var(--at-border);
+  border-radius:10px;
+  background:var(--at-surface);
+  margin-bottom:calc(var(--at-space) * 1.1);
+}
+#__SCOUT_ROOT__ .at-lenses .at-tab-sep{width:1px;height:1.1em;background:var(--at-border);margin:0 .2em}
+#__SCOUT_ROOT__ .at-lenses [data-view]{border-radius:7px;padding:.3em .65em;font-size:.88em;color:var(--at-muted)}
+#__SCOUT_ROOT__ .at-lenses [aria-pressed="true"]{background:var(--at-accent-soft);color:var(--at-accent);border-color:transparent;font-weight:600}
+#__SCOUT_ROOT__ .at-breadcrumb,#__SCOUT_ROOT__ .at-header,#__SCOUT_ROOT__ .at-intent,#__SCOUT_ROOT__ .at-journey-preview,#__SCOUT_ROOT__ .at-sectionhead{margin-bottom:var(--at-space)}
+#__SCOUT_ROOT__ .at-header{display:grid;justify-items:start;gap:var(--at-half);padding-bottom:var(--at-half);border-bottom:1px solid var(--at-border)}
+#__SCOUT_ROOT__ .at-header p{max-width:72ch;color:var(--at-muted)}
+#__SCOUT_ROOT__ .at-header details{border:none;padding:0;background:transparent}
 #__SCOUT_ROOT__ .at-sectionhead{display:flex;align-items:center;justify-content:space-between;gap:var(--at-half);flex-wrap:wrap}
-#__SCOUT_ROOT__ .at-intent,#__SCOUT_ROOT__ .at-journey-preview,#__SCOUT_ROOT__ .at-reading,#__SCOUT_ROOT__ .at-reading section,#__SCOUT_ROOT__ .at-callout,#__SCOUT_ROOT__ .at-choices,#__SCOUT_ROOT__ .at-choice,#__SCOUT_ROOT__ .at-timeline,#__SCOUT_ROOT__ .at-timeline section{display:grid;gap:var(--at-half)}
+#__SCOUT_ROOT__ .at-intent,#__SCOUT_ROOT__ .at-journey-preview,#__SCOUT_ROOT__ .at-reading,#__SCOUT_ROOT__ .at-reading section,#__SCOUT_ROOT__ .at-callout,#__SCOUT_ROOT__ .at-choices,#__SCOUT_ROOT__ .at-choice,#__SCOUT_ROOT__ .at-timeline,#__SCOUT_ROOT__ .at-timeline section{display:grid;justify-items:start;gap:var(--at-half)}
+#__SCOUT_ROOT__ .at-journey-preview,#__SCOUT_ROOT__ .at-callout,#__SCOUT_ROOT__ .at-advice-teaser{padding:.85em 1em;border:1px solid var(--at-border);border-radius:10px;background:var(--at-surface)}
 #__SCOUT_ROOT__ .at-reading,#__SCOUT_ROOT__ .at-timeline{gap:var(--at-space)}
-#__SCOUT_ROOT__ .at-branches{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16em),1fr));gap:var(--at-space)}
-#__SCOUT_ROOT__ .at-branch,#__SCOUT_ROOT__ .at-node-list section{min-width:0;display:grid;justify-items:start;gap:var(--at-quarter)}
-#__SCOUT_ROOT__ .at-node-list{display:grid;gap:var(--at-space)}
-#__SCOUT_ROOT__ .at-crosslinks,#__SCOUT_ROOT__ .at-advice-teaser,#__SCOUT_ROOT__ .at-network-summary{margin-top:var(--at-space);display:grid;gap:var(--at-half)}
-#__SCOUT_ROOT__ .at-footer{margin-top:var(--at-space)}
+#__SCOUT_ROOT__ .at-branches{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15.5em),1fr));gap:.85em}
+#__SCOUT_ROOT__ .at-branch{min-width:0;display:grid;align-content:start;justify-items:start;gap:.3em;padding:.8em .95em;border:1px solid var(--at-border);border-radius:10px;background:var(--at-surface)}
+#__SCOUT_ROOT__ .at-branch p{font-size:.9em;color:var(--at-muted)}
+#__SCOUT_ROOT__ .at-node-list{display:grid;gap:.75em}
+#__SCOUT_ROOT__ .at-node-list section{min-width:0;display:grid;justify-items:start;gap:.25em;padding:.7em .9em;border:1px solid var(--at-border);border-radius:9px;background:var(--at-surface)}
+#__SCOUT_ROOT__ .at-crosslinks,#__SCOUT_ROOT__ .at-advice-teaser,#__SCOUT_ROOT__ .at-network-summary{margin-top:var(--at-space);display:grid;justify-items:start;gap:var(--at-half)}
+#__SCOUT_ROOT__ .at-crosslinks>details,#__SCOUT_ROOT__ .at-network-summary>details{width:100%}
+#__SCOUT_ROOT__ .at-footer{margin-top:calc(var(--at-space) * 1.1);padding-top:var(--at-half);border-top:1px solid var(--at-border)}
 #__SCOUT_ROOT__ .at-relation{display:flex;align-items:center;gap:var(--at-quarter);flex-wrap:wrap}
 #__SCOUT_ROOT__ .at-reading ul{margin:0;padding-left:calc(var(--at-space) * 1.5)}
-#__SCOUT_ROOT__ .at-steps{margin:var(--at-space) 0;padding-left:calc(var(--at-space) * 2)}
+#__SCOUT_ROOT__ .at-steps{margin:var(--at-space) 0;padding-left:1.5em}
 #__SCOUT_ROOT__ .at-steps li{padding-bottom:var(--at-space)}
 #__SCOUT_ROOT__ .at-steps li>div{display:grid;justify-items:start;gap:var(--at-quarter)}
-#__SCOUT_ROOT__ .at-source,#__SCOUT_ROOT__ .at-advice-row{margin-top:var(--at-space);display:grid;gap:var(--at-half)}
-#__SCOUT_ROOT__ .at-source p{margin-top:var(--at-quarter)}
-#__SCOUT_ROOT__ code,#__SCOUT_ROOT__ p{overflow-wrap:anywhere}
-#__SCOUT_ROOT__ .at-network{position:relative;margin:var(--at-space) 0;isolation:isolate}
-#__SCOUT_ROOT__ .at-network-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13em),1fr));gap:calc(var(--at-space) * 4) calc(var(--at-space) * 3);padding:calc(var(--at-space) * 2)}
-#__SCOUT_ROOT__ .at-network-node{min-width:0;display:grid;align-content:start;justify-items:start;gap:var(--at-half)}
-#__SCOUT_ROOT__ .at-network svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;color:var(--muted-foreground)}
-#__SCOUT_ROOT__ .at-network path{stroke:currentColor;stroke-width:1.5;fill:none}
-#__SCOUT_ROOT__ .at-network marker path{fill:currentColor;stroke:none}
+#__SCOUT_ROOT__ .at-source,#__SCOUT_ROOT__ .at-advice-row{margin-top:.6em;display:grid;justify-items:start;gap:.35em;width:100%}
+#__SCOUT_ROOT__ .at-advice-row{padding:.8em .95em;border:1px solid var(--at-border);border-radius:10px;background:var(--at-surface)}
+#__SCOUT_ROOT__ .at-choice{width:100%;padding:.65em .85em;border:1px solid var(--at-border);border-radius:8px;background:var(--at-surface)}
+#__SCOUT_ROOT__ .table-responsive{width:100%;overflow-x:auto;border:1px solid var(--at-border);border-radius:9px}
+#__SCOUT_ROOT__ .table{width:100%;border-collapse:collapse;font-size:.9em}
+#__SCOUT_ROOT__ .table th,#__SCOUT_ROOT__ .table td{text-align:left;vertical-align:top;padding:.55em .75em;border-bottom:1px solid var(--at-border)}
+#__SCOUT_ROOT__ .table th{font-weight:600;color:var(--at-muted);background:var(--at-surface-subtle)}
+#__SCOUT_ROOT__ .table tr:last-child td{border-bottom:none}
+#__SCOUT_ROOT__ .at-network{position:relative;margin:var(--at-space) 0;padding:.4em;border:1px solid var(--at-border);border-radius:12px;background:var(--at-surface);isolation:isolate}
+#__SCOUT_ROOT__ .at-network-grid{position:relative;z-index:2;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13.5em),1fr));gap:2.6em 2.2em;padding:1.8em 1.4em}
+#__SCOUT_ROOT__ .at-network-node{min-width:0;display:grid;align-content:start;justify-items:start;gap:.35em;padding:.75em .9em;border:1px solid var(--at-border-strong);border-radius:10px;background:var(--at-surface-subtle)}
+#__SCOUT_ROOT__ .at-network svg{position:absolute;inset:0;z-index:1;width:100%;height:100%;overflow:visible;pointer-events:none;color:var(--at-muted)}
+#__SCOUT_ROOT__ .at-network path{stroke:currentColor;stroke-opacity:.7;stroke-width:1.5;fill:none}
+#__SCOUT_ROOT__ .at-network marker path{fill:currentColor;fill-opacity:.8;stroke:none}
+#__SCOUT_ROOT__ .at-status{margin-top:var(--at-half);color:var(--at-muted)}
 </style>
 <nav class="at-breadcrumb" aria-label="当前位置"></nav>
 <header class="at-header"></header>
@@ -91,15 +203,15 @@ function renderStructure(n){
  const kids=children(n.id),j=visibleJourney(n);let html='';
  if(n.id===data.root){
   html+=`<div class="at-intent"><span class="at-small text-small text-muted">目标与范围</span><p>${esc(n.why)}</p></div>`;
-  if(j)html+=`<section class="at-journey-preview" data-visible-journey="${esc(j.id)}"><h2>${esc(j.title)}</h2><div class="at-route">${j.steps.map(([id],i)=>`${i?'<span aria-hidden="true">→</span>':''}${button(id,node(id).title)}`).join('')}</div><p>${esc(j.result)}</p><button type="button" class="btn btn-ghost at-link" data-view="path">沿这条任务查看交接与恢复 →</button></section>`;
+  if(j)html+=`<section class="at-journey-preview" data-visible-journey="${esc(j.id)}"><h2>${esc(j.title)}</h2><div class="at-route">${j.steps.map(([id],i)=>`${i?'<span aria-hidden="true" class="text-muted">→</span>':''}${button(id,node(id).title)}`).join('')}</div><p>${esc(j.result)}</p><button type="button" class="btn btn-ghost at-link" data-view="path">沿这条任务查看交接与恢复 →</button></section>`;
   html+=`<div class="at-sectionhead"><h2>各部分负责什么</h2><button type="button" class="btn btn-ghost at-link" data-view="graph">展开协作关系图 →</button></div><div class="at-branches">`;
-  for(const k of kids)html+=`<section class="at-branch"><button type="button" class="btn btn-ghost cursor-interaction" data-node="${esc(k.id)}">${esc(k.title)} ↗</button><p>${esc(k.summary)}</p></section>`;
+  for(const k of kids)html+=`<section class="at-branch"><button type="button" class="btn btn-ghost at-link cursor-interaction" data-node="${esc(k.id)}">${esc(k.title)} ↗</button><p>${esc(k.summary)}</p></section>`;
   html+='</div>';
   const groups=projectRelations(kids,data.relations.filter(r=>r.type!=='contains'));
-  html+=`<div class="at-crosslinks"><h3>这些分工如何连接</h3>${groupDetails(groups)||'<p>来源尚未提供可核实的协作关系；这不表示各部分相互独立。</p>'}</div>`;
+  html+=`<div class="at-crosslinks"><h3>这些分工如何连接</h3>${groupDetails(groups)||'<p class="text-muted">来源尚未提供可核实的协作关系；这不表示各部分相互独立。</p>'}</div>`;
  }else{
   html+=`<div class="at-intent"><span class="at-small text-small text-muted">为何需要这一部分</span><p>${esc(n.why)}</p></div>`;
-  if(kids.length)html+=`<div class="at-sectionhead"><h2>内部职责</h2></div><div class="at-node-list">${kids.map(k=>`<section><div>${button(k.id,k.title)}</div><p>${esc(k.summary)}</p></section>`).join('')}</div>`;
+  if(kids.length)html+=`<div class="at-sectionhead"><h2>内部职责</h2></div><div class="at-node-list">${kids.map(k=>`<section><div>${button(k.id,k.title)}</div><p class="text-muted">${esc(k.summary)}</p></section>`).join('')}</div>`;
   else html+=`<div class="at-reading"><section><h3>当前实现与维护归属</h3><p>${esc(n.keep)}</p></section><section><h3>已知范围与缺口</h3><p>${esc(n.unknown)}</p></section></div>`;
   const rels=data.relations.filter(r=>r.from===n.id||r.to===n.id);
   if(rels.length)html+=`<details class="at-crosslinks"><summary class="cursor-interaction">与其他职责的交接与约束</summary>${rels.map(relationHtml).join('')}</details>`;
@@ -121,23 +233,54 @@ function graphData(n){const visible=graphNodes(n),scope=new Set([n.id,...data.no
  for(const g of groups)for(const id of [g.from,g.to])if(!visible.some(n=>n.id===id))visible.push(node(id));
  return {visible,groups,types,type};
 }
-function renderGraph(n){const g=graphData(n);return `<div class="at-sectionhead"><h2>如何协同</h2>${g.types.length?`<select class="form-select" id="atlas-relation" aria-label="选择关系类型">${g.types.map(t=>`<option value="${esc(t)}" ${t===g.type?'selected':''}>${esc(source.relation_labels[t])}</option>`).join('')}</select>`:''}</div><p class="at-small text-small text-muted">先看当前分工，按需展开内部能力；箭头只表示所选关系，具体交接可在下方查看。</p>${state.expanded.length?'<button type="button" class="btn btn-ghost at-link" data-action="collapse">收起展开，回到当前分工</button>':''}<div class="at-network"><svg aria-hidden="true"></svg><div class="at-network-grid">${g.visible.map(x=>`<section class="at-network-node" data-graph-node="${esc(x.id)}">${button(x.id,x.title)}<p class="at-small text-small text-muted">${esc(x.summary)}</p>${children(x.id).length?`<button type="button" class="btn btn-ghost" data-expand="${esc(x.id)}">展开内部能力</button>`:''}</section>`).join('')}</div></div><div class="at-network-summary">${groupDetails(g.groups)||'<p>尚无这部分的协作关系证据。结构分工仍可查看，不补造连线。</p>'}</div>`;}
-function drawGraph(){const panel=qs('.at-network');if(!panel)return;const svg=panel.querySelector('svg'),bounds=panel.getBoundingClientRect(),boxes=new Map([...panel.querySelectorAll('[data-graph-node]')].map(el=>[el.dataset.graphNode,el.getBoundingClientRect()])),marker=root.id+'-arrow';
- svg.setAttribute('viewBox',`0 0 ${bounds.width} ${bounds.height}`);let paths='';
- const groups=graphData(node(state.node)).groups.filter(g=>g.from!==g.to),gutter=parseFloat(getComputedStyle(panel.querySelector('.at-network-grid')).paddingTop);
- for(const [index,g] of groups.entries()){const a=boxes.get(g.from),b=boxes.get(g.to);if(!a||!b)continue;
-  const x1=(a.left+a.right)/2-bounds.left,y1=a.top-bounds.top,x2=(b.left+b.right)/2-bounds.left,y2=b.top-bounds.top,lane=gutter*(index+1)/(groups.length+1),outer=bounds.width-lane;
-  // Route through the reserved gutters, never through an unrelated node's surface.
-  const route=Math.abs(y1-y2)<1?`L ${x2} ${y1-lane}`:`L ${outer} ${y1-lane} L ${outer} ${y2-lane} L ${x2} ${y2-lane}`;
-  paths+=`<path data-graph-link="${esc(g.type)}" d="M ${x1} ${y1} L ${x1} ${y1-lane} ${route} L ${x2} ${y2}" marker-end="url(#${marker})"><title>${esc(node(g.from).title+' → '+node(g.to).title+'：'+g.kind)}</title></path>`;}
- svg.innerHTML=`<defs><marker id="${marker}" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M 0 0 L 8 4 L 0 8 Z"/></marker></defs>`+paths;
+function renderGraph(n){const g=graphData(n);return `<div class="at-sectionhead"><h2>如何协同</h2>${g.types.length?`<select class="form-select" id="atlas-relation" aria-label="选择关系类型">${g.types.map(t=>`<option value="${esc(t)}" ${t===g.type?'selected':''}>${esc(source.relation_labels[t])}</option>`).join('')}</select>`:''}</div><p class="at-small text-small text-muted">先看当前分工，按需展开内部能力；箭头表示所选关系方向，完整交接说明见下方列表。</p>${state.expanded.length?'<button type="button" class="btn btn-ghost at-link" data-action="collapse">收起展开，回到当前分工</button>':''}<div class="at-network"><svg aria-hidden="true"></svg><div class="at-network-grid">${g.visible.map(x=>`<section class="at-network-node" data-graph-node="${esc(x.id)}">${button(x.id,x.title)}<p class="at-small text-small text-muted">${esc(x.summary)}</p>${children(x.id).length?`<button type="button" class="btn" data-expand="${esc(x.id)}">展开内部能力</button>`:''}</section>`).join('')}</div></div><div class="at-network-summary">${groupDetails(g.groups)||'<p class="text-muted">尚无这部分的协作关系证据。结构分工仍可查看，不补造连线。</p>'}</div>`;}
+function drawGraph(){
+ const panel=qs('.at-network');if(!panel)return;
+ const svg=panel.querySelector('svg'),bounds=panel.getBoundingClientRect();
+ if(!bounds.width||!bounds.height)return;
+ const boxes=new Map([...panel.querySelectorAll('[data-graph-node]')].map(el=>[el.dataset.graphNode,el.getBoundingClientRect()]));
+ const marker=root.id+'-arrow';
+ svg.setAttribute('viewBox',`0 0 ${bounds.width} ${bounds.height}`);
+ const groups=graphData(node(state.node)).groups.filter(g=>g.from!==g.to);
+ let paths='';
+ for(const [index,g] of groups.entries()){
+  const a=boxes.get(g.from),b=boxes.get(g.to);if(!a||!b)continue;
+  const al=a.left-bounds.left,ar=a.right-bounds.left,at=a.top-bounds.top,ab=a.bottom-bounds.top;
+  const bl=b.left-bounds.left,br=b.right-bounds.left,bt=b.top-bounds.top,bb=b.bottom-bounds.top;
+  const acx=(al+ar)/2,acy=(at+ab)/2,bcx=(bl+br)/2,bcy=(bt+bb)/2;
+  const jitter=((index%5)-2)*5;
+  let d='';
+  if(Math.abs(acy-bcy)<Math.max(a.height,b.height)*0.55){
+   if(ar<=bl-4){
+    const mx=(ar+bl)/2+jitter*0.4;
+    d=`M ${ar} ${acy+jitter} L ${mx} ${acy+jitter} L ${mx} ${bcy+jitter} L ${bl-2} ${bcy+jitter}`;
+   }else if(br<=al-4){
+    const mx=(br+al)/2+jitter*0.4;
+    d=`M ${al} ${acy+jitter} L ${mx} ${acy+jitter} L ${mx} ${bcy+jitter} L ${br+2} ${bcy+jitter}`;
+   }else{
+    const lift=Math.min(at,bt)-12-((index%4)*6);
+    d=`M ${acx} ${at} L ${acx} ${lift} L ${bcx} ${lift} L ${bcx} ${bt-2}`;
+   }
+  }else if(ab<=bt-4){
+   const my=(ab+bt)/2+jitter*0.6;
+   d=`M ${acx+jitter} ${ab} L ${acx+jitter} ${my} L ${bcx+jitter} ${my} L ${bcx+jitter} ${bt-2}`;
+  }else if(bb<=at-4){
+   const my=(bb+at)/2+jitter*0.6;
+   d=`M ${acx+jitter} ${at} L ${acx+jitter} ${my} L ${bcx+jitter} ${my} L ${bcx+jitter} ${bb+2}`;
+  }else{
+   const my=(acy+bcy)/2;
+   d=`M ${acx} ${ab} L ${acx} ${my} L ${bcx} ${my} L ${bcx} ${bt-2}`;
+  }
+  paths+=`<path data-graph-link="${esc(g.type)}" d="${d}" marker-end="url(#${marker})"><title>${esc(node(g.from).title+' → '+node(g.to).title+'：'+g.kind)}</title></path>`;
+ }
+ svg.innerHTML=`<defs><marker id="${marker}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M 0 0 L 7 3.5 L 0 7 Z"/></marker></defs>`+paths;
 }
 function renderPath(n){const candidates=applicableJourneys(n);if(!candidates.length)return `<div class="at-callout"><p>已知职责尚未关联到一条完整执行路径。</p><p class="at-small text-small text-muted">保留当前结构与依据，不补造执行顺序。</p></div>`;const j=visibleJourney(n);return `<div class="at-sectionhead"><h2>从场景走到结果</h2><select class="form-select" aria-label="选择执行场景" id="atlas-journey">${candidates.map(x=>`<option value="${esc(x.id)}" ${x.id===j.id?'selected':''}>${esc(x.title)}</option>`).join('')}</select></div><p>${esc(j.result)}</p><ol class="at-steps" data-visible-journey="${esc(j.id)}">${j.steps.map(([id,detail,claims],i)=>`<li><div>${button(id,node(id).title)}<p><span class="text-muted">入口与职责：</span>${esc(node(id).summary)}</p><p><span class="text-muted">${i===0?'开始':'动作与交接'}：</span>${esc(detail)}</p>${claims.map(c=>`<p data-step-claim="${esc(c.layer)}"><span class="text-muted">${esc(source.layer_labels[c.layer])} · ${esc(c.environment)}：</span>${esc(c.statement)}</p>`).join('')}</div></li>`).join('')}</ol><div class="at-callout"><strong>异常与恢复</strong><p>${esc(j.exception)}</p></div>`;}
-function renderRelations(n){const selected=data.relations.find(r=>r.id===state.edge);if(selected)return `<div class="at-sectionhead"><h2>${esc(selected.kind)}</h2></div>${relationHtml(selected)}${refs(selected.refs)}`;const p=project(),ids=new Set([n.id,...p.nodes.filter(x=>ancestors(x.id).some(a=>a.id===n.id)).map(x=>x.id)]),rels=p.relations.filter(r=>ids.has(r.from)||ids.has(r.to));return `<div class="at-sectionhead"><h2>关系说明</h2><span class="at-small text-small text-muted">归属、调用和约束分别表达</span></div>${rels.map(r=>`<section class="at-advice-row">${relationHtml(r)}${refs(r.refs)}</section>`).join('')||`<p>尚无已核实的横向关系；这不表示该对象没有依赖。</p>`}`;}
-function renderEvolution(n){const entries=project().evolution.filter(e=>n.id===project().root||e.nodes.some(id=>ancestors(id).some(a=>a.id===n.id))||e.nodes.includes(n.id));return `<div class="at-sectionhead"><h2>为什么走到今天</h2></div><div class="at-timeline">${entries.map(e=>`<section><span class="text-small text-muted">${esc(e.date)}</span><h3>${esc(e.title)}</h3><p><span class="text-muted">此前对象：</span>${esc(e.before)}</p><p><span class="text-muted">后续对象与相关判断：</span>${esc(e.choice)} ${esc(e.tradeoff)}</p><div>${e.nodes.map(id=>button(id,node(id).title)).join(' · ')}</div><details><summary class="cursor-interaction">依据</summary>${refs(e.refs)}</details></section>`).join('')||'<p>没有足够来源解释这一对象的演进原因，保留当前已知职责。</p>'}</div>`;}
-function renderEvidence(n){const p=project();return `<div class="at-sectionhead"><h2>依据与环境</h2><span class="at-small text-small text-muted">当前源码 · 历史运行分开</span></div><div class="table-responsive"><table class="table at-table"><thead><tr><th>维度</th><th>已有依据</th><th>不能据此推断</th></tr></thead><tbody>${p.matrix.filter(r=>r[5].some(id=>relatedScope([id],n.id))).map(r=>`<tr><td>${r[4]==='node'?button(r[3],r[0]):`<button type="button" class="btn btn-ghost" data-edge="${esc(r[3])}">${esc(r[0])}</button>`}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td></tr>`).join('')||`<tr><td>当前对象</td><td>${esc(n.role)}已有设计依据</td><td>${esc(n.unknown)}</td></tr>`}</tbody></table></div>${n.id===p.root?`<div class="at-reading">${map.coverage.map(c=>`<section><h3>${esc(c.dimension)} · ${esc(source.coverage_labels[c.status])}</h3><p>${esc(c.explanation)}</p></section>`).join('')}</div>`:''}<div class="at-crosslinks"><h3>可追溯来源</h3>${refs(n.refs)}</div>`;}
-function renderAdvice(n){const p=project();let a=advice(state.advice);if(!a){const list=p.advice.filter(x=>x.parent===null&&adviceMatches(x,n.id));return `<div class="at-sectionhead"><h2>从整体取舍，逐层审阅</h2></div><p class="text-muted">大范围重构可以讨论。每层分别说明依据、备选方案与实施条件，不因展开或选择而获准实施。</p>${list.map(x=>`<section class="at-advice-row"><span class="at-small text-small text-muted">${esc(x.level)} · 收益待验证</span><button type="button" class="btn btn-ghost cursor-interaction" data-advice="${esc(x.id)}">${esc(x.title)} ↗</button><p>${esc(x.recommend)}</p><span class="at-small text-small text-muted">涉及：${x.scope.map(id=>esc(node(id).title)).join('、')}</span></section>`).join('')||`<div class="at-callout">当前没有针对这一对象的独立增量。保留现状依据，可回到整体建议检查关联影响。</div>`}`;}
-const chain=[];for(let x=a;x;x=x.parent?advice(x.parent):null)chain.unshift(x);const sub=p.advice.filter(x=>x.parent===a.id);return `<div class="at-advice-path"><button type="button" class="btn btn-ghost at-link cursor-interaction" data-advice="">全部建议</button>${chain.map(x=>`<span>/</span><button type="button" class="btn btn-ghost at-link cursor-interaction" data-advice="${esc(x.id)}" ${x.id===a.id?'aria-current="page"':''}>${esc(x.level)}</button>`).join('')}</div><div class="at-sectionhead"><h2>${esc(a.title)}</h2><span class="at-small text-small text-muted">讨论候选 · 未实施</span></div><div class="at-reading"><section><h3>为什么值得审视</h3><p>${esc(a.basis)}</p><p><span class="text-muted">用户成本：</span>${esc(a.userCost)}</p></section><section><h3>建议与备选方案</h3><p>${esc(a.recommend)}</p><p class="at-small text-small text-muted">${esc(a.disposition)}</p><p><span class="text-muted">当前：</span>${esc(a.before)}</p><p><span class="text-muted">调整后：</span>${esc(a.after)}</p><div class="at-choices">${a.options.map((x,i)=>`<div class="at-choice"><strong>${esc(x[0])}</strong><p>${esc(x[1])}</p></div>`).join('')}</div></section><section><h3>收益、代价与反例</h3><p>${esc(a.benefit)}</p><p><span class="text-muted">代价：</span>${esc(a.cost)}</p><p><span class="text-muted">保留或删除的条件：</span>${esc(a.counter)}</p></section><section><h3>影响哪些职责</h3><div>${a.scope.map(id=>button(id,node(id).title)).join(' · ')}</div><p class="at-small text-small text-muted">维护归属：${esc(a.owner)}</p></section>${sub.length?`<section><h3>继续向下一层</h3>${sub.map(x=>`<div class="at-advice-row"><span class="at-small text-small text-muted">${esc(x.level)} · 可单独讨论</span><button type="button" class="btn btn-ghost cursor-interaction" data-advice="${esc(x.id)}">${esc(x.title)} ↗</button><p>${esc(x.recommend)}</p></div>`).join('')}</section>`:''}<details><summary class="cursor-interaction">验证条件与依据</summary><p>${esc(a.verify)}</p>${refs(a.refs)}</details></div>`;}
+function renderRelations(n){const selected=data.relations.find(r=>r.id===state.edge);if(selected)return `<div class="at-sectionhead"><h2>${esc(selected.kind)}</h2></div>${relationHtml(selected)}${refs(selected.refs)}`;const p=project(),ids=new Set([n.id,...p.nodes.filter(x=>ancestors(x.id).some(a=>a.id===n.id)).map(x=>x.id)]),rels=p.relations.filter(r=>ids.has(r.from)||ids.has(r.to));return `<div class="at-sectionhead"><h2>关系说明</h2><span class="at-small text-small text-muted">归属、调用和约束分别表达</span></div>${rels.map(r=>`<section class="at-advice-row">${relationHtml(r)}${refs(r.refs)}</section>`).join('')||`<p class="text-muted">尚无已核实的横向关系；这不表示该对象没有依赖。</p>`}`;}
+function renderEvolution(n){const entries=project().evolution.filter(e=>n.id===project().root||e.nodes.some(id=>ancestors(id).some(a=>a.id===n.id))||e.nodes.includes(n.id));return `<div class="at-sectionhead"><h2>为什么走到今天</h2></div><div class="at-timeline">${entries.map(e=>`<section><span class="text-small text-muted">${esc(e.date)}</span><h3>${esc(e.title)}</h3><p><span class="text-muted">此前对象：</span>${esc(e.before)}</p><p><span class="text-muted">后续对象与相关判断：</span>${esc(e.choice)} ${esc(e.tradeoff)}</p><div>${e.nodes.map(id=>button(id,node(id).title)).join(' · ')}</div><details><summary class="cursor-interaction">依据</summary>${refs(e.refs)}</details></section>`).join('')||'<p class="text-muted">没有足够来源解释这一对象的演进原因，保留当前已知职责。</p>'}</div>`;}
+function renderEvidence(n){const p=project();return `<div class="at-sectionhead"><h2>依据与环境</h2><span class="at-small text-small text-muted">当前源码 · 历史运行分开</span></div><div class="table-responsive"><table class="table at-table"><thead><tr><th>维度</th><th>已有依据</th><th>不能据此推断</th></tr></thead><tbody>${p.matrix.filter(r=>r[5].some(id=>relatedScope([id],n.id))).map(r=>`<tr><td>${r[4]==='node'?button(r[3],r[0]):`<button type="button" class="btn btn-ghost at-link" data-edge="${esc(r[3])}">${esc(r[0])}</button>`}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td></tr>`).join('')||`<tr><td>当前对象</td><td>${esc(n.role)}已有设计依据</td><td>${esc(n.unknown)}</td></tr>`}</tbody></table></div>${n.id===p.root?`<div class="at-reading">${map.coverage.map(c=>`<section><h3>${esc(c.dimension)} · ${esc(source.coverage_labels[c.status])}</h3><p>${esc(c.explanation)}</p></section>`).join('')}</div>`:''}<div class="at-crosslinks"><h3>可追溯来源</h3>${refs(n.refs)}</div>`;}
+function renderAdvice(n){const p=project();let a=advice(state.advice);if(!a){const list=p.advice.filter(x=>x.parent===null&&adviceMatches(x,n.id));return `<div class="at-sectionhead"><h2>从整体取舍，逐层审阅</h2></div><p class="text-muted">大范围重构可以讨论。每层分别说明依据、备选方案与实施条件，不因展开或选择而获准实施。</p>${list.map(x=>`<section class="at-advice-row"><span class="at-small text-small text-muted">${esc(x.level)} · 收益待验证</span><button type="button" class="btn btn-ghost at-link cursor-interaction" data-advice="${esc(x.id)}">${esc(x.title)} ↗</button><p>${esc(x.recommend)}</p><span class="at-small text-small text-muted">涉及：${x.scope.map(id=>esc(node(id).title)).join('、')}</span></section>`).join('')||`<div class="at-callout">当前没有针对这一对象的独立增量。保留现状依据，可回到整体建议检查关联影响。</div>`}`;}
+const chain=[];for(let x=a;x;x=x.parent?advice(x.parent):null)chain.unshift(x);const sub=p.advice.filter(x=>x.parent===a.id);return `<div class="at-advice-path"><button type="button" class="btn btn-ghost at-link cursor-interaction" data-advice="">全部建议</button>${chain.map(x=>`<span>/</span><button type="button" class="btn btn-ghost at-link cursor-interaction" data-advice="${esc(x.id)}" ${x.id===a.id?'aria-current="page"':''}>${esc(x.level)}</button>`).join('')}</div><div class="at-sectionhead"><h2>${esc(a.title)}</h2><span class="at-small text-small text-muted">讨论候选 · 未实施</span></div><div class="at-reading"><section><h3>为什么值得审视</h3><p>${esc(a.basis)}</p><p><span class="text-muted">用户成本：</span>${esc(a.userCost)}</p></section><section><h3>建议与备选方案</h3><p>${esc(a.recommend)}</p><p class="at-small text-small text-muted">${esc(a.disposition)}</p><p><span class="text-muted">当前：</span>${esc(a.before)}</p><p><span class="text-muted">调整后：</span>${esc(a.after)}</p><div class="at-choices">${a.options.map((x,i)=>`<div class="at-choice"><strong>${esc(x[0])}</strong><p>${esc(x[1])}</p></div>`).join('')}</div></section><section><h3>收益、代价与反例</h3><p>${esc(a.benefit)}</p><p><span class="text-muted">代价：</span>${esc(a.cost)}</p><p><span class="text-muted">保留或删除的条件：</span>${esc(a.counter)}</p></section><section><h3>影响哪些职责</h3><div>${a.scope.map(id=>button(id,node(id).title)).join(' · ')}</div><p class="at-small text-small text-muted">维护归属：${esc(a.owner)}</p></section>${sub.length?`<section><h3>继续向下一层</h3>${sub.map(x=>`<div class="at-advice-row"><span class="at-small text-small text-muted">${esc(x.level)} · 可单独讨论</span><button type="button" class="btn btn-ghost at-link cursor-interaction" data-advice="${esc(x.id)}">${esc(x.title)} ↗</button><p>${esc(x.recommend)}</p></div>`).join('')}</section>`:''}<details><summary class="cursor-interaction">验证条件与依据</summary><p>${esc(a.verify)}</p>${refs(a.refs)}</details></div>`;}
 let graphObserver;
 function render(){
  graphObserver?.disconnect();const p=project(),n=node(state.node);
@@ -145,15 +288,15 @@ function render(){
  if(selectedJourney){const raw=map.journeys.find(j=>j.id===selectedJourney.id);const matches=state.edge?raw.edge_ids.includes(state.edge):state.advice?raw.card_ids.includes(state.advice)||selectedJourney.steps.some(([id])=>adviceMatches(advice(state.advice),id)):applicableJourneys(n).some(j=>j.id===state.journey);if(!matches)state.journey=null;}
  // Commit the actually visible default before optional persistence or continuation.
  if(state.view==='path'||state.view==='structure'&&state.node===p.root)state.journey=visibleJourney(n)?.id||null;
- qs('.at-breadcrumb').innerHTML=(history.length?'<button type="button" class="btn btn-ghost at-link cursor-interaction" data-action="back">← 返回上一处</button><span aria-hidden="true">·</span>':'')+breadcrumbs(n.id).map((x,i)=>`${i?'<span aria-hidden="true">/</span>':''}${button(x.id,x.id===p.root?p.name:x.title,'at-link',x.id===n.id?'aria-current="page"':'')}`).join('');
+ qs('.at-breadcrumb').innerHTML=(history.length?'<button type="button" class="btn btn-ghost at-link cursor-interaction" data-action="back">← 返回上一处</button><span aria-hidden="true" class="text-muted">·</span>':'')+breadcrumbs(n.id).map((x,i)=>`${i?'<span aria-hidden="true" class="text-muted">/</span>':''}${button(x.id,x.id===p.root?p.name:x.title,'at-link',x.id===n.id?'aria-current="page"':'')}`).join('');
  qs('.at-breadcrumb').hidden=n.id===p.root&&!history.length;
- qs('.at-header').innerHTML=`<h1>${esc(n.title)}</h1><p>${esc(n.summary)}</p><details><summary class="at-small text-small text-muted">本次依据与范围</summary><div class="at-meta"><span>来源 ${esc(p.revision.slice(0,7))}</span><span>读取于 ${esc(p.observed_at)}</span><span>${source.purpose==='inspect'?'当前设计查看 · 未做近期复盘':'深度复盘 · 覆盖边界见依据'}</span></div></details>`;
+ qs('.at-header').innerHTML=`<h1>${esc(n.title)}</h1><p>${esc(n.summary)}</p><details><summary class="at-small text-small text-muted">本次依据与范围</summary><div class="at-meta text-small text-muted"><span>来源 ${esc(p.revision.slice(0,7))}</span><span>·</span><span>读取于 ${esc(p.observed_at)}</span><span>·</span><span>${source.purpose==='inspect'?'当前设计查看 · 未做近期复盘':'深度复盘 · 覆盖边界见依据'}</span></div></details>`;
  const tab=([id,label])=>`<button type="button" class="btn btn-ghost cursor-interaction" data-view="${id}" aria-pressed="${state.view===id}">${label}</button>`;
- qs('.at-lenses').innerHTML=views.slice(0,3).map(tab).join('')+`<details ${views.slice(3).some(([id])=>id===state.view)?'open':''}><summary class="cursor-interaction">深入查看</summary>${views.slice(3).map(tab).join(' · ')}</details>`;
+ qs('.at-lenses').innerHTML=views.slice(0,3).map(tab).join('')+'<span class="at-tab-sep" aria-hidden="true"></span>'+views.slice(3).map(tab).join('');
  const renderers={structure:renderStructure,path:renderPath,graph:renderGraph,relations:renderRelations,evolution:renderEvolution,evidence:renderEvidence,advice:renderAdvice};qs('.at-content').innerHTML=renderers[state.view](n);
  if(state.view==='graph'){drawGraph();graphObserver=new ResizeObserver(drawGraph);graphObserver.observe(qs('.at-network'));}
  const first=p.advice.find(a=>a.parent===null&&adviceMatches(a,n.id)),teaser=qs('.at-advice-teaser');teaser.hidden=state.view==='advice'||state.view==='graph';
- teaser.innerHTML=first?`<span class="at-small text-small text-muted">关联建议</span><button type="button" class="btn btn-ghost cursor-interaction" data-advice="${esc(first.id)}">${esc(first.title)} ↗</button><p>${esc(first.benefit)}</p>`:`<p class="at-small text-small text-muted">当前无独立改动建议。${esc(n.keep)}</p>`;status('');
+ teaser.innerHTML=first?`<span class="at-small text-small text-muted">关联建议</span><button type="button" class="btn btn-ghost at-link cursor-interaction" data-advice="${esc(first.id)}">${esc(first.title)} ↗</button><p>${esc(first.benefit)}</p>`:`<p class="at-small text-small text-muted">当前无独立改动建议。${esc(n.keep)}</p>`;status('');
 }
 root.addEventListener('click',async e=>{
  const b=e.target.closest('button');if(!b||!root.contains(b))return;
@@ -166,10 +309,10 @@ root.addEventListener('click',async e=>{
  if(b.dataset.action==='back'){if(history.length){state=history.pop();render();focusLocation();persist();}return;}
  if(b.dataset.action==='discuss'){
   const n=node(state.node),a=advice(state.advice),[kind,id]=selection(),selected=kind+':'+id,label=a?.title||(state.edge?map.edges.find(e=>e.id===state.edge).label:n.title);
-  const prompt=`请继续讨论已交付的 Scout 结果：报告 ${source.report_hash}；工程 ${source.project_key}；来源版本 ${data.revision}；上下文 ${source.context_snapshot_hash}；对象 ${selected}「${label}」；视角 ${state.view}；路径 ${state.journey||'未选择'}。请从当前聊天恢复原 prepare-delivery manifest 和原文件，使用 recover-delivery，将报告 hash 作为 --report-hash、对象与路径作为 --object 和 --journey 参数数据核对，沿同一证据解释并承接讨论；不要重跑普查，不要将本次讨论视为写入授权。`;
-  const fallback=`报告 ${source.report_hash}；工程 ${source.project_key}；对象 ${selected}；路径 ${state.journey||'未选择'}。可复制这些信息，在当前聊天继续讨论。`;
-  if(!window.openai?.sendFollowUpMessage){status('当前端未提供原生续接。'+fallback);return;}
-  b.disabled=true;try{await window.openai.sendFollowUpMessage({prompt,title:`讨论：${label}`});status('已交给原生后续消息入口；是否实际发送及后续采用，以聊天中的结果为准。');}catch{status('原生续接未完成，选择保留。'+fallback);}finally{b.disabled=false;}
+  const prompt=`请基于已交付报告继续讨论「${label}」（对象 ${selected}；路径 ${state.journey||'未选择'}；视角 ${state.view}；报告 ${source.report_hash}）。请恢复原报告核对上下文并沿同一证据解释；不要重跑普查，不要将本次讨论视为写入授权。`;
+  const fallback=`报告 ${source.report_hash}｜对象 ${selected}｜路径 ${state.journey||'未选择'}（复制后粘贴到当前聊天继续讨论）`;
+  if(!window.openai?.sendFollowUpMessage){status('当前端未提供原生续接，可复制：'+fallback);return;}
+  b.disabled=true;try{await window.openai.sendFollowUpMessage({prompt,title:`讨论：${label}`});status('已提交给当前聊天续接；是否发送及后续采用以聊天结果为准。');}catch{status('原生续接未完成，可复制：'+fallback);}finally{b.disabled=false;}
  }
 });
 root.addEventListener('change',e=>{if(e.target.id==='atlas-journey')go({journey:e.target.value});if(e.target.id==='atlas-relation')go({relation:e.target.value});});

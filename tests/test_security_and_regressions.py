@@ -99,13 +99,13 @@ class CliDailyOnlyAndReleaseVersionTests(unittest.TestCase):
 
             # Baseline copy passes version_facts
             facts = build_release_artifacts.version_facts(fake_root)
-            self.assertEqual("5.19.11", facts["scout"])
+            self.assertEqual("5.20.0", facts["scout"])
 
             # Perturb validate_output.py SKILL_VERSION only
             vo_path = fake_root / "skills" / "global-owner-scout" / "scripts" / "validate_output.py"
             text = vo_path.read_text(encoding="utf-8")
-            self.assertIn('SKILL_VERSION = "5.19.11"', text)
-            vo_path.write_text(text.replace('SKILL_VERSION = "5.19.11"', 'SKILL_VERSION = "5.99.0"', 1), encoding="utf-8")
+            self.assertIn('SKILL_VERSION = "5.20.0"', text)
+            vo_path.write_text(text.replace('SKILL_VERSION = "5.20.0"', 'SKILL_VERSION = "5.99.0"', 1), encoding="utf-8")
 
             with self.assertRaisesRegex(build_release_artifacts.ReleaseError, "release_scout_version_mismatch"):
                 build_release_artifacts.version_facts(fake_root)
@@ -194,7 +194,7 @@ class ScoutPreflightAndSecurityTests(unittest.TestCase):
                 )
                 data = json.loads(proc.stdout)
                 self.assertEqual("global_owner_scout_preflight_summary_v1", data["contract_version"])
-                self.assertEqual("5.19.11", data["skill_version"])
+                self.assertEqual("5.20.0", data["skill_version"])
                 self.assertEqual(host, data["host"])
                 self.assertEqual(purpose, data["purpose"])
                 self.assertEqual(proj_c, data["project_contract"])
@@ -458,6 +458,54 @@ class HighFidelityReplayAndMalformedNativeTests(unittest.TestCase):
             rendered = prepare_delivery.render_terminal_receipt(terminal)
             self.assertIn("**下一步建议**：" + recovery, rendered)
             self.assertIn("<details>\n<summary>技术诊断详情</summary>", rendered)
+
+    def test_wave_b_seal_project_and_seal_delivery_composite_fast_path(self) -> None:
+        from tests.test_scout_native_protocol import native_pack
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            proj = root / "project"
+            out = root / "output"
+            proj.mkdir()
+            out.mkdir()
+
+            draft_pack = native_pack("antigravity")
+            draft_project = draft_pack["project_result"]
+            draft_project["project_cards"][0]["normalized_evidence_hash"] = ""
+            draft_project["project_cards"][0]["project_claim_hash"] = ""
+            draft_project_file = root / "draft-project.json"
+            sealed_project_file = root / "sealed-project.json"
+            draft_project_file.write_text(json.dumps(draft_project, ensure_ascii=False), encoding="utf-8")
+
+            seal_proj = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_SCRIPTS / "scout.py"), "seal-project",
+                 "--input-file", str(draft_project_file), "--output-file", str(sealed_project_file)],
+                capture_output=True, text=True, encoding="utf-8", check=True,
+            )
+            self.assertEqual("ok", json.loads(seal_proj.stdout)["status"])
+            sealed_proj = json.loads(sealed_project_file.read_text(encoding="utf-8"))
+            self.assertEqual(64, len(sealed_proj["project_cards"][0]["project_claim_hash"]))
+
+            draft_pack["project_result"] = draft_project
+            draft_pack["review_cards"][0]["project_claim_hash"] = ""
+            draft_pack["review_pack_hash"] = ""
+            draft_pack_file = root / "draft-pack.json"
+            draft_pack_file.write_text(json.dumps(draft_pack, ensure_ascii=False), encoding="utf-8")
+
+            seal_deliv = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_SCRIPTS / "scout.py"), "seal-delivery",
+                 "--artifact-dir", str(out), "--protected-root", str(proj),
+                 "--host", "antigravity", "--with-visual", "--input-file", str(draft_pack_file)],
+                capture_output=True, text=True, encoding="utf-8", check=True,
+            )
+            payload = json.loads(seal_deliv.stdout)
+            self.assertEqual("ok", payload["status"])
+            self.assertTrue(Path(payload["artifact_path"]).is_file())
+            self.assertNotIn("visualize", payload["receipt"])
+            self.assertIn("<details>\n<summary>技术校验信息</summary>", payload["receipt"])
+            recovered = prepare_delivery.verify_final_receipt(payload["receipt"], artifact_root=out)
+            self.assertEqual("artifact_verified", recovered["status"])
+            self.assertFalse(recovered["confirmation_eligible"])
 
 
 if __name__ == "__main__":
