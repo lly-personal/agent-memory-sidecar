@@ -1053,6 +1053,32 @@ class InstructionSyncTests(unittest.TestCase):
         self.assertFalse((fail_codex / "agent-memory-sidecar" / "memory.sqlite-journal").exists())
         self.assertFalse((fail_state / "instruction-sync-recovery.json").exists())
 
+        # Post-replace failure while writing instruction-sync.json must still roll back config before deleting snapshot_root.
+        cfg_state = self.root / "cfg_rollback_state"
+        cfg_codex = self.root / "cfg_rollback_codex"
+        cfg_pi = self.root / "cfg_rollback_pi"
+        cfg_opts = dict(source=self.source, codex_home=cfg_codex, pi_agent_dir=cfg_pi, state_dir=cfg_state)
+        p_init = sync.synchronize(**cfg_opts)
+        sync.synchronize(**cfg_opts, apply=True, plan_hash=p_init["plan_hash"])
+        cfg_path = cfg_state / "instruction-sync.json"
+        cfg_before = cfg_path.read_bytes()
+        self.publish()
+        p_upd = sync.synchronize(**cfg_opts)
+        orig_atomic_write = sync.atomic_write
+
+        def fail_after_config_replace(path, data, **kwargs):
+            res = orig_atomic_write(path, data, **kwargs)
+            if path == cfg_path and data != cfg_before:
+                raise OSError("post-replace verification failure")
+            return res
+
+        with patch.object(sync, "atomic_write", side_effect=fail_after_config_replace):
+            with self.assertRaises(OSError):
+                sync.synchronize(**cfg_opts, apply=True, plan_hash=p_upd["plan_hash"])
+        self.assertEqual(cfg_before, cfg_path.read_bytes())
+        self.assertFalse((cfg_state / "instruction-sync-recovery.json").exists())
+        self.assertEqual("planned", sync.synchronize(**cfg_opts)["status"])
+
         # Host-accurate error message when Antigravity binding changes before exit removal.
         ag = self.root / "antigravity_msg"
         ag.mkdir()

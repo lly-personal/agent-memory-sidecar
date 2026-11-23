@@ -9,6 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 ACTIVE_DOCUMENTS = (
     ROOT / "README.md",
     ROOT / "AGENTS.md",
+    ROOT / "COMPATIBILITY.md",
+    ROOT / "CHANGELOG.md",
+    ROOT / "CONTRIBUTING.md",
     ROOT / "domain.md",
     ROOT / "docs" / "README.md",
     ROOT / "docs" / "specs" / "axioms.md",

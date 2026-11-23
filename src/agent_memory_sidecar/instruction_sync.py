@@ -477,8 +477,8 @@ def _apply(state: Path, snapshot_root: Path, stage: Path, data: bytes,
             if not _host_matches(_read_host_files(home, name), desired) or _binding(home)["target_file_sha256"] != target_hash:
                 raise CoreError("instruction_sync_readback_failed", "Target or binding readback differs", host=name)
         if _bytes(config_path) != desired_config_bytes:
-            atomic_write(config_path, desired_config_bytes)
             config_written = True
+            atomic_write(config_path, desired_config_bytes)
         if _bytes(config_path) != desired_config_bytes:
             raise CoreError("instruction_sync_readback_failed", "Local source binding readback differs")
     except BaseException as failure:
@@ -799,11 +799,14 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
         prepare_store_parent(journal)
         secure_store_location(journal, allow_missing=True)
         with (
-            hold_physical_directory(home),
-            hold_physical_directory(rules_dir),
+            hold_physical_directory(home) as home_fd,
+            hold_physical_directory(rules_dir) as rules_fd,
             hold_physical_directory(state) as state_fd,
             CoreDatabase(_store(home)) as db,
         ):
+            def relative(directory_fd: int | None, target: Path) -> str | Path:
+                return target.name if directory_fd is not None else target
+
             def selected_state_exists() -> bool:
                 try:
                     return state_fd is None or os.path.samestat(os.fstat(state_fd), state.stat())
@@ -815,27 +818,8 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
             if _bytes(config_path, directory_fd=state_fd) != config_before or _bytes(journal, directory_fd=state_fd) is not None:
                 raise CoreError("instruction_sync_stale_plan", "State changed while opening")
             stage = home / (".agent-memory-exit-" + uuid.uuid4().hex)
-            stage.mkdir(mode=0o700)
+            os.mkdir(relative(home_fd, stage), mode=0o700, dir_fd=home_fd)
             captured = {rel: stage / f"rule-{idx}.md" for idx, rel in enumerate(ANTIGRAVITY_FILES)}
-
-            def approved_capture(rel: str) -> bool:
-                dst_path = captured[rel]
-                try:
-                    st = dst_path.lstat()
-                except FileNotFoundError:
-                    return False
-                if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1
-                        or not os.path.samestat(target_stats[rel], st)):
-                    return False
-                flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
-                descriptor = os.open(dst_path, flags)
-                with os.fdopen(descriptor, "rb") as stream:
-                    opened = os.fstat(stream.fileno())
-                    return (
-                        os.path.samestat(target_stats[rel], opened)
-                        and stream.read(len(before_files[rel]) + 1) == before_files[rel]
-                    )
-
             recovery = {
                 "contract_version": plan["contract_version"],
                 "targets": {
@@ -850,7 +834,25 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
                 "config_before": base64.b64encode(config_before).decode(),
                 "after_sha256": None,
             }
-            with hold_physical_directory(stage):
+            with hold_physical_directory(stage) as stage_fd:
+                def approved_capture(rel: str) -> bool:
+                    dst_path = captured[rel]
+                    try:
+                        st = os.lstat(relative(stage_fd, dst_path), dir_fd=stage_fd)
+                    except FileNotFoundError:
+                        return False
+                    if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1
+                            or not os.path.samestat(target_stats[rel], st)):
+                        return False
+                    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+                    descriptor = os.open(relative(stage_fd, dst_path), flags, dir_fd=stage_fd)
+                    with os.fdopen(descriptor, "rb") as stream:
+                        opened = os.fstat(stream.fileno())
+                        return (
+                            os.path.samestat(target_stats[rel], opened)
+                            and stream.read(len(before_files[rel]) + 1) == before_files[rel]
+                        )
+
                 atomic_write(journal, _json(recovery), directory_fd=state_fd)
                 moved: list[str] = []
                 binding_started = config_started = False
@@ -859,7 +861,8 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
                         src_path = target_paths[rel]
                         dst_path = captured[rel]
                         secure_store_location(dst_path, allow_missing=True)
-                        os.replace(src_path, dst_path)
+                        os.replace(relative(rules_fd, src_path), relative(stage_fd, dst_path),
+                                   src_dir_fd=rules_fd, dst_dir_fd=stage_fd)
                         moved.append(rel)
                         if not approved_capture(rel):
                             raise CoreError("instruction_sync_recovery_required", "A changed instruction was captured and retained", capture_directory=str(stage))
@@ -871,7 +874,7 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
                         raise CoreError("instruction_sync_stale_plan", "Enrollment changed before removal")
                     config_started = True
                     atomic_write(config_path, config_after, directory_fd=state_fd)
-                    if (any(p.exists() for p in target_paths.values())
+                    if (any(_bytes(p, directory_fd=rules_fd) is not None for p in target_paths.values())
                             or _connection_binding(db) is not None
                             or _bytes(config_path, directory_fd=state_fd) != config_after
                             or not os.path.samestat(store_stat, _store(home).stat())):
@@ -902,13 +905,19 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
                         try:
                             dst_path = captured[rel]
                             src_path = target_paths[rel]
-                            if dst_path.exists():
+                            try:
+                                os.lstat(relative(stage_fd, dst_path), dir_fd=stage_fd)
+                                has_captured = True
+                            except FileNotFoundError:
+                                has_captured = False
+                            if has_captured:
                                 if not approved_capture(rel):
                                     raise CoreError("instruction_sync_recovery_required", "Changed capture retained")
                                 # Non-overwriting restore: preserve any concurrently recreated user file and retain capture.
-                                os.link(dst_path, src_path)
-                                dst_path.unlink()
-                            elif not src_path.exists():
+                                os.link(relative(stage_fd, dst_path), relative(rules_fd, src_path),
+                                        src_dir_fd=stage_fd, dst_dir_fd=rules_fd)
+                                os.unlink(relative(stage_fd, dst_path), dir_fd=stage_fd)
+                            elif _bytes(src_path, directory_fd=rules_fd) is None:
                                 errors.append(rel)
                         except Exception:
                             errors.append(rel)
@@ -918,7 +927,7 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
                     if not selected_state_exists():
                         raise CoreError("instruction_sync_recovery_required", "Selected state directory moved; inspect retained journal") from failure
                     try:
-                        journal.unlink()
+                        os.unlink(relative(state_fd, journal), dir_fd=state_fd)
                     except OSError as exc:
                         raise CoreError("instruction_sync_recovery_required", "Exit rolled back; journal cleanup remains", operation_committed=False) from exc
                     raise
@@ -927,13 +936,13 @@ def unenroll_antigravity(*, antigravity_home: Path | None = None, state_dir: Pat
                     for rel in ANTIGRAVITY_FILES:
                         if not approved_capture(rel):
                             raise OSError("instruction capture changed after commit")
-                        captured[rel].unlink()
+                        os.unlink(relative(stage_fd, captured[rel]), dir_fd=stage_fd)
                 except OSError as exc:
                     raise CoreError("instruction_sync_cleanup_required", "Antigravity exit committed; capture retained", operation_committed=True,
                                     capture_directory=str(stage)) from exc
             try:
-                stage.rmdir()
-                journal.unlink()
+                os.rmdir(relative(home_fd, stage), dir_fd=home_fd)
+                os.unlink(relative(state_fd, journal), dir_fd=state_fd)
             except OSError as exc:
                 raise CoreError("instruction_sync_cleanup_required", "Antigravity exit committed; cleanup remains", operation_committed=True,
                                 capture_directory=str(stage)) from exc

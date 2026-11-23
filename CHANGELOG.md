@@ -3,6 +3,16 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.7.3 (2026-11-24)
+
+- Close security, rollback, and UX findings from post-`v0.7.2` multi-model blind peer review and fresh-session handoff acceptance:
+  - **Doctor Hook interpreter boundary**: restrict `_recorded_hook_interpreter()` to entries bound to the active `runtime.artifact_path` + `runtime-hook`, and only execute `[hook_interp, "--version"]` when `hooks.json` matches the Store-bound `hook_config_sha256` (`codex_integration.py`).
+  - **Instruction sync rollback & POSIX `dir_fd` hardening**: set `config_written = True` before `atomic_write(config_path, ...)` so post-replace failures still roll back `instruction-sync.json` prior to deleting `snapshot_root`, and use held `home_fd` / `rules_fd` / `stage_fd` / `state_fd` descriptors throughout `unenroll_antigravity` on POSIX (`instruction_sync.py`).
+  - **Antigravity Scout write boundary, snapshot order & POSIX transcript pin**: enforce strict zero-exemption validation on `[project_root, SKILL_ROOT]` independently of `app_data_dir` (closing the `app_data_dir == project_root` coincidence bypass), collect full Git snapshots after output authorization and before writing capture files so missing-`HEAD` repos leave no orphan files, and read transcripts via `dir_fd` on POSIX (`antigravity_native.py`).
+  - **Scout first-answer evidence provenance, `prepare_delivery` validation & per-object `evolution` tab**: qualify `关键交接` claims with `[evidence_layer · environment]` in `render_conversation_brief()`, validate packs before inspecting `project_map` in `prepare_delivery()` (avoiding `AttributeError` on malformed `{"project_result": null}` inputs while keeping single visual rendering), and scope `evolution` tab visibility in `assets/project-map.html` to the currently selected object (`render_review.py`, `prepare_delivery.py`, `assets/project-map.html`).
+  - **Four-host doc alignment & cold-start navigation**: add Antigravity L1/L2 coverage and `--unenroll-antigravity` guidance to `README.md`, add the Antigravity column to `docs/specs/topology.md` and `specs/public-distribution-v1.md`, align `docs/README.md`, mark `docs/codex-desktop-setup.md` as a historical snapshot, add `COMPATIBILITY.md` / `-B` verification guidance to `AGENTS.md`, and include `COMPATIBILITY.md`, `CHANGELOG.md`, and `CONTRIBUTING.md` in `scripts/check_doc_links.py`.
+- Components: Core 0.7.3, Plugin 1.12.3, Bootstrap 2.6.2, and Scout 5.20.2; active Project v7/v8, Review Pack v8/v9, and Delivery v2 wire contracts and Freeze Gate natural-use rows remain unchanged.
+
 ## 0.7.2 (2026-11-24)
 
 - Fix Antigravity L2 native Scout capture boundary and pre-authorization reads: allow the exact host-granted `<appDataDir>/brain/<session-id>` directory while continuing to reject `<appDataDir>`, `brain`, sibling sessions, `.system_generated`, subdirectories, project roots, and skill roots; validate `app_data_dir` physical directory chains, pin transcript reads, verify index file readback, and move output-root validation ahead of untracked project file hashing (`antigravity_native.py`, `history_import.py`, `scout_security.py`, `scout.py`).

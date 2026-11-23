@@ -97,7 +97,7 @@ For normal Codex Desktop use, register the immutable repository Marketplace,
 install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.7.2
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.7.3
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -117,10 +117,12 @@ Plugin, Pi package and Claude Code Plugin expose that same directory; their inst
 For Pi or local Claude Code, install the tagged source through the host's native manager:
 
 ```sh
-pi install git:github.com/lly-personal/agent-memory-sidecar@v0.7.2
-claude plugin marketplace add https://github.com/lly-personal/agent-memory-sidecar.git#v0.7.2
+pi install git:github.com/lly-personal/agent-memory-sidecar@v0.7.3
+claude plugin marketplace add https://github.com/lly-personal/agent-memory-sidecar.git#v0.7.3
 claude plugin install agent-memory-sidecar@agent-memory --scope user
 ```
+
+Antigravity users can install the same portable `engineering-contract-review` and `global-owner-scout` directories from the verified Release under `~/.gemini/config/skills/` (discovered by the local Antigravity runtime without cross-host reads).
 
 Ask the agent to use Engineering Contract Review for a design, failure-recovery, verification or performance question. It reads
 only the relevant bundled method and returns an evidence-bounded review within the current task's authorization. Explicit
@@ -159,7 +161,7 @@ session loading or model behavior. See [Pi package management](https://github.co
 These packages also expose the existing Bootstrap Anchor. Installing or calling a method does not deploy Core, change global
 instructions, grant new tools, or prove model adoption. Local Claude Code plugins do not establish Cowork/cloud support.
 
-### Bounded Scout on Pi and local Claude Code
+### Bounded Scout on Pi, local Claude Code and Antigravity
 
 In the target Git project, invoke `/skill:global-owner-scout 看懂当前工程全貌` for an overview, or
 `/skill:global-owner-scout 复盘当前工程` to review the available sources. The agent binds the current Pi session to the Git root,
@@ -185,7 +187,9 @@ Before using Claude Scout, the maintainer prepares its pinned SDK once, with the
 `node <loaded-skill>/scripts/prepare_claude_runtime.mjs <native-CLAUDE_PLUGIN_DATA> <absolute-npm-cli.js>`.
 The formal prerequisite uses its checked-in lock, skips lifecycle scripts and optional bundled CLIs, and preserves unknown
 existing runtime contents. Ordinary Scout does not install dependencies. Released installation, native discovery and scoped
-capture do not prove a complete natural review or lower token use. See the
+capture do not prove a complete natural review or lower token use.
+
+In Antigravity, the installed `global-owner-scout` Skill runs its read-only `antigravity_native.py` adapter (`Project v8` / `Review Pack v9` / `Delivery v2`, `observed_only` current-session scope) without Codex-bound rule confirmation or Global Owner writes. Output is restricted to an explicitly authorized project-external directory or the exact host-granted `<appDataDir>/brain/<session-id>` directory (never `<appDataDir>`, `brain`, sibling sessions, `.system_generated`, subdirectories, project roots, or Skill roots). See the
 [native interface and qualification boundaries](specs/public-distribution-v1.md#scout-host-qualification).
 
 Desktop setup also installs a self-contained command entry with the Agent Memory Skill. The Agent runs
@@ -197,7 +201,7 @@ For Core-only CLI use, install the wheel from the same Release, then preview and
 apply setup:
 
 ```powershell
-python -m pip install .\agent_memory_sidecar-0.7.2-py3-none-any.whl
+python -m pip install .\agent_memory_sidecar-0.7.3-py3-none-any.whl
 agent-memory --help
 agent-memory setup
 agent-memory setup --apply
@@ -210,7 +214,7 @@ and Doctor remain available; global publication and Scout Owner parity are
 explicitly unavailable. Owner-integrated installations provide a separate clean
 Git checkout and bind it explicitly.
 
-Workstation Bootstrap 2.6.1 accepts `agent_memory_source_manifest_v1`. Release
+Workstation Bootstrap 2.6.2 accepts `agent_memory_source_manifest_v1`. Release
 manifests bind each source to both a ref and a full commit SHA; an optional
 `canonical_owner` is `null` in the public profile. On an existing host that means “the release does not distribute an Owner”, not
 “detach the current Owner”: a clean managed Owner is preserved only when Core is bound to that exact root and commit. Floating branches are a
@@ -222,17 +226,17 @@ not use normal sync to replace it. The unified deployment flow reviews and appli
 existing private Owner remains a separate optional backend unless explicitly
 detached.
 
-## Global instructions across Codex, Pi and Claude Code
+## Global instructions across Codex, Pi, Claude Code and Antigravity
 
 The same `同步并部署本机 Agent Memory` intent has an instruction-distribution lane: resolve the verified Release, preview
 and apply its Core `instructions sync` operation, then report each enrolled local host separately. A single published canonical
 `global/AGENTS.md` is deployed byte-for-byte to enrolled Codex and Pi instruction files and, only after explicit enrollment, to
-Claude Code's user `CLAUDE.md`; local drift blocks overwrites. This does not install Hooks or Scout in Pi or Claude Code, prove
-project-instruction discovery, or claim model adoption. Claude interprets imports and comments differently, and effective session
+Claude Code's user `CLAUDE.md` and Antigravity's two-file rule projection (`config/rules/01-global-charter.md` + `02-confirmed-rules.md`, each `<= 24,000` bytes); local drift blocks overwrites. This does not install Hooks or Scout in Pi, Claude Code or Antigravity, prove
+project-instruction discovery, or claim model adoption. Claude and Antigravity interpret imports, rules and comments differently, and effective session
 context must be checked separately. See [the synchronization contract](specs/global-instruction-sync-v1.md), including rollback limits.
 
-Before downgrading to an older Codex/Pi-only sync runtime, the new verified runtime must preview and apply an explicitly approved
-`instructions sync --unenroll-claude` operation. It removes only the unchanged managed Claude projection and enrollment, retaining
+Before downgrading to an older sync runtime that predates Claude or Antigravity support, the new verified runtime must preview and apply an explicitly approved
+`instructions sync --unenroll-claude` or `instructions sync --unenroll-antigravity` operation. Each removes only the unchanged managed projection and enrollment for that host, retaining
 other hosts and user files. Source-content rollback remains a published revert followed by normal sync; neither operation proves
 that an already-running session has dropped its prior context.
 
@@ -310,12 +314,16 @@ failure.
 ## Verification
 
 ```powershell
+# Isolated repository checks (with source PYTHONPATH)
 $env:PYTHONPATH='src'
 $env:PYTHONDONTWRITEBYTECODE='1'
-python -m unittest discover -v
-python scripts/check_doc_links.py
+python -B -m unittest discover -v
+python -B scripts/check_doc_links.py
 git diff --check
-python -m agent_memory_sidecar doctor
+
+# Installed Codex entry check (without source PYTHONPATH)
+Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
+python -B "$env:USERPROFILE\.codex\skills\agent-memory\scripts\agent-memory.py" doctor
 ```
 
 Automated checks prove contracts, storage, publication transactions, packages,

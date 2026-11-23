@@ -69,11 +69,12 @@ def _load_transcript_steps(app_data_dir: Path, source_session_id: str) -> tuple[
     logs_dir = _assert_physical_dir_chain(base, ("brain", source_session_id, ".system_generated", "logs"))
     selected_kind: str | None = None
     selected_path: Path | None = None
-    with pinned_directory(logs_dir):
+    with pinned_directory(logs_dir) as logs_fd:
+        selected_name: str | None = None
         for kind, filename in (("transcript_full", "transcript_full.jsonl"), ("transcript", "transcript.jsonl")):
             candidate = logs_dir / filename
             try:
-                st = candidate.lstat()
+                st = os.lstat(filename, dir_fd=logs_fd) if logs_fd is not None else candidate.lstat()
             except FileNotFoundError:
                 continue
             except OSError as exc:
@@ -81,9 +82,30 @@ def _load_transcript_steps(app_data_dir: Path, source_session_id: str) -> tuple[
             _require(not is_reparse(st) and stat.S_ISREG(st.st_mode) and st.st_nlink == 1, "antigravity_transcript_not_regular")
             selected_kind = kind
             selected_path = candidate
+            selected_name = filename
+            selected_stat = st
             break
-        _require(selected_kind is not None and selected_path is not None, "antigravity_transcript_missing")
-        raw_text = safe_artifact_bytes(selected_path).decode("utf-8-sig")
+        _require(selected_kind is not None and selected_path is not None and selected_name is not None, "antigravity_transcript_missing")
+        if logs_fd is not None:
+            flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            try:
+                fd = os.open(selected_name, flags, dir_fd=logs_fd)
+                with os.fdopen(fd, "rb") as stream:
+                    opened = os.fstat(stream.fileno())
+                    _require(
+                        stat.S_ISREG(opened.st_mode)
+                        and not is_reparse(opened)
+                        and opened.st_nlink == 1
+                        and (opened.st_dev, opened.st_ino) == (selected_stat.st_dev, selected_stat.st_ino),
+                        "antigravity_transcript_not_regular",
+                    )
+                    raw_text = stream.read().decode("utf-8-sig")
+            except ContractError:
+                raise
+            except (OSError, UnicodeError) as exc:
+                raise ContractError("antigravity_transcript_not_regular") from exc
+        else:
+            raw_text = safe_artifact_bytes(selected_path).decode("utf-8-sig")
     steps: list[dict[str, Any]] = []
     for line in raw_text.splitlines():
         stripped = line.strip()
@@ -159,18 +181,23 @@ def invoke_antigravity(
     # are never read prior to output authorization.
     binding = inspect_native_context(native, include_snapshot=False)
     bound_project = Path(binding["project_root"])
-    protected_roots = [bound_project, SKILL_ROOT, app_data_path]
+    strict_protected = [bound_project, SKILL_ROOT]
+    # Enforce strict project and Skill write protection with zero exemptions first,
+    # even if app_data_path aliases or coincides with project_root or SKILL_ROOT.
+    validate_output_root(Path(artifact_dir), strict_protected)
     exempt_exact_roots = _resolve_session_artifact_exemption(
         Path(artifact_dir),
         app_data_path=app_data_path,
         session_id=session_id,
     )
-    # Check every write boundary before reading any transcript or untracked project bytes.
     validate_output_root(
         Path(artifact_dir),
-        protected_roots,
+        [app_data_path],
         exempt_exact_roots=exempt_exact_roots,
     )
+    # Collect full git snapshot after output authorization succeeds and before writing
+    # any capture files, so missing HEAD or git errors never leave orphan artifacts.
+    binding["git_snapshot"] = inspect_git_context(bound_project)
 
     transcript_kind, steps = _load_transcript_steps(app_data_path, selected_source)
     payload = {
@@ -188,10 +215,9 @@ def invoke_antigravity(
         project_root=bound_project,
         session_id=selected_source,
         artifact_dir=Path(artifact_dir),
-        protected_roots=protected_roots,
+        protected_roots=[*strict_protected, app_data_path],
         exempt_exact_roots=exempt_exact_roots,
     )
-    binding["git_snapshot"] = inspect_git_context(bound_project)
     result: dict[str, Any] = {"native_context": native, "native_binding": binding}
     result["capture"] = {
         key: captured[key]

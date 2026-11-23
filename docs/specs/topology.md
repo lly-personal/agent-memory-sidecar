@@ -169,7 +169,7 @@ helper 从任意 cwd 执行时都显式接收当前绑定的 project-root；当�
 `verify-final` 可在后续从原回执恢复 manifest 与原文件，无需重做发现或建立控制任务。queued 保留未观测；准确人类
 选择经文件核验和 Fresh Core 预演进入现有原子授权链，不把旧排队状态改称展示成功。
 
-Bootstrap 2.6.1 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
+Bootstrap 2.6.2 先通过 Repo Anchor 或 Git-backed plugin 的 Release Resolver 验证不可变第一跳，并把已验证 portable
 安全展开到临时解析目录。Anchor 在同一任务从该唯一副本调用正式 Bootstrap，按 source manifest 把 Sidecar 与可选
 canonical Owner 同步到当前 Codex home 的受管 clean sources。两个显式源必须全部完成 staged clone、remote identity、
 clean worktree 与 commit 校验后再替换受管目标；任何受管源 identity 漂移或 dirty 都失败关闭。该过程不得
@@ -308,25 +308,25 @@ proposal body、before 文档和规则正文始终留在实际 instruction targe
 ## 全局规范的多宿主按需分发
 
 规则发布与完整文档分发是两条边界不同的链路。`instructions sync` 从 canonical Git 的已发布 main 固定提交，
-经隔离 clone 读取完整字节，不 pull 或覆盖活跃工程。一次本机操作向已接入 Codex/Pi/Claude Code 物化，并逐宿主回读；Claude 只通过显式目录接入，其用户级文件与项目指令的实际加载各自验收。
+经隔离 clone 读取完整字节，不 pull 或覆盖活跃工程。一次本机操作向已接入 Codex/Pi/Claude Code/Antigravity 物化，并逐宿主回读；Claude 与 Antigravity 只通过显式目录接入（Antigravity 拆分为两份 `<= 24,000` 字节规则文件），其用户级文件与项目指令的实际加载各自验收。
 宿主目标与源发现信息保存在本机同步 metadata；每个宿主的既有格式 Installation Registry 保存该目标最后部署的 hash，
 不复制行为内容、运行事件或授权。Codex 继续使用其现有 Store，Pi 只使用相同 registry schema，不安装 Codex runtime。
 同步后的受管源 snapshot 由现有 Bootstrap 显式识别并校验后承接，不能把外部路径相似当作 Owner 身份证据。
 
 统一入口先完成原有 Release Resolver；指令分发调用 verified portable 内 Core wheel，完整 Codex 能力安装仍走
 Workstation Reconcile。Pi 原生 package manifest 暴露同一 Bootstrap Anchor 与可选 Engineering Contract Review，
-Claude Code 原生 Plugin 读取相同 Skill 目录；方法分发不引入第二实现，也不授予 Desktop-bound Scout 资格。
+Claude Code 原生 Plugin 与 Antigravity 本地技能目录读取相同 Skill 源码；方法分发不引入第二实现，也不授予 Desktop-bound Scout 资格。
 详见[同步契约](../../specs/global-instruction-sync-v1.md)与[多宿主能力阶梯 ADR](../decisions/0083-multihost-capability-ladder.zh.md)。本机部署与另一设备、刷新加载、行为采用分开验收。
 
 ### 多宿主三阶能力阶梯（ADR Gate）
 
-| 阶梯 | 能力 | Codex | Pi | Claude Code |
-| --- | --- | --- | --- | --- |
-| **L1** | 全局规范同步（`instructions sync`） | 已支持 | 已支持 | 已支持（显式接入 `CLAUDE.md`） |
-| **L2** | 只读 Scout / 工程审阅 | 已支持（v7/v8） | 候选（v8/v9，只读） | 候选（v8/v9，只读） |
-| **L3** | 规则审批与受控写入 | 已支持（CLI + Hooks） | **阻断（须先通过 ADR）** | **阻断（须先通过 ADR）** |
+| 阶梯 | 能力 | Codex | Pi | Claude Code | Antigravity |
+| --- | --- | --- | --- | --- | --- |
+| **L1** | 全局规范同步（`instructions sync`） | 已支持 | 已支持 | 已支持（显式接入 `CLAUDE.md`） | 已支持（显式接入双文件 `rules/01-global-charter.md` + `02-confirmed-rules.md`，单文件 `<= 24,000` B） |
+| **L2** | 只读 Scout / 工程审阅 | 已支持（v7/v8） | 候选（v8/v9，只读） | 候选（v8/v9，只读） | 候选（v8/v9，只读，当前会话） |
+| **L3** | 规则审批与受控写入 | 已支持（CLI + Hooks） | **阻断（须先通过 ADR）** | **阻断（须先通过 ADR）** | **阻断（须先通过 ADR）** |
 
-- Pi 与 Claude Code 进入 L3 前必须由正式 ADR 批准“不可伪造的宿主原生确认原语”；禁止任何未经批准的写入代码、Hook 或关键词/自然语言匹配确认。
+- Pi、Claude Code 与 Antigravity 进入 L3 前必须由正式 ADR 批准“不可伪造的宿主原生确认原语”；禁止任何未经批准的写入代码、Hook 或关键词/自然语言匹配确认。
 - Scheduled 实验（`PAUSED / 0 of 14`）与日常交互式验收独立解耦，`global_owner_scout_host_profile_v1` 仍保留用于可选实验持久化。
 
 ## Scope 与 Desktop
