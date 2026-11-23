@@ -60,7 +60,7 @@ class PublicDistributionTests(unittest.TestCase):
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
         self.assertEqual(
-            {"core": "0.6.16", "plugin": "1.11.12", "bootstrap": "2.5.14", "scout": "5.19.11"},
+            {"core": "0.7.0", "plugin": "1.12.0", "bootstrap": "2.6.0", "scout": "5.20.0"},
             facts,
         )
         self.assertFalse((ROOT / "scripts" / "build_public_export.py").exists())

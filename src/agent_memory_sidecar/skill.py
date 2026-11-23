@@ -57,6 +57,81 @@ def default_user_skill_root() -> Path:
     return codex_home / "skills"
 
 
+def legacy_shared_skill_root() -> Path:
+    return logical_absolute(Path.home() / ".agents" / "skills")
+
+
+def skill_tree_sha256(path: Path) -> str | None:
+    logical = logical_absolute(path)
+    if _assert_skill_directory_chain(logical.parent, allow_missing_tail=True) is None:
+        return None
+    if not _physical_skill_directory_exists(logical):
+        return None
+    values: dict[str, str] = {}
+    for item in _skill_tree_files(logical):
+        existed, data = read_physical_regular_bytes(
+            item,
+            allow_missing_parent=False,
+            unsafe_code="skill_target_unsafe",
+            unsafe_message="Skill tree contains an unsafe file",
+            unavailable_message="Skill file cannot be read",
+        )
+        if not existed:
+            return None
+        try:
+            values[item.relative_to(logical).as_posix()] = data.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+    return skill_package_sha256(values)
+
+
+def looks_like_sidecar_skill(path: Path) -> bool:
+    logical = logical_absolute(path)
+    try:
+        if _assert_skill_directory_chain(logical.parent, allow_missing_tail=True) is None:
+            return False
+        if not _physical_skill_directory_exists(logical):
+            return False
+        existed, data = read_physical_regular_bytes(
+            logical / CLI_ENTRY,
+            allow_missing_parent=True,
+            unsafe_code="skill_target_unsafe",
+        )
+        if not existed:
+            return False
+        text = data.decode("utf-8", errors="ignore")
+        return "agent_memory_sidecar.cli" in text and "daily_only=True" in text
+    except CoreError:
+        return False
+
+
+def stage_legacy_skill_removal(path: Path) -> SkillSnapshot:
+    logical = logical_absolute(path)
+    _assert_skill_directory_chain(logical.parent, allow_missing_tail=False)
+    if not _physical_skill_directory_exists(logical):
+        backup_root = Path(
+            tempfile.mkdtemp(
+                prefix=f".{SKILL_NAME}.legacy-migration.",
+                dir=logical.parent,
+            )
+        )
+        return SkillSnapshot(logical, False, backup_root, backup_root / SKILL_NAME)
+    backup_root = Path(
+        tempfile.mkdtemp(
+            prefix=f".{SKILL_NAME}.legacy-migration.",
+            dir=logical.parent,
+        )
+    )
+    backup_path = backup_root / SKILL_NAME
+    snapshot = SkillSnapshot(logical, True, backup_root, backup_path)
+    try:
+        os.replace(logical, backup_path)
+    except BaseException:
+        discard_skill_snapshot(snapshot)
+        raise
+    return snapshot
+
+
 def _assert_skill_directory_chain(path: Path, *, allow_missing_tail: bool) -> os.stat_result | None:
     return assert_physical_directory_chain(
         path,

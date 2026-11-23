@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.7.0 | 0.7.0 | 1.12.0 | 2.6.0 | 5.20.0 | v8 | 3.11–3.13 |
 | v0.6.16 | 0.6.16 | 1.11.12 | 2.5.14 | 5.19.11 | v8 | 3.11–3.13 |
 | v0.6.15 | 0.6.15 | 1.11.11 | 2.5.13 | 5.19.10 | v8 | 3.11–3.13 |
 | v0.6.14 | 0.6.14 | 1.11.10 | 2.5.12 | 5.19.9 | v8 | 3.11–3.13 |
@@ -152,6 +153,8 @@ Scout 5.19.9 removes the retired v4 compatibility scripts, adds deterministic ze
 Scout 5.19.10 decouples cross-host environment variable sniffing from explicit `--state` handles, permits long backticked file paths and CLI flags inside Chinese user-facing prose without relaxing natural-prose English ratio checks, and hardens broken-symlink physical scan isolation on Windows alongside Core 0.6.15, Plugin 1.11.11, and Bootstrap 2.5.13. Active Project v7/v8, Review Pack v8/v9, and Delivery v2 contracts remain compatible; natural handoff and adoption remain separately observed.
 
 Scout 5.19.11 adds the read-only Antigravity L2 native lane (`scripts/antigravity_native.py`) with hardened transcript path-chain and session-scope verification alongside Core 0.6.16 (Antigravity L1 two-file `<= 24 KB` rule projection and `--unenroll-antigravity` exit rollback), Plugin 1.11.12, and Bootstrap 2.5.14. Active Project v7/v8, Review Pack v8/v9, and Delivery v2 contracts remain compatible; natural handoff and adoption remain separately observed.
+
+Core 0.7.0 isolates the Codex-only `agent-memory` Skill to `$CODEX_HOME/skills`, excludes `core_cutover.py`/`instruction_sync.py` from its daily projection, replaces four-column pipe receipts with concise plain-Chinese outcomes, retires `scripts/build_public_export.py` and `specs/public-export-allowlist-v1.json`, and aligns Anchor/Bootstrap docs with Antigravity L1. Bootstrap 2.6.0 folds the internal deployment matrix into `<details>` while keeping status, drift, next steps, and unproven boundaries prominent. Scout 5.20.0 fixes non-Codex `preflight-summary`, legacy `confirmation_eligible`, malformed `evidence_window`, and host-gated `\ue200visualize` PUA leakage; adds built-in Mermaid architecture maps, collapsible decision-card audit evidence, redesigned self-contained `assets/project-map.html`, and composite `seal-project`/`seal-delivery` commands; and records the 4-journey Anti-Snowball Freeze Gate. Plugin 1.12.0 carries the aligned release bundle. Active Project v7/v8, Review Pack v8/v9, and Delivery v2 wire contracts remain compatible; natural UX acceptance remains separately observed.
 
 ## Core User Journey Status (Anti-Snowball Freeze Gate)
 

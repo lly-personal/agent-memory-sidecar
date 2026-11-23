@@ -99,13 +99,13 @@ class CliDailyOnlyAndReleaseVersionTests(unittest.TestCase):
 
             # Baseline copy passes version_facts
             facts = build_release_artifacts.version_facts(fake_root)
-            self.assertEqual("5.19.11", facts["scout"])
+            self.assertEqual("5.20.0", facts["scout"])
 
             # Perturb validate_output.py SKILL_VERSION only
             vo_path = fake_root / "skills" / "global-owner-scout" / "scripts" / "validate_output.py"
             text = vo_path.read_text(encoding="utf-8")
-            self.assertIn('SKILL_VERSION = "5.19.11"', text)
-            vo_path.write_text(text.replace('SKILL_VERSION = "5.19.11"', 'SKILL_VERSION = "5.99.0"', 1), encoding="utf-8")
+            self.assertIn('SKILL_VERSION = "5.20.0"', text)
+            vo_path.write_text(text.replace('SKILL_VERSION = "5.20.0"', 'SKILL_VERSION = "5.99.0"', 1), encoding="utf-8")
 
             with self.assertRaisesRegex(build_release_artifacts.ReleaseError, "release_scout_version_mismatch"):
                 build_release_artifacts.version_facts(fake_root)
@@ -194,7 +194,7 @@ class ScoutPreflightAndSecurityTests(unittest.TestCase):
                 )
                 data = json.loads(proc.stdout)
                 self.assertEqual("global_owner_scout_preflight_summary_v1", data["contract_version"])
-                self.assertEqual("5.19.11", data["skill_version"])
+                self.assertEqual("5.20.0", data["skill_version"])
                 self.assertEqual(host, data["host"])
                 self.assertEqual(purpose, data["purpose"])
                 self.assertEqual(proj_c, data["project_contract"])
@@ -458,6 +458,114 @@ class HighFidelityReplayAndMalformedNativeTests(unittest.TestCase):
             rendered = prepare_delivery.render_terminal_receipt(terminal)
             self.assertIn("**下一步建议**：" + recovery, rendered)
             self.assertIn("<details>\n<summary>技术诊断详情</summary>", rendered)
+
+    def test_wave_b_seal_project_and_seal_delivery_composite_fast_path(self) -> None:
+        from tests.test_scout_native_protocol import native_pack
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            proj = root / "project"
+            out = root / "output"
+            proj.mkdir()
+            out.mkdir()
+
+            draft_pack = native_pack("antigravity")
+            draft_project = draft_pack["project_result"]
+            draft_project["project_cards"][0]["normalized_evidence_hash"] = ""
+            draft_project["project_cards"][0]["project_claim_hash"] = ""
+            draft_project_file = root / "draft-project.json"
+            sealed_project_file = out / "sealed-project.json"
+            draft_project_file.write_text(json.dumps(draft_project, ensure_ascii=False), encoding="utf-8")
+
+            # --output-file rejects missing boundary flags, protected paths, and overwriting existing files
+            for bad_args in (
+                ["--output-file", str(sealed_project_file)],
+                ["--output-file", str(proj / "leak.json"), "--artifact-dir", str(proj), "--protected-root", str(proj)],
+            ):
+                bad = subprocess.run(
+                    [sys.executable, "-B", str(SCOUT_SCRIPTS / "scout.py"), "seal-project",
+                     "--input-file", str(draft_project_file), *bad_args],
+                    capture_output=True, text=True, encoding="utf-8",
+                )
+                self.assertEqual(1, bad.returncode)
+
+            seal_proj = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_SCRIPTS / "scout.py"), "seal-project",
+                 "--input-file", str(draft_project_file), "--output-file", str(sealed_project_file),
+                 "--artifact-dir", str(out), "--protected-root", str(proj)],
+                capture_output=True, text=True, encoding="utf-8", check=True,
+            )
+            self.assertEqual("ok", json.loads(seal_proj.stdout)["status"])
+            sealed_proj = json.loads(sealed_project_file.read_text(encoding="utf-8"))
+            self.assertEqual(64, len(sealed_proj["project_cards"][0]["project_claim_hash"]))
+
+            # Existing output file must fail closed (O_EXCL)
+            overwrite = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_SCRIPTS / "scout.py"), "seal-project",
+                 "--input-file", str(draft_project_file), "--output-file", str(sealed_project_file),
+                 "--artifact-dir", str(out), "--protected-root", str(proj)],
+                capture_output=True, text=True, encoding="utf-8",
+            )
+            self.assertEqual(1, overwrite.returncode)
+
+            draft_pack["project_result"] = draft_project
+            draft_pack["review_cards"][0]["project_claim_hash"] = ""
+            draft_pack["review_pack_hash"] = ""
+            draft_pack_file = root / "draft-pack.json"
+            draft_pack_file.write_text(json.dumps(draft_pack, ensure_ascii=False), encoding="utf-8")
+
+            # Host mismatch must fail closed before writing
+            for wrong_host in ("pi", "codex"):
+                mismatch = subprocess.run(
+                    [sys.executable, "-B", str(SCOUT_SCRIPTS / "scout.py"), "seal-delivery",
+                     "--artifact-dir", str(out), "--protected-root", str(proj),
+                     "--host", wrong_host, "--input-file", str(draft_pack_file)],
+                    capture_output=True, text=True, encoding="utf-8",
+                )
+                self.assertEqual(1, mismatch.returncode, wrong_host)
+
+            # Native host must also reject a Codex rule pack
+            codex_rule_pack = valid_review_pack(valid_project(status="ok", card_count=1))
+            codex_rule_file = root / "codex-rule-pack.json"
+            codex_rule_file.write_text(json.dumps(codex_rule_pack, ensure_ascii=False), encoding="utf-8")
+            bad_pi_rule = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_SCRIPTS / "scout.py"), "seal-delivery",
+                 "--artifact-dir", str(out), "--protected-root", str(proj),
+                 "--host", "pi", "--outcome", "open_succeeded", "--input-file", str(codex_rule_file)],
+                capture_output=True, text=True, encoding="utf-8",
+            )
+            self.assertEqual(1, bad_pi_rule.returncode)
+
+            # Codex draft with null selection_preview & null selection_token auto-derives token for prepare_review
+            draft_codex_rule = json.loads(json.dumps(codex_rule_pack))
+            draft_codex_rule["selection_preview"] = None
+            draft_codex_rule["review_cards"][0]["selection_token"] = None
+            draft_codex_rule["review_pack_hash"] = ""
+            with mock.patch.object(scout, "prepare_review", side_effect=lambda p, **_: codex_rule_pack) as mock_pr:
+                codex_out = root / "codex-out"
+                codex_out.mkdir()
+                res = scout.seal_delivery_payload(
+                    draft_codex_rule, artifact_dir=codex_out, protected_roots=[proj], host="codex", with_visual=True,
+                )
+                self.assertEqual("ok", res["status"])
+                passed_pack = mock_pr.call_args.args[0]
+                self.assertIsNotNone(passed_pack["review_cards"][0]["selection_token"])
+
+            # --with-visual without explicit --host codex never emits PUA visualize token
+            seal_deliv = subprocess.run(
+                [sys.executable, "-B", str(SCOUT_SCRIPTS / "scout.py"), "seal-delivery",
+                 "--artifact-dir", str(out), "--protected-root", str(proj),
+                 "--host", "antigravity", "--with-visual", "--input-file", str(draft_pack_file)],
+                capture_output=True, text=True, encoding="utf-8", check=True,
+            )
+            payload = json.loads(seal_deliv.stdout)
+            self.assertEqual("ok", payload["status"])
+            self.assertTrue(Path(payload["artifact_path"]).is_file())
+            self.assertNotIn("visualize", payload["receipt"])
+            self.assertIn("<details>\n<summary>技术校验信息</summary>", payload["receipt"])
+            recovered = prepare_delivery.verify_final_receipt(payload["receipt"], artifact_root=out)
+            self.assertEqual("artifact_verified", recovered["status"])
+            self.assertFalse(recovered["confirmation_eligible"])
 
 
 if __name__ == "__main__":

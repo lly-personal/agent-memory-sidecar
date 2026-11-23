@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import io
 import json
@@ -49,7 +50,12 @@ from validate_output import (
     PROJECT_CONTRACT,
     REVIEW_PACK_CONTRACT,
     SKILL_VERSION,
+    canonical_hash,
     describe_input,
+    expected_action_policy,
+    project_claim_hash,
+    review_pack_hash,
+    selection_token,
     validate_project,
     validate_review_pack,
 )
@@ -137,6 +143,12 @@ def build_preflight_summary(host: str, purpose: str) -> dict[str, Any]:
         "describe_input_kinds": describe_kinds,
         "evidence_window_kind": "manual_30d" if purpose == "review" else "current",
         "command_order": [*entry_steps, *history_steps, *review_steps],
+        "recommended_fast_path": [
+            *entry_steps,
+            *history_steps,
+            "seal-project",
+            f"seal-delivery --host {host}",
+        ],
         "blocking_rules": [
             "project_binding_required",
             "explicit_external_output_root_required",
@@ -239,6 +251,168 @@ def inspect_native_context(value: Any, project_root: Path | None = None) -> dict
                 binding_scope=scope, git_snapshot=inspect_git_context(native_root))
 
 
+def _write_exclusive_json(path: Path, payload: bytes, *, artifact_dir: Path, protected_roots: list[Path]) -> Path:
+    out_root = validate_output_root(artifact_dir, protected_roots)
+    require(path.is_absolute(), "--output-file must be absolute")
+    name = path.name
+    require(bool(name) and name not in {".", ".."} and Path(name).name == name, "--output-file name is invalid")
+    try:
+        parent = path.parent.resolve(strict=True)
+    except OSError as exc:
+        raise ContractError(f"output parent unavailable: {exc}") from exc
+    require(parent == out_root, "--output-file must be a direct child of --artifact-dir")
+    target = out_root / name
+    require(not target.exists() and not target.is_symlink(), "--output-file already exists")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_BINARY"):
+        flags |= os.O_BINARY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd: int | None = None
+    dir_fd: int | None = None
+    try:
+        if os.open in getattr(os, "supports_dir_fd", set()) and hasattr(os, "O_DIRECTORY"):
+            dir_flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
+            dir_fd = os.open(out_root, dir_flags)
+            dir_stat = os.fstat(dir_fd)
+            root_stat = out_root.lstat()
+            require(
+                dir_stat.st_dev == root_stat.st_dev and dir_stat.st_ino == root_stat.st_ino,
+                "output directory changed during validation",
+            )
+            fd = os.open(name, flags, 0o600, dir_fd=dir_fd)
+        else:
+            require(not out_root.is_symlink() and out_root.resolve(strict=True) == out_root, "output directory changed")
+            fd = os.open(target, flags, 0o600)
+            if target.parent.resolve(strict=True) != out_root:
+                os.close(fd)
+                fd = None
+                raise ContractError("output directory changed during creation")
+        with os.fdopen(fd, "wb", closefd=True) as stream:
+            fd = None
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except OSError as exc:
+        if fd is not None:
+            os.close(fd)
+        raise ContractError(f"output file creation failed: {exc}") from exc
+    finally:
+        if dir_fd is not None:
+            os.close(dir_fd)
+    return target
+
+
+def seal_project_payload(value: Any) -> dict[str, Any]:
+    require(isinstance(value, dict), "project payload must be an object")
+    project = copy.deepcopy(value)
+    cards = project.get("project_cards")
+    if isinstance(cards, list):
+        for card in cards:
+            if isinstance(card, dict):
+                if isinstance(card.get("direct_evidence"), list):
+                    card["normalized_evidence_hash"] = canonical_hash(card["direct_evidence"])
+                card["project_claim_hash"] = project_claim_hash(card)
+    return validate_project(project)
+
+
+def seal_delivery_payload(
+    value: Any,
+    *,
+    artifact_dir: Path,
+    protected_roots: list[Path],
+    host: str | None = None,
+    outcome: str = "not_requested",
+    with_visual: bool = False,
+    text_only: bool = False,
+    visual_input: Path | None = None,
+    selected_card_ids: list[str] | None = None,
+    codex_home: Path | None = None,
+) -> dict[str, Any]:
+    require(isinstance(value, dict), "review pack payload must be an object")
+    require(host in {None, "codex", "pi", "claude", "antigravity"}, "unsupported host")
+    pack = copy.deepcopy(value)
+    effective_host = host or "codex"
+    if isinstance(pack.get("project_result"), dict):
+        sealed_project = seal_project_payload(pack["project_result"])
+        pack["project_result"] = sealed_project
+        review_cards = pack.get("review_cards")
+        project_cards = sealed_project.get("project_cards", [])
+        if isinstance(review_cards, list) and len(review_cards) == len(project_cards):
+            for pcard, rcard in zip(project_cards, review_cards):
+                if isinstance(rcard, dict) and not rcard.get("project_claim_hash"):
+                    rcard["project_claim_hash"] = pcard["project_claim_hash"]
+    if effective_host in {"pi", "claude", "antigravity"}:
+        require(pack.get("contract_version") == NATIVE_REVIEW_PACK_CONTRACT, "native host requires native Review Pack v9")
+        project = pack.get("project_result") or {}
+        require(project.get("contract_version") == NATIVE_PROJECT_CONTRACT, "native host requires native Project v8")
+        if project.get("purpose") != "inspect":
+            cov = project.get("session_coverage")
+            require(isinstance(cov, dict) and cov.get("native_host") == effective_host, "native review pack native_host does not match --host")
+    else:
+        require(pack.get("contract_version") != NATIVE_REVIEW_PACK_CONTRACT, "codex host cannot deliver native Review Pack v9")
+        parity = pack.get("owner_parity")
+        if (
+            isinstance(parity, dict)
+            and parity.get("status") == "matched"
+            and isinstance(parity.get("canonical_source_hash"), str)
+            and pack.get("selection_preview") is None
+            and pack.get("project_result", {}).get("purpose") != "inspect"
+        ):
+            project_cards = pack.get("project_result", {}).get("project_cards", [])
+            review_cards = pack.get("review_cards", [])
+            if isinstance(review_cards, list) and len(review_cards) == len(project_cards):
+                for pcard, rcard in zip(project_cards, review_cards):
+                    if (
+                        isinstance(pcard, dict)
+                        and isinstance(rcard, dict)
+                        and pcard.get("kind") != "engineering"
+                        and rcard.get("selection_token") is None
+                        and isinstance(rcard.get("integration_preview"), dict)
+                    ):
+                        relation = rcard["integration_preview"].get("global_relation")
+                        supersedes = rcard["integration_preview"].get("supersedes")
+                        _, expected_actions = expected_action_policy(pcard, parity["status"], relation, True)
+                        if "confirm" in expected_actions and isinstance(supersedes, list):
+                            rcard["selection_token"] = selection_token(
+                                card_id=pcard["card_id"],
+                                project_claim_hash=pcard["project_claim_hash"],
+                                proposal=pcard["rule_payload"],
+                                supersedes=supersedes,
+                                target_before_sha256=parity["canonical_source_hash"],
+                            )
+    pack["review_pack_hash"] = review_pack_hash(pack)
+    if effective_host == "codex" and pack.get("owner_parity") is not None and pack.get("project_result", {}).get("purpose") != "inspect":
+        home = codex_home
+        if home is None:
+            configured = os.environ.get("CODEX_HOME")
+            home = Path(configured).expanduser() if configured else Path.home() / ".codex"
+        pack = prepare_review(pack, codex_home=home, selected_card_ids=selected_card_ids)
+    else:
+        pack = validate_review_pack(pack)
+    manifest, artifact_path = prepare_delivery(
+        pack,
+        artifact_dir=artifact_dir,
+        protected_roots=protected_roots,
+        visual_input=visual_input,
+    )
+    receipt = render_delivery_receipt(
+        manifest,
+        artifact_path=artifact_path,
+        artifact_root=artifact_dir,
+        outcome=outcome,
+        text_only=text_only,
+        host=host,
+        with_visual=with_visual,
+    )
+    return {
+        "status": "ok",
+        "artifact_path": str(artifact_path),
+        "manifest": manifest,
+        "receipt": receipt,
+    }
+
+
 def main() -> int:
     configure_utf8_stdio()
     parser = argparse.ArgumentParser(description="Run one active Global Owner Scout helper operation.")
@@ -267,6 +441,10 @@ def main() -> int:
     output.add_argument("--artifact-dir", type=Path, required=True)
     output.add_argument("--protected-root", action="append", type=Path, required=True)
     commands.add_parser("validate-project")
+    seal_proj = commands.add_parser("seal-project", help="Compute card hashes and validate a Project JSON payload in one step.")
+    seal_proj.add_argument("--output-file", type=Path)
+    seal_proj.add_argument("--artifact-dir", type=Path)
+    seal_proj.add_argument("--protected-root", action="append", type=Path)
     commands.add_parser("validate-review-pack")
     preview = commands.add_parser("prepare-review")
     preview.add_argument("--select-card", action="append")
@@ -279,11 +457,20 @@ def main() -> int:
     prepare.add_argument("--artifact-dir", type=Path, required=True)
     prepare.add_argument("--protected-root", action="append", type=Path, required=True)
     prepare.add_argument("--visual-input", type=Path)
+    seal_deliv = commands.add_parser("seal-delivery", help="Hash, preview (Codex rule packs), validate, deliver, and render receipt in one step.")
+    seal_deliv.add_argument("--artifact-dir", type=Path, required=True)
+    seal_deliv.add_argument("--protected-root", action="append", type=Path, required=True)
+    seal_deliv.add_argument("--host", choices=("codex", "pi", "claude", "antigravity"), default=None)
+    seal_deliv.add_argument("--outcome", choices=tuple(SURFACE_COPY), default="not_requested")
+    seal_deliv.add_argument("--with-visual", action="store_true")
+    seal_deliv.add_argument("--text-only", action="store_true")
+    seal_deliv.add_argument("--visual-input", type=Path)
+    seal_deliv.add_argument("--select-card", action="append")
     receipt = commands.add_parser("render-receipt")
     receipt.add_argument("outcome", choices=tuple(SURFACE_COPY))
     receipt.add_argument("--artifact-path", type=Path)
     receipt.add_argument("--artifact-root", type=Path)
-    receipt.add_argument("--host", choices=("codex", "pi", "claude", "antigravity"), default="codex")
+    receipt.add_argument("--host", choices=("codex", "pi", "claude", "antigravity"), default=None)
     receipt.add_argument("--with-visual", action="store_true")
     receipt.add_argument("--text-only", action="store_true")
     commands.add_parser("render-terminal")
@@ -294,8 +481,8 @@ def main() -> int:
         recovery.add_argument("--project-root", type=Path)
         recovery.add_argument("--object", dest="selected_object")
         recovery.add_argument("--journey")
-    for name in ('inspect-native', 'import-history', 'validate-project', 'validate-review-pack', 'prepare-review',
-                 'render-review', 'verify-visible', 'prepare-delivery', 'render-receipt', 'render-terminal', 'recover-delivery', 'verify-final'):
+    for name in ('inspect-native', 'import-history', 'validate-project', 'seal-project', 'validate-review-pack', 'prepare-review',
+                 'render-review', 'verify-visible', 'prepare-delivery', 'seal-delivery', 'render-receipt', 'render-terminal', 'recover-delivery', 'verify-final'):
         commands.choices[name].add_argument('--input-file', type=Path, help='Consume an existing UTF-8 input instead of serializing it again through stdin.')
     args = parser.parse_args()
     def load_input() -> Any:
@@ -342,6 +529,22 @@ def main() -> int:
             validated = validate_project(load_input())
             result = {"status": "ok", "mode": "project_scout", "contract_version": validated["contract_version"]}
             print(json.dumps(result, separators=(",", ":")))
+        elif args.command == "seal-project":
+            sealed = seal_project_payload(load_input())
+            serialized = json.dumps(sealed, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            if args.output_file is not None:
+                require(args.artifact_dir is not None, "--artifact-dir is required with --output-file")
+                require(bool(args.protected_root), "--protected-root is required with --output-file")
+                _write_exclusive_json(
+                    args.output_file,
+                    (serialized + "\n").encode("utf-8"),
+                    artifact_dir=args.artifact_dir,
+                    protected_roots=args.protected_root,
+                )
+                print(json.dumps({"status": "ok", "mode": "project_scout", "contract_version": sealed["contract_version"],
+                                  "output_file": str(args.output_file)}, ensure_ascii=False, separators=(",", ":")))
+            else:
+                print(serialized)
         elif args.command == "validate-review-pack":
             validated = validate_review_pack(load_input())
             result = {"status": "ok", "mode": "review_pack", "contract_version": validated["contract_version"]}
@@ -363,6 +566,19 @@ def main() -> int:
             manifest, _ = prepare_delivery(load_input(), artifact_dir=args.artifact_dir, protected_roots=args.protected_root,
                                            visual_input=args.visual_input)
             print(json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+        elif args.command == "seal-delivery":
+            result = seal_delivery_payload(
+                load_input(),
+                artifact_dir=args.artifact_dir,
+                protected_roots=args.protected_root,
+                host=args.host,
+                outcome=args.outcome,
+                with_visual=args.with_visual,
+                text_only=args.text_only,
+                visual_input=args.visual_input,
+                selected_card_ids=args.select_card,
+            )
+            print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
         elif args.command == "render-receipt":
             manifest = validate_delivery_manifest(load_input())
             if args.outcome == "open_failed" and args.artifact_path is None and args.artifact_root is None:

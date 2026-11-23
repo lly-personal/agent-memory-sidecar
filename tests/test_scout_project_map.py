@@ -375,6 +375,7 @@ class ScoutProjectMapTests(unittest.TestCase):
                                                         outcome='not_requested')
             self.assertNotIn('visualize', default_receipt)
             for host, with_visual, text_only, expected_token in (
+                (None, True, False, False),
                 ('codex', True, False, True),
                 ('codex', True, True, False),
                 ('codex', False, False, False),
@@ -535,6 +536,23 @@ class ScoutProjectMapTests(unittest.TestCase):
             missing = recover(root/'missing')
             self.assertEqual('unavailable', missing['source_status'])
             self.assertEqual('verified', missing['visual_status'])
+
+    def test_markdown_map_emits_safe_mermaid_and_cards_collapse_audit_evidence(self):
+        from render_review import render_review_pack
+        from verify_visible_output import verify_visible_output
+
+        pack = layered_pack()
+        pack['project_result']['project_map']['nodes'][0]['label'] = '用户["入口"]|<x>'
+        pack['review_pack_hash'] = v.review_pack_hash(pack)
+        rendered = render_review_pack(pack, surface='interactive')
+        self.assertIn('```mermaid\nflowchart LR\n', rendered)
+        self.assertNotIn('用户["入口"]|<x>', rendered.split('```mermaid', 1)[1].split('```', 1)[0])
+        self.assertEqual('ok', verify_visible_output(rendered, surface='interactive')['status'])
+
+        rule_pack = v.valid_review_pack(v.valid_project(card_count=1))
+        rendered_rule = render_review_pack(rule_pack, surface='interactive')
+        self.assertIn('<details>\n<summary>展开完整核对依据</summary>\n\n### 完整核对依据', rendered_rule)
+        self.assertEqual('ok', verify_visible_output(rendered_rule, surface='interactive')['status'])
 
 
 if __name__ == '__main__':
