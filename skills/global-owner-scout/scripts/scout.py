@@ -106,10 +106,10 @@ def build_preflight_summary(host: str, purpose: str) -> dict[str, Any]:
         review_steps = [
             f"describe-input {describe_kinds[0]}",
             "validate-project",
-            "resolve-owner-parity",
+            *([] if native_host else ["resolve-owner-parity"]),
             f"describe-input {describe_kinds[1]}",
             "validate-review-pack",
-            "prepare-review",
+            *([] if native_host else ["prepare-review"]),
             "prepare-delivery",
             "render-receipt",
         ]
@@ -283,6 +283,8 @@ def main() -> int:
     receipt.add_argument("outcome", choices=tuple(SURFACE_COPY))
     receipt.add_argument("--artifact-path", type=Path)
     receipt.add_argument("--artifact-root", type=Path)
+    receipt.add_argument("--host", choices=("codex", "pi", "claude", "antigravity"), default="codex")
+    receipt.add_argument("--with-visual", action="store_true")
     receipt.add_argument("--text-only", action="store_true")
     commands.add_parser("render-terminal")
     for command in ("recover-delivery", "verify-final"):
@@ -369,7 +371,8 @@ def main() -> int:
                 require(args.artifact_path is not None, "--artifact-path is required")
                 require(args.artifact_root is not None, "--artifact-root is required")
                 print(render_delivery_receipt(manifest, artifact_path=args.artifact_path, artifact_root=args.artifact_root,
-                                              outcome=args.outcome, text_only=args.text_only), end="")
+                                              outcome=args.outcome, text_only=args.text_only,
+                                              host=args.host, with_visual=args.with_visual), end="")
         elif args.command == "render-terminal":
             print(render_terminal_receipt(load_input()), end="")
         else:

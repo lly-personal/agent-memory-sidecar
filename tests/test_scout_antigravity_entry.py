@@ -53,6 +53,8 @@ class AntigravityEntryTests(unittest.TestCase):
             self.assertEqual(doc['review_pack_contract'], NATIVE_REVIEW_PACK_CONTRACT)
             self.assertIn('antigravity_native.py context', doc['command_order'])
             self.assertEqual('antigravity_native.py capture' in doc['command_order'], purpose == 'review')
+            self.assertNotIn('resolve-owner-parity', doc['command_order'])
+            self.assertNotIn('prepare-review', doc['command_order'])
 
     def test_cli_help_is_read_only_without_touching_output(self):
         res = subprocess.run(

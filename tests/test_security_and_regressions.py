@@ -204,6 +204,9 @@ class ScoutPreflightAndSecurityTests(unittest.TestCase):
                 self.assertEqual(kinds, data["describe_input_kinds"])
                 self.assertEqual(window, data["evidence_window_kind"])
                 self.assertTrue(isinstance(data["command_order"], list) and len(data["command_order"]) >= 6)
+                expected_codex_owner_steps = host == "codex" and purpose == "review"
+                self.assertEqual(expected_codex_owner_steps, "resolve-owner-parity" in data["command_order"])
+                self.assertEqual(expected_codex_owner_steps, "prepare-review" in data["command_order"])
                 raw = proc.stdout
                 self.assertNotIn(str(ROOT), raw)
                 self.assertNotIn(str(iso_path), raw)
@@ -403,6 +406,58 @@ class HighFidelityReplayAndMalformedNativeTests(unittest.TestCase):
             }
             with self.assertRaisesRegex(ContractError, "native_context_mismatch"):
                 scout.inspect_native_context(bad_claude_ctx, proj)
+
+    def test_wave_a_malformed_window_legacy_eligibility_and_terminal_recovery(self) -> None:
+        import validate_output
+
+        # 1) Malformed evidence_window raises ContractError cleanly and stays inside CLI error envelope.
+        for bad_window in ({}, None, "manual_30d", ["bad"]):
+            broken = valid_project(status="no_material_delta", card_count=0)
+            broken["evidence_window"] = bad_window
+            with self.subTest(bad_window=bad_window):
+                with self.assertRaises(ContractError):
+                    validate_output.validate_project(broken)
+                proc = subprocess.run(
+                    [sys.executable, "-B", str(SCOUT_SCRIPTS / "scout.py"), "validate-project"],
+                    input=json.dumps(broken),
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                )
+                self.assertEqual(1, proc.returncode)
+                err = json.loads(proc.stderr)
+                self.assertEqual("error", err["status"])
+                self.assertNotIn("Traceback", proc.stderr)
+
+        # 2) Legacy no-brief open_succeeded without recovery_bundle never marks confirmation_eligible=true.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            proj = root / "project"
+            out = root / "output"
+            proj.mkdir()
+            out.mkdir()
+            pack = valid_review_pack(valid_project(status="no_material_delta", card_count=0))
+            manifest, artifact = prepare_delivery.prepare_delivery(pack, artifact_dir=out, protected_roots=[proj])
+            with mock.patch.object(prepare_delivery, "extract_conversation_brief", return_value=None):
+                receipt = prepare_delivery.render_delivery_receipt(
+                    manifest, artifact_path=artifact, artifact_root=out, outcome="open_succeeded"
+                )
+            self.assertIn("confirmation_eligible=false", receipt)
+            self.assertNotIn("confirmation_eligible=true", receipt)
+
+        # 3) Every terminal receipt includes concrete recovery guidance and folds technical fields.
+        for reason_code, (status, phase, states, _, recovery) in prepare_delivery.TERMINAL_REASON_MAPPINGS.items():
+            terminal = {
+                "contract_version": prepare_delivery.TERMINAL_CONTRACT,
+                "status": status,
+                "phase": phase,
+                "reason_code": reason_code,
+                "project_state": sorted(states)[0],
+                "confirmation_eligible": False,
+            }
+            rendered = prepare_delivery.render_terminal_receipt(terminal)
+            self.assertIn("**下一步建议**：" + recovery, rendered)
+            self.assertIn("<details>\n<summary>技术诊断详情</summary>", rendered)
 
 
 if __name__ == "__main__":

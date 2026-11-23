@@ -26,15 +26,15 @@ This Skill separates six facts that must never be collapsed:
 A normal deployment request always enters `inspect`. It must not create, update, pause, resume, or delete Scheduled tasks and must
 not change the Host Profile. Only an explicit request to retest or configure Scheduled capability enters `apply_enrollment`.
 
-## Global-standard synchronization (Codex, Pi or Claude Code)
+## Global-standard synchronization (Codex, Pi, Claude Code or Antigravity)
 
 For `同步并部署本机 Agent Memory` requests whose purpose is updating global standards, use the Bootstrap Anchor's instruction
 lane: resolve the immutable Release first, then invoke `scripts/sync_instructions.py` from that verified portable bundle.
-This lane synchronizes all enrolled local Codex/Pi/Claude Code targets and does not install Codex Hooks, run Scout, or request project inventory. Claude first requires an explicitly observed `--claude-home` and separately authorized enrollment; never enroll it from directory presence. Its effective session and project instructions remain separate checks.
-Before downgrading to a Codex/Pi-only sync runtime, an explicitly authorized Claude exit uses the same verified wrapper's
-`--unenroll-claude` preview/apply path. Do not combine it with synchronization or source options; require successful removal
+This lane synchronizes all enrolled local Codex/Pi/Claude Code/Antigravity targets and does not install Codex Hooks, run Scout, or request project inventory. Claude and Antigravity require an explicitly observed `--claude-home` / `--antigravity-home` and separately authorized enrollment; never enroll them from directory presence. Antigravity splits the projection into `rules/01-global-charter.md` + `02-confirmed-rules.md` (`<= 24,000` bytes each). Effective session and project instructions remain separate checks.
+Before downgrading to an older sync runtime, an explicitly authorized Claude or Antigravity exit uses the same verified wrapper's
+`--unenroll-claude` or `--unenroll-antigravity` preview/apply path. Do not combine it with synchronization or source options; require successful removal
 readback and keep recovery/cleanup blockers visible. Missing release support blocks downgrade rather than authorizing a source-script fallback.
-Do not route a Pi instruction request through `workstation-reconcile`, and do not use this installed script instead of the
+Do not route a Pi, Claude Code or Antigravity instruction request through `workstation-reconcile`, and do not use this installed script instead of the
 Resolver-verified bundle. Report instruction deployment separately from full capability readiness. Full Codex installation and
 migration continue through `inspect` below.
 

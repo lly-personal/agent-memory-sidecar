@@ -17,10 +17,8 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPORTER = ROOT / "scripts" / "build_public_export.py"
 RELEASE_BUILDER = ROOT / "scripts" / "build_release_artifacts.py"
 DOC_LINK_CHECKER = ROOT / "scripts" / "check_doc_links.py"
-PRIVATE_EXPORT_TEMPLATE = ROOT / "templates" / "public" / "AGENTS.md"
 
 
 def load_module(name: str, path: Path):
@@ -35,7 +33,6 @@ def load_module(name: str, path: Path):
 class PublicDistributionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.exporter = load_module("public_export_builder", EXPORTER)
         cls.release = load_module("public_release_builder", RELEASE_BUILDER)
         cls.doc_links = load_module("public_doc_link_checker", DOC_LINK_CHECKER)
         cls.head = subprocess.run(
@@ -43,178 +40,22 @@ class PublicDistributionTests(unittest.TestCase):
             text=True, encoding="utf-8", check=True,
         ).stdout.strip()
 
-    @unittest.skipUnless(PRIVATE_EXPORT_TEMPLATE.is_file(), "private engineering export source required")
-    def test_allowlisted_export_excludes_private_history_and_injects_license(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            license_file = root / "selected-license.txt"
-            license_file.write_text("Synthetic test license.\n", encoding="utf-8")
-            output = root / "export"
-            receipt = self.exporter.prepare_export(
-                output=output,
-                source_commit=self.head,
-                repository_url="https://github.com/example/agent-memory-sidecar",
-                license_expression="LicenseRef-Synthetic-Test",
-                license_file=license_file,
-                require_clean=False,
-            )
-            self.assertEqual("public_repository_commit_required", receipt["status"])
-            self.assertEqual(self.head, receipt["source_commit"])
-            self.assertTrue((output / "AGENTS.md").is_file())
-            self.assertEqual(
-                "* text=auto eol=lf",
-                (output / ".gitattributes").read_text(encoding="utf-8").splitlines()[-1],
-            )
-            self.assertTrue((output / "LICENSE").is_file())
-            self.assertTrue((output / "specs" / "public-authority-cutover-v1.md").is_file())
-            self.assertTrue((output / "docs" / "decisions" / "0073-public-engineering-authority-cutover.zh.md").is_file())
-            self.assertFalse((output / "docs/codex-desktop-hook-runtime-repro.md").exists())
-            self.assertFalse((output / "specs/portable-global-instruction-source-v1.md").exists())
-            pyproject = (output / "pyproject.toml").read_text(encoding="utf-8")
-            self.assertIn('license = "LicenseRef-Synthetic-Test"', pyproject)
-            self.assertIn('license-files = ["LICENSE"]', pyproject)
-            readme = (output / "README.md").read_text(encoding="utf-8")
-            self.assertNotIn("No open-source license has been selected yet", readme)
-            self.assertIn("root `LICENSE` and `pyproject.toml` SPDX metadata", readme)
-            agents = (output / "AGENTS.md").read_text(encoding="utf-8")
-            self.assertNotRegex(agents, r"[A-Za-z]:[\\/]")
-            for path in output.rglob("*"):
-                if path.is_file():
-                    self.assertNotIn(b"\r", path.read_bytes(), path.as_posix())
-            self.exporter.scan_private_content(output)
-
-    def test_public_text_normalization_is_checkout_independent(self) -> None:
-        self.assertEqual(
-            b"first\nsecond\nthird\n",
-            self.exporter.normalize_public_text(
-                b"first\r\nsecond\rthird\n",
-                label="fixture.txt",
-            ),
-        )
-        with self.assertRaisesRegex(self.exporter.ExportError, "public_export_binary_forbidden:fixture.bin"):
-            self.exporter.normalize_public_text(b"prefix\x00suffix", label="fixture.bin")
-        with self.assertRaisesRegex(self.exporter.ExportError, "public_export_binary_forbidden:fixture.bin"):
-            self.exporter.normalize_public_text(b"prefix\xffsuffix", label="fixture.bin")
-
-    def test_recursive_allowlist_is_independent_of_trailing_double_star_glob(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            nested = root / "nested"
-            (nested / "child").mkdir(parents=True)
-            (nested / "child" / "file.txt").write_text("selected", encoding="utf-8")
-            (root / "template.txt").write_text("mapped", encoding="utf-8")
-            specs = root / "specs"
-            specs.mkdir()
-            (specs / "public-export-allowlist-v1.json").write_text(
-                json.dumps(
-                    {
-                        "contract_version": "public_export_allowlist_v1",
-                        "copy": ["nested/**"],
-                        "map": {"template.txt": "mapped.txt"},
-                    }
-                ),
-                encoding="utf-8",
-            )
-            with mock.patch.object(Path, "glob", return_value=iter((nested,))):
-                selected = self.exporter.resolve_files(root)
-            self.assertEqual(
-                {"nested/child/file.txt", "mapped.txt"},
-                {path.as_posix() for path in selected.values()},
-            )
-            (specs / "public-export-allowlist-v1.json").write_text(
-                json.dumps(
-                    {
-                        "contract_version": "public_export_allowlist_v1",
-                        "copy": ["nested/**/file.txt"],
-                        "map": {"template.txt": "mapped.txt"},
-                    }
-                ),
-                encoding="utf-8",
-            )
-            with self.assertRaisesRegex(
-                self.exporter.ExportError,
-                "public_export_allowlist_invalid",
-            ):
-                self.exporter.resolve_files(root)
-
-    def test_export_rejects_binary_private_literals_hardlinks_and_private_url_case(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            binary = root / "binary.txt"
-            binary.write_bytes(b"safe\x00secret")
-            with self.assertRaisesRegex(self.exporter.ExportError, "public_export_binary_forbidden"):
-                self.exporter.scan_private_content(root)
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            text = root / "text.txt"
-            text.write_text("private-marker", encoding="utf-8")
-            with self.assertRaisesRegex(self.exporter.ExportError, "private_literal"):
-                self.exporter.scan_private_content(root, deny_literals=("private-marker",))
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            first = root / "first.txt"
-            second = root / "second.txt"
-            first.write_text("safe", encoding="utf-8")
-            try:
-                second.hardlink_to(first)
-            except OSError as exc:
-                self.skipTest(f"hard links unavailable: {exc}")
-            with self.assertRaisesRegex(self.exporter.ExportError, "public_export_file_unsafe"):
-                self.exporter.scan_private_content(root)
+    def test_release_archive_rejects_directory_symlink_alias(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             physical = root / "physical"
             physical.mkdir()
             (physical / "outside.txt").write_text("outside", encoding="utf-8")
-            alias = root / "alias"
-            try:
-                alias.symlink_to(physical, target_is_directory=True)
-            except OSError as exc:
-                self.skipTest(f"directory symbolic links unavailable: {exc}")
-            with self.assertRaisesRegex(self.exporter.ExportError, "public_export_alias_forbidden"):
-                self.exporter._assert_physical(root, alias / "outside.txt", regular_file=True)
             safe = root / "safe"
             safe.mkdir()
             (safe / "inside.txt").write_text("inside", encoding="utf-8")
             nested_alias = safe / "nested-alias"
-            nested_alias.symlink_to(physical, target_is_directory=True)
-            with self.assertRaisesRegex(self.exporter.ExportError, "public_export_alias_forbidden"):
-                self.exporter.scan_private_content(safe)
+            try:
+                nested_alias.symlink_to(physical, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"directory symbolic links unavailable: {exc}")
             with self.assertRaisesRegex(self.release.ReleaseError, "release_alias_forbidden"):
                 self.release._archive_files([safe], root)
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            license_file = root / "license.txt"
-            license_file.write_text("Synthetic test license.\n", encoding="utf-8")
-            current_url = tomllib.loads(
-                (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-            )["project"]["urls"]["Homepage"]
-            case_variant = current_url.replace("https://github.com/", "https://GITHUB.COM/")
-            with self.assertRaisesRegex(self.exporter.ExportError, "public_export_repository_url_invalid"):
-                self.exporter.prepare_export(
-                    output=root / "export",
-                    source_commit=self.head,
-                    repository_url=case_variant,
-                    license_expression="MIT",
-                    license_file=license_file,
-                    require_clean=False,
-                )
-
-    def test_export_requires_real_license_file_and_new_output(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            with self.assertRaisesRegex(
-                self.exporter.ExportError,
-                "public_export_license_missing",
-            ):
-                self.exporter.prepare_export(
-                    output=root / "export",
-                    source_commit=self.head,
-                    repository_url="https://github.com/example/agent-memory-sidecar",
-                    license_expression="MIT",
-                    license_file=root / "missing",
-                    require_clean=False,
-                )
 
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
@@ -222,18 +63,8 @@ class PublicDistributionTests(unittest.TestCase):
             {"core": "0.6.16", "plugin": "1.11.12", "bootstrap": "2.5.14", "scout": "5.19.11"},
             facts,
         )
-        allowlist = json.loads(
-            (ROOT / "specs/public-export-allowlist-v1.json").read_text(encoding="utf-8")
-        )
-        self.assertNotIn("AGENTS.md", allowlist["copy"])
-        self.assertEqual("AGENTS.md", allowlist["map"]["templates/public/AGENTS.md"])
-        self.assertIn("scripts/publish_release.py", allowlist["copy"])
-        self.assertIn("specs/release-promotion-v1.md", allowlist["copy"])
-        self.assertIn("specs/workstation-reconcile-v2.md", allowlist["copy"])
-        self.assertIn("docs/decisions/0077-deterministic-release-promotion.zh.md", allowlist["copy"])
-        self.assertIn("docs/decisions/0078-workstation-reconcile-v2-observed-state.zh.md", allowlist["copy"])
-        self.assertIn("docs/decisions/0080-consumer-visible-skill-scope-reconciliation.zh.md", allowlist["copy"])
-        self.assertIn("docs/sops/workstation-reconcile.zh.md", allowlist["copy"])
+        self.assertFalse((ROOT / "scripts" / "build_public_export.py").exists())
+        self.assertFalse((ROOT / "specs" / "public-export-allowlist-v1.json").exists())
 
     def test_repo_and_plugin_anchor_are_byte_identical(self) -> None:
         repo_anchor = ROOT / ".agents" / "skills" / "agent-memory-bootstrap-anchor"
@@ -272,22 +103,13 @@ class PublicDistributionTests(unittest.TestCase):
         self.assertIn("Historical archives can", agents)
         self.assertIn("real Codex Desktop new-task check", agents)
 
-    @unittest.skipUnless(PRIVATE_EXPORT_TEMPLATE.is_file(), "private engineering export source required")
     def test_public_active_marker_requires_tracked_ancestral_release(self) -> None:
         repository_url = "https://github.com/example/agent-memory-sidecar"
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            license_file = root / "selected-license.txt"
-            license_file.write_text("Synthetic test license.\n", encoding="utf-8")
             public_root = root / "public"
-            receipt = self.exporter.prepare_export(
-                output=public_root,
-                source_commit=self.head,
-                repository_url=repository_url,
-                license_expression="LicenseRef-Synthetic-Test",
-                license_file=license_file,
-                require_clean=False,
-            )
+            public_root.mkdir()
+            (public_root / "README.md").write_text("# Synthetic public repo\n", encoding="utf-8")
             commands = (
                 ["git", "init", "-b", "main"],
                 ["git", "config", "user.name", "Public Authority Test"],
@@ -307,11 +129,11 @@ class PublicDistributionTests(unittest.TestCase):
                 "contract_version": "agent_memory_public_authority_v1",
                 "status": "public_active",
                 "repository": repository_url,
-                "engineering_source_commit": receipt["source_commit"],
+                "engineering_source_commit": "a" * 40,
                 "initial_public_release": {
                     "ref": "v0.3.0",
                     "commit": initial_commit,
-                    "snapshot_sha256": receipt["source_snapshot_sha256"],
+                    "snapshot_sha256": "b" * 64,
                 },
                 "activated_at": "2026-08-14T00:00:00Z",
             }
@@ -535,41 +357,18 @@ class PublicDistributionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             public_root = root / "public"
-            if PRIVATE_EXPORT_TEMPLATE.is_file():
-                repository_url = "https://github.com/example/agent-memory-sidecar"
-                expected_authority_epoch = "private_engineering"
-                license_file = root / "selected-license.txt"
-                license_file.write_text("Synthetic test license.\n", encoding="utf-8")
-                receipt = self.exporter.prepare_export(
-                    output=public_root,
-                    source_commit=self.head,
-                    repository_url=repository_url,
-                    license_expression="LicenseRef-Synthetic-Test",
-                    license_file=license_file,
-                    require_clean=False,
-                )
-                commands = (
-                    ["git", "init", "-b", "main"],
-                    ["git", "config", "user.name", "Public Lane Test"],
-                    ["git", "config", "user.email", "public-lane@example.invalid"],
-                    ["git", "add", "."],
-                    ["git", "commit", "-m", "Synthetic public snapshot"],
-                    ["git", "remote", "add", "origin", repository_url + ".git"],
-                    ["git", "tag", source_ref],
-                )
-            else:
-                repository_url = project["urls"]["Homepage"]
-                expected_authority_epoch = "public_active"
-                subprocess.run(
-                    ["git", "clone", "--no-hardlinks", str(ROOT), str(public_root)],
-                    check=True,
-                    capture_output=True,
-                )
-                receipt = None
-                commands = (
-                    ["git", "remote", "set-url", "origin", repository_url + ".git"],
-                    ["git", "tag", "--force", source_ref],
-                )
+            repository_url = project["urls"]["Homepage"]
+            expected_authority_epoch = "public_active"
+            subprocess.run(
+                ["git", "clone", "--no-hardlinks", str(ROOT), str(public_root)],
+                check=True,
+                capture_output=True,
+            )
+            receipt = None
+            commands = (
+                ["git", "remote", "set-url", "origin", repository_url + ".git"],
+                ["git", "tag", "--force", source_ref],
+            )
             for command in commands:
                 subprocess.run(command, cwd=public_root, check=True, capture_output=True)
 

@@ -7,12 +7,10 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 from .codex_integration import doctor, setup, store_path
-from .core_cutover import apply_core_cutover, preview_core_cutover
 from .database import CoreDatabase
 from .errors import CoreError
 from .file_security import logical_absolute
 from .identity import resolve_identity
-from .instruction_sync import synchronize, unenroll_antigravity, unenroll_claude
 from .proposal import RuleBundle, RuleProposal
 from .rule_service import RuleService
 from .rule_preview import preview_bundle, preview_rule
@@ -415,6 +413,8 @@ def cmd_proposal_discard(args: argparse.Namespace) -> _OperationResult:
 
 
 def cmd_instruction_sync(args: argparse.Namespace) -> dict[str, Any]:
+    from .instruction_sync import synchronize, unenroll_antigravity, unenroll_claude
+
     if args.unenroll_claude and args.unenroll_antigravity:
         raise CoreError("invalid_request", "Cannot combine Claude and Antigravity exit options")
     if args.unenroll_claude:
@@ -457,6 +457,8 @@ def cmd_doctor(args: argparse.Namespace) -> _OperationResult:
 
 
 def cmd_core_cutover(args: argparse.Namespace) -> _OperationResult:
+    from .core_cutover import apply_core_cutover, preview_core_cutover
+
     target = _store(args)
     if args.apply:
         if not args.plan_hash or not args.approval_ref:

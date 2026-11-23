@@ -863,14 +863,14 @@ def validate_project(value: Any) -> dict[str, Any]:
     for field in ("project_key", "run_id", "task_id"):
         require_string(obj[field], f"$.{field}")
     validate_project_identity(obj["project_identity"], "$.project_identity")
-    if obj["evidence_window"]["kind"] == "rolling_72h":
+    window = require_object(obj["evidence_window"], "$.evidence_window")
+    require_exact_keys(window, {"kind", "start", "end"}, "$.evidence_window")
+    require(not native or window.get('kind') != 'rolling_72h', 'native-session candidate is interactive only')
+    require(window["kind"] in ({'current'} if inspect else {"manual_30d", "rolling_72h"}), "$.evidence_window.kind invalid")
+    if window["kind"] == "rolling_72h":
         require(obj["project_identity"]["identity_kind"] == "content", "Scheduled v5 run requires content identity")
         require(obj["project_identity"]["git_worktree_eligible"], "Scheduled v5 run requires isolated worktree eligibility")
         require(obj["project_identity"]["binding_status"] != "ambiguous", "Scheduled v5 run rejects ambiguous binding")
-    window = require_object(obj["evidence_window"], "$.evidence_window")
-    require(not native or window.get('kind') != 'rolling_72h', 'native-session candidate is interactive only')
-    require_exact_keys(window, {"kind", "start", "end"}, "$.evidence_window")
-    require(window["kind"] in ({'current'} if inspect else {"manual_30d", "rolling_72h"}), "$.evidence_window.kind invalid")
     start = validate_iso(window["start"], "$.evidence_window.start")
     end = validate_iso(window["end"], "$.evidence_window.end")
     require(start <= end, "$.evidence_window start exceeds end")

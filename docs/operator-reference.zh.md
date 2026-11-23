@@ -136,7 +136,7 @@ Hook 命令只引用 immutable artifact，不引用 editable checkout。遇到 l
 - 已有受管 Sidecar identity 不同时，普通 `sync-sources` 必须继续失败。统一入口只展示一次短计划并取得一次确认，
   再以 fresh `plan_hash` 原子 apply；公开 manifest 不携带 Owner 时，仅在既有 clean checkout 与 Core binding
   root/commit 精确一致时保留私有 Owner，解绑不是隐含动作。
-- `build_public_export.py` 只保留为首个公开 seed 的 provenance 工具；`public_active` 后不得再次从冻结私有工程导出。
+- 首个公开 seed 导出脚本 `build_public_export.py` 及 `public-export-allowlist-v1.json` 已在 `public_active` 切主完成后退役移除（历史溯源由 Git 历史与 `PUBLIC_AUTHORITY.json` 保留）。
   后续 `build_release_artifacts.py` 只从公开 commit 和精确指向该 commit 的 `v<Core>` tag 生成 Core wheel/sdist、portable
   bundle、SBOM、source manifest、checksums 和 release manifest。
 - `public_artifact_verified` 不等于 public repository、Release、PyPI 或新任务采用；外部发布仍需独立授权和远端复读。
