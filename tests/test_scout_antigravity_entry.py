@@ -241,6 +241,39 @@ class AntigravityEntryTests(unittest.TestCase):
         )
         self.assertEqual(second['capture']['status'], 'reused')
 
+        # Coinciding app_data_dir == project_root must still reject writing inside project_root/brain/<session-id>.
+        coincide_session_dir = self.project / 'brain' / 'session-coincide'
+        (coincide_session_dir / '.system_generated' / 'logs').mkdir(parents=True)
+        (coincide_session_dir / '.system_generated' / 'logs' / 'transcript.jsonl').write_text(
+            json.dumps({'type': 'user', 'content': 'hello'}) + '\n', encoding='utf-8',
+        )
+        with self.assertRaises(ContractError):
+            invoke_antigravity(
+                operation='capture',
+                session_id='session-coincide',
+                project_root=str(self.project),
+                app_data_dir=str(self.project),
+                artifact_dir=str(coincide_session_dir),
+                cwd=str(self.project),
+            )
+
+        # A Git repo without HEAD must fail before writing any capture files to a valid output directory.
+        empty_repo = self.root / 'empty-git-repo'
+        empty_repo.mkdir()
+        subprocess.run(['git', 'init'], cwd=empty_repo, check=True, capture_output=True)
+        clean_out = self.root / 'clean-out-no-head'
+        clean_out.mkdir()
+        with self.assertRaises(ContractError):
+            invoke_antigravity(
+                operation='capture',
+                session_id=session_id,
+                project_root=str(empty_repo),
+                app_data_dir=str(self.app_data),
+                artifact_dir=str(clean_out),
+                cwd=str(empty_repo),
+            )
+        self.assertEqual([], list(clean_out.iterdir()))
+
 
 if __name__ == '__main__':
     unittest.main()

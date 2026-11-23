@@ -561,17 +561,23 @@ class ScoutProjectMapTests(unittest.TestCase):
         import scout
         from render_review import render_conversation_brief
 
-        # 1. Causal first-answer: mutating edge kind and factual claim changes chat brief text.
+        # 1. Causal first-answer: mutating claim layer/environment alone (same statement text) changes chat brief text.
         base_pack = layered_pack()
         mutated_pack = copy.deepcopy(base_pack)
         edge = mutated_pack['project_result']['project_map']['edges'][0]
-        edge['kind'] = 'depends_on'
-        edge['claims'][0]['statement'] = '只有核对完最新状态后，下游才会放行。'
+        edge['claims'][0]['layer'] = 'inference'
+        edge['claims'][0]['environment'] = '远端 macOS'
         mutated_pack['review_pack_hash'] = v.review_pack_hash(mutated_pack)
         brief_a = render_conversation_brief(base_pack)
         brief_b = render_conversation_brief(mutated_pack)
         self.assertNotEqual(brief_a, brief_b)
-        self.assertIn('只有核对完最新状态后，下游才会放行。', brief_b)
+        self.assertIn('[推断 · 远端 macOS]', brief_b)
+        self.assertIn('[设计规定 ·', brief_a)
+
+        # 1b. Malformed {"project_result": None} fails cleanly with ContractError instead of AttributeError.
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(v.ContractError):
+                d.prepare_delivery({'project_result': None}, artifact_dir=Path(tmp), protected_roots=[SCRIPTS])
 
         # 2. Single render_visual() invocation during prepare_delivery under Delivery v2.
         orig_render = project_map.render_visual

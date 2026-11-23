@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic identity, validation, installation, and rendering for Bootstrap 2.6.1."""
+"""Deterministic identity, validation, installation, and rendering for Bootstrap 2.6.2."""
 
 from __future__ import annotations
 
@@ -33,8 +33,8 @@ from bootstrap_security import (
 
 PACK_VERSION = "global_owner_scout_enrollment_pack_v1"
 PROFILE_VERSION = "global_owner_scout_host_profile_v1"
-BOOTSTRAP_VERSION = "2.6.1"
-SCOUT_VERSION = "5.20.1"
+BOOTSTRAP_VERSION = "2.6.2"
+SCOUT_VERSION = "5.20.2"
 PACK_FIELDS = {
     "contract_version", "status", "display_locale", "bootstrap_version", "generated_at",
     "portable_layer", "discovery", "projects", "recommended_project_refs",

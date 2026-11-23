@@ -2,7 +2,7 @@
 
 - The north star is cross-session key memory continuity: high-value event -> one explicit user confirmation -> approved scoped
   revision -> later-task behavior change -> revoke.
-- Read `docs/specs/axioms.md`, then `docs/specs/topology.md`, then `docs/specs/interface.md` before high-impact design or workflow changes.
+- Read `docs/specs/axioms.md`, then `docs/specs/topology.md`, then `docs/specs/interface.md`, and check [`COMPATIBILITY.md`](COMPATIBILITY.md) (Anti-Snowball Freeze Gate & 4-host L3 ADR Gate) before high-impact design or workflow changes.
 - Treat natural project continuation and ordinary Git requests as ordinary project work. Do not invoke Agent Memory governance,
   readiness, trace, or lifecycle machinery solely because the current directory is this repository.
 - Keep `AGENTS.md` as the only must-apply behavior owner; Hooks, Store, Git, Memories, tests, and release manifests are not substitutes.
@@ -17,4 +17,4 @@
 - For session-facing changes, validate affected behavior in an isolated environment. A real Codex Desktop new-task check requires a
   user-requested run and stays within that run's scope; engineering validation never authorizes changes to the user's Global Owner.
   Report later user experience and adoption as unverified until observed, without blocking technical delivery on them.
-- Verify with `PYTHONPATH=src python -m unittest discover`, `python scripts/check_doc_links.py`, and `git diff --check`.
+- Verify with `PYTHONPATH=src python -B -m unittest discover`, `python -B scripts/check_doc_links.py`, and `git diff --check`.

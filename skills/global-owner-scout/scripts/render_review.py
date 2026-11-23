@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a validated Global Owner Scout 5.20.1 Review Pack as deterministic Chinese Markdown."""
+"""Render a validated Global Owner Scout 5.20.2 Review Pack as deterministic Chinese Markdown."""
 
 from __future__ import annotations
 
@@ -72,7 +72,7 @@ def render_conversation_brief(pack: dict[str, Any]) -> str:
     project = pack['project_result']
     overview = []
     if m := project.get('project_map'):
-        from project_map import RELATIONS
+        from project_map import LAYERS, RELATIONS
         overview = ['**工程全貌：' + m['title'] + '**', m['goal'], '范围：' + m['boundary']]
         if m['journeys']:
             j = m['journeys'][0]
@@ -86,8 +86,16 @@ def render_conversation_brief(pack: dict[str, Any]) -> str:
                 detail = edge['label']
                 if rel and rel not in detail:
                     detail = f"{rel}：{detail}"
-                claim_hint = edge['claims'][0]['statement'] if edge.get('claims') else ''
-                step_desc = f"{detail}；{claim_hint}" if claim_hint and claim_hint != edge['label'] else detail
+                claim = edge['claims'][0] if edge.get('claims') else None
+                if claim:
+                    layer_label = LAYERS.get(claim['layer'], claim['layer'])
+                    env_label = claim.get('environment', '')
+                    qualifier = f"{layer_label} · {env_label}" if env_label else layer_label
+                    statement = claim['statement']
+                    claim_text = f"[{qualifier}] {statement}"
+                    step_desc = f"{detail}；{claim_text}"
+                else:
+                    step_desc = detail
                 handoffs.append(f"{nodes[edge['source']]} → {nodes[edge['target']]}（{step_desc}）")
             overview.extend([
                 j['label'] + '：' + ' → '.join(chain) + '。' + j['outcome'],

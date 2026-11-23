@@ -4,7 +4,7 @@
 - Owner layer: project_docs
 - Applies when: 定位 Agent Memory Core v1 的当前规范、操作文档、实现契约或历史理由。
 - Avoid when: 小范围源码查找即可回答。
-- Last verified: 2026-11-16
+- Last verified: 2026-11-24
 - Evidence: [L1](specs/axioms.md)、[L2](specs/topology.md)、[L3](specs/interface.md)、[ADR 0057](decisions/0057-agent-memory-core-v1.zh.md)、[ADR 0058](decisions/0058-persistent-runtime-journal.zh.md)、[ADR 0059](decisions/0059-bounded-behavior-set-evolution.zh.md)、[ADR 0070](decisions/0070-atomic-review-pack-rule-bundles.zh.md)、[ADR 0072](decisions/0072-allowlisted-public-distribution-lane.zh.md)、[ADR 0073](decisions/0073-public-engineering-authority-cutover.zh.md)、[ADR 0074](decisions/0074-public-operations-closure.zh.md)、[ADR 0075](decisions/0075-unified-workstation-reconcile.zh.md)、[ADR 0076](decisions/0076-task-scoped-review-pack-delivery.zh.md)、[ADR 0077](decisions/0077-deterministic-release-promotion.zh.md)、[ADR 0078](decisions/0078-workstation-reconcile-v2-observed-state.zh.md)、[ADR 0083](decisions/0083-multihost-capability-ladder.zh.md)
 
 ## 当前 Core v1 权威路径
@@ -12,7 +12,8 @@
 按以下顺序阅读：
 
 1. [`AGENTS.md`](../AGENTS.md)：仓库内 Agent 的高影响设计与实现边界。
-2. [`specs/axioms.md`](specs/axioms.md)：L1 产品目标、公理、证据与非目标。
+2. [`COMPATIBILITY.md`](../COMPATIBILITY.md)：当前版本兼容矩阵、4 条核心旅程的 Anti-Snowball Freeze Gate 与 4 宿主 L3 ADR 门禁。
+3. [`specs/axioms.md`](specs/axioms.md)：L1 产品目标、公理、证据与非目标。
 3. [`specs/topology.md`](specs/topology.md)：L2 owner、数据流、Store、scope 与 Desktop 边界。
 4. [`specs/interface.md`](specs/interface.md)：L3 七字段、CLI、状态、失败与迁移契约。
 5. [`domain.md`](../domain.md)：当前统一语言。
@@ -41,7 +42,7 @@
     [`ADR 0078`](decisions/0078-workstation-reconcile-v2-observed-state.zh.md) 与
     [`工作站调和 SOP`](sops/workstation-reconcile.zh.md)：统一期望身份、真实分发读回、补偿事务与同任务消费者范围检查。
 20. [`ADR 0081`](decisions/0081-capacity-preflight-and-owner-delivery.zh.md)：单条与整块完整容量预演、正式 Owner 路由交付及预算复审。
-21. [`ADR 0083`](decisions/0083-multihost-capability-ladder.zh.md)：Codex / Pi / Claude Code 三阶多宿主能力阶梯与 L3 宿主确认 ADR 门禁。
+21. [`ADR 0083`](decisions/0083-multihost-capability-ladder.zh.md)：Codex / Pi / Claude Code / Antigravity 四宿主三阶能力阶梯与 L3 宿主确认 ADR 门禁。
 
 Global Owner Scout 的确认交接还必须读取 [`ADR 0070`](decisions/0070-atomic-review-pack-rule-bundles.zh.md)：用户可以
 精确多选，同一 target 以一个原子规则包提交；逐卡只是批次大小为一的兼容形式。

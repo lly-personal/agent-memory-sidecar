@@ -1023,3 +1023,41 @@ class CliAndPackageTests(unittest.TestCase):
                 missing_err = next(e for e in report["errors"] if e["code"] == "hook_interpreter_missing")
                 self.assertEqual(missing_python, missing_err["interpreter"])
                 self.assertIn("reconcile", missing_err["remediation"].lower())
+
+                # Unrelated hook entry mentioning "runtime-hook" before Sidecar's hook must never be selected or executed,
+                # and a tampered Sidecar hook pointing to an existing binary must never be executed when identity mismatches.
+                decoy_exe = root / "decoy-hook.exe"
+                decoy_exe.write_bytes(b"not-a-real-binary")
+                tampered = json.loads(hooks_path.read_text(encoding="utf-8"))
+                tampered["hooks"]["UserPromptSubmit"].insert(
+                    0,
+                    {
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": f'"{decoy_exe}" /unrelated.py runtime-hook',
+                                "commandWindows": f'"{decoy_exe}" /unrelated.py runtime-hook',
+                            }
+                        ]
+                    },
+                )
+                for group in tampered["hooks"]["UserPromptSubmit"][1:]:
+                    for entry in group.get("hooks", []):
+                        for key in ("commandWindows", "command"):
+                            if key in entry and isinstance(entry[key], str):
+                                entry[key] = entry[key].replace(missing_python, str(decoy_exe))
+                hooks_path.write_text(json.dumps(tampered, indent=2), encoding="utf-8")
+                orig_run = subprocess.run
+                seen_probed: list[str] = []
+
+                def guarded_run(cmd, *args, **kwargs):
+                    if isinstance(cmd, (list, tuple)) and cmd and str(cmd[0]) == str(decoy_exe):
+                        seen_probed.append(str(cmd[0]))
+                        raise AssertionError("doctor must not execute untrusted hook binaries")
+                    return orig_run(cmd, *args, **kwargs)
+
+                with patch("agent_memory_sidecar.codex_integration.subprocess.run", side_effect=guarded_run):
+                    tampered_report = doctor(identity=identity)
+                self.assertEqual([], seen_probed)
+                self.assertEqual("error", tampered_report["status"])
+                self.assertIn("hook_identity_mismatch", [e["code"] for e in tampered_report["errors"]])

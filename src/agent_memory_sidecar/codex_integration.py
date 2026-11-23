@@ -388,10 +388,18 @@ def doctor(*, identity: ProjectIdentity) -> dict[str, Any]:
                     "message": "runtime command does not match the bound identity",
                 }
             )
-        hook_interp = _recorded_hook_interpreter(current_hooks)
+        hook_interp = _recorded_hook_interpreter(
+            current_hooks,
+            artifact_path=runtime.artifact_path,
+        )
         if hook_interp is not None:
-            interp_ok = False
-            if Path(hook_interp).is_file():
+            hook_identity_ok = (
+                current_sidecar_sha == expected_sidecar_sha
+                and current_sidecar_sha == runtime.hook_config_sha256
+            )
+            interp_exists = bool(hook_interp) and Path(hook_interp).is_file()
+            interp_ok = interp_exists
+            if interp_exists and hook_identity_ok:
                 try:
                     probe = subprocess.run(
                         [hook_interp, "--version"],
@@ -719,12 +727,17 @@ def _git_identity(root: Path) -> tuple[str | None, bool]:
     return (value or None), not status.stdout.decode("utf-8", errors="replace").strip()
 
 
-def _recorded_hook_interpreter(hooks_document: dict[str, Any] | None) -> str | None:
+def _recorded_hook_interpreter(
+    hooks_document: dict[str, Any] | None,
+    *,
+    artifact_path: Path | str,
+) -> str | None:
     if not isinstance(hooks_document, dict):
         return None
     hooks = hooks_document.get("hooks")
     if not isinstance(hooks, dict):
         return None
+    expected_artifact = Path(artifact_path).resolve(strict=False)
     field = "commandWindows" if os.name == "nt" else "command"
     for event_name in ("UserPromptSubmit", "SessionStart"):
         entries = hooks.get(event_name)
@@ -745,13 +758,18 @@ def _recorded_hook_interpreter(hooks_document: dict[str, Any] | None) -> str | N
                 try:
                     tokens = shlex.split(raw, posix=(os.name != "nt"))
                 except ValueError:
-                    return ""
-                if not tokens:
-                    return ""
-                exe = tokens[0]
-                if os.name == "nt" and len(exe) >= 2 and exe[0] == exe[-1] == '"':
-                    exe = exe[1:-1]
-                return exe
+                    continue
+                if len(tokens) < 3:
+                    continue
+                cleaned = [
+                    tok[1:-1] if (os.name == "nt" and len(tok) >= 2 and tok[0] == tok[-1] == '"') else tok
+                    for tok in tokens[:3]
+                ]
+                if cleaned[2] != "runtime-hook":
+                    continue
+                if Path(cleaned[1]).resolve(strict=False) != expected_artifact:
+                    continue
+                return cleaned[0]
     return None
 
 

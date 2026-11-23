@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate Global Owner Scout 5.20.1 project results and Review Packs."""
+"""Validate Global Owner Scout 5.20.2 project results and Review Packs."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ if _SCRIPT_DIR not in sys.path:
 from utf8_stdio import configure_utf8_stdio
 
 
-SKILL_VERSION = "5.20.1"
+SKILL_VERSION = "5.20.2"
 PROJECT_CONTRACT = "global_owner_scout_project_v7"
 NATIVE_PROJECT_CONTRACT = "global_owner_scout_project_v8"
 MAP_PROJECT_CONTRACT = "global_owner_scout_project_v6"
@@ -1305,7 +1305,7 @@ def load_stdin_json() -> Any:
 
 def main() -> int:
     configure_utf8_stdio()
-    parser = argparse.ArgumentParser(description="Validate Global Owner Scout 5.20.1 JSON contracts from stdin.")
+    parser = argparse.ArgumentParser(description="Validate Global Owner Scout 5.20.2 JSON contracts from stdin.")
     parser.add_argument("--mode", choices=("project_scout", "review_pack"))
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--hash-project-card", action="store_true")

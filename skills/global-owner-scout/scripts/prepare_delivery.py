@@ -310,18 +310,18 @@ def artifact_manifest(data: bytes, artifact_name: str) -> dict[str, Any]:
 
 def prepare_delivery(pack: dict[str, Any], *, artifact_dir: Path, protected_roots: Iterable[Path], visual_input: Path | None = None) -> tuple[dict[str, Any], Path]:
     output_root = validate_output_root(artifact_dir, protected_roots)
+    validated = validate_review_pack(pack)
     visual_text = None
     if visual_input is not None:
         require(visual_input.is_absolute() and visual_input.parent.resolve(strict=True) == output_root,
                 "visual-input must be a direct child of artifact-dir")
         visual_text = safe_artifact_bytes(visual_input).decode('utf-8')
         require(bool(visual_text.strip()), "visual-input must not be empty")
-        require(pack['project_result'].get('project_map') is not None, "visual-input requires bound project context")
-    if visual_text is None and pack.get('project_result', {}).get('project_map') is not None:
+        require(validated['project_result'].get('project_map') is not None, "visual-input requires bound project context")
+    if visual_text is None and validated['project_result'].get('project_map') is not None:
         from project_map import map_context, render_visual
-        validated = validate_review_pack(pack)
         visual_text = render_visual(map_context(validated), validated['review_pack_hash'])
-    rendered = render_review_pack(pack, surface="interactive", visual=visual_text)
+    rendered = render_review_pack(validated, surface="interactive", visual=visual_text)
     rendered_bytes = rendered.encode("utf-8")
     visible = verify_visible_output(rendered, surface="interactive")
     artifact_name = f"global-owner-scout-review-pack-{visible['review_pack_hash'][:16]}.md"

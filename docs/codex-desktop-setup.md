@@ -1,8 +1,8 @@
 # Codex Desktop Setup — Agent Memory Core v1
 
-- Status: active
+- Status: historical snapshot (superseded for current install versions & four-host commands by [`README.md`](../README.md) and [`COMPATIBILITY.md`](../COMPATIBILITY.md))
 - Owner layer: project_docs
-- Last verified: 2026-08-22
+- Last verified: 2026-08-22 (archived version examples below; use the current release ref in [`README.md`](../README.md))
 - Evidence: [Core v1 contract](../specs/agent-memory-core-v1.md)、[Public distribution v1](../specs/public-distribution-v1.md)、[Workstation Reconcile v2](../specs/workstation-reconcile-v2.md)
 
 ## Released consumer path
