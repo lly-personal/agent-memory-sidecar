@@ -952,6 +952,22 @@ class CliAndPackageTests(unittest.TestCase):
                 skill_package_sha256(),
             )
 
+    def test_install_skill_preserves_parent_inherited_acls_on_windows(self) -> None:
+        if os.name != "nt":
+            self.skipTest("Windows inherited ACL verification only applies on Windows")
+        with tempfile.TemporaryDirectory() as directory:
+            skills_root = Path(directory) / "skills"
+            skills_root.mkdir()
+            # Reset skills_root to inherit cleanly from its parent (unlike TemporaryDirectory's mkdtemp root)
+            subprocess.run(["icacls", str(skills_root), "/reset"], check=True, capture_output=True)
+            installed = install_skill(root=skills_root)
+            acl = subprocess.run(
+                ["icacls", str(installed.path)],
+                check=True, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            ).stdout
+            self.assertIn("(I)", acl)
+            self.assertNotIn("OWNER RIGHTS:(OI)(CI)(F)", acl)
+
     def test_skill_install_rejects_ancestor_directory_alias(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
