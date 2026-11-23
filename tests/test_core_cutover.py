@@ -111,6 +111,7 @@ class CoreCutoverTests(unittest.TestCase):
             with (
                 patch.dict(os.environ, {"CODEX_HOME": str(codex)}),
                 patch("agent_memory_sidecar.skill.default_user_skill_root", return_value=root / "skills"),
+                patch("agent_memory_sidecar.codex_integration.legacy_shared_skill_root", return_value=root / "legacy-skills"),
             ):
                 result = apply_core_cutover(
                     store_path=store,

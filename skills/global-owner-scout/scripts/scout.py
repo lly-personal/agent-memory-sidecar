@@ -254,20 +254,40 @@ def inspect_native_context(value: Any, project_root: Path | None = None) -> dict
 def _write_exclusive_json(path: Path, payload: bytes, *, artifact_dir: Path, protected_roots: list[Path]) -> Path:
     out_root = validate_output_root(artifact_dir, protected_roots)
     require(path.is_absolute(), "--output-file must be absolute")
+    name = path.name
+    require(bool(name) and name not in {".", ".."} and Path(name).name == name, "--output-file name is invalid")
     try:
         parent = path.parent.resolve(strict=True)
     except OSError as exc:
         raise ContractError(f"output parent unavailable: {exc}") from exc
     require(parent == out_root, "--output-file must be a direct child of --artifact-dir")
-    require(not path.exists() and not path.is_symlink(), "--output-file already exists")
+    target = out_root / name
+    require(not target.exists() and not target.is_symlink(), "--output-file already exists")
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_BINARY"):
         flags |= os.O_BINARY
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     fd: int | None = None
+    dir_fd: int | None = None
     try:
-        fd = os.open(path, flags, 0o600)
+        if os.open in getattr(os, "supports_dir_fd", set()) and hasattr(os, "O_DIRECTORY"):
+            dir_flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
+            dir_fd = os.open(out_root, dir_flags)
+            dir_stat = os.fstat(dir_fd)
+            root_stat = out_root.lstat()
+            require(
+                dir_stat.st_dev == root_stat.st_dev and dir_stat.st_ino == root_stat.st_ino,
+                "output directory changed during validation",
+            )
+            fd = os.open(name, flags, 0o600, dir_fd=dir_fd)
+        else:
+            require(not out_root.is_symlink() and out_root.resolve(strict=True) == out_root, "output directory changed")
+            fd = os.open(target, flags, 0o600)
+            if target.parent.resolve(strict=True) != out_root:
+                os.close(fd)
+                fd = None
+                raise ContractError("output directory changed during creation")
         with os.fdopen(fd, "wb", closefd=True) as stream:
             fd = None
             stream.write(payload)
@@ -277,7 +297,10 @@ def _write_exclusive_json(path: Path, payload: bytes, *, artifact_dir: Path, pro
         if fd is not None:
             os.close(fd)
         raise ContractError(f"output file creation failed: {exc}") from exc
-    return path
+    finally:
+        if dir_fd is not None:
+            os.close(dir_fd)
+    return target
 
 
 def seal_project_payload(value: Any) -> dict[str, Any]:

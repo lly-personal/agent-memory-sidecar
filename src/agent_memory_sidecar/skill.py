@@ -105,11 +105,30 @@ def looks_like_sidecar_skill(path: Path) -> bool:
         return False
 
 
-def remove_legacy_skill(path: Path) -> SkillSnapshot:
+def stage_legacy_skill_removal(path: Path) -> SkillSnapshot:
     logical = logical_absolute(path)
-    snapshot = snapshot_skill(root=logical.parent)
-    if _physical_skill_directory_exists(logical):
-        shutil.rmtree(logical)
+    _assert_skill_directory_chain(logical.parent, allow_missing_tail=False)
+    if not _physical_skill_directory_exists(logical):
+        backup_root = Path(
+            tempfile.mkdtemp(
+                prefix=f".{SKILL_NAME}.legacy-migration.",
+                dir=logical.parent,
+            )
+        )
+        return SkillSnapshot(logical, False, backup_root, backup_root / SKILL_NAME)
+    backup_root = Path(
+        tempfile.mkdtemp(
+            prefix=f".{SKILL_NAME}.legacy-migration.",
+            dir=logical.parent,
+        )
+    )
+    backup_path = backup_root / SKILL_NAME
+    snapshot = SkillSnapshot(logical, True, backup_root, backup_path)
+    try:
+        os.replace(logical, backup_path)
+    except BaseException:
+        discard_skill_snapshot(snapshot)
+        raise
     return snapshot
 
 

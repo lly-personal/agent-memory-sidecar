@@ -134,7 +134,7 @@
 #__SCOUT_ROOT__ .table th{font-weight:600;color:var(--at-muted);background:var(--at-surface-subtle)}
 #__SCOUT_ROOT__ .table tr:last-child td{border-bottom:none}
 #__SCOUT_ROOT__ .at-network{position:relative;margin:var(--at-space) 0;padding:.4em;border:1px solid var(--at-border);border-radius:12px;background:var(--at-surface);isolation:isolate}
-#__SCOUT_ROOT__ .at-network-grid{position:relative;z-index:2;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13.5em),1fr));gap:2.6em 2.2em;padding:1.8em 1.4em}
+#__SCOUT_ROOT__ .at-network-grid{position:relative;z-index:2;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13.5em),1fr));gap:2.6em 2.2em;padding:1.9em 1.75em}
 #__SCOUT_ROOT__ .at-network-node{min-width:0;display:grid;align-content:start;justify-items:start;gap:.35em;padding:.75em .9em;border:1px solid var(--at-border-strong);border-radius:10px;background:var(--at-surface-subtle)}
 #__SCOUT_ROOT__ .at-network svg{position:absolute;inset:0;z-index:1;width:100%;height:100%;overflow:visible;pointer-events:none;color:var(--at-muted)}
 #__SCOUT_ROOT__ .at-network path{stroke:currentColor;stroke-opacity:.7;stroke-width:1.5;fill:none}
@@ -244,60 +244,72 @@ function drawGraph(){
  const marker=root.id+'-arrow';
  svg.setAttribute('viewBox',`0 0 ${bounds.width} ${bounds.height}`);
  const groups=graphData(node(state.node)).groups.filter(g=>g.from!==g.to);
- const blocksH=(fromId,toId,xMin,xMax,yMid)=>{
+ const allRects=[...rects.values()];
+ const minLeft=allRects.length?Math.min(...allRects.map(c=>c.l)):24;
+ const maxRight=allRects.length?Math.max(...allRects.map(c=>c.r)):bounds.width-24;
+ const rowSpan=(r)=>{
+  const cy=(r.t+r.b)/2;
+  const peers=allRects.filter(c=>Math.abs((c.t+c.b)/2-cy)<Math.max(c.h,r.h)*0.55);
+  return {t:Math.min(...peers.map(c=>c.t)),b:Math.max(...peers.map(c=>c.b))};
+ };
+ const segHits=(c,x1,y1,x2,y2)=>{
+  const xMin=Math.min(x1,x2),xMax=Math.max(x1,x2),yMin=Math.min(y1,y2),yMax=Math.max(y1,y2);
+  return c.r>xMin-2&&c.l<xMax+2&&c.b>yMin-2&&c.t<yMax+2;
+ };
+ const pathClear=(fromId,toId,pts)=>{
   for(const [id,c] of rects.entries()){
    if(id===fromId||id===toId)continue;
-   if(c.r>xMin+2&&c.l<xMax-2&&c.b>yMid-14&&c.t<yMid+14)return true;
+   for(let i=0;i<pts.length-1;i++)if(segHits(c,pts[i][0],pts[i][1],pts[i+1][0],pts[i+1][1]))return false;
   }
-  return false;
+  return true;
  };
- const blocksV=(fromId,toId,yMin,yMax,xMid)=>{
-  for(const [id,c] of rects.entries()){
-   if(id===fromId||id===toId)continue;
-   if(c.b>yMin+2&&c.t<yMax-2&&c.r>xMid-14&&c.l<xMid+14)return true;
-  }
-  return false;
- };
+ const toPath=(pts)=>pts.map((p,i)=>`${i?'L':'M'} ${p[0]} ${p[1]}`).join(' ');
+ const clampX=(r,x)=>Math.max(r.l+10,Math.min(r.r-10,x));
  let paths='';
  for(const [index,g] of groups.entries()){
   const a=rects.get(g.from),b=rects.get(g.to);if(!a||!b)continue;
   const acx=(a.l+a.r)/2,acy=(a.t+a.b)/2,bcx=(b.l+b.r)/2,bcy=(b.t+b.b)/2;
   const jitter=((index%5)-2)*4;
-  const laneLift=10+((index%5)*5);
-  let d='';
+  const ax=clampX(a,acx+jitter),bx=clampX(b,bcx+jitter);
+  const laneLift=9+((index%4)*4);
+  const gutterStep=7+((index%3)*4);
+  const ra=rowSpan(a),rb=rowSpan(b);
+  let pts;
   if(Math.abs(acy-bcy)<Math.max(a.h,b.h)*0.55){
-   const yLine=(acy+bcy)/2+jitter;
-   if(a.r<=b.l-4&&!blocksH(g.from,g.to,a.r,b.l,yLine)){
-    const mx=(a.r+b.l)/2+jitter*0.4;
-    d=`M ${a.r} ${acy+jitter} L ${mx} ${acy+jitter} L ${mx} ${bcy+jitter} L ${b.l-2} ${bcy+jitter}`;
-   }else if(b.r<=a.l-4&&!blocksH(g.from,g.to,b.r,a.l,yLine)){
-    const mx=(b.r+a.l)/2+jitter*0.4;
-    d=`M ${a.l} ${acy+jitter} L ${mx} ${acy+jitter} L ${mx} ${bcy+jitter} L ${b.r+2} ${bcy+jitter}`;
-   }else{
-    const lift=Math.max(4,Math.min(a.t,b.t)-laneLift);
-    d=`M ${acx+jitter} ${a.t} L ${acx+jitter} ${lift} L ${bcx+jitter} ${lift} L ${bcx+jitter} ${b.t-2}`;
+   const ay=acy+jitter,by=bcy+jitter;
+   const rightDirect=a.r<=b.l-4?[[a.r,ay],[(a.r+b.l)/2+jitter*0.4,ay],[(a.r+b.l)/2+jitter*0.4,by],[b.l-2,by]]:null;
+   const leftDirect=b.r<=a.l-4?[[a.l,ay],[(b.r+a.l)/2+jitter*0.4,ay],[(b.r+a.l)/2+jitter*0.4,by],[b.r+2,by]]:null;
+   if(rightDirect&&pathClear(g.from,g.to,rightDirect))pts=rightDirect;
+   else if(leftDirect&&pathClear(g.from,g.to,leftDirect))pts=leftDirect;
+   else{
+    const lift=Math.max(4,Math.min(ra.t,rb.t)-laneLift);
+    pts=[[ax,a.t],[ax,lift],[bx,lift],[bx,b.t-2]];
    }
   }else if(a.b<=b.t-4){
-   if(!blocksV(g.from,g.to,a.b,b.t,(acx+bcx)/2)){
-    const my=(a.b+b.t)/2+jitter*0.5;
-    d=`M ${acx+jitter} ${a.b} L ${acx+jitter} ${my} L ${bcx+jitter} ${my} L ${bcx+jitter} ${b.t-2}`;
-   }else{
-    const outer=bounds.width-6-((index%4)*5);
-    d=`M ${a.r} ${acy+jitter} L ${outer} ${acy+jitter} L ${outer} ${bcy+jitter} L ${b.r+2} ${bcy+jitter}`;
+   const my=(ra.b+rb.t)/2+jitter*0.4;
+   const direct=[[ax,a.b],[ax,my],[bx,my],[bx,b.t-2]];
+   if(pathClear(g.from,g.to,direct))pts=direct;
+   else{
+    const y1=ra.b+gutterStep;
+    const y2=Math.max(y1+4,rb.t-gutterStep);
+    const outerR=Math.min(bounds.width-4,maxRight+8+((index%3)*4));
+    pts=[[ax,a.b],[ax,y1],[outerR,y1],[outerR,y2],[bx,y2],[bx,b.t-2]];
    }
   }else if(b.b<=a.t-4){
-   if(!blocksV(g.from,g.to,b.b,a.t,(acx+bcx)/2)){
-    const my=(b.b+a.t)/2+jitter*0.5;
-    d=`M ${acx+jitter} ${a.t} L ${acx+jitter} ${my} L ${bcx+jitter} ${my} L ${bcx+jitter} ${b.b+2}`;
-   }else{
-    const outer=6+((index%4)*5);
-    d=`M ${a.l} ${acy+jitter} L ${outer} ${acy+jitter} L ${outer} ${bcy+jitter} L ${b.l-2} ${bcy+jitter}`;
+   const my=(rb.b+ra.t)/2+jitter*0.4;
+   const direct=[[ax,a.t],[ax,my],[bx,my],[bx,b.b+2]];
+   if(pathClear(g.from,g.to,direct))pts=direct;
+   else{
+    const y1=Math.max(4,ra.t-gutterStep);
+    const y2=Math.min(y1-4,rb.b+gutterStep);
+    const outerL=Math.max(4,minLeft-8-((index%3)*4));
+    pts=[[ax,a.t],[ax,y1],[outerL,y1],[outerL,y2],[bx,y2],[bx,b.b+2]];
    }
   }else{
-   const lift=Math.max(4,Math.min(a.t,b.t)-laneLift);
-   d=`M ${acx} ${a.t} L ${acx} ${lift} L ${bcx} ${lift} L ${bcx} ${b.t-2}`;
+   const lift=Math.max(4,Math.min(ra.t,rb.t)-laneLift);
+   pts=[[ax,a.t],[ax,lift],[bx,lift],[bx,b.t-2]];
   }
-  paths+=`<path data-graph-link="${esc(g.type)}" d="${d}" marker-end="url(#${marker})"><title>${esc(node(g.from).title+' → '+node(g.to).title+'：'+g.kind)}</title></path>`;
+  paths+=`<path data-graph-link="${esc(g.type)}" d="${toPath(pts)}" marker-end="url(#${marker})"><title>${esc(node(g.from).title+' → '+node(g.to).title+'：'+g.kind)}</title></path>`;
  }
  svg.innerHTML=`<defs><marker id="${marker}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M 0 0 L 7 3.5 L 0 7 Z"/></marker></defs>`+paths;
 }

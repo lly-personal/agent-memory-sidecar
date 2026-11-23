@@ -41,20 +41,16 @@ from .skill import (
     legacy_shared_skill_root,
     looks_like_sidecar_skill,
     plan_skill_install,
-    remove_legacy_skill,
     restore_skill,
     skill_tree_sha256,
     snapshot_skill,
+    stage_legacy_skill_removal,
 )
 
 
 def codex_home() -> Path:
     configured = os.environ.get("CODEX_HOME")
     return logical_absolute(configured if configured else Path.home() / ".codex")
-
-
-def _default_codex_home_active() -> bool:
-    return codex_home() == logical_absolute(Path.home() / ".codex")
 
 
 def store_path() -> Path:
@@ -217,20 +213,19 @@ def setup(
             _write_hooks(desired_hook_bytes)
         skill_snapshot = snapshot_skill(root=skill_plan.path.parent)
         installed_skill = install_skill()
-        if _default_codex_home_active():
-            legacy_path = legacy_shared_skill_root() / SKILL_NAME
-            prev_row = (registry_snapshot or {}).get("runtime_installation")
-            prev_sha = (
-                str(prev_row.get("skill_sha256", "")).removeprefix("sha256:")
-                if isinstance(prev_row, dict) and prev_row.get("skill_sha256")
-                else None
-            )
-            if (
-                legacy_path != skill_plan.path
-                and prev_sha
-                and skill_tree_sha256(legacy_path) == prev_sha
-            ):
-                legacy_skill_snapshot = remove_legacy_skill(legacy_path)
+        legacy_path = legacy_shared_skill_root() / SKILL_NAME
+        prev_row = (registry_snapshot or {}).get("runtime_installation")
+        prev_sha = (
+            str(prev_row.get("skill_sha256", "")).removeprefix("sha256:")
+            if isinstance(prev_row, dict) and prev_row.get("skill_sha256")
+            else None
+        )
+        if (
+            legacy_path != skill_plan.path
+            and prev_sha
+            and skill_tree_sha256(legacy_path) == prev_sha
+        ):
+            legacy_skill_snapshot = stage_legacy_skill_removal(legacy_path)
         source_commit, source_clean = _git_identity(_package_root())
         with CoreDatabase(target_store) as db:
             registry = InstallationRegistry(db)
@@ -423,13 +418,12 @@ def doctor(*, identity: ProjectIdentity) -> dict[str, Any]:
                     "code": "skill_cli_unavailable",
                     "message": "installed Skill command cannot run from the current project without source injection",
                 })
-        if _default_codex_home_active():
-            legacy_skill = legacy_shared_skill_root() / SKILL_NAME
-            if legacy_skill != plan_skill_install().path and looks_like_sidecar_skill(legacy_skill):
-                errors.append({
-                    "code": "legacy_shared_skill_present",
-                    "message": "legacy Codex-only agent-memory Skill remains in shared ~/.agents/skills; migrate via setup --apply or remove the stale copy",
-                })
+        legacy_skill = legacy_shared_skill_root() / SKILL_NAME
+        if legacy_skill != plan_skill_install().path and looks_like_sidecar_skill(legacy_skill):
+            errors.append({
+                "code": "legacy_shared_skill_present",
+                "message": "legacy Codex-only agent-memory Skill remains in shared ~/.agents/skills; migrate via setup --apply or remove the stale copy",
+            })
     global_report: dict[str, Any] | None = None
     if binding is not None:
         source = binding.source_file
