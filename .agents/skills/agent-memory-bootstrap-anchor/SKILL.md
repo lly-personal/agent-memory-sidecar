@@ -1,6 +1,6 @@
 ---
 name: agent-memory-bootstrap-anchor
-description: Synchronize global instructions across enrolled local Codex, Pi and Claude Code, or restore Agent Memory workstation capability, from a verified immutable release when the user says “同步并部署本机 Agent Memory”. Use for explicit synchronization, cold start or migration; not ordinary project work.
+description: Synchronize global instructions across enrolled local Codex, Pi, Claude Code and Antigravity, or restore Agent Memory workstation capability, from a verified immutable release when the user says “同步并部署本机 Agent Memory”. Use for explicit synchronization, cold start or migration; not ordinary project work.
 ---
 
 # Agent Memory Bootstrap Anchor
@@ -9,29 +9,29 @@ This is a cold-start distribution anchor, not the Bootstrap implementation and n
 
 When the user says `同步并部署本机 Agent Memory`:
 
-Choose the requested operation, not the current host alone. Global-standard synchronization on Codex, Pi or Claude Code uses the
+Choose the requested operation, not the current host alone. Global-standard synchronization on Codex, Pi, Claude Code or Antigravity uses the
 instruction lane below; full Codex capability installation/migration uses the existing workstation lane. An established Owner
-with a request to synchronize standards defaults to the instruction lane. Do not install Codex Hooks or Scout to satisfy a Pi
+with a request to synchronize standards defaults to the instruction lane. Do not install Codex Hooks or Scout to satisfy a Pi, Claude Code or Antigravity
 instruction request. Both lanes first complete step 1's immutable Release resolution.
 
-## Instruction lane: Codex, Pi and Claude Code
+## Instruction lane: Codex, Pi, Claude Code and Antigravity
 
 After step 1, run `python -B <portable_root>/.agents/skills/agent-memory-workstation-bootstrap/scripts/sync_instructions.py
 --portable-root <portable_root>` to preview the verified wheel's `instructions sync` operation. Do not use an ambient installed
 Core or bypass missing release support with source-checkout scripts. The implementation resolves saved target/source bindings;
-for first enrollment, pass `--codex-home` / `--pi-agent-dir` / `--claude-home` only from observed host configuration, and `--source` from the existing
+for first enrollment, pass `--codex-home` / `--pi-agent-dir` / `--claude-home` / `--antigravity-home` only from observed host configuration, and `--source` from the existing
 canonical Owner binding or an explicitly selected private source checkout. Never guess a repository or overwrite an ambiguous
 home. First-time source selection is a one-time user choice, not a recurring path-entry requirement.
 
-Claude Code is never enrolled from directory presence. Its first persistent enrollment and user-level `CLAUDE.md` change require the
-separate authorization applicable to that host. Check actual Claude engine/session loading and project instructions independently;
-do not claim Scout, Hooks, plugin installation, or adoption from the projected file. Review the old-runtime rollback boundary in
+Claude Code and Antigravity are never enrolled from directory presence. Their first persistent enrollment and user-level rule file changes (`CLAUDE.md` or Antigravity two-file `rules/01-global-charter.md` + `02-confirmed-rules.md`, hard `<= 24,000` bytes each) require the
+separate authorization applicable to that host. Check actual host engine/session loading and project instructions independently;
+do not claim Scout, Hooks, plugin installation, or adoption from the projected files. Review the old-runtime rollback boundary in
 `specs/global-instruction-sync-v1.md` before enrollment.
 
-For an explicitly requested Claude exit before runtime downgrade, use this same verified portable entry with
-`--unenroll-claude` instead of source or other-host options. Preview, obtain the applicable approval for removing the exact managed
+For an explicitly requested Claude or Antigravity exit before runtime downgrade, use this same verified portable entry with
+`--unenroll-claude` or `--unenroll-antigravity` instead of source or other-host options. Preview, obtain the applicable approval for removing the exact managed
 projection, then apply only its fresh plan hash. Stop if the verified release lacks this flag; never fall back to checkout scripts
-or edit saved state. Require `unenrolled` and fresh target/binding readback before running an older Codex/Pi-only release. Preserve
+or edit saved state. Require `unenrolled` and fresh target/binding readback before running an older release. Preserve
 committed-cleanup and recovery blockers; a current session may still retain previously loaded instructions.
 
 The preview covers all enrolled local hosts. If successful, repeat with `--apply --plan-hash <returned-plan-hash>`; the user's

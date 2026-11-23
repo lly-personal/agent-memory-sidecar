@@ -539,17 +539,9 @@ def render_pack(value: Any) -> str:
     lines = [
         "# Agent Memory 本机部署结果",
         "",
-        f"> **{status}**。本次没有创建或恢复 Scheduled Task，也没有修改任何项目 Owner。",
+        f"**{status}**（Core `{desired['core_version']}` · Release `{desired['release_ref']}`）。",
         "",
-        "| 能力层 | 结果 | 说明 |",
-        "|---|---|---|",
-        f"| 期望发行身份 | Core `{desired['core_version']}` / Plugin `{desired['plugin_version']}` | Release `{desired['release_ref']}` / `{desired['source_commit'][:12]}` |",
-        f"| Plugin 分发 | Marketplace `{distribution['marketplace']['status']}` / Plugin `{distribution['plugin']['status']}` | Ref `{distribution['plugin']['ref']}` / enabled `{str(distribution['plugin']['enabled']).lower()}` |",
-        f"| 能力源同步 | Sidecar `{sources['sidecar']['status']}` / Global Owner `{sources['canonical_owner']['status']}` | 只更新本机受管缓存，不清理活跃工程 |",
-        f"| 主机物化 | Core `{material['core']['status']}` / Doctor `{material['doctor']}` / Scout `{material['scout_skill']['status']}` | Doctor 包含安装后的命令入口；Bootstrap {material['bootstrap_skill']['version']}；Scout {material['scout_skill']['version']} |",
-        f"| 项目消费者范围 | `{scope['status']}` | Desktop 项目 {scope['desktop_project_count']}；已读 {scope['scanned_project_count']}；同名 Skill {scope['matching_skill_count']} |",
-        f"| 消费者入口条件 | 入口检查 `{activation['interactive_entry']}` | `verified` 仅表示安装与项目范围检查通过；Scheduled `{activation['scheduled']}` |",
-        "| Scout 实际运行 | 本次未运行 | 本次未验证 Scout 运行验收，不判断其他运行的验收结果 |",
+        "本次没有创建或恢复 Scheduled Task，也没有修改任何项目 Owner。",
     ]
     attention = [project for project in scope["projects"] if project["status"] != "exact"]
     if attention:
@@ -562,23 +554,37 @@ def render_pack(value: Any) -> str:
                 lines.append(
                     f"| {display_name} | `{skill['name']}@{skill['scope']} enabled={str(skill['enabled']).lower()}` | `{skill['version']}` | `{skill['relation']}` |"
                 )
-    if pack["limitations"]:
-        lines.extend(["", "## 尚未证明", ""])
-        lines.extend(f"> {item}" for item in pack["limitations"])
     next_step = {
         "reload_required": "本次安装交付到此完成。若本次已要求验收，Agent 继续在同一主机、同一聊天完成只读消费者检查，无需重复请求。未要求时到此结束；仅在能力未显示或宿主明确要求时提示刷新。",
         "ready": "已完成所请求的安装与项目范围检查。实际使用继续沿用目标工程的现有入口，无需另建验收聊天。",
         "consumer_scope_drift": "下一步：Agent 根据已授权范围处理重复启用或内容不符的来源；可复用原生按路径停用，不能自动覆盖 checkout 或重新启用已停用项。",
         "consumer_scope_bounded": "下一步：恢复完整 Desktop 项目枚举与只读访问后，继续你已请求的只读消费者检查；无需重复部署。",
-        "distribution_reconcile_blocked": "下一步：处理上表显示的 Plugin/Marketplace 唯一阻断后，再发送“同步并部署本机 Agent Memory”。",
+        "distribution_reconcile_blocked": "下一步：处理明细中显示的 Plugin/Marketplace 唯一阻断后，再发送“同步并部署本机 Agent Memory”。",
         "source_sync_blocked": "下一步：恢复期望来源的只读访问或消除来源歧义后，再发送“同步并部署本机 Agent Memory”。",
         "host_materialization_blocked": "下一步：保留当前失败现场并重试同一句部署入口；不得手工跳过 Core、Doctor 或 Skill 步骤。",
     }[pack["status"]]
+    lines.extend(["", next_step])
+    if pack["limitations"]:
+        lines.extend(["", "## 尚未证明", ""])
+        lines.extend(f"- {item}" for item in pack["limitations"])
     lines.extend([
         "",
-        next_step,
+        "<details>",
+        "<summary>查看版本与安装明细</summary>",
+        "",
+        "| 能力层 | 结果 | 说明 |",
+        "|---|---|---|",
+        f"| 期望发行身份 | Core `{desired['core_version']}` / Plugin `{desired['plugin_version']}` | Release `{desired['release_ref']}` / `{desired['source_commit'][:12]}` |",
+        f"| Plugin 分发 | Marketplace `{distribution['marketplace']['status']}` / Plugin `{distribution['plugin']['status']}` | Ref `{distribution['plugin']['ref']}` / enabled `{str(distribution['plugin']['enabled']).lower()}` |",
+        f"| 能力源同步 | Sidecar `{sources['sidecar']['status']}` / Global Owner `{sources['canonical_owner']['status']}` | 只更新本机受管缓存，不清理活跃工程 |",
+        f"| 主机物化 | Core `{material['core']['status']}` / Doctor `{material['doctor']}` / Scout `{material['scout_skill']['status']}` | Doctor 包含安装后的命令入口；Bootstrap {material['bootstrap_skill']['version']}；Scout {material['scout_skill']['version']} |",
+        f"| 项目消费者范围 | `{scope['status']}` | Desktop 项目 {scope['desktop_project_count']}；已读 {scope['scanned_project_count']}；同名 Skill {scope['matching_skill_count']} |",
+        f"| 消费者入口条件 | 入口检查 `{activation['interactive_entry']}` | `verified` 仅表示安装与项目范围检查通过；Scheduled `{activation['scheduled']}` |",
+        "| Scout 实际运行 | 本次未运行 | 本次未验证 Scout 运行验收，不判断其他运行的验收结果 |",
         "",
         f"校验回执：`{PACK_VERSION}`｜Pack `{pack['pack_hash'][:12]}`",
+        "",
+        "</details>",
     ])
     return "\n".join(lines) + "\n"
 

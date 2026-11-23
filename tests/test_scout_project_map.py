@@ -371,10 +371,21 @@ class ScoutProjectMapTests(unittest.TestCase):
             visual.write_text(fragment, encoding='utf-8')
             manifest, artifact = d.prepare_delivery(map_pack(), artifact_dir=root, protected_roots=[SCRIPTS], visual_input=visual)
             self.assertEqual(fragment, (root / manifest['visual_name']).read_text(encoding='utf-8'))
-            for text_only in (False, True):
+            default_receipt = d.render_delivery_receipt(manifest, artifact_path=artifact, artifact_root=root,
+                                                        outcome='not_requested')
+            self.assertNotIn('visualize', default_receipt)
+            for host, with_visual, text_only, expected_token in (
+                ('codex', True, False, True),
+                ('codex', True, True, False),
+                ('codex', False, False, False),
+                ('pi', True, False, False),
+                ('claude', True, False, False),
+                ('antigravity', True, False, False),
+            ):
                 receipt = d.render_delivery_receipt(manifest, artifact_path=artifact, artifact_root=root,
-                                                    outcome='not_requested', text_only=text_only)
-                self.assertEqual(not text_only, 'visualize' in receipt)
+                                                    outcome='not_requested', text_only=text_only,
+                                                    host=host, with_visual=with_visual)
+                self.assertEqual(expected_token, 'visualize' in receipt, (host, with_visual, text_only))
                 recovered = d.verify_final_receipt(receipt, artifact_root=root)
                 self.assertEqual('verified', recovered['visual_status'])
                 context = recovered['project_map_bundle']['context']

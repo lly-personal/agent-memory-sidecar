@@ -45,6 +45,7 @@ from agent_memory_sidecar.runtime_package import (
 from agent_memory_sidecar.skill import (
     CLI_COMMAND,
     build_skill_files,
+    default_user_skill_root,
     install_skill,
     installed_skill_sha256,
     skill_package_sha256,
@@ -828,21 +829,22 @@ class CliAndPackageTests(unittest.TestCase):
         self.assertIn("Commentary, capability delivery", skill)
         self.assertIn("do not silently exit after `rule list`", skill)
         self.assertIn(
-            "记忆检查：已完成｜结论：没有合格的可复用规则｜动作：未创建建议｜长期状态：未变更",
+            "本次核查未发现需要沉淀的新规则，未创建建议，现有规则未变更。",
             skill,
         )
         self.assertIn(
-            "记忆检查：已完成｜结论：当前规则已经覆盖｜动作：未创建建议｜长期状态：未变更",
+            "该要求已被当前规则覆盖，未创建建议，现有规则未变更。",
             skill,
         )
         self.assertIn(
-            "记忆检查：已完成｜结论：内容应归入{正式 owner}｜动作：未创建长期规则｜长期状态：未变更",
+            "该内容更适合留在{正式 owner}，未新增长期行为规则，现有规则未变更。",
             skill,
         )
         self.assertIn(
-            "记忆检查：执行失败｜结论：{已证明事实}｜动作：未保存｜长期状态：未变更",
+            "未保存：{已证明事实}，现有规则未变更。",
             skill,
         )
+        self.assertNotIn("记忆检查：", skill)
         self.assertLess(
             skill.index("agent-memory proposal create"),
             skill.index("**记忆建议**"),
@@ -850,12 +852,25 @@ class CliAndPackageTests(unittest.TestCase):
         self.assertIn("do not ask twice", skill)
         self.assertIn("Never substitute optional Memories", skill)
         self.assertIn("map every old obligation, trigger and exception", skill)
-        self.assertIn("正文已落地但必需入口未部署", skill)
+        self.assertIn("必需的行为入口尚未部署", skill)
         self.assertIn("A link without a mandatory trigger is insufficient", skill)
         self.assertNotIn(
             "For explicit remember, say it is already covered; otherwise remain silent",
             skill,
         )
+
+    def test_default_skill_root_uses_codex_home_and_daily_bundle_excludes_cutover_and_sync(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            codex = Path(directory) / "codex-home"
+            with patch.dict(os.environ, {"CODEX_HOME": str(codex)}):
+                self.assertEqual(codex / "skills", default_user_skill_root())
+            env_without_codex = {k: v for k, v in os.environ.items() if k != "CODEX_HOME"}
+            with patch.dict(os.environ, env_without_codex, clear=True):
+                self.assertEqual(Path.home() / ".codex" / "skills", default_user_skill_root())
+        files = build_skill_files()
+        self.assertNotIn("scripts/agent_memory_sidecar/core_cutover.py", files)
+        self.assertNotIn("scripts/agent_memory_sidecar/instruction_sync.py", files)
+        self.assertIn("scripts/agent_memory_sidecar/cli.py", files)
 
     def test_skill_install_recovers_an_interrupted_previous_swap(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

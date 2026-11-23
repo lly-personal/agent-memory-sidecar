@@ -55,60 +55,70 @@ TERMINAL_REASON_MAPPINGS = {
         "preflight",
         {"unverified"},
         "当前任务没有可验证的目标工程绑定。",
+        "请先切换到目标 Git 工程所在任务后重试，不要在未绑定工作区的空白会话里运行复盘。",
     ),
     "git_worktree_ineligible": (
         "interactive_entry_blocked",
         "preflight",
         {"unverified"},
         "当前目标不是可投影到隔离执行快照的 Git 工程。",
+        "请确认目标目录为有效 Git 仓库后再重新发起复盘。",
     ),
     "worktree_projection_unavailable": (
         "interactive_entry_blocked",
         "preflight",
         {"unchanged", "unverified"},
         "当前宿主无法把本次调用自动投影到隔离 worktree 任务。",
+        "请在当前目标工程的交互式会话中直接发起复盘，或在支持 worktree 的宿主上重试。",
     ),
     "execution_protocol_failed": (
         "failed",
         "session_census",
         {"unchanged", "unverified"},
         "复盘所需的证据获取、封存或执行流程未完成。本次复盘失败；具体原因以原生记录和未完成范围为准。",
+        "可先在当前工程用“看懂当前工程全貌”查看设计与源码结构，待会话读取恢复后再做历史复盘。",
     ),
     "read_only_violation": (
         "failed",
         "project_review",
         {"changed"},
         "复盘前后项目只读指纹不一致。",
+        "请检查目标仓库是否有并发修改或未清理产物，待工作区稳定后重新复盘。",
     ),
     "privacy_or_contract_failed": (
         "failed",
         "project_review",
         {"unchanged", "unverified"},
         "项目结果或 Review Pack 未通过隐私与契约校验。",
+        "请查看错误详情修正缺失字段或移除本地绝对路径后重新校验，不会改动项目或规则。",
     ),
     "output_preflight_unavailable": (
         "interactive_host_blocked",
         "preflight",
         {"unchanged", "unverified"},
         "深挖前输出根检查未通过，当前无法生成审阅文件。",
+        "请提供一个位于被审阅仓库之外的可写输出目录，然后重试复盘。",
     ),
     "output_root_unavailable": (
         "interactive_host_blocked",
         "delivery",
         {"unchanged", "unverified"},
         "当前任务的输出根目录不可用，当前无法生成审阅文件。",
+        "请确认外部输出目录仍存在且可写后重新交付，原有工程与规则未受影响。",
     ),
     "render_integrity_failed": (
         "render_integrity_failed",
         "delivery",
         {"unchanged", "unverified"},
         "Review Pack 渲染或字节守恒校验失败。",
+        "请重新生成并校验审阅包，本次不会写入任何规则。",
     ),
     "output_budget_exceeded": (
         "output_budget_exceeded",
         "project_review",
         {"unchanged", "unverified"},
         "完整 Review Pack 超出当前输出预算。",
+        "可缩小本次聚焦范围或分主题复盘，原有工程与规则保持不变。",
     ),
 }
 TERMINAL_STATUSES = {mapping[0] for mapping in TERMINAL_REASON_MAPPINGS.values()}
@@ -152,7 +162,7 @@ def validate_terminal_result(value: Any) -> dict[str, Any]:
     require(value["reason_code"] in TERMINAL_REASON_MAPPINGS, "terminal result reason_code is invalid")
     require(value["project_state"] in TERMINAL_PROJECT_STATES, "terminal result project_state is invalid")
     require(value["confirmation_eligible"] is False, "terminal result cannot enable confirmation")
-    expected_status, expected_phase, allowed_project_states, _ = TERMINAL_REASON_MAPPINGS[value["reason_code"]]
+    expected_status, expected_phase, allowed_project_states, _, _ = TERMINAL_REASON_MAPPINGS[value["reason_code"]]
     require(value["status"] == expected_status, "terminal result status does not match reason_code")
     require(value["phase"] == expected_phase, "terminal result phase does not match reason_code")
     require(value["project_state"] in allowed_project_states, "terminal result project_state does not match reason_code")
@@ -165,13 +175,17 @@ def terminal_result_sha256(value: dict[str, Any]) -> str:
 
 def render_terminal_receipt(value: dict[str, Any]) -> str:
     value = validate_terminal_result(value)
+    _, _, _, summary, recovery = TERMINAL_REASON_MAPPINGS[value["reason_code"]]
     return (
         "# Global Owner Scout · 未形成完整审阅包\n\n"
-        f"{TERMINAL_REASON_MAPPINGS[value['reason_code']][3]} 本次未展示部分卡片，确认入口保持关闭。\n\n"
+        f"{summary} 本次未展示部分卡片，确认入口保持关闭。\n\n"
+        f"**下一步建议**：{recovery}\n\n"
+        "<details>\n<summary>技术诊断详情</summary>\n\n"
         f"终态回执：`contract={TERMINAL_CONTRACT}`；`status={value['status']}`；"
         f"`phase={value['phase']}`；`reason_code={value['reason_code']}`；"
         f"`project_state={value['project_state']}`；`confirmation_eligible=false`；"
-        f"`terminal_result_sha256={terminal_result_sha256(value)}`。\n"
+        f"`terminal_result_sha256={terminal_result_sha256(value)}`。\n\n"
+        "</details>\n"
     )
 
 
@@ -371,34 +385,49 @@ def visual_result(manifest: dict[str, Any], root: Path) -> dict[str, Any]:
     return {"visual_status": "verified", "visual_path": markdown_path(path)}
 
 
-def render_delivery_receipt(manifest: dict[str, Any], *, artifact_path: Path, artifact_root: Path, outcome: str, text_only: bool = False) -> str:
+def render_delivery_receipt(
+    manifest: dict[str, Any],
+    *,
+    artifact_path: Path,
+    artifact_root: Path,
+    outcome: str,
+    text_only: bool = False,
+    host: str = "codex",
+    with_visual: bool = False,
+) -> str:
     manifest = validate_delivery_manifest(manifest)
     data = validate_manifest_artifact(manifest, artifact_path=artifact_path, artifact_root=artifact_root)
     require(outcome in SURFACE_COPY, "unknown file surface outcome")
+    require(host in {"codex", "pi", "claude", "antigravity"}, "unknown receipt host")
     body = data.decode("utf-8")
     brief = extract_conversation_brief(body)
+    has_recovery_bundle = bool(verify_visible_output(body, surface="interactive")["recovery_bundle"])
     if brief is None and outcome in {"open_succeeded", "open_queued"}:
         copy = OPENED_COPY if outcome == "open_succeeded" else QUEUED_COPY
-        eligible = outcome == "open_succeeded"
+        eligible = outcome == "open_succeeded" and has_recovery_bundle
         return (
             "# Global Owner Scout · 完整审阅包\n\n"
             f"[打开完整审阅包](<{markdown_path(artifact_path)}>)\n\n"
-            f"{copy}\n\n交付回执："
-            f"`delivery_manifest_sha256={manifest['delivery_manifest_sha256']}`；"
-            f"`surface_observation={outcome}`；`confirmation_eligible={str(eligible).lower()}`。\n"
+            f"{copy}\n\n"
+            "<details>\n<summary>技术校验信息</summary>\n\n"
+            f"交付回执：`delivery_manifest_sha256={manifest['delivery_manifest_sha256']}`；"
+            f"`surface_observation={outcome}`；`confirmation_eligible={str(eligible).lower()}`。\n\n"
+            "</details>\n"
         )
     if brief is None:
         brief = "原报告已校验。此历史文件没有首项摘要，可在当前对话依据原文件继续讨论；现有规则未改变。"
-    eligible = outcome == "open_succeeded" and bool(verify_visible_output(body, surface="interactive")["recovery_bundle"])
+    eligible = outcome == "open_succeeded" and has_recovery_bundle
     receipt = (
         "# Global Owner Scout · 复盘结论与建议\n\n"
         f"{brief}\n\n[完整依据](<{markdown_path(artifact_path)}>)\n\n"
-        f"{SURFACE_COPY[outcome]}\n\n交付回执："
-        f"`delivery_manifest_sha256={manifest['delivery_manifest_sha256']}`；"
-        f"`surface_observation={outcome}`；`confirmation_eligible={str(eligible).lower()}`。\n"
+        f"{SURFACE_COPY[outcome]}\n\n"
+        "<details>\n<summary>技术校验信息</summary>\n\n"
+        f"交付回执：`delivery_manifest_sha256={manifest['delivery_manifest_sha256']}`；"
+        f"`surface_observation={outcome}`；`confirmation_eligible={str(eligible).lower()}`。\n\n"
+        "</details>\n"
     )
     visual = visual_result(manifest, artifact_root)
-    if visual["visual_status"] == "verified" and not text_only:
+    if host == "codex" and with_visual and visual["visual_status"] == "verified" and not text_only:
         receipt += '\nvisualize' + json.dumps({"path": visual["visual_path"]}, ensure_ascii=False) + '\n'
     return receipt
 
@@ -416,9 +445,12 @@ def render_blocked_receipt(manifest: dict[str, Any]) -> str:
     return (
         "# Global Owner Scout · 交付阻断\n\n"
         "完整 Review Pack 已准备，但当前任务宿主未证明同任务可见表面；没有显示部分卡片，确认入口保持关闭。\n\n"
+        "**下一步建议**：请先在当前任务打开外部审阅文件，或以纯文本简报方式继续讨论，本次不会写入任何规则。\n\n"
+        "<details>\n<summary>技术诊断详情</summary>\n\n"
         f"交付失败：`status=interactive_host_blocked`；"
         f"`delivery_manifest_sha256={manifest['delivery_manifest_sha256']}`；"
-        "`surface_observation=open_failed`；`confirmation_eligible=false`。\n"
+        "`surface_observation=open_failed`；`confirmation_eligible=false`。\n\n"
+        "</details>\n"
     )
 
 
@@ -532,7 +564,7 @@ def run_self_test() -> None:
         assert "confirmation_eligible=false" in terminal_receipt
         tests += 1
 
-        for reason_code, (status, phase, project_states, _) in TERMINAL_REASON_MAPPINGS.items():
+        for reason_code, (status, phase, project_states, _, _) in TERMINAL_REASON_MAPPINGS.items():
             candidate = {
                 "contract_version": TERMINAL_CONTRACT,
                 "status": status,
@@ -569,6 +601,9 @@ def main() -> int:
     parser.add_argument("--artifact-dir", type=Path)
     parser.add_argument("--protected-root", action="append", type=Path, default=[])
     parser.add_argument("--render-receipt", choices=tuple(SURFACE_COPY))
+    parser.add_argument("--host", choices=("codex", "pi", "claude", "antigravity"), default="codex")
+    parser.add_argument("--with-visual", action="store_true")
+    parser.add_argument("--text-only", action="store_true")
     parser.add_argument("--render-terminal", action="store_true")
     parser.add_argument("--artifact-path", type=Path)
     parser.add_argument("--artifact-root", type=Path)
@@ -590,7 +625,8 @@ def main() -> int:
                 require(args.artifact_path is not None, "--artifact-path is required")
                 require(args.artifact_root is not None, "--artifact-root is required")
                 print(render_delivery_receipt(manifest, artifact_path=args.artifact_path, artifact_root=args.artifact_root,
-                                              outcome=args.render_receipt), end="")
+                                              outcome=args.render_receipt, text_only=args.text_only,
+                                              host=args.host, with_visual=args.with_visual), end="")
         else:
             require(args.artifact_dir is not None, "--artifact-dir is required")
             manifest, _ = prepare_delivery(load_stdin_json(), artifact_dir=args.artifact_dir, protected_roots=args.protected_root)

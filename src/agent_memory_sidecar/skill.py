@@ -20,6 +20,7 @@ from .file_security import (
 SKILL_NAME = "agent-memory"
 CLI_ENTRY = "scripts/agent-memory.py"
 CLI_COMMAND = '"<python>" -B "<skill-dir>/scripts/agent-memory.py"'
+DAILY_SKILL_EXCLUDED_MODULES = frozenset({"core_cutover.py", "instruction_sync.py"})
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,9 @@ class SkillSnapshot:
 
 
 def default_user_skill_root() -> Path:
-    return Path.home() / ".agents" / "skills"
+    configured = os.environ.get("CODEX_HOME")
+    codex_home = logical_absolute(configured if configured else Path.home() / ".codex")
+    return codex_home / "skills"
 
 
 def _assert_skill_directory_chain(path: Path, *, allow_missing_tail: bool) -> os.stat_result | None:
@@ -128,6 +131,7 @@ def build_skill_files() -> dict[str, str]:
         **{
             f"scripts/agent_memory_sidecar/{path.name}": path.read_text(encoding="utf-8")
             for path in sorted(Path(__file__).parent.glob("*.py"))
+            if path.name not in DAILY_SKILL_EXCLUDED_MODULES
         },
     }
 
@@ -351,14 +355,9 @@ Use one standalone command in the current primary project directory:
 
 Show at most one card, after create succeeds:
 
-> **记忆建议**
-> 规则：{action}
-> 适用：{trigger}
-> 不适用：{skip_boundary}
-> 范围：本项目 | 跨项目
-> 回复：**记住** / **修改：…** / **忽略**
->
-> 记忆检查：已完成｜结论：发现新的可复用规则｜动作：已创建确认建议｜长期状态：待确认
+> **记忆建议**（本项目 / 跨项目）
+> {action}（适用：{trigger}；不适用：{skip_boundary}）
+> 回复 **记住** / **修改：…** / **忽略**。当前尚未写入，现有规则未变更。
 
 ## Scout bundle handoff
 
@@ -388,21 +387,21 @@ On failure, preserve the completed task result and state only `未保存`, `未�
 
 ## Terminal outcomes
 
-The terminal artifact is the last user-facing Agent Memory block in the final reply. Use these exact four-part receipt lines; replace only braced user-readable summaries:
+The terminal artifact is the last user-facing Agent Memory block in the final reply. Keep ordinary work completely silent. When a visible flow runs, use one concise plain-Chinese outcome below (replace only braced user-readable summaries; never leak internal tokens, hashes, or raw JSON):
 
-- Explicit audit with no candidate: `记忆检查：已完成｜结论：没有合格的可复用规则｜动作：未创建建议｜长期状态：未变更`
-- Covered by actual authority: `记忆检查：已完成｜结论：当前规则已经覆盖｜动作：未创建建议｜长期状态：未变更`
-- Routing proposed but not implemented: `记忆检查：已完成｜结论：内容应归入{正式 owner}｜动作：未创建长期规则｜长期状态：未变更`
-- Owner content landed, mandatory entry still missing or failed: `记忆检查：交付未完成｜结论：正文已落地但必需入口未部署｜动作：已写入{正式 owner}｜长期状态：行为未部署`
-- Owner content landed with no mandatory behavior required: `记忆检查：已完成｜结论：正式正文已落地｜动作：已写入{正式 owner}｜长期状态：未新增行为规则`
-- Proposal created: use the confirmation card above, including its `待确认` receipt as the last line.
-- Explicit deploy or proposal confirmation succeeded: after the rule echo, `记忆检查：已完成｜结论：规则已部署｜动作：已写入{范围}规则｜长期状态：生效中`
-- Atomic Scout bundle succeeded: after echoing every selected `When / Do / Skip / scope`, `记忆检查：已完成｜结论：已原子部署{数量}条规则｜动作：选中规则已整包写入{范围}｜长期状态：生效中`
-- Clarification required: after the draft, `记忆检查：需要澄清｜结论：尚不能确定{待澄清内容}｜动作：未创建建议｜长期状态：未变更`
-- Proposal or classification failed: `记忆检查：执行失败｜结论：{已证明事实}｜动作：未保存｜长期状态：未变更`
-- Deploy, edit, consolidate, or revoke failed: `记忆检查：执行失败｜结论：{已证明事实}｜动作：未部署｜长期状态：未变更`
-- Committed mutation with incomplete cleanup: `记忆检查：清理待完成｜结论：规则操作已提交｜动作：待事务清理｜长期状态：{实际 target 读回状态，无法读回则未证明}`. This takes precedence over the generic failure receipt.
-- Adoption is not yet observed: `记忆检查：已完成｜结论：规则已部署但后续采用尚未观察｜动作：未证明行为采用｜长期状态：生效中`
+- Explicit audit with no candidate: `本次核查未发现需要沉淀的新规则，未创建建议，现有规则未变更。`
+- Covered by actual authority: `该要求已被当前规则覆盖，未创建建议，现有规则未变更。`
+- Routing proposed but not implemented: `该内容更适合留在{正式 owner}，未新增长期行为规则，现有规则未变更。`
+- Owner content landed, mandatory entry still missing or failed: `交付未完成：已写入{正式 owner}，但必需的行为入口尚未部署。`
+- Owner content landed with no mandatory behavior required: `已写入{正式 owner}，无需新增行为规则。`
+- Proposal created: show the confirmation card above (its final line explicitly states `当前尚未写入，现有规则未变更。`).
+- Explicit deploy or proposal confirmation succeeded: after echoing `When / Do / Skip / scope`, `已写入{范围}规则，当前生效中（后续新任务采用待观察；随时可说“查看/撤销规则”）。`
+- Atomic Scout bundle succeeded: after echoing every selected `When / Do / Skip / scope`, `已整包写入 {数量} 条{范围}规则，当前生效中（后续新任务采用待观察）。`
+- Revoke succeeded: `已从{范围}规则撤销（当前会话可能仍保留先前已加载的指令，新任务起生效）。`
+- Clarification required: after the draft, `需要确认：{待澄清内容}。当前未创建建议，现有规则未变更。`
+- Proposal or classification failed: `未保存：{已证明事实}，现有规则未变更。`
+- Deploy, edit, consolidate, or revoke failed: `未部署：{已证明事实}，现有规则未变更。`
+- Committed mutation with incomplete cleanup: `规则操作已提交，但事务清理待完成；当前目标状态：{实际 target 读回状态，无法读回则未证明}。` This takes precedence over the generic failure receipt.
 
-For routed mandatory behavior, use the deployed or adoption-unobserved outcome only after both Owner content and the mandatory entry are verified. For discard, edit, consolidate, and revoke, use the same four-part shape with the operation actually completed and the actual parsed target state. A no-op receipt proves only that the Agent surfaced a classification; it does not prove persistence, adoption, continuity, or product effect.
+For routed mandatory behavior, use the deployed outcome only after both Owner content and the mandatory entry are verified. A no-op outcome proves only that the Agent surfaced a classification; it does not prove persistence, adoption, continuity, or product effect.
 """

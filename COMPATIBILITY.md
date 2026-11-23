@@ -153,13 +153,24 @@ Scout 5.19.10 decouples cross-host environment variable sniffing from explicit `
 
 Scout 5.19.11 adds the read-only Antigravity L2 native lane (`scripts/antigravity_native.py`) with hardened transcript path-chain and session-scope verification alongside Core 0.6.16 (Antigravity L1 two-file `<= 24 KB` rule projection and `--unenroll-antigravity` exit rollback), Plugin 1.11.12, and Bootstrap 2.5.14. Active Project v7/v8, Review Pack v8/v9, and Delivery v2 contracts remain compatible; natural handoff and adoption remain separately observed.
 
+## Core User Journey Status (Anti-Snowball Freeze Gate)
+
+| Journey | Status | Last Real Evidence | Freeze Rule |
+|---|---|---|---|
+| 显式记住（Codex L3） | `UNVERIFIED_SINCE v0.5.4` | Isolated CLI/Hook pass (`v0.6.16`); natural Desktop UX pending | No new Core rule-write schema or host expansion while unverified `>= 2` releases |
+| 被动建议与确认（Codex L3） | `UNVERIFIED_SINCE v0.5.4` | Isolated CLI/Hook pass (`v0.6.16`); natural Desktop UX pending | No new proposal/confirmation schema while unverified `>= 2` releases |
+| 真实撤销与新任务生效（Codex L3） | `UNVERIFIED_SINCE v0.5.4` | Isolated CLI/Hook pass (`v0.6.16`); natural Desktop UX pending | Only bugfixes and burden reduction allowed until observed naturally |
+| Scout 首次阅读、视图与续接（L2） | `REJECTED` (repairing) | 2026-11-04 / 2026-11-23 user UX critique & browser render audit | Frozen for new `*_vN` contracts or new hosts until UX repairs are accepted in natural use |
+
+- **Freeze Policy**: Allowed states are strictly `VERIFIED_NATURAL`, `REJECTED`, and `UNVERIFIED_SINCE <ver>`. Whenever any journey is `REJECTED` or unverified across `>= 2` releases, new `*_vN` contracts and new host expansions on that surface are frozen (bugfixes and cognitive-burden reduction remain allowed) until natural use produces same-identity evidence. Never ask the user to perform artificial acceptance drills solely to unfreeze a row.
+
 ## Multi-Host Capability Ladder & L3 ADR Gate
 
-| Level | Capability | Codex | Pi | Claude Code |
-|---|---|---|---|---|
-| **Level 1** | On-demand global instruction sync (`instructions sync`) | Active (`~/.codex/AGENTS.md`) | Active (`AGENTS.md` + registry) | Active (explicit opt-in `~/.claude/CLAUDE.md` + registry) |
-| **Level 2** | Read-only Scout / engineering review | Active (Project v7 / Pack v8) | Candidate (Project v8 / Pack v9, `observed_only`) | Candidate (Project v8 / Pack v9, `observed_only`) |
-| **Level 3** | Rule approval & `AGENTS.md` mutation | Active (Core CLI + Hooks) | **Blocked pending ADR** | **Blocked pending ADR** |
+| Level | Capability | Codex | Pi | Claude Code | Antigravity |
+|---|---|---|---|---|---|
+| **Level 1** | On-demand global instruction sync (`instructions sync`) | Active (`~/.codex/AGENTS.md`) | Active (`AGENTS.md` + registry) | Active (explicit opt-in `~/.claude/CLAUDE.md` + registry) | Active (explicit opt-in two-file `rules/01-global-charter.md` + `02-confirmed-rules.md`, `<= 24 KB` each) |
+| **Level 2** | Read-only Scout / engineering review | Active (Project v7 / Pack v8) | Candidate (Project v8 / Pack v9, `observed_only`) | Candidate (Project v8 / Pack v9, `observed_only`) | Candidate (Project v8 / Pack v9, `observed_only`, current session) |
+| **Level 3** | Rule approval & `AGENTS.md` mutation | Active (Core CLI + Hooks; `$CODEX_HOME/skills/agent-memory`) | **Blocked pending ADR** | **Blocked pending ADR** | **Blocked pending ADR** |
 
-- **Mandatory ADR Gate before Level 3 for Pi / Claude Code**: No Pi/Claude rule-write path, proposal/confirm store, or confirmation Hook may be introduced until a new accepted ADR defines an unforgeable host-native confirmation primitive bound to runtime identity. Keyword/natural-language matching or model self-reporting is explicitly forbidden.
+- **Mandatory ADR Gate before Level 3 for Pi / Claude Code / Antigravity**: No non-Codex rule-write path, proposal/confirm store, or confirmation Hook may be introduced until a new accepted ADR defines an unforgeable host-native confirmation primitive bound to runtime identity. Keyword/natural-language matching or model self-reporting is explicitly forbidden.
 - **Scheduled Decoupling**: Scheduled automation remains `PAUSED / 0 of 14` and is decoupled from daily interactive Scout or Core acceptance.
