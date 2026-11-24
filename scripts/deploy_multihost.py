@@ -151,11 +151,24 @@ def _deploy_codex(
     if dry.returncode != 0:
         return {"host": "codex", "status": "blocked", "error": (dry.stderr or dry.stdout).strip()[:400]}
     plan = json.loads(dry.stdout)
+    plan_status = str(plan.get("status") or "")
+    blockers = plan.get("blockers") or []
+    if blockers or plan_status not in {"noop", "ready", "confirmation_required"}:
+        return {
+            "host": "codex",
+            "status": "blocked",
+            "plan_status": plan_status or "unknown",
+            "blockers": blockers,
+            "changes": plan.get("changes", []),
+            "error": f"codex_reconcile_blocked:{plan_status or 'unknown'}",
+        }
+    if plan_status == "noop":
+        return {"host": "codex", "status": "noop", "changes": [], "session_loading": "unverified", "adoption": "unverified"}
     if not apply:
         return {
             "host": "codex",
             "status": "planned",
-            "plan_status": plan.get("status"),
+            "plan_status": plan_status,
             "changes": plan.get("changes", []),
             "confirmation_required": bool(plan.get("confirmation_required")),
             "plan_hash": plan.get("plan_hash"),
@@ -168,8 +181,6 @@ def _deploy_codex(
             "plan_hash": plan.get("plan_hash"),
             "error": "codex_source_identity_change_requires_explicit_confirmation",
         }
-    if plan.get("status") == "noop":
-        return {"host": "codex", "status": "noop", "changes": [], "session_loading": "unverified", "adoption": "unverified"}
     appl = runner(
         [
             sys.executable, "-B", str(ms), "workstation-reconcile", "--apply",
@@ -180,10 +191,19 @@ def _deploy_codex(
     if appl.returncode != 0:
         return {"host": "codex", "status": "blocked", "error": (appl.stderr or appl.stdout).strip()[:400]}
     rec = json.loads(appl.stdout)
+    rec_status = str(rec.get("status") or "")
+    if rec_status not in {"applied", "reload_required", "noop", "ready"}:
+        return {
+            "host": "codex",
+            "status": "blocked",
+            "plan_status": rec_status or "unknown",
+            "blockers": rec.get("blockers", []),
+            "error": f"codex_reconcile_apply_blocked:{rec_status or 'unknown'}",
+        }
     pack = rec.get("deployment_pack", {})
     return {
         "host": "codex",
-        "status": rec.get("status", "applied"),
+        "status": rec_status,
         "core_version": pack.get("host_materialization", {}).get("core", {}).get("version"),
         "plugin_version": pack.get("distribution", {}).get("plugin", {}).get("version"),
         "doctor": pack.get("host_materialization", {}).get("doctor"),
@@ -192,22 +212,34 @@ def _deploy_codex(
     }
 
 
-def _find_pi_checkout(pi_exe: str, runner: CommandRunner) -> Path | None:
+def _inspect_pi_registration(pi_exe: str, runner: CommandRunner) -> tuple[bool, str | None, Path | None, str | None]:
+    """Return (ok, registered_ref, checkout_path, error) parsed from `pi list`."""
     listed = runner([pi_exe, "list"])
     if listed.returncode != 0:
-        return None
-    for line in listed.stdout.splitlines():
-        if "agent-memory-sidecar" not in line.lower():
+        return False, None, None, f"pi_list_failed:{(listed.stderr or listed.stdout).strip()[:200]}"
+    lines = listed.stdout.splitlines()
+    registered_ref: str | None = None
+    checkout: Path | None = None
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if "agent-memory-sidecar" not in stripped.lower():
             continue
-        for token in line.split():
-            candidate = Path(token.strip("()[]<>\"',"))
+        for token in stripped.split():
+            cleaned = token.strip("()[]<>\"',")
+            if "agent-memory-sidecar" in cleaned.lower() and "@" in cleaned:
+                registered_ref = cleaned.rsplit("@", 1)[1]
+            candidate = Path(cleaned)
             if candidate.is_dir() and (candidate / ".git").exists():
-                return candidate
-    # Check standard Pi npm/git package location
-    standard = Path.home() / ".pi" / "agent" / "git" / "github.com" / "lly-personal" / "agent-memory-sidecar"
-    if standard.is_dir() and (standard / ".git").exists():
-        return standard
-    return None
+                checkout = candidate
+        if checkout is None and idx + 1 < len(lines):
+            next_line = lines[idx + 1].strip().strip("\"'")
+            if next_line:
+                candidate = Path(next_line)
+                if candidate.is_dir() and (candidate / ".git").exists():
+                    checkout = candidate
+        if registered_ref is not None or checkout is not None:
+            break
+    return True, registered_ref, checkout, None
 
 
 def _deploy_pi(
@@ -222,15 +254,24 @@ def _deploy_pi(
     if not pi_exe:
         return {"host": "pi", "status": "unavailable", "error": "pi_cli_not_found"}
 
-    checkout = _find_pi_checkout(pi_exe, runner)
+    list_ok, registered_ref, checkout, list_err = _inspect_pi_registration(pi_exe, runner)
+    if not list_ok:
+        return {"host": "pi", "status": "blocked", "error": list_err}
+
+    disk_checkout = checkout
+    if disk_checkout is None:
+        standard = Path.home() / ".pi" / "agent" / "git" / "github.com" / "lly-personal" / "agent-memory-sidecar"
+        if standard.is_dir() and (standard / ".git").exists():
+            disk_checkout = standard
+
     current_head = None
     dirty = False
     incomplete_marker = False
     preserved_untracked: dict[str, str] = {}
-    if checkout is not None:
-        marker = checkout.parent / ".agent-memory-sidecar.pi-update-incomplete"
+    if disk_checkout is not None:
+        marker = disk_checkout.parent / ".agent-memory-sidecar.pi-update-incomplete"
         incomplete_marker = marker.exists()
-        st = runner(["git", "-C", str(checkout), "status", "--porcelain", "--untracked-files=all"])
+        st = runner(["git", "-C", str(disk_checkout), "status", "--porcelain", "--untracked-files=all"])
         if st.returncode != 0:
             dirty = True
         else:
@@ -238,11 +279,11 @@ def _deploy_pi(
                 if not line.strip():
                     continue
                 # Preserve harmless Pi-generated root package-lock.json only when no tracked changes exist.
-                if line == "?? package-lock.json" and (checkout / "package-lock.json").is_file() and not _is_alias(checkout / "package-lock.json"):
-                    preserved_untracked["package-lock.json"] = hashlib.sha256((checkout / "package-lock.json").read_bytes()).hexdigest()
+                if line == "?? package-lock.json" and (disk_checkout / "package-lock.json").is_file() and not _is_alias(disk_checkout / "package-lock.json"):
+                    preserved_untracked["package-lock.json"] = hashlib.sha256((disk_checkout / "package-lock.json").read_bytes()).hexdigest()
                 else:
                     dirty = True
-        hd = runner(["git", "-C", str(checkout), "rev-parse", "HEAD"])
+        hd = runner(["git", "-C", str(disk_checkout), "rev-parse", "HEAD"])
         current_head = hd.stdout.strip().casefold() if hd.returncode == 0 else None
 
     if incomplete_marker or dirty:
@@ -251,13 +292,20 @@ def _deploy_pi(
             "status": "blocked",
             "error": "pi_checkout_dirty_or_incomplete_preserved",
             "current_commit": current_head,
+            "registered_ref": registered_ref,
             "desired_commit": commit,
         }
-    if current_head == commit:
+
+    registered_matches = bool(
+        registered_ref
+        and (registered_ref.casefold() == commit or (registered_ref == tag and current_head == commit))
+    )
+    if checkout is not None and current_head == commit and registered_matches:
         return {
             "host": "pi",
             "status": "noop",
             "commit": current_head,
+            "registered_ref": registered_ref,
             "tag": tag,
             "preserved_untracked": sorted(preserved_untracked),
             "session_loading": "unverified",
@@ -267,26 +315,27 @@ def _deploy_pi(
         return {
             "host": "pi",
             "status": "planned",
-            "action": "fetch_detach_and_pin" if checkout else "pi_install",
+            "action": "pin_register_only" if current_head == commit else ("fetch_detach_and_pin" if disk_checkout else "pi_install"),
             "current_commit": current_head,
+            "registered_ref": registered_ref,
             "desired_commit": commit,
             "preserved_untracked": sorted(preserved_untracked),
             "tag": tag,
         }
 
     # Safe update path per README: fetch exact tag -> verify commit -> check no untracked collision -> detach -> pi install commit pin
-    if checkout is not None:
-        fetch = runner(["git", "-C", str(checkout), "fetch", "--no-tags", "origin", f"refs/tags/{tag}"])
+    if disk_checkout is not None and current_head != commit:
+        fetch = runner(["git", "-C", str(disk_checkout), "fetch", "--no-tags", "origin", f"refs/tags/{tag}"])
         if fetch.returncode != 0:
             return {"host": "pi", "status": "blocked", "error": f"pi_git_fetch_failed:{fetch.stderr.strip()[:200]}"}
-        fh = runner(["git", "-C", str(checkout), "rev-parse", "FETCH_HEAD^{commit}"])
+        fh = runner(["git", "-C", str(disk_checkout), "rev-parse", "FETCH_HEAD^{commit}"])
         if fh.returncode != 0 or fh.stdout.strip().casefold() != commit:
             return {"host": "pi", "status": "blocked", "error": "pi_fetch_commit_mismatch"}
         for rel in preserved_untracked:
-            col = runner(["git", "-C", str(checkout), "ls-tree", commit, "--", rel])
+            col = runner(["git", "-C", str(disk_checkout), "ls-tree", commit, "--", rel])
             if col.returncode != 0 or col.stdout.strip():
                 return {"host": "pi", "status": "blocked", "error": f"pi_untracked_collision:{rel}"}
-        sw = runner(["git", "-C", str(checkout), "switch", "--detach", commit])
+        sw = runner(["git", "-C", str(disk_checkout), "switch", "--detach", commit])
         if sw.returncode != 0:
             return {"host": "pi", "status": "blocked", "error": f"pi_git_switch_failed:{sw.stderr.strip()[:200]}"}
 
@@ -295,21 +344,25 @@ def _deploy_pi(
     if inst.returncode != 0:
         return {"host": "pi", "status": "blocked", "error": f"pi_install_failed:{(inst.stderr or inst.stdout).strip()[:300]}"}
 
-    checkout_after = _find_pi_checkout(pi_exe, runner) or checkout
+    after_ok, reg_after, checkout_after, after_err = _inspect_pi_registration(pi_exe, runner)
+    if not after_ok:
+        return {"host": "pi", "status": "blocked", "error": after_err}
+    effective_checkout = checkout_after or disk_checkout
     observed_head = None
-    if checkout_after is not None:
-        hd = runner(["git", "-C", str(checkout_after), "rev-parse", "HEAD"])
+    if effective_checkout is not None:
+        hd = runner(["git", "-C", str(effective_checkout), "rev-parse", "HEAD"])
         observed_head = hd.stdout.strip().casefold() if hd.returncode == 0 else None
         for rel, expected_sha in preserved_untracked.items():
-            p = checkout_after / rel
+            p = effective_checkout / rel
             if not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest() != expected_sha:
                 return {"host": "pi", "status": "blocked", "error": f"pi_preserved_file_changed:{rel}"}
-    if observed_head != commit:
+    if observed_head != commit or not reg_after or reg_after.casefold() != commit:
         return {
             "host": "pi",
             "status": "blocked",
-            "error": "pi_readback_commit_mismatch",
+            "error": "pi_readback_mismatch",
             "observed_commit": observed_head,
+            "registered_ref": reg_after,
             "desired_commit": commit,
         }
     return {
@@ -317,6 +370,7 @@ def _deploy_pi(
         "status": "applied",
         "tag": tag,
         "commit": observed_head,
+        "registered_ref": reg_after,
         "pin_spec": pin_spec,
         "preserved_untracked": sorted(preserved_untracked),
         "session_loading": "unverified",
@@ -331,39 +385,82 @@ def _deploy_claude(
     apply: bool,
     runner: CommandRunner,
     claude_executable: str | None = None,
+    claude_home: Path | None = None,
 ) -> dict[str, Any]:
     claude_exe = claude_executable or shutil.which("claude") or shutil.which("claude.cmd")
     if not claude_exe:
         return {"host": "claude", "status": "unavailable", "error": "claude_cli_not_found"}
 
-    def _read_installed_version() -> str | None:
-        listed = runner([claude_exe, "plugin", "list", "--json"])
-        if listed.returncode == 0:
-            try:
-                items = json.loads(listed.stdout)
-                entries = items if isinstance(items, list) else items.get("plugins", [])
-                for item in entries:
-                    if isinstance(item, dict) and str(item.get("id", item.get("name", ""))).startswith("agent-memory-sidecar"):
-                        return str(item.get("version")) if item.get("version") else None
-            except json.JSONDecodeError:
-                pass
-        installed_json = Path.home() / ".claude" / "plugins" / "installed_plugins.json"
-        if installed_json.is_file() and not _is_alias(installed_json):
-            try:
-                data = json.loads(installed_json.read_text(encoding="utf-8"))
-                entry = data.get("plugins", {}).get("agent-memory-sidecar@agent-memory", [])
-                if isinstance(entry, list) and entry and isinstance(entry[0], dict):
-                    return str(entry[0].get("version")) if entry[0].get("version") else None
-            except (OSError, json.JSONDecodeError):
-                pass
+    active_claude_home = (claude_home or (Path.home() / ".claude")).expanduser()
+    known_mk_path = active_claude_home / "plugins" / "known_marketplaces.json"
+    desired_git_url = f"{REPO_URL}.git"
+
+    def _read_marketplace_source() -> dict[str, Any] | None:
+        if not known_mk_path.is_file() or _is_alias(known_mk_path):
+            return None
+        try:
+            data = json.loads(known_mk_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        entry = data.get("agent-memory")
+        if isinstance(entry, dict) and isinstance(entry.get("source"), dict):
+            return entry["source"]
         return None
 
-    observed_before = _read_installed_version()
-    if observed_before == plugin_version:
+    def _marketplace_restore_spec(src: dict[str, Any] | None) -> str | None:
+        if not isinstance(src, dict):
+            return None
+        if src.get("source") == "git" and isinstance(src.get("url"), str):
+            ref = src.get("ref")
+            return f"{src['url']}#{ref}" if isinstance(ref, str) and ref else src["url"]
+        if src.get("source") == "github" and isinstance(src.get("repo"), str):
+            return src["repo"]
+        return None
+
+    def _read_installed_entry() -> tuple[bool, dict[str, Any] | None, str | None]:
+        listed = runner([claude_exe, "plugin", "list", "--json"])
+        if listed.returncode != 0:
+            return False, None, f"claude_plugin_list_failed:{(listed.stderr or listed.stdout).strip()[:200]}"
+        try:
+            items = json.loads(listed.stdout)
+        except json.JSONDecodeError:
+            return False, None, "claude_plugin_list_invalid_json"
+        entries = items if isinstance(items, list) else items.get("plugins", [])
+        if not isinstance(entries, list):
+            return False, None, "claude_plugin_list_invalid_shape"
+        for item in entries:
+            if not isinstance(item, dict):
+                continue
+            if item.get("id") == "agent-memory-sidecar@agent-memory" and item.get("scope", "user") == "user":
+                return True, item, None
+        return True, None, None
+
+    list_ok, entry_before, list_err = _read_installed_entry()
+    if not list_ok:
+        return {"host": "claude", "status": "blocked", "error": list_err}
+
+    mk_before = _read_marketplace_source()
+    observed_version = str(entry_before.get("version")) if isinstance(entry_before, dict) and entry_before.get("version") else None
+    enabled_before = entry_before.get("enabled") if isinstance(entry_before, dict) else None
+    if entry_before is not None and enabled_before is False:
+        return {
+            "host": "claude",
+            "status": "blocked",
+            "error": "claude_plugin_explicitly_disabled",
+            "current_plugin_version": observed_version,
+        }
+
+    mk_matches = bool(
+        isinstance(mk_before, dict)
+        and mk_before.get("source") == "git"
+        and str(mk_before.get("url") or "").casefold() == desired_git_url.casefold()
+        and mk_before.get("ref") == tag
+    )
+    if observed_version == plugin_version and enabled_before is True and mk_matches:
         return {
             "host": "claude",
             "status": "noop",
-            "plugin_version": observed_before,
+            "plugin_version": observed_version,
             "tag": tag,
             "session_loading": "unverified",
             "adoption": "unverified",
@@ -372,27 +469,63 @@ def _deploy_claude(
         return {
             "host": "claude",
             "status": "planned",
-            "current_plugin_version": observed_before,
+            "current_plugin_version": observed_version,
+            "current_marketplace_ref": mk_before.get("ref") if isinstance(mk_before, dict) else None,
             "desired_plugin_version": plugin_version,
             "tag": tag,
         }
 
-    # Native Claude CLI workflow: remove & re-add tagged marketplace ref (no manual JSON mutation), then install plugin
-    runner([claude_exe, "plugin", "marketplace", "remove", "agent-memory"])
-    add = runner([claude_exe, "plugin", "marketplace", "add", f"{REPO_URL}.git#{tag}"])
-    if add.returncode != 0:
-        return {"host": "claude", "status": "blocked", "error": f"claude_marketplace_add_failed:{(add.stderr or add.stdout).strip()[:300]}"}
-    inst = runner([claude_exe, "plugin", "install", "agent-memory-sidecar@agent-memory", "--scope", "user"])
-    if inst.returncode != 0:
-        return {"host": "claude", "status": "blocked", "error": f"claude_plugin_install_failed:{(inst.stderr or inst.stdout).strip()[:300]}"}
+    prior_restore_spec = _marketplace_restore_spec(mk_before)
 
-    observed_after = _read_installed_version()
-    if observed_after != plugin_version:
+    def _rollback_marketplace() -> dict[str, Any]:
+        if not prior_restore_spec:
+            return {"rollback_attempted": False, "rollback_succeeded": None}
+        runner([claude_exe, "plugin", "marketplace", "remove", "agent-memory"])
+        rb = runner([claude_exe, "plugin", "marketplace", "add", prior_restore_spec])
+        return {"rollback_attempted": True, "rollback_succeeded": rb.returncode == 0, "rollback_spec": prior_restore_spec}
+
+    # Native Claude CLI workflow: remove & re-add tagged marketplace ref (with rollback if add/install fails), then install plugin
+    if mk_before is not None:
+        runner([claude_exe, "plugin", "marketplace", "remove", "agent-memory"])
+    add = runner([claude_exe, "plugin", "marketplace", "add", f"{desired_git_url}#{tag}"])
+    if add.returncode != 0:
+        rb_info = _rollback_marketplace()
         return {
             "host": "claude",
             "status": "blocked",
-            "error": "claude_readback_version_mismatch",
+            "error": f"claude_marketplace_add_failed:{(add.stderr or add.stdout).strip()[:300]}",
+            **rb_info,
+        }
+    inst = runner([claude_exe, "plugin", "install", "agent-memory-sidecar@agent-memory", "--scope", "user"])
+    if inst.returncode != 0:
+        rb_info = _rollback_marketplace()
+        return {
+            "host": "claude",
+            "status": "blocked",
+            "error": f"claude_plugin_install_failed:{(inst.stderr or inst.stdout).strip()[:300]}",
+            **rb_info,
+        }
+
+    after_ok, entry_after, after_err = _read_installed_entry()
+    mk_after = _read_marketplace_source()
+    observed_after = str(entry_after.get("version")) if isinstance(entry_after, dict) and entry_after.get("version") else None
+    enabled_after = entry_after.get("enabled") if isinstance(entry_after, dict) else None
+    mk_after_ok = (
+        mk_after is None
+        or (
+            mk_after.get("source") == "git"
+            and str(mk_after.get("url") or "").casefold() == desired_git_url.casefold()
+            and mk_after.get("ref") == tag
+        )
+    )
+    if not after_ok or observed_after != plugin_version or enabled_after is not True or not mk_after_ok:
+        return {
+            "host": "claude",
+            "status": "blocked",
+            "error": after_err or "claude_readback_mismatch",
             "observed_plugin_version": observed_after,
+            "observed_enabled": enabled_after,
+            "observed_marketplace_ref": mk_after.get("ref") if isinstance(mk_after, dict) else None,
             "desired_plugin_version": plugin_version,
         }
     return {
@@ -405,11 +538,40 @@ def _deploy_claude(
     }
 
 
+ANTIGRAVITY_MANAGED_SIGNATURES: dict[str, tuple[str, ...]] = {
+    "global-owner-scout": ("SKILL.md", "scripts/scout.py", "scripts/validate_output.py"),
+    "engineering-contract-review": (
+        "SKILL.md",
+        "references/design.md",
+        "references/verify.md",
+        "references/recover.md",
+        "references/performance.md",
+    ),
+}
+
+
+def _is_managed_antigravity_skill(name: str, dst: Path) -> bool:
+    """Confirm an existing Antigravity skill directory matches our shipped layout before replacing it."""
+    required_files = ANTIGRAVITY_MANAGED_SIGNATURES.get(name)
+    if not required_files:
+        return False
+    for rel in required_files:
+        p = dst / rel
+        if not p.is_file() or _is_alias(p):
+            return False
+    try:
+        head = (dst / "SKILL.md").read_text(encoding="utf-8")[:512]
+    except OSError:
+        return False
+    return f"name: {name}" in head
+
+
 def _deploy_antigravity(
     *,
     portable: Path,
     antigravity_home: Path | None,
     apply: bool,
+    allow_replace_unmanaged: bool = False,
 ) -> dict[str, Any]:
     if antigravity_home is None:
         return {
@@ -417,7 +579,8 @@ def _deploy_antigravity(
             "status": "blocked",
             "error": "antigravity_home_not_provided_or_enrolled",
         }
-    skills_root = antigravity_home / "config" / "skills"
+    config_dir = antigravity_home / "config"
+    skills_root = config_dir / "skills"
     sources = {
         "global-owner-scout": portable / ".agents" / "skills" / "global-owner-scout",
         "engineering-contract-review": portable / "plugins" / "agent-memory-sidecar" / "skills" / "engineering-contract-review",
@@ -425,8 +588,11 @@ def _deploy_antigravity(
     for name, src in sources.items():
         _require(src.is_dir() and not _is_alias(src), f"antigravity_portable_source_missing:{name}")
 
+    # Validate every existing component down to skills_root, including intermediate `config` even when `skills` is absent.
     _assert_physical_dir(antigravity_home, label="antigravity_home")
-    if skills_root.exists():
+    if config_dir.exists() or _is_alias(config_dir):
+        _assert_physical_dir(config_dir, label="antigravity_config_dir")
+    if skills_root.exists() or _is_alias(skills_root):
         _assert_physical_dir(skills_root, label="antigravity_skills_root")
 
     plan_items: dict[str, dict[str, Any]] = {}
@@ -434,9 +600,11 @@ def _deploy_antigravity(
     for name, src in sources.items():
         desired_sha = _tree_digest(src)
         dst = skills_root / name
-        if dst.exists():
+        if dst.exists() or _is_alias(dst):
             _require(dst.is_dir() and not _is_alias(dst), f"antigravity_target_unsafe:{name}")
             current_sha = _tree_digest(dst)
+            if current_sha != desired_sha and not allow_replace_unmanaged:
+                _require(_is_managed_antigravity_skill(name, dst), f"antigravity_unmanaged_skill_conflict:{name}")
         else:
             current_sha = None
         action = "noop" if current_sha == desired_sha else ("install" if current_sha is None else "replace")
@@ -459,6 +627,7 @@ def _deploy_antigravity(
         return {"host": "antigravity", "status": "planned", "skills": plan_items}
 
     skills_root.mkdir(parents=True, exist_ok=True)
+    _assert_physical_dir(skills_root, label="antigravity_skills_root")
     backups: list[tuple[Path, Path | None]] = []
     staged_dirs: list[Path] = []
     try:
@@ -520,8 +689,10 @@ def deploy_multihost(
     hosts: tuple[str, ...] = ALL_HOSTS,
     codex_home: Path | None = None,
     antigravity_home: Path | None = None,
+    claude_home: Path | None = None,
     apply: bool = False,
     confirm_source_change: bool = False,
+    allow_replace_unmanaged: bool = False,
     runner: CommandRunner = _default_run,
     resolved_dir: Path | None = None,
 ) -> dict[str, Any]:
@@ -532,15 +703,16 @@ def deploy_multihost(
     resolved_ag_home = _resolve_antigravity_home(active_codex_home, antigravity_home)
 
     owns_temp = resolved_dir is None
+    stage_parent: Path | None = None
     if resolved_dir is None:
         temp_parent = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "Temp" if os.name == "nt" else Path(tempfile.gettempdir())
         temp_parent.mkdir(parents=True, exist_ok=True)
-        stage_dir = temp_parent / f"ams-multihost-{os.getpid()}"
-        if stage_dir.exists():
-            shutil.rmtree(stage_dir)
+        stage_parent = Path(tempfile.mkdtemp(prefix="ams-multihost-", dir=str(temp_parent)))
+        stage_dir = stage_parent / "resolved"
     else:
         stage_dir = resolved_dir
 
+    receipt: dict[str, Any] | None = None
     try:
         if owns_temp:
             resolver = root / "plugins" / "agent-memory-sidecar" / "skills" / "agent-memory-bootstrap-anchor" / "scripts" / "resolve_release.py"
@@ -576,15 +748,26 @@ def deploy_multihost(
                 elif host == "pi":
                     results[host] = _deploy_pi(tag=tag, commit=commit, apply=apply, runner=runner)
                 elif host == "claude":
-                    results[host] = _deploy_claude(tag=tag, plugin_version=plugin_version, apply=apply, runner=runner)
+                    results[host] = _deploy_claude(
+                        tag=tag,
+                        plugin_version=plugin_version,
+                        apply=apply,
+                        runner=runner,
+                        claude_home=claude_home,
+                    )
                 elif host == "antigravity":
-                    results[host] = _deploy_antigravity(portable=portable, antigravity_home=resolved_ag_home, apply=apply)
+                    results[host] = _deploy_antigravity(
+                        portable=portable,
+                        antigravity_home=resolved_ag_home,
+                        apply=apply,
+                        allow_replace_unmanaged=allow_replace_unmanaged,
+                    )
             except MultiHostDeployError as exc:
                 results[host] = {"host": host, "status": "blocked", "error": str(exc)}
 
-        ok_states = {"planned", "noop", "applied"}
+        ok_states = {"planned", "noop", "applied", "reload_required"}
         overall = "ok" if all(item.get("status") in ok_states for item in results.values()) else "partial_or_blocked"
-        return {
+        receipt = {
             "contract_version": RECEIPT_CONTRACT,
             "mode": "apply" if apply else "dry_run",
             "status": overall,
@@ -599,10 +782,19 @@ def deploy_multihost(
                 "L3 rule approval and writes remain Codex-only (ADR 0083); Pi, Claude Code, and Antigravity remain L1/L2 only.",
             ],
         }
+        return receipt
     finally:
-        if owns_temp and stage_dir.exists():
-            shutil.rmtree(stage_dir, ignore_errors=False)
-            _require(not stage_dir.exists(), "multihost_temp_cleanup_failed")
+        if owns_temp and stage_parent is not None and stage_parent.exists():
+            try:
+                shutil.rmtree(stage_parent, ignore_errors=False)
+                if stage_parent.exists():
+                    raise OSError("multihost_temp_cleanup_incomplete")
+            except OSError as exc:
+                if receipt is not None:
+                    receipt["cleanup_error"] = f"multihost_temp_cleanup_failed:{exc}"
+                    receipt["status"] = "partial_or_blocked"
+                else:
+                    raise MultiHostDeployError("multihost_temp_cleanup_failed") from exc
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -617,6 +809,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--codex-home", type=Path, default=None)
     parser.add_argument("--antigravity-home", type=Path, default=None)
     parser.add_argument("--confirm-source-change", action="store_true")
+    parser.add_argument("--allow-replace-unmanaged", action="store_true")
     args = parser.parse_args(argv)
     hosts = tuple(item.strip().lower() for item in args.hosts.split(",") if item.strip())
     try:
@@ -628,6 +821,7 @@ def main(argv: list[str] | None = None) -> int:
             antigravity_home=args.antigravity_home,
             apply=args.apply,
             confirm_source_change=args.confirm_source_change,
+            allow_replace_unmanaged=args.allow_replace_unmanaged,
         )
         print(json.dumps(receipt, ensure_ascii=False, separators=(",", ":")))
         return 0 if receipt["status"] == "ok" else 1

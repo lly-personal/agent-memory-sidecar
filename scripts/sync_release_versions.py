@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import stat
 import sys
+import tempfile
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -244,6 +247,46 @@ def compute_expected_files(
     return expected
 
 
+def _is_alias(path: Path) -> bool:
+    try:
+        st = path.lstat()
+    except FileNotFoundError:
+        return False
+    return stat.S_ISLNK(st.st_mode) or bool(
+        getattr(st, "st_file_attributes", 0)
+        & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    )
+
+
+def _assert_safe_repo_path(root: Path, path: Path) -> None:
+    root_resolved = root.resolve()
+    rel = path.relative_to(root)
+    cursor = root
+    for part in rel.parts[:-1]:
+        cursor = cursor / part
+        if cursor.exists():
+            _require(cursor.is_dir() and not _is_alias(cursor), f"unsafe_repo_dir:{cursor.relative_to(root).as_posix()}")
+    if path.exists() or _is_alias(path):
+        _require(path.is_file() and not _is_alias(path), f"unsafe_repo_file:{rel.as_posix()}")
+        _require(path.resolve().is_relative_to(root_resolved), f"repo_path_escape:{rel.as_posix()}")
+
+
+def _atomic_write_bytes(path: Path, content: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".sync-{path.name}-", dir=str(path.parent))
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, path)
+    except Exception:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+        raise
+
+
 def sync_versions(
     root: Path = ROOT,
     *,
@@ -263,27 +306,57 @@ def sync_versions(
     expected = compute_expected_files(root, **desired)
     drifted: list[str] = []
     extra_repo_anchor: list[Path] = []
+    planned_writes: list[tuple[Path, bytes, bytes | None]] = []
 
     repo_anchor = root / REPO_ANCHOR_REL
+    repo_anchor_resolved = repo_anchor.resolve() if repo_anchor.exists() else None
     if repo_anchor.is_dir():
+        _require(not _is_alias(repo_anchor), "unsafe_repo_anchor_dir")
         for path in sorted(repo_anchor.rglob("*")):
-            if not path.is_file() or "__pycache__" in path.parts or path.suffix in {".pyc", ".pyo"}:
+            if "__pycache__" in path.parts or path.suffix in {".pyc", ".pyo"}:
+                continue
+            if _is_alias(path):
+                raise VersionSyncError(f"unsafe_repo_file:{path.relative_to(root).as_posix()}")
+            if not path.is_file():
                 continue
             if path not in expected:
                 extra_repo_anchor.append(path)
                 drifted.append(path.relative_to(root).as_posix())
 
     for path, content in sorted(expected.items()):
+        _assert_safe_repo_path(root, path)
         rel = path.relative_to(root).as_posix()
-        if not path.exists() or path.read_bytes() != content:
+        prior = path.read_bytes() if path.exists() else None
+        if prior != content:
             drifted.append(rel)
-            if apply:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(content)
+            planned_writes.append((path, content, prior))
 
     if apply:
-        for stale in extra_repo_anchor:
-            stale.unlink()
+        written: list[tuple[Path, bytes | None]] = []
+        try:
+            for path, content, prior in planned_writes:
+                _atomic_write_bytes(path, content)
+                written.append((path, prior))
+            for stale in extra_repo_anchor:
+                _require(
+                    repo_anchor_resolved is not None
+                    and stale.is_file()
+                    and not _is_alias(stale)
+                    and stale.resolve().is_relative_to(repo_anchor_resolved),
+                    f"unsafe_extra_anchor:{stale.name}",
+                )
+                stale.unlink()
+        except Exception:
+            for path, prior in reversed(written):
+                try:
+                    if prior is None:
+                        if path.exists() and not _is_alias(path):
+                            path.unlink()
+                    else:
+                        _atomic_write_bytes(path, prior)
+                except OSError:
+                    pass
+            raise
 
     return {
         "status": "ok" if (apply or not drifted) else "drifted",

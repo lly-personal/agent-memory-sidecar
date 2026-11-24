@@ -18,7 +18,39 @@ permissions:
   contents: read
 
 jobs:
+  resolve-ref:
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.resolve.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve and pin candidate commit on protected main
+        id: resolve
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          python -c "
+          import os, re, subprocess, sys
+          ref = os.environ['INPUT_REF'].strip() or 'main'
+          commit = subprocess.check_output(['git', 'rev-parse', '--verify', f'{ref}^{{commit}}'], text=True).strip().lower()
+          if not re.fullmatch(r'[0-9a-f]{40}', commit):
+              print(f'invalid commit: {commit}', file=sys.stderr)
+              sys.exit(1)
+          rc = subprocess.call(['git', 'merge-base', '--is-ancestor', commit, 'origin/main'])
+          if rc != 0:
+              print(f'candidate commit {commit} is not an ancestor of origin/main', file=sys.stderr)
+              sys.exit(1)
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write(f'commit={commit}\n')
+          print(f'Pinned release candidate commit: {commit}')
+          "
+
   contracts:
+    needs: resolve-ref
     strategy:
       fail-fast: false
       matrix:
@@ -28,7 +60,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -46,12 +78,13 @@ jobs:
           python scripts/check_doc_links.py
 
   public-release-smoke:
+    needs: resolve-ref
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -68,11 +101,12 @@ jobs:
           tests.test_public_distribution.PublicDistributionTests.test_positive_public_release_lane
 
   package:
+    needs: resolve-ref
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -110,6 +144,7 @@ jobs:
           python -m agent_memory_sidecar --help
 
   performance-observation:
+    needs: resolve-ref
     if: ${{ inputs.include_performance }}
     strategy:
       fail-fast: false
@@ -120,7 +155,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -135,27 +170,31 @@ jobs:
 
   release-candidate-gate:
     if: always()
-    needs: [contracts, public-release-smoke, package, artifact-smoke]
+    needs: [resolve-ref, contracts, public-release-smoke, package, artifact-smoke]
     runs-on: ubuntu-latest
     steps:
       - name: Enforce full release-candidate matrix succeeded
         env:
+          RESOLVE_RESULT: ${{ needs.resolve-ref.result }}
+          PINNED_COMMIT: ${{ needs.resolve-ref.outputs.commit }}
           CONTRACTS_RESULT: ${{ needs.contracts.result }}
           RELEASE_SMOKE_RESULT: ${{ needs.public-release-smoke.result }}
           PACKAGE_RESULT: ${{ needs.package.result }}
           ARTIFACT_SMOKE_RESULT: ${{ needs.artifact-smoke.result }}
         run: |
           python -c "
-          import os, sys
+          import os, re, sys
+          commit = os.environ.get('PINNED_COMMIT', '')
           results = {
+              'resolve-ref': os.environ['RESOLVE_RESULT'],
               'contracts': os.environ['CONTRACTS_RESULT'],
               'public-release-smoke': os.environ['RELEASE_SMOKE_RESULT'],
               'package': os.environ['PACKAGE_RESULT'],
               'artifact-smoke': os.environ['ARTIFACT_SMOKE_RESULT'],
           }
           bad = {k: v for k, v in results.items() if v != 'success'}
-          if bad:
-              print('release-candidate-gate failed:', bad, file=sys.stderr)
+          if bad or not re.fullmatch(r'[0-9a-f]{40}', commit):
+              print('release-candidate-gate failed:', bad, 'commit:', commit, file=sys.stderr)
               sys.exit(1)
-          print('release-candidate-gate passed:', results)
+          print('release-candidate-gate passed for pinned commit:', commit, results)
           "
