@@ -108,6 +108,7 @@ class VerifyReleaseSandboxTests(unittest.TestCase):
         exit_code: int = 0,
         envelope: dict | None = None,
         prose_only: bool = False,
+        spoof_command: bool = False,
         mutate_agents: Path | None = None,
         captured_env: list[dict[str, str] | None] | None = None,
     ):
@@ -163,12 +164,17 @@ class VerifyReleaseSandboxTests(unittest.TestCase):
                 if envelope is None:
                     return subprocess.CompletedProcess(command, 1, "", "sandbox crash")
                 cmd_text = str(entry_holder["entry"]).replace("\\", "\\\\")
+                executed_cmd = (
+                    f'"pwsh.exe" -Command "echo \\"{cmd_text} rule list\\""'
+                    if spoof_command
+                    else f'"pwsh.exe" -Command "python -B -S \\"{cmd_text}\\" rule list"'
+                )
                 cmd_event = json.dumps({
                     "type": "item.completed",
                     "item": {
                         "id": "item_2",
                         "type": "command_execution",
-                        "command": f'"pwsh.exe" -Command "python -B -S \\"{cmd_text}\\" rule list"',
+                        "command": executed_cmd,
                         "aggregated_output": json.dumps(envelope),
                         "exit_code": exit_code,
                         "status": "completed",
@@ -218,6 +224,14 @@ class VerifyReleaseSandboxTests(unittest.TestCase):
                     root=self.fake_root,
                     codex_home=codex_home,
                     runner=self._make_fake_runner(prose_only=True),
+                    codex_executable="fake-codex",
+                )
+
+            with self.assertRaisesRegex(self.gate.SandboxGateError, "sandbox_gate_command_not_executed"):
+                self.gate.verify_candidate_in_codex_sandbox(
+                    root=self.fake_root,
+                    codex_home=codex_home,
+                    runner=self._make_fake_runner(envelope=valid_envelope, spoof_command=True),
                     codex_executable="fake-codex",
                 )
 
@@ -436,9 +450,12 @@ class DeployMultiHostTests(unittest.TestCase):
             resolved_dir = self._make_resolved_fixture(base)
             ag_home = base / "antigravity"
             ag_home.mkdir()
+            codex_home = base / "codex_state"
+            codex_home.mkdir()
 
             plan = self.deploy.deploy_multihost(
                 hosts=("antigravity",),
+                codex_home=codex_home,
                 antigravity_home=ag_home,
                 apply=False,
                 resolved_dir=resolved_dir,
@@ -448,6 +465,7 @@ class DeployMultiHostTests(unittest.TestCase):
 
             applied = self.deploy.deploy_multihost(
                 hosts=("antigravity",),
+                codex_home=codex_home,
                 antigravity_home=ag_home,
                 apply=True,
                 resolved_dir=resolved_dir,
@@ -462,26 +480,60 @@ class DeployMultiHostTests(unittest.TestCase):
 
             noop = self.deploy.deploy_multihost(
                 hosts=("antigravity",),
+                codex_home=codex_home,
                 antigravity_home=ag_home,
                 apply=True,
                 resolved_dir=resolved_dir,
             )
             self.assertEqual("noop", noop["hosts"]["antigravity"]["status"])
 
-            # Independent unmanaged skill with the same name must block replacement by default.
+            # Unmodified Sidecar-deployed tree upgrades cleanly via recorded SHA-256 receipt.
+            (resolved_dir / "portable/.agents/skills/global-owner-scout/SKILL.md").write_text(
+                "---\nname: global-owner-scout\n---\n# upgraded\n", encoding="utf-8"
+            )
+            upgraded = self.deploy.deploy_multihost(
+                hosts=("antigravity",),
+                codex_home=codex_home,
+                antigravity_home=ag_home,
+                apply=True,
+                resolved_dir=resolved_dir,
+            )
+            self.assertEqual("ok", upgraded["status"])
+            self.assertEqual("applied", upgraded["hosts"]["antigravity"]["status"])
+
+            # Adding a user file inside an installed skill turns it into a modified tree and blocks default replace!
+            extra_user_file = ag_home / "config/skills/global-owner-scout/user-notes.md"
+            extra_user_file.write_text("# user private note\n", encoding="utf-8")
+            (resolved_dir / "portable/.agents/skills/global-owner-scout/SKILL.md").write_text(
+                "---\nname: global-owner-scout\n---\n# upgraded-v2\n", encoding="utf-8"
+            )
+            blocked_fork = self.deploy.deploy_multihost(
+                hosts=("antigravity",),
+                codex_home=codex_home,
+                antigravity_home=ag_home,
+                apply=True,
+                resolved_dir=resolved_dir,
+            )
+            self.assertEqual("partial_or_blocked", blocked_fork["status"])
+            self.assertEqual("blocked", blocked_fork["hosts"]["antigravity"]["status"])
+            self.assertIn("antigravity_unmanaged_or_modified_skill:global-owner-scout", blocked_fork["hosts"]["antigravity"]["error"])
+            self.assertTrue(extra_user_file.is_file())
+
+            # Independent unmanaged skill with the same name must also block replacement by default.
             custom_home = base / "antigravity_custom"
             custom_skill = custom_home / "config" / "skills" / "global-owner-scout"
             custom_skill.mkdir(parents=True)
             (custom_skill / "SKILL.md").write_text("---\nname: custom-user-skill\n---\n", encoding="utf-8")
             blocked = self.deploy.deploy_multihost(
                 hosts=("antigravity",),
+                codex_home=base / "other_codex",
                 antigravity_home=custom_home,
                 apply=True,
                 resolved_dir=resolved_dir,
             )
             self.assertEqual("partial_or_blocked", blocked["status"])
             self.assertEqual("blocked", blocked["hosts"]["antigravity"]["status"])
-            self.assertIn("antigravity_unmanaged_skill_conflict:global-owner-scout", blocked["hosts"]["antigravity"]["error"])
+            self.assertIn("antigravity_unmanaged_or_modified_skill:global-owner-scout", blocked["hosts"]["antigravity"]["error"])
             self.assertIn("custom-user-skill", (custom_skill / "SKILL.md").read_text(encoding="utf-8"))
 
     def test_trusted_posix_root_alias_accepts_only_root_owned_top_level_symlink(self) -> None:
@@ -560,24 +612,46 @@ class DeployMultiHostTests(unittest.TestCase):
             pi_noop = self.deploy._deploy_pi(tag="v0.7.6", commit="b" * 40, apply=False, runner=pi_retry_runner, pi_executable="fake-pi")
             self.assertEqual("noop", pi_noop["status"])
 
+            # Project-scoped or third-party fork packages in `pi list` must NEVER match as user-scoped noop.
+            def pi_fork_runner(command: list[str], *, cwd: Path | None = None, timeout: int = 180):
+                del cwd, timeout
+                if command == ["fake-pi", "list"]:
+                    return subprocess.CompletedProcess(
+                        command,
+                        0,
+                        f"Project packages:\n  git:github.com/lly-personal/agent-memory-sidecar@{'b' * 40}\n    {pi_checkout}\n"
+                        f"User packages:\n  git:github.com/other-org/agent-memory-sidecar@{'b' * 40}\n    {pi_checkout}\n",
+                        "",
+                    )
+                if command[:3] == ["git", "-C"] and "status" in command:
+                    return subprocess.CompletedProcess(command, 0, "", "")
+                if command[:3] == ["git", "-C"] and "rev-parse" in command:
+                    return subprocess.CompletedProcess(command, 0, "b" * 40 + "\n", "")
+                raise AssertionError(f"unexpected command: {command}")
+
+            pi_fork_plan = self.deploy._deploy_pi(
+                tag="v0.7.6", commit="b" * 40, apply=False, runner=pi_fork_runner, pi_executable="fake-pi", pi_home=base / ".pi"
+            )
+            self.assertEqual("planned", pi_fork_plan["status"])
+            self.assertEqual("pi_install", pi_fork_plan["action"])
+            self.assertIsNone(pi_fork_plan["registered_ref"])
+
     def test_claude_exact_identity_check_and_marketplace_rollback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             claude_home = Path(tmp) / ".claude"
             plugins_dir = claude_home / "plugins"
             plugins_dir.mkdir(parents=True)
             mk_file = plugins_dir / "known_marketplaces.json"
-            mk_file.write_text(
-                json.dumps({
-                    "agent-memory": {
-                        "source": {
-                            "source": "git",
-                            "url": "https://github.com/lly-personal/agent-memory-sidecar.git",
-                            "ref": "v0.7.5",
-                        }
+            prior_mk = {
+                "agent-memory": {
+                    "source": {
+                        "source": "git",
+                        "url": "https://github.com/lly-personal/agent-memory-sidecar.git",
+                        "ref": "v0.7.5",
                     }
-                }),
-                encoding="utf-8",
-            )
+                }
+            }
+            mk_file.write_text(json.dumps(prior_mk), encoding="utf-8")
             commands: list[list[str]] = []
 
             def rollback_runner(command: list[str], *, cwd: Path | None = None, timeout: int = 180):
@@ -591,20 +665,47 @@ class DeployMultiHostTests(unittest.TestCase):
                         "",
                     )
                 if command[1:4] == ["plugin", "marketplace", "remove"]:
+                    mk_file.write_text("{}", encoding="utf-8")
                     return subprocess.CompletedProcess(command, 0, "", "")
                 if command[1:4] == ["plugin", "marketplace", "add"]:
                     if command[4].endswith("#v0.7.6"):
                         return subprocess.CompletedProcess(command, 1, "", "network error")
+                    mk_file.write_text(json.dumps(prior_mk), encoding="utf-8")
                     return subprocess.CompletedProcess(command, 0, "restored", "")
                 raise AssertionError(f"unexpected command: {command}")
 
-            # Same version 1.12.6 but marketplace ref is v0.7.5 -> NOT noop!
+            # Missing `scope` field must NEVER match as user-scoped noop.
+            def missing_scope_runner(command: list[str], *, cwd: Path | None = None, timeout: int = 180):
+                del cwd, timeout
+                if command[1:] == ["plugin", "list", "--json"]:
+                    return subprocess.CompletedProcess(
+                        command,
+                        0,
+                        json.dumps([{"id": "agent-memory-sidecar@agent-memory", "version": "1.12.6", "enabled": True}]),
+                        "",
+                    )
+                raise AssertionError(f"unexpected command: {command}")
+
+            mk_v076 = json.dumps({
+                "agent-memory": {
+                    "source": {"source": "git", "url": "https://github.com/lly-personal/agent-memory-sidecar.git", "ref": "v0.7.6"}
+                }
+            })
+            mk_file.write_text(mk_v076, encoding="utf-8")
+            missing_scope = self.deploy._deploy_claude(
+                tag="v0.7.6", plugin_version="1.12.6", apply=False, runner=missing_scope_runner, claude_executable="fake-claude", claude_home=claude_home
+            )
+            self.assertEqual("planned", missing_scope["status"])
+            self.assertIsNone(missing_scope["current_plugin_version"])
+
+            # Restore prior v0.7.5 marketplace for rollback test.
+            mk_file.write_text(json.dumps(prior_mk), encoding="utf-8")
             plan = self.deploy._deploy_claude(
                 tag="v0.7.6", plugin_version="1.12.6", apply=False, runner=rollback_runner, claude_executable="fake-claude", claude_home=claude_home
             )
             self.assertEqual("planned", plan["status"])
 
-            # Failed marketplace add triggers rollback to prior v0.7.5 ref!
+            # Failed marketplace add triggers readback-verified rollback to prior v0.7.5 ref!
             failed = self.deploy._deploy_claude(
                 tag="v0.7.6", plugin_version="1.12.6", apply=True, runner=rollback_runner, claude_executable="fake-claude", claude_home=claude_home
             )
@@ -615,6 +716,14 @@ class DeployMultiHostTests(unittest.TestCase):
                 ["fake-claude", "plugin", "marketplace", "add", "https://github.com/lly-personal/agent-memory-sidecar.git#v0.7.5"],
                 commands,
             )
+
+            # Unrestorable prior marketplace source blocks BEFORE removing anything.
+            mk_file.write_text(json.dumps({"agent-memory": {"source": {"source": "custom-local"}}}), encoding="utf-8")
+            unrestorable = self.deploy._deploy_claude(
+                tag="v0.7.6", plugin_version="1.12.6", apply=True, runner=rollback_runner, claude_executable="fake-claude", claude_home=claude_home
+            )
+            self.assertEqual("blocked", unrestorable["status"])
+            self.assertEqual("claude_marketplace_prior_source_unrestorable", unrestorable["error"])
 
     def test_codex_confirmation_guard_and_pi_dirty_checkout_preservation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
