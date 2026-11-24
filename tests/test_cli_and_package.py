@@ -6,6 +6,7 @@ import json
 import os
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -951,6 +952,87 @@ class CliAndPackageTests(unittest.TestCase):
                 installed_skill_sha256(target),
                 skill_package_sha256(),
             )
+
+    def test_rule_list_uses_read_only_store_and_degrades_honestly_when_store_permission_denied(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            codex = root / "codex"
+            project.mkdir()
+            codex.mkdir()
+            store = codex / "agent-memory-sidecar" / "memory.sqlite"
+            proposal = {
+                "trigger": "When testing read-only list.",
+                "action": "Return the authoritative rules.",
+                "skip_boundary": "Never skip.",
+                "scope": "project",
+                "instruction_target": "project_agents",
+                "why": "Prove read-only queries work safely.",
+                "evidence": "An explicit test authorization.",
+            }
+            with CoreDatabase(store, create=True, now="2026-07-24T00:00:00+00:00") as db:
+                event = RuntimeLedger(db).capture_prompt(
+                    identity=resolve_identity(project),
+                    source_session="ro-list-session",
+                    prompt="remember",
+                    metadata={},
+                )
+            deploy_out = io.StringIO()
+            with patch.dict(os.environ, {"CODEX_HOME": str(codex)}), redirect_stdout(deploy_out):
+                deploy_code = cli.main([
+                    "--store", str(store), "--cwd", str(project),
+                    "rule", "deploy", "--from-json", json.dumps(proposal),
+                    "--approval-ref", f"user_prompt:{event.event_id}",
+                ])
+            self.assertEqual(0, deploy_code, deploy_out.getvalue())
+            rule_id = json.loads(deploy_out.getvalue())["data"]["rule"]["id"]
+
+            # 1. Readable read-only Store succeeds without calling secure_store_location
+            os.chmod(store, stat.S_IREAD)
+            try:
+                out = io.StringIO()
+                with (
+                    patch.dict(os.environ, {"CODEX_HOME": str(codex)}),
+                    patch("agent_memory_sidecar.database.secure_store_location") as secure_mock,
+                    redirect_stdout(out),
+                ):
+                    code = cli.main(["--store", str(store), "--cwd", str(project), "rule", "list", "--target", "project_agents"])
+                self.assertEqual(0, code, out.getvalue())
+                secure_mock.assert_not_called()
+                payload = json.loads(out.getvalue())
+                self.assertEqual("ok", payload["status"])
+                self.assertEqual(0, payload["data"]["pending_count"])
+                self.assertNotIn("pending_status", payload["data"])
+                self.assertEqual([rule_id], [r["id"] for r in payload["data"]["rules"]])
+            finally:
+                os.chmod(store, stat.S_IREAD | stat.S_IWRITE)
+
+            # 2. Restricted sandbox (PermissionError on private Store) still returns AGENTS.md rules honestly
+            out_restricted = io.StringIO()
+            with (
+                patch.dict(os.environ, {"CODEX_HOME": str(codex)}),
+                patch(
+                    "agent_memory_sidecar.cli.CoreDatabase",
+                    side_effect=CoreError("store_permission_denied", "restricted sandbox"),
+                ),
+                redirect_stdout(out_restricted),
+            ):
+                code = cli.main(["--store", str(store), "--cwd", str(project), "rule", "list", "--target", "project_agents"])
+            self.assertEqual(0, code, out_restricted.getvalue())
+            restricted = json.loads(out_restricted.getvalue())
+            self.assertEqual("ok", restricted["status"])
+            self.assertIsNone(restricted["data"]["pending_count"])
+            self.assertIsNone(restricted["data"]["state_counts"]["待确认"])
+            self.assertEqual("store_access_restricted", restricted["data"]["pending_status"])
+            self.assertEqual(1, restricted["data"]["state_counts"]["生效中"])
+            self.assertEqual([rule_id], [r["id"] for r in restricted["data"]["rules"]])
+
+            # 3. Missing Store still fails closed (never silently degraded)
+            out_missing = io.StringIO()
+            with patch.dict(os.environ, {"CODEX_HOME": str(codex)}), redirect_stdout(out_missing):
+                code = cli.main(["--store", str(root / "missing.sqlite"), "--cwd", str(project), "rule", "list", "--target", "project_agents"])
+            self.assertEqual(1, code)
+            self.assertEqual("store_unavailable", json.loads(out_missing.getvalue())["error"]["code"])
 
     def test_install_skill_preserves_parent_inherited_acls_on_windows(self) -> None:
         if os.name != "nt":

@@ -625,6 +625,59 @@ class CoreDatabaseTests(unittest.TestCase):
                     1,
                 )
 
+    def test_read_only_connection_reads_without_mutating_acls_and_blocks_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store_dir = root / "store"
+            store_dir.mkdir()
+            path = store_dir / "memory.sqlite"
+            with CoreDatabase(
+                path,
+                create=True,
+                now="2026-07-24T00:00:00+00:00",
+            ) as db:
+                with CoreDatabase(path, runtime=True):
+                    pass
+                self.assertEqual(db.table_names(), CORE_TABLES)
+            # Make file read-only (and directory read-only on POSIX) to verify zero writes/chmod
+            os.chmod(path, stat.S_IREAD)
+            if os.name != "nt":
+                os.chmod(store_dir, 0o500)
+            try:
+                with patch("agent_memory_sidecar.database.secure_store_location") as secure_mock:
+                    with CoreDatabase(path, read_only=True) as ro:
+                        self.assertTrue(ro.read_only)
+                        self.assertEqual(ro.table_names(), CORE_TABLES)
+                        self.assertEqual(
+                            ro.conn.execute("PRAGMA query_only").fetchone()[0],
+                            1,
+                        )
+                        with self.assertRaises(CoreError) as tx_err:
+                            with ro.transaction():
+                                pass
+                        self.assertEqual(tx_err.exception.code, "store_read_only")
+                        with self.assertRaises(sqlite3.OperationalError):
+                            ro.conn.execute("DELETE FROM proposal_tokens")
+                    secure_mock.assert_not_called()
+            finally:
+                if os.name != "nt":
+                    os.chmod(store_dir, 0o700)
+                os.chmod(path, stat.S_IREAD | stat.S_IWRITE)
+
+            with self.assertRaises(CoreError) as combo_err:
+                CoreDatabase(path, create=True, read_only=True, now="2026-07-24T00:00:00+00:00")
+            self.assertEqual(combo_err.exception.code, "invalid_request")
+            with self.assertRaises(CoreError) as runtime_err:
+                CoreDatabase(path, runtime=True, read_only=True)
+            self.assertEqual(runtime_err.exception.code, "invalid_request")
+
+            # Corrupt non-SQLite file still fails closed in read_only mode
+            corrupt = root / "corrupt.sqlite"
+            corrupt.write_bytes(b"not a sqlite db")
+            with self.assertRaises(CoreError) as corrupt_err:
+                CoreDatabase(corrupt, read_only=True)
+            self.assertEqual(corrupt_err.exception.code, "store_unavailable")
+
     def test_approval_event_expires_even_before_a_prune_trigger(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

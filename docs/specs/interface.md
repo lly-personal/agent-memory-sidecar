@@ -188,6 +188,7 @@ agent-memory proposal discard --approval-ref <ref>
 - `rule list` 的 `data.targets` 对每个实际 target 返回
   `managed_block_bytes`、`managed_block_budget_bytes`、`remaining_bytes`、
   `document_bytes` 与 `rule_count`；完整文档字节数只用于可见性。
+- `rule list` 以只读方式打开 Core Store（不改写权限或写入事务）；若只读沙盒无法访问私密 Store（`store_permission_denied`），仍直接从真实权威 `AGENTS.md` 返回 `rules` 与 `targets`，并将 `pending_count` 及 `state_counts["待确认"]` 如实置为 `null`、附 `pending_status="store_access_restricted"`（Store 缺失、损坏、链接或 schema 失配仍按失败拒绝）。
 
 ## 用户操作
 

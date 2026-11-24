@@ -13,6 +13,7 @@ from .file_security import (
     logical_absolute,
     prepare_store_parent,
     secure_store_location,
+    validate_store_identity,
 )
 
 
@@ -203,11 +204,77 @@ class CoreDatabase:
         *,
         create: bool = False,
         runtime: bool = False,
+        read_only: bool = False,
         migrated_from_sha256: str | None = None,
         now: str | None = None,
     ) -> None:
+        if read_only and (create or runtime):
+            raise CoreError(
+                "invalid_request",
+                "read_only Core Store connections cannot create or reconfigure runtime storage",
+            )
         self.path = logical_absolute(path)
-        existed = self.path.exists()
+        self.read_only = read_only
+        if read_only:
+            validate_store_identity(
+                self.path,
+                allow_missing=False,
+                permission_denied_code="store_permission_denied",
+            )
+            uri = self.path.as_uri() + "?mode=ro"
+            try:
+                self.conn = sqlite3.connect(uri, uri=True, timeout=30)
+            except sqlite3.OperationalError as exc:
+                try:
+                    with self.path.open("rb"):
+                        pass
+                except PermissionError as perm_exc:
+                    raise CoreError(
+                        "store_permission_denied",
+                        "Core Store is not accessible in the current execution context",
+                        path=str(self.path),
+                    ) from perm_exc
+                raise CoreError(
+                    "store_unavailable",
+                    "Core Store could not be opened read-only",
+                    path=str(self.path),
+                ) from exc
+            self.conn.row_factory = sqlite3.Row
+            try:
+                validate_store_identity(
+                    self.path,
+                    allow_missing=False,
+                    permission_denied_code="store_permission_denied",
+                )
+                self.conn.execute("PRAGMA query_only = ON")
+                self.conn.execute("PRAGMA foreign_keys = ON")
+                self.conn.execute("PRAGMA busy_timeout = 30000")
+                try:
+                    self._assert_schema()
+                except sqlite3.DatabaseError as exc:
+                    raise CoreError(
+                        "store_unavailable",
+                        "Core Store could not be read safely",
+                        path=str(self.path),
+                    ) from exc
+                validate_store_identity(
+                    self.path,
+                    allow_missing=False,
+                    permission_denied_code="store_permission_denied",
+                )
+            except BaseException:
+                self.conn.close()
+                raise
+            return
+
+        try:
+            existed = self.path.exists()
+        except PermissionError as exc:
+            raise CoreError(
+                "store_permission_denied",
+                "Core Store is not accessible in the current execution context",
+                path=str(self.path),
+            ) from exc
         if not existed and not create:
             raise CoreError(
                 "store_unavailable",
@@ -253,6 +320,11 @@ class CoreDatabase:
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
+        if self.read_only:
+            raise CoreError(
+                "store_read_only",
+                "cannot start a write transaction on a read-only Core Store connection",
+            )
         if self.conn.in_transaction:
             yield
             return

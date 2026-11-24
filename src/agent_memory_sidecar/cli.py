@@ -12,7 +12,7 @@ from .errors import CoreError
 from .file_security import logical_absolute
 from .identity import resolve_identity
 from .proposal import RuleBundle, RuleProposal
-from .rule_service import RuleService
+from .rule_service import RuleService, list_instruction_rules
 from .rule_preview import preview_bundle, preview_rule
 from .runtime_selftest import run as run_runtime_self_test
 
@@ -280,9 +280,19 @@ class _OperationResult:
 
 def cmd_rule_list(args: argparse.Namespace) -> _OperationResult:
     identity = resolve_identity(args.cwd)
-    with CoreDatabase(_store(args)) as db:
-        data = RuleService(db=db, identity=identity).list(
+    try:
+        with CoreDatabase(_store(args), read_only=True) as db:
+            data = RuleService(db=db, identity=identity).list(
+                target=args.target,
+            )
+    except CoreError as exc:
+        if exc.code != "store_permission_denied":
+            raise
+        data = list_instruction_rules(
+            identity=identity,
             target=args.target,
+            pending_count=None,
+            pending_status="store_access_restricted",
         )
     return _OperationResult(data=data)
 
