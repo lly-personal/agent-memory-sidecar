@@ -237,10 +237,15 @@ def compute_expected_files(
     # 7. Dual Anchor single-source projection: plugins/.../anchor -> .agents/skills/anchor
     plugin_anchor = root / PLUGIN_ANCHOR_REL
     repo_anchor = root / REPO_ANCHOR_REL
-    _require(plugin_anchor.is_dir(), "plugin_anchor_missing")
+    _require(plugin_anchor.is_dir() and not _is_alias(plugin_anchor), "plugin_anchor_missing")
     for src in sorted(plugin_anchor.rglob("*")):
-        if not src.is_file() or "__pycache__" in src.parts or src.suffix in {".pyc", ".pyo"}:
+        if "__pycache__" in src.parts or src.suffix in {".pyc", ".pyo"}:
             continue
+        if _is_alias(src):
+            raise VersionSyncError(f"unsafe_repo_file:{src.relative_to(root).as_posix()}")
+        if not src.is_file():
+            continue
+        _assert_safe_repo_path(root, src)
         rel_in_anchor = src.relative_to(plugin_anchor)
         expected[repo_anchor / rel_in_anchor] = src.read_bytes()
 
@@ -333,6 +338,7 @@ def sync_versions(
 
     if apply:
         written: list[tuple[Path, bytes | None]] = []
+        unlinked: list[tuple[Path, bytes]] = []
         try:
             for path, content, prior in planned_writes:
                 _atomic_write_bytes(path, content)
@@ -345,8 +351,15 @@ def sync_versions(
                     and stale.resolve().is_relative_to(repo_anchor_resolved),
                     f"unsafe_extra_anchor:{stale.name}",
                 )
+                prior_stale = stale.read_bytes()
                 stale.unlink()
+                unlinked.append((stale, prior_stale))
         except Exception:
+            for stale, prior_stale in reversed(unlinked):
+                try:
+                    _atomic_write_bytes(stale, prior_stale)
+                except OSError:
+                    pass
             for path, prior in reversed(written):
                 try:
                     if prior is None:

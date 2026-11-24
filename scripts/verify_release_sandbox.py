@@ -66,9 +66,34 @@ def _default_run(
     )
 
 
+def _unwrap_shell_command(command_str: str) -> str:
+    """Strip one outer shell wrapper (e.g. pwsh -Command / bash -c) to inspect the executed command."""
+    text = command_str.strip()
+    m = re.match(
+        r'^(?:"[^"]*(?:pwsh|powershell|cmd|bash|sh)(?:\.exe)?"|\S*(?:pwsh|powershell|cmd|bash|sh)(?:\.exe)?)\s+(?:-Command|-c|/c)\s+(.+)$',
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if not m:
+        return text
+    inner = m.group(1).strip()
+    if len(inner) >= 2 and inner[0] == inner[-1] and inner[0] in {'"', "'"}:
+        quote = inner[0]
+        inner = inner[1:-1]
+        if quote == '"':
+            inner = inner.replace('\\"', '"')
+    return inner.strip()
+
+
 def _extract_verified_command_execution(ndjson_text: str, candidate_entry: Path) -> dict[str, Any]:
     """Verify actual Codex --json command_execution output; never trust assistant prose."""
     entry_norm = re.sub(r"[\\/]+", "/", str(candidate_entry)).casefold()
+    exact_cmd_re = re.compile(
+        r"^(?:&\s*)?(?:[\"']?[^\"'\s]*python(?:3(?:\.\d+)?)?(?:\.exe)?[\"']?)\s+"
+        r"(?:-[A-Za-z]+\s+)*"
+        r"[\"']?" + re.escape(entry_norm) + r"[\"']?\s+rule\s+list\s*$",
+        flags=re.IGNORECASE,
+    )
     matched_events: list[dict[str, Any]] = []
     for raw_line in ndjson_text.splitlines():
         line = raw_line.strip()
@@ -83,9 +108,9 @@ def _extract_verified_command_execution(ndjson_text: str, candidate_entry: Path)
         item = event.get("item")
         if not isinstance(item, dict) or item.get("type") != "command_execution":
             continue
-        command_str = str(item.get("command") or "")
-        command_norm = re.sub(r"[\\/]+", "/", command_str).casefold()
-        if entry_norm in command_norm and "rule list" in command_norm:
+        inner_cmd = _unwrap_shell_command(str(item.get("command") or ""))
+        inner_norm = re.sub(r"[\\/]+", "/", inner_cmd).casefold()
+        if exact_cmd_re.fullmatch(inner_norm):
             matched_events.append(item)
 
     _require(bool(matched_events), "sandbox_gate_command_not_executed")
@@ -146,7 +171,12 @@ def verify_candidate_in_codex_sandbox(
     codex_exe = codex_executable or shutil.which("codex") or shutil.which("codex.cmd")
     _require(bool(codex_exe), "sandbox_gate_codex_cli_missing")
 
-    active_codex_home = codex_home or (Path.home() / ".codex")
+    if codex_home is not None:
+        active_codex_home = codex_home
+    elif os.environ.get("CODEX_HOME"):
+        active_codex_home = Path(os.environ["CODEX_HOME"]).expanduser()
+    else:
+        active_codex_home = Path.home() / ".codex"
     global_agents = active_codex_home / "AGENTS.md"
     project_agents = root / "AGENTS.md"
     before_global = _sha256_file(global_agents) if global_agents.is_file() else None
