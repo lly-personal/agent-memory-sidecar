@@ -59,10 +59,17 @@ class PublicDistributionTests(unittest.TestCase):
 
     def test_component_versions_and_release_boundaries_are_consistent(self) -> None:
         facts = self.release.version_facts(ROOT)
-        self.assertEqual(
-            {"core": "0.7.5", "plugin": "1.12.5", "bootstrap": "2.6.2", "scout": "5.20.2"},
-            facts,
+        pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+        codex_plugin = json.loads(
+            (ROOT / "plugins" / "agent-memory-sidecar" / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
         )
+        self.assertEqual(pyproject["version"], facts["core"])
+        self.assertEqual(codex_plugin["version"], facts["plugin"])
+        self.assertEqual({"core", "plugin", "bootstrap", "scout"}, set(facts))
+        sync_mod = load_module("sync_release_versions_check", ROOT / "scripts" / "sync_release_versions.py")
+        sync_result = sync_mod.sync_versions(ROOT, apply=False)
+        self.assertEqual("ok", sync_result["status"], sync_result)
+        self.assertEqual(facts, sync_result["versions"])
         self.assertFalse((ROOT / "scripts" / "build_public_export.py").exists())
         self.assertFalse((ROOT / "specs" / "public-export-allowlist-v1.json").exists())
 

@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -174,7 +175,13 @@ def _release_files(asset_dir: Path) -> tuple[list[dict[str, Any]], dict[str, Pat
 
 
 def _git_identity(
-    *, root: Path, repository: str, tag: str, expected_commit: str, runner: Runner
+    *,
+    root: Path,
+    repository: str,
+    tag: str,
+    expected_commit: str,
+    runner: Runner,
+    allow_ancestor_main: bool = False,
 ) -> None:
     require(runner(["git", "status", "--porcelain", "--untracked-files=all"], root) == "", "promotion_source_dirty")
     require(runner(["git", "rev-parse", "HEAD"], root).casefold() == expected_commit, "promotion_head_mismatch")
@@ -186,7 +193,11 @@ def _git_identity(
     origin = _normalize_repository(runner(["git", "remote", "get-url", "origin"], root))
     require(origin.casefold() == repository.casefold(), "promotion_origin_mismatch")
     remote_main = runner(["git", "ls-remote", "origin", "refs/heads/main"], root).split()
-    require(remote_main and remote_main[0].casefold() == expected_commit, "promotion_remote_main_mismatch")
+    require(bool(remote_main) and SHA40.fullmatch(remote_main[0].casefold()) is not None, "promotion_remote_main_mismatch")
+    remote_main_sha = remote_main[0].casefold()
+    if remote_main_sha != expected_commit:
+        require(allow_ancestor_main, "promotion_remote_main_mismatch")
+        runner(["git", "merge-base", "--is-ancestor", expected_commit, remote_main_sha], root)
     refs = runner(
         ["git", "ls-remote", "--tags", "origin", f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}"], root
     ).splitlines()
@@ -196,6 +207,52 @@ def _git_identity(
         if line.strip() and (line.endswith("^{}") or len(refs) == 1)
     }
     require(remote_commits == {expected_commit}, "promotion_remote_tag_mismatch")
+
+
+def download_draft_assets(
+    *,
+    root: Path,
+    repository: str,
+    tag: str,
+    output_dir: Path,
+    runner: Runner = run,
+) -> dict[str, Any]:
+    repository = _normalize_repository(repository)
+    require(TAG.fullmatch(tag) is not None, "promotion_tag_invalid")
+    require(not output_dir.exists() and not output_dir.is_symlink(), "promotion_download_output_exists")
+    output_dir.mkdir(parents=True, exist_ok=False)
+    try:
+        runner(["gh", "release", "download", tag, "--repo", repository, "--dir", str(output_dir)], root)
+        sums_path = output_dir / "SHA256SUMS"
+        require(sums_path.is_file() and not _is_alias(sums_path), "promotion_release_metadata_missing")
+        for raw in sums_path.read_text(encoding="utf-8").splitlines():
+            match = re.fullmatch(r"[0-9a-f]{64}  (.+)", raw)
+            require(match is not None, "promotion_checksums_invalid")
+            parsed = PurePosixPath(match.group(1))
+            require(
+                not parsed.is_absolute() and all(part not in {"", ".", ".."} for part in parsed.parts),
+                "promotion_checksums_invalid",
+            )
+            if len(parsed.parts) > 1:
+                flat_src = output_dir / parsed.name
+                nested_dst = output_dir / Path(*parsed.parts)
+                if flat_src.is_file() and not nested_dst.exists():
+                    nested_dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(flat_src), str(nested_dst))
+        assets, _ = _release_files(output_dir)
+    except Exception:
+        if output_dir.exists():
+            shutil.rmtree(output_dir, ignore_errors=True)
+        raise
+    return {
+        "contract_version": PLAN_CONTRACT,
+        "status": "draft_assets_downloaded",
+        "repository": repository,
+        "tag": tag,
+        "asset_dir": str(output_dir),
+        "asset_count": len(assets),
+        "assets": assets,
+    }
 
 
 def _release_state(*, repository: str, tag: str, root: Path, runner: Runner) -> dict[str, Any]:
@@ -237,6 +294,7 @@ def inspect_plan(
     tag: str,
     expected_commit: str,
     runner: Runner = run,
+    allow_ancestor_main: bool = False,
 ) -> dict[str, Any]:
     repository = _normalize_repository(repository)
     expected_commit = expected_commit.casefold()
@@ -255,7 +313,14 @@ def inspect_plan(
         and str(source.get("commit", "")).casefold() == expected_commit,
         "promotion_release_source_mismatch",
     )
-    _git_identity(root=root, repository=repository, tag=tag, expected_commit=expected_commit, runner=runner)
+    _git_identity(
+        root=root,
+        repository=repository,
+        tag=tag,
+        expected_commit=expected_commit,
+        runner=runner,
+        allow_ancestor_main=allow_ancestor_main,
+    )
 
     version = tag.removeprefix("v")
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -307,6 +372,7 @@ def apply_plan(
     plan_hash: str,
     runner: Runner = run,
     wait: Callable[[float], None] = time.sleep,
+    allow_ancestor_main: bool = False,
 ) -> dict[str, Any]:
     require(SHA64.fullmatch(plan_hash.casefold()) is not None, "promotion_plan_hash_invalid")
     plan = inspect_plan(
@@ -316,6 +382,7 @@ def apply_plan(
         tag=tag,
         expected_commit=expected_commit,
         runner=runner,
+        allow_ancestor_main=allow_ancestor_main,
     )
     require(plan["plan_hash"] == plan_hash.casefold(), "promotion_plan_stale")
     runner(["gh", "release", "edit", tag, "--repo", repository, "--draft=false"], root)
@@ -390,26 +457,40 @@ def verify_release_assets(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Inspect or apply one immutable GitHub Release promotion.")
+    parser = argparse.ArgumentParser(description="Download, inspect, or apply one immutable GitHub Release promotion.")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    dl = subparsers.add_parser("download-draft")
+    dl.add_argument("--repository", required=True)
+    dl.add_argument("--tag", required=True)
+    dl.add_argument("--output", required=True)
     for command in ("inspect", "apply"):
         current = subparsers.add_parser(command)
         current.add_argument("--asset-dir", required=True)
         current.add_argument("--repository", required=True)
         current.add_argument("--tag", required=True)
         current.add_argument("--expected-commit", required=True)
+        current.add_argument("--allow-ancestor-main", action="store_true")
         if command == "apply":
             current.add_argument("--plan-hash", required=True)
     args = parser.parse_args()
-    inputs = {
-        "root": ROOT,
-        "asset_dir": Path(os.path.abspath(Path(args.asset_dir).expanduser())),
-        "repository": args.repository,
-        "tag": args.tag,
-        "expected_commit": args.expected_commit,
-    }
     try:
-        result = inspect_plan(**inputs) if args.command == "inspect" else apply_plan(**inputs, plan_hash=args.plan_hash)
+        if args.command == "download-draft":
+            result = download_draft_assets(
+                root=ROOT,
+                repository=args.repository,
+                tag=args.tag,
+                output_dir=Path(os.path.abspath(Path(args.output).expanduser())),
+            )
+        else:
+            inputs = {
+                "root": ROOT,
+                "asset_dir": Path(os.path.abspath(Path(args.asset_dir).expanduser())),
+                "repository": args.repository,
+                "tag": args.tag,
+                "expected_commit": args.expected_commit,
+                "allow_ancestor_main": args.allow_ancestor_main,
+            }
+            result = inspect_plan(**inputs) if args.command == "inspect" else apply_plan(**inputs, plan_hash=args.plan_hash)
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
         return 0
     except (PromotionError, OSError, UnicodeError, json.JSONDecodeError, KeyError) as exc:

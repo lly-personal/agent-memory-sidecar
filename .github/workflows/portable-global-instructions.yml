@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -124,3 +128,30 @@ jobs:
           python -c "import glob,subprocess,sys; wheels=glob.glob('dist/*.whl'); assert len(wheels)==1;
           subprocess.check_call([sys.executable,'-m','pip','install','--no-deps',wheels[0]])" &&
           python -m agent_memory_sidecar --help
+
+  core-gate:
+    if: always()
+    needs: [contracts, public-release-smoke, package, artifact-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce all required CI gates succeeded
+        env:
+          CONTRACTS_RESULT: ${{ needs.contracts.result }}
+          RELEASE_SMOKE_RESULT: ${{ needs.public-release-smoke.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
+          ARTIFACT_SMOKE_RESULT: ${{ needs.artifact-smoke.result }}
+        run: |
+          python -c "
+          import os, sys
+          results = {
+              'contracts': os.environ['CONTRACTS_RESULT'],
+              'public-release-smoke': os.environ['RELEASE_SMOKE_RESULT'],
+              'package': os.environ['PACKAGE_RESULT'],
+              'artifact-smoke': os.environ['ARTIFACT_SMOKE_RESULT'],
+          }
+          print('core-gate upstream results:', results)
+          bad = {k: v for k, v in results.items() if v != 'success'}
+          if bad:
+              print('core-gate failed due to non-success upstream jobs:', bad, file=sys.stderr)
+              sys.exit(1)
+          "
