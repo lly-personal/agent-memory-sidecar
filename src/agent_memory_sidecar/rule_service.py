@@ -36,7 +36,51 @@ __all__ = [
     "RuleBundleRevision",
     "RuleRevision",
     "RuleService",
+    "list_instruction_rules",
 ]
+
+
+def list_instruction_rules(
+    *,
+    identity: ProjectIdentity,
+    target: str | None = None,
+    repository: InstructionRepository | None = None,
+    pending_count: int | None = 0,
+    pending_status: str | None = None,
+) -> dict[str, Any]:
+    if target not in {None, "global_agents", "project_agents"}:
+        raise CoreError(
+            "invalid_request",
+            "target must be global_agents or project_agents",
+            target=target,
+        )
+    repo = repository or InstructionRepository()
+    snapshots = repo.list_targets(
+        identity=identity,
+        target=target,
+    )
+    views = [
+        RuleView(
+            rule=rule,
+            path=snapshot.path,
+            shadowed=snapshot.shadowed,
+        )
+        for snapshot in snapshots
+        for rule in snapshot.rules
+    ]
+    payload: dict[str, Any] = {
+        "pending_count": pending_count,
+        "rules": [view.to_dict() for view in views],
+        "targets": [snapshot.capacity_dict() for snapshot in snapshots],
+        "state_counts": {
+            "待确认": pending_count,
+            "生效中": sum(not view.shadowed for view in views),
+            "已停用": sum(view.shadowed for view in views),
+        },
+    }
+    if pending_status is not None:
+        payload["pending_status"] = pending_status
+    return payload
 
 
 @dataclass(frozen=True)
@@ -193,38 +237,14 @@ class RuleService:
         )
 
     def list(self, *, target: str | None = None) -> dict[str, Any]:
-        if target not in {None, "global_agents", "project_agents"}:
-            raise CoreError(
-                "invalid_request",
-                "target must be global_agents or project_agents",
-                target=target,
-            )
-        snapshots = self.repository.list_targets(
+        return list_instruction_rules(
             identity=self.identity,
             target=target,
+            repository=self.repository,
+            pending_count=self.runtime.pending_count(
+                scope_key=self.identity.scope_key
+            ),
         )
-        views = [
-            RuleView(
-                rule=rule,
-                path=snapshot.path,
-                shadowed=snapshot.shadowed,
-            )
-            for snapshot in snapshots
-            for rule in snapshot.rules
-        ]
-        pending_count = self.runtime.pending_count(
-            scope_key=self.identity.scope_key
-        )
-        return {
-            "pending_count": pending_count,
-            "rules": [view.to_dict() for view in views],
-            "targets": [snapshot.capacity_dict() for snapshot in snapshots],
-            "state_counts": {
-                "待确认": pending_count,
-                "生效中": sum(not view.shadowed for view in views),
-                "已停用": sum(view.shadowed for view in views),
-            },
-        }
 
     def create_proposal(
         self,

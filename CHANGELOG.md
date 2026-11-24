@@ -3,6 +3,13 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.7.4 (2026-11-24)
+
+- Add strict read-only Store connection mode (`CoreDatabase(..., read_only=True)`) using SQLite URI `?mode=ro`, `PRAGMA query_only = ON`, and read-only identity checks (`validate_store_identity` with no `chmod`/`SetFileSecurityW` mutation), rejecting write transactions (`store_read_only`) and translating OS `PermissionError` into structured `store_permission_denied` instead of `internal_error` (`database.py`, `file_security.py`).
+- Switch `agent-memory rule list` to open Core Store read-only and, when a restricted sandbox (such as Codex Windows `-s read-only`) cannot access the private Store (`store_permission_denied`), continue reading confirmed rules and capacity directly from authoritative `AGENTS.md` while honestly reporting `pending_count: null`, `state_counts["待确认"]: null`, and `pending_status: "store_access_restricted"` (keeping missing, corrupt, symlinked, or schema-mismatched Stores fail-closed; `cli.py`, `rule_service.py`, `docs/specs/interface.md`).
+- Add regression tests covering read-only file/directory Store queries, write-transaction rejection, corrupt DB fail-closed behavior, and `rule list` restricted-Store degradation (`tests/test_core_database.py`, `tests/test_cli_and_package.py`).
+- Components: Core 0.7.4, Plugin 1.12.4, Bootstrap 2.6.2, and Scout 5.20.2.
+
 ## 0.7.3 (2026-11-24)
 
 - Close security, rollback, and UX findings from post-`v0.7.2` multi-model blind peer review and fresh-session handoff acceptance:

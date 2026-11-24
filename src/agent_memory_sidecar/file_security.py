@@ -309,6 +309,7 @@ def assert_physical_directory_chain(
     allow_missing_tail: bool = False,
     missing_code: str = "store_unsafe",
     unsafe_code: str = "store_unsafe",
+    permission_denied_code: str | None = None,
     missing_message: str = "Core Store ancestor metadata is unavailable",
     unsafe_message: str = "Core Store ancestor must be a physical directory",
     unavailable_message: str = "Core Store ancestor metadata is unavailable",
@@ -319,6 +320,12 @@ def assert_physical_directory_chain(
     if not logical.parts[1:]:
         try:
             value = cursor.lstat()
+        except PermissionError as exc:
+            raise CoreError(
+                permission_denied_code or unsafe_code,
+                unavailable_message,
+                path=str(cursor),
+            ) from exc
         except OSError as exc:
             raise CoreError(unsafe_code, unavailable_message, path=str(cursor)) from exc
         if not stat.S_ISDIR(value.st_mode) or stat.S_ISLNK(value.st_mode) or _is_reparse_point(value):
@@ -332,6 +339,12 @@ def assert_physical_directory_chain(
             if allow_missing_tail:
                 return None
             raise CoreError(missing_code, missing_message, path=str(cursor)) from exc
+        except PermissionError as exc:
+            raise CoreError(
+                permission_denied_code or unsafe_code,
+                unavailable_message,
+                path=str(cursor),
+            ) from exc
         except OSError as exc:
             raise CoreError(unsafe_code, unavailable_message, path=str(cursor)) from exc
         alias = stat.S_ISLNK(value.st_mode) or _is_reparse_point(value)
@@ -358,8 +371,14 @@ def assert_physical_directory_chain(
     return value
 
 
-def _validate_physical_directory_chain(path: Path) -> None:
-    assert_physical_directory_chain(path, allow_missing_tail=False)
+def _validate_physical_directory_chain(
+    path: Path, *, permission_denied_code: str | None = None
+) -> None:
+    assert_physical_directory_chain(
+        path,
+        allow_missing_tail=False,
+        permission_denied_code=permission_denied_code,
+    )
 
 
 def assert_physical_regular_file(
@@ -641,27 +660,47 @@ def secure_store_location(path: Path | str, *, allow_missing: bool) -> Path:
 
 
 def validate_store_identity(
-    path: Path | str, *, allow_missing: bool
+    path: Path | str,
+    *,
+    allow_missing: bool,
+    permission_denied_code: str | None = None,
 ) -> Path:
     target, _ = _validated_store_location(
         path,
         allow_missing=allow_missing,
+        permission_denied_code=permission_denied_code,
     )
     return target
 
 
 def _validated_store_location(
-    path: Path | str, *, allow_missing: bool
+    path: Path | str,
+    *,
+    allow_missing: bool,
+    permission_denied_code: str | None = None,
 ) -> tuple[Path, os.stat_result | None]:
     target = logical_absolute(path)
     parent = target.parent
-    _validate_physical_directory_chain(parent)
+    _validate_physical_directory_chain(
+        parent,
+        permission_denied_code=permission_denied_code,
+    )
 
     file_stat: os.stat_result | None
     try:
         file_stat = target.lstat()
     except FileNotFoundError:
         file_stat = None
+    except PermissionError as exc:
+        raise CoreError(
+            permission_denied_code or "store_unsafe",
+            (
+                "Core Store is not accessible in the current execution context"
+                if permission_denied_code
+                else "Core Store metadata is unavailable"
+            ),
+            path=str(target),
+        ) from exc
     except OSError as exc:
         raise CoreError(
             "store_unsafe",
