@@ -1007,13 +1007,17 @@ class CliAndPackageTests(unittest.TestCase):
             finally:
                 os.chmod(store, stat.S_IREAD | stat.S_IWRITE)
 
-            # 2. Restricted sandbox (PermissionError on private Store) still returns AGENTS.md rules honestly
+            # 2. Restricted sandbox (PermissionError on private Store + no writable temp dir) still returns AGENTS.md rules honestly
             out_restricted = io.StringIO()
             with (
                 patch.dict(os.environ, {"CODEX_HOME": str(codex)}),
                 patch(
                     "agent_memory_sidecar.cli.CoreDatabase",
                     side_effect=CoreError("store_permission_denied", "restricted sandbox"),
+                ),
+                patch(
+                    "agent_memory_sidecar.instructions.tempfile.gettempdir",
+                    side_effect=FileNotFoundError("No usable temporary directory found"),
                 ),
                 redirect_stdout(out_restricted),
             ):
