@@ -22,7 +22,7 @@
 8. [`0058-persistent-runtime-journal.zh.md`](decisions/0058-persistent-runtime-journal.zh.md)：短生命周期 Runtime 的 SQLite policy、性能依据与回滚条件。
 9. [`0059-bounded-behavior-set-evolution.zh.md`](decisions/0059-bounded-behavior-set-evolution.zh.md)：当前规则集演化、容量与 authority 去重决策。
 10. [`user-guide.zh.md`](user-guide.zh.md)：用户可见操作。
-11. [`operator-reference.zh.md`](operator-reference.zh.md) 与 [`codex-desktop-setup.md`](codex-desktop-setup.md)：安装、Doctor 与维护操作。
+11. [`sops/workstation-reconcile.zh.md`](sops/workstation-reconcile.zh.md) 与 [`README.md`](../README.md)：安装、Doctor、工作站调和与多宿主运维操作（配合 `scripts/sync_release_versions.py`、`scripts/verify_release_sandbox.py`、`scripts/publish_release.py`、`scripts/deploy_multihost.py`；[`codex-desktop-setup.md`](codex-desktop-setup.md) 保留早期 Codex 桌面安装快照参考）。
 12. [`knowledge/README.md`](knowledge/README.md)：当前知识路由与平台事实边界。
 13. [`src/agent_memory_sidecar`](../src/agent_memory_sidecar)：规范投影后的可执行实现。
 14. [`public-distribution-v1.md`](../specs/public-distribution-v1.md) 与
@@ -62,6 +62,7 @@ Global Owner Scout 的确认交接还必须读取 [`ADR 0070`](decisions/0070-at
 - ADR 0061 的来源分片和 ADR 0062 的固定七槽只记录未激活或失败的 Scheduled 中央传输尝试；ADR 0063 已将
   当前路径收敛为每个项目直接呈现完整 Review Pack，因此公开树只保留这条 supersession 结论。
 - `docs/evidence/` 中公开的 dated records 只证明当时 checkout，不自动证明当前实现；私有 evidence 不进入公开事实面。
+- [`operator-reference.zh.md`](operator-reference.zh.md)（`Last verified: 2026-08-22`）已退出日常操作推荐路径，仅保留原 URL 作历史快照参考。
 - `v0.2.0` tag 是旧可执行系统的回滚来源，不能作为 Core v1 的兼容要求。
 
 需要考古冻结归档时只能只读使用。任何仍影响当前行为的理由必须先脱敏，并通过公开 Issue/PR 写入本页路由的

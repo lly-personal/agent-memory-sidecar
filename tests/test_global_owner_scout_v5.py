@@ -103,8 +103,8 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         finally:
             connection.close()
 
-    @staticmethod
-    def materialization_result(source_commit: str) -> dict[str, object]:
+    @classmethod
+    def materialization_result(cls, source_commit: str) -> dict[str, object]:
         return {
             "core": {
                 "status": "verified",
@@ -116,12 +116,12 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             "doctor": "verified",
             "bootstrap_skill": {
                 "status": "unchanged",
-                "version": "2.6.2",
+                "version": cls.managed_sources.BOOTSTRAP_VERSION,
                 "content_sha256": "b" * 64,
             },
             "scout_skill": {
                 "status": "unchanged",
-                "version": "5.20.2",
+                "version": cls.managed_sources.SCOUT_VERSION,
                 "content_sha256": "c" * 64,
             },
         }
@@ -868,8 +868,8 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
         desired = {
             "release_ref": "v0.3.10", "source_commit": "a" * 40,
             "core_version": "0.3.10", "plugin_version": "1.5.1", "plugin_sha256": "b" * 64,
-            "bootstrap_version": "2.6.2", "bootstrap_sha256": "c" * 64,
-            "scout_version": "5.20.2", "scout_sha256": "d" * 64,
+            "bootstrap_version": self.managed_sources.BOOTSTRAP_VERSION, "bootstrap_sha256": "c" * 64,
+            "scout_version": self.managed_sources.SCOUT_VERSION, "scout_sha256": "d" * 64,
         }
         source_sha = "e" * 64
         pack = self.managed_sources.build_deployment_pack(
@@ -886,15 +886,15 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             host_materialization={
                 "core": {"status": "verified", "version": "0.3.10", "source_commit": "a" * 40, "artifact_sha256": "f" * 64},
                 "global_binding": "unavailable", "doctor": "verified",
-                "bootstrap_skill": {"status": "unchanged", "version": "2.6.2", "content_sha256": "c" * 64},
-                "scout_skill": {"status": "unchanged", "version": "5.20.2", "content_sha256": "d" * 64},
+                "bootstrap_skill": {"status": "unchanged", "version": self.managed_sources.BOOTSTRAP_VERSION, "content_sha256": "c" * 64},
+                "scout_skill": {"status": "unchanged", "version": self.managed_sources.SCOUT_VERSION, "content_sha256": "d" * 64},
             },
             requires_reload=True,
             consumer_verified=False,
             generated_at="2026-08-21T12:00:00+08:00",
         )
         validated = self.managed_sources.validate_pack(pack)
-        self.assertEqual("2.6.2", validated["desired_bundle"]["bootstrap_version"])
+        self.assertEqual(self.managed_sources.BOOTSTRAP_VERSION, validated["desired_bundle"]["bootstrap_version"])
         rendered = self.managed_sources.render_pack(pack)
         for label in ("期望发行身份", "Plugin 分发", "能力源同步", "主机物化", "项目消费者范围", "消费者入口条件"):
             self.assertIn(label, rendered)
@@ -933,23 +933,17 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             self.assertIn("workstation-reconcile --verify-consumer", text)
             self.assertNotIn("In that task, invoke", text)
         marketplace = ROOT / ".agents" / "plugins" / "marketplace.json"
-        if marketplace.is_file():
-            text = marketplace.read_text(encoding="utf-8")
-            self.assertIn('"installation": "AVAILABLE"', text)
-            value = self.managed_sources.validate_marketplace(
-                json.loads(text),
-                expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
-            )
-            import tomllib
+        self.assertTrue(marketplace.is_file(), "public main requires .agents/plugins/marketplace.json")
+        text = marketplace.read_text(encoding="utf-8")
+        self.assertIn('"installation": "AVAILABLE"', text)
+        value = self.managed_sources.validate_marketplace(
+            json.loads(text),
+            expected_remote="https://github.com/lly-personal/agent-memory-sidecar.git",
+        )
+        import tomllib
 
-            core_version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
-            self.assertEqual(f"v{core_version}", value["plugins"][0]["source"]["ref"])
-        else:
-            self.assertTrue(
-                (ROOT / "PUBLIC_EXPORT_RECEIPT.json").is_file()
-                or (ROOT / "PUBLIC_AUTHORITY.json").is_file()
-            )
-            self.assertTrue((ROOT / "LICENSE").is_file())
+        core_version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+        self.assertEqual(f"v{core_version}", value["plugins"][0]["source"]["ref"])
 
     def test_scout_validator_renderer_and_visible_verifier_self_tests(self) -> None:
         for script in (SCOUT_VALIDATOR, SCOUT_RENDERER, SCOUT_VISIBLE_VERIFIER, SCOUT_DELIVERY, SCOUT_OWNER_RESOLVER):
@@ -1094,7 +1088,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
     def test_v5_prompt_has_no_fixed_binding(self) -> None:
         prompt = (
             "Use $global-owner-scout in project_scout mode for the current bound project; rolling 72 hours; "
-            "Skill 5.20.2; global_owner_scout_project_v7; global_owner_scout_review_pack_v8; "
+            f"Skill {self.managed_sources.SCOUT_VERSION}; global_owner_scout_project_v7; global_owner_scout_review_pack_v8; "
             "gpt-5.6-sol; medium; read-only."
         )
         self.bootstrap.validate_prompt(prompt)
@@ -2248,7 +2242,7 @@ class GlobalOwnerScoutV55Tests(unittest.TestCase):
             target = Path(temporary) / "global-owner-scout"
             source = ROOT / "skills" / "global-owner-scout"
             installed = self.bootstrap.install_skill(source, target)
-            self.assertEqual("5.20.2", installed["version"])
+            self.assertEqual(self.managed_sources.SCOUT_VERSION, installed["version"])
             helper = target / "scripts" / "prepare_delivery.py"
             dispatcher = target / "scripts" / "scout.py"
             self.assertTrue(helper.is_file())

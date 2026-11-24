@@ -66,3 +66,12 @@ tag digest 和签名验证器，后者再次取证和验签，只额外匹配本
 
 验收保留原有发布、回滚边界和全部兼容矩阵，并增加上述反例回归。通用层已有按规模执行、消融与有效证据复用的
 规则；本次将具体改变归入本 ADR 和既有发布契约，不新增全局规则、第二套流程或维护服务。
+
+## 2026-11-24：CI 分层聚合、前置真机门禁与单源版本同步
+
+在 `v0.7.0`–`v0.7.5` 高频迭代取证中出现四项改变既有取舍的新事实：
+
+1. **PR 并发重叠前提失效**：2026-11-02 抽样未见同 PR 重叠，但 2026-11-23/24 的 Actions 记录（运行 `45224982920` 与 `45204658455`）证实旧 PR run 在新提交触发时仍在占用 Windows 契约 runner。因此在 `portable-global-instructions.yml` 启用**仅限 `pull_request`** 的 `concurrency: cancel-in-progress: true`，`main` 与 `v*` tag 运行保持绝不取消。
+2. **Ruleset 硬绑 24 项具体矩阵与非资格观测 job**：PR #98 单次消耗 23 个 job / 34.7 runner-min（Windows `contracts` 约 7 分钟），且规范明定“不授予性能资格”的 3 个 `performance-observation` job 被锁作合并必检。现已通过并行上线 `core-gate`（`if: always()` 严格校验必需上游全 `success`）验证上报后，将 `main-governance`（`20830772`）收敛为 `core-gate` + CodeQL `analyze`；PR 保留 5 组边界契约（Windows 3.12/3.13、macOS 3.13、Ubuntu 3.11/3.13）+ 2 组跨 OS wheel 烟测，`push: main` 保留同 SHA 的 Ubuntu `public-release-smoke` + `core-gate` 与独立 CodeQL；完整 3×3 矩阵与按需 `performance-observation` 迁至 `release-candidate.yml`（`workflow_dispatch`）。
+3. **验证顺序倒置导致两次烧掉不可变 tag**：`v0.7.0`（Windows `mkdtemp` 剥离继承 ACL）与 `v0.7.4`（`InstructionRepository.__init__` 急切调用 `tempfile.gettempdir()`）均在 24 项 CI 全绿后发布，并在原生 Windows Codex `--sandbox read-only` 首次运行崩溃。现新增 `scripts/verify_release_sandbox.py`，在选定 `main` 提交分配不可变 `v*` tag 前从 `git archive` 构建候选 wheel、安装 Skill 并在真实只读沙盒验证 `agent-memory.py rule list` 与保护文件零写入；同时保留 `v0.7.3` 受保护 tag 并按契约撤回其过期 draft。
+4. **单源版本同步与草稿下载韧性**：新增 `scripts/sync_release_versions.py` 从 `pyproject.toml` 同步所有版本文件与双 Anchor 副本，消除手抄 11 文件及测试硬编码字面量；`publish_release.py` 增加 `download-draft`（直走 `gh release download` 避开 Actions Artifact Blob `503`）与显式 `--allow-ancestor-main`，支持多个 PR 合入 `Unreleased` 后再选定 SHA 统一发版。全部不可变发布、draft-only CI、单次验签全资产与 `release-tag-immutability` 护栏保持不变。

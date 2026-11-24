@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a validated Global Owner Scout 5.20.2 Review Pack as deterministic Chinese Markdown."""
+"""Render a validated Global Owner Scout 5.20.3 Review Pack as deterministic Chinese Markdown."""
 
 from __future__ import annotations
 
@@ -21,8 +21,6 @@ from validate_output import (
     canonical_json,
     project_claim_hash,
     review_bundle,
-    valid_project,
-    valid_review_pack,
     validate_review_pack,
 )
 
@@ -601,6 +599,7 @@ def render_review_pack(pack: dict[str, Any], *, surface: str, visual: str | None
 
 
 def run_self_test() -> None:
+    from validate_output import valid_project, valid_review_pack
     from verify_visible_output import RECOVERY_BLOCK_RE
 
     tests = 0

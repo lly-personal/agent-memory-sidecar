@@ -216,6 +216,21 @@ def compute_expected_files(
     )
     put_text("README.md", readme)
 
+    # 6b. Active L2/L3 spec Bootstrap version mentions
+    put_text(
+        "docs/specs/topology.md",
+        _sub_once(text_of("docs/specs/topology.md"), r"Bootstrap [0-9]+\.[0-9]+\.[0-9]+ 先通过", f"Bootstrap {bootstrap} 先通过", "topology.md bootstrap"),
+    )
+    put_text(
+        "docs/specs/interface.md",
+        _sub_once(
+            text_of("docs/specs/interface.md"),
+            r"`agent-memory-workstation-bootstrap` Skill [0-9]+\.[0-9]+\.[0-9]+ 提供三个显式模式",
+            f"`agent-memory-workstation-bootstrap` Skill {bootstrap} 提供三个显式模式",
+            "interface.md bootstrap",
+        ),
+    )
+
     # 7. Dual Anchor single-source projection: plugins/.../anchor -> .agents/skills/anchor
     plugin_anchor = root / PLUGIN_ANCHOR_REL
     repo_anchor = root / REPO_ANCHOR_REL

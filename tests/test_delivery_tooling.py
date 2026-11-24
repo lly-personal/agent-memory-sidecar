@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 
@@ -38,6 +39,8 @@ class SyncReleaseVersionsTests(unittest.TestCase):
             ".agents/plugins/marketplace.json",
             "COMPATIBILITY.md",
             "README.md",
+            "docs/specs/topology.md",
+            "docs/specs/interface.md",
             "skills/agent-memory-workstation-bootstrap/SKILL.md",
             "skills/agent-memory-workstation-bootstrap/references/contracts.md",
             "skills/agent-memory-workstation-bootstrap/scripts/bootstrap_contracts.py",
@@ -264,6 +267,158 @@ class PublishReleaseEnhancementTests(unittest.TestCase):
                 allow_ancestor_main=True,
             )
             self.assertEqual("authorization_required", plan["status"])
+
+
+class ScoutRuntimeDecouplingTests(unittest.TestCase):
+    def test_normal_scout_modules_import_without_selftest_fixture_module(self) -> None:
+        scout_scripts = str(ROOT / "skills" / "global-owner-scout" / "scripts")
+        script = (
+            "import sys\n"
+            f"sys.path.insert(0, {scout_scripts!r})\n"
+            "sys.modules['validate_output_selftest'] = None\n"
+            "import validate_output, render_review, verify_visible_output, prepare_delivery, scout\n"
+            "assert scout.canonical_json is validate_output.canonical_json\n"
+            "assert scout.sha256_bytes is prepare_delivery.sha256_bytes\n"
+            "assert scout.build_preflight_summary('codex', 'inspect')['host'] == 'codex'\n"
+            "print('DECOUPLED_OK')\n"
+        )
+        proc = subprocess.run(
+            [sys.executable, "-B", "-c", script],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        self.assertEqual(0, proc.returncode, f"stdout={proc.stdout}\nstderr={proc.stderr}")
+        self.assertIn("DECOUPLED_OK", proc.stdout)
+
+
+class DeployMultiHostTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.deploy = _load("test_deploy_multihost_mod", "scripts/deploy_multihost.py")
+
+    def _make_resolved_fixture(self, base: Path) -> Path:
+        resolved_dir = base / "resolved"
+        portable = resolved_dir / "portable"
+        for rel in (
+            ".agents/skills/global-owner-scout/SKILL.md",
+            ".agents/skills/global-owner-scout/scripts/scout.py",
+            "plugins/agent-memory-sidecar/skills/engineering-contract-review/SKILL.md",
+            ".agents/skills/agent-memory-workstation-bootstrap/scripts/managed_sources.py",
+        ):
+            p = portable / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(f"# fixture {rel}\n", encoding="utf-8")
+        (portable / "source-manifest.json").write_text('{"sidecar":{"ref":"v0.7.6"}}\n', encoding="utf-8")
+        (resolved_dir / "release-manifest.json").write_text(
+            json.dumps({"versions": {"core": "0.7.6", "plugin": "1.12.6", "bootstrap": "2.6.3", "scout": "5.20.3"}}),
+            encoding="utf-8",
+        )
+        (resolved_dir / "resolution.json").write_text(
+            json.dumps({
+                "status": "verified",
+                "tag": "v0.7.6",
+                "commit": "b" * 40,
+                "portable_root": "portable",
+            }),
+            encoding="utf-8",
+        )
+        return resolved_dir
+
+    def test_antigravity_atomic_projection_dry_run_apply_and_noop(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            resolved_dir = self._make_resolved_fixture(base)
+            ag_home = base / "antigravity"
+            ag_home.mkdir()
+
+            plan = self.deploy.deploy_multihost(
+                hosts=("antigravity",),
+                antigravity_home=ag_home,
+                apply=False,
+                resolved_dir=resolved_dir,
+            )
+            self.assertEqual("ok", plan["status"])
+            self.assertEqual("planned", plan["hosts"]["antigravity"]["status"])
+
+            applied = self.deploy.deploy_multihost(
+                hosts=("antigravity",),
+                antigravity_home=ag_home,
+                apply=True,
+                resolved_dir=resolved_dir,
+            )
+            self.assertEqual("ok", applied["status"])
+            self.assertEqual("applied", applied["hosts"]["antigravity"]["status"])
+            self.assertTrue((ag_home / "config/skills/global-owner-scout/SKILL.md").is_file())
+            self.assertTrue((ag_home / "config/skills/engineering-contract-review/SKILL.md").is_file())
+            # Guard against sentinel bug: fresh install must never touch CWD or repo root.
+            self.assertTrue((ROOT / ".claude-plugin/marketplace.json").is_file())
+            self.assertTrue((ROOT / ".agents/plugins/marketplace.json").is_file())
+
+            noop = self.deploy.deploy_multihost(
+                hosts=("antigravity",),
+                antigravity_home=ag_home,
+                apply=True,
+                resolved_dir=resolved_dir,
+            )
+            self.assertEqual("noop", noop["hosts"]["antigravity"]["status"])
+
+    def test_trusted_posix_root_alias_accepts_only_root_owned_top_level_symlink(self) -> None:
+        root_link = types.SimpleNamespace(st_mode=0o120777, st_uid=0)
+        user_link = types.SimpleNamespace(st_mode=0o120777, st_uid=501)
+        self.assertTrue(self.deploy._is_trusted_posix_root_alias(Path("/var"), root_link, platform="posix"))
+        self.assertFalse(self.deploy._is_trusted_posix_root_alias(Path("/var/tmp"), root_link, platform="posix"))
+        self.assertFalse(self.deploy._is_trusted_posix_root_alias(Path("/var"), user_link, platform="posix"))
+        self.assertFalse(self.deploy._is_trusted_posix_root_alias(Path("/var"), root_link, platform="nt"))
+
+    def test_codex_confirmation_guard_and_pi_dirty_checkout_preservation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            resolved_dir = self._make_resolved_fixture(base)
+            pi_checkout = base / "pi-repo"
+            (pi_checkout / ".git").mkdir(parents=True)
+
+            def fake_runner(command: list[str], *, cwd: Path | None = None, timeout: int = 180):
+                del cwd, timeout
+                if "workstation-reconcile" in command and "--dry-run" in command:
+                    return subprocess.CompletedProcess(
+                        command,
+                        0,
+                        json.dumps({
+                            "status": "confirmation_required",
+                            "confirmation_required": True,
+                            "changes": ["source:sidecar:replace"],
+                            "plan_hash": "e" * 64,
+                        }),
+                        "",
+                    )
+                if command[0] == "fake-pi" and command[1:] == ["list"]:
+                    return subprocess.CompletedProcess(command, 0, f"agent-memory-sidecar {pi_checkout}\n", "")
+                if command[:3] == ["git", "-C", str(pi_checkout)] and "status" in command:
+                    return subprocess.CompletedProcess(command, 0, " M dirty.txt\n", "")
+                if command[:3] == ["git", "-C", str(pi_checkout)] and "rev-parse" in command:
+                    return subprocess.CompletedProcess(command, 0, "a" * 40 + "\n", "")
+                raise AssertionError(f"unexpected command: {command}")
+
+            codex_res = self.deploy._deploy_codex(
+                portable=resolved_dir / "portable",
+                release_manifest=resolved_dir / "release-manifest.json",
+                codex_home=base / "codex",
+                apply=True,
+                confirm_source_change=False,
+                runner=fake_runner,
+            )
+            self.assertEqual("confirmation_required", codex_res["status"])
+
+            pi_res = self.deploy._deploy_pi(
+                tag="v0.7.6",
+                commit="b" * 40,
+                apply=True,
+                runner=fake_runner,
+                pi_executable="fake-pi",
+            )
+            self.assertEqual("blocked", pi_res["status"])
+            self.assertEqual("pi_checkout_dirty_or_incomplete_preserved", pi_res["error"])
 
 
 if __name__ == "__main__":

@@ -15,11 +15,21 @@ permissions:
 
 jobs:
   contracts:
+    if: github.event_name != 'push'
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-        python-version: ["3.11", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python-version: "3.12"
+          - os: windows-latest
+            python-version: "3.13"
+          - os: macos-latest
+            python-version: "3.13"
+          - os: ubuntu-latest
+            python-version: "3.11"
+          - os: ubuntu-latest
+            python-version: "3.13"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,28 +49,6 @@ jobs:
         run: >-
           python -m unittest discover &&
           python scripts/check_doc_links.py
-
-  performance-observation:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.13"
-      - name: Install Sidecar
-        run: python -m pip install -e .
-      - name: Record hosted-runner performance observation
-        env:
-          AGENT_MEMORY_PERFORMANCE_MODE: "observe"
-          PYTHONDONTWRITEBYTECODE: "1"
-        run: python -m unittest -v tests.test_performance
 
   public-release-smoke:
     runs-on: ubuntu-latest
@@ -84,6 +72,7 @@ jobs:
           tests.test_public_distribution.PublicDistributionTests.test_positive_public_release_lane
 
   package:
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -108,12 +97,16 @@ jobs:
           if-no-files-found: error
 
   artifact-smoke:
+    if: github.event_name != 'push'
     needs: package
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-        python-version: ["3.11", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python-version: "3.12"
+          - os: macos-latest
+            python-version: "3.13"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -134,8 +127,9 @@ jobs:
     needs: [contracts, public-release-smoke, package, artifact-smoke]
     runs-on: ubuntu-latest
     steps:
-      - name: Enforce all required CI gates succeeded
+      - name: Enforce required CI gates for event type
         env:
+          EVENT_NAME: ${{ github.event_name }}
           CONTRACTS_RESULT: ${{ needs.contracts.result }}
           RELEASE_SMOKE_RESULT: ${{ needs.public-release-smoke.result }}
           PACKAGE_RESULT: ${{ needs.package.result }}
@@ -143,14 +137,20 @@ jobs:
         run: |
           python -c "
           import os, sys
+          event = os.environ['EVENT_NAME']
           results = {
               'contracts': os.environ['CONTRACTS_RESULT'],
               'public-release-smoke': os.environ['RELEASE_SMOKE_RESULT'],
               'package': os.environ['PACKAGE_RESULT'],
               'artifact-smoke': os.environ['ARTIFACT_SMOKE_RESULT'],
           }
-          print('core-gate upstream results:', results)
-          bad = {k: v for k, v in results.items() if v != 'success'}
+          print(f'core-gate ({event}) upstream results:', results)
+          required = ['public-release-smoke'] if event == 'push' else list(results)
+          bad = {k: results[k] for k in required if results[k] != 'success'}
+          if event == 'push':
+              for k in ('contracts', 'package', 'artifact-smoke'):
+                  if results[k] not in ('skipped', 'success'):
+                      bad[k] = results[k]
           if bad:
               print('core-gate failed due to non-success upstream jobs:', bad, file=sys.stderr)
               sys.exit(1)
