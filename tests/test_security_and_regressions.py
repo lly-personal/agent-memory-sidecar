@@ -99,13 +99,13 @@ class CliDailyOnlyAndReleaseVersionTests(unittest.TestCase):
 
             # Baseline copy passes version_facts
             facts = build_release_artifacts.version_facts(fake_root)
-            self.assertEqual("5.20.2", facts["scout"])
+            self.assertEqual(managed_sources.SCOUT_VERSION, facts["scout"])
 
             # Perturb validate_output.py SKILL_VERSION only
             vo_path = fake_root / "skills" / "global-owner-scout" / "scripts" / "validate_output.py"
             text = vo_path.read_text(encoding="utf-8")
-            self.assertIn('SKILL_VERSION = "5.20.2"', text)
-            vo_path.write_text(text.replace('SKILL_VERSION = "5.20.2"', 'SKILL_VERSION = "5.99.0"', 1), encoding="utf-8")
+            self.assertIn(f'SKILL_VERSION = "{managed_sources.SCOUT_VERSION}"', text)
+            vo_path.write_text(text.replace(f'SKILL_VERSION = "{managed_sources.SCOUT_VERSION}"', 'SKILL_VERSION = "5.99.0"', 1), encoding="utf-8")
 
             with self.assertRaisesRegex(build_release_artifacts.ReleaseError, "release_scout_version_mismatch"):
                 build_release_artifacts.version_facts(fake_root)
@@ -194,7 +194,7 @@ class ScoutPreflightAndSecurityTests(unittest.TestCase):
                 )
                 data = json.loads(proc.stdout)
                 self.assertEqual("global_owner_scout_preflight_summary_v1", data["contract_version"])
-                self.assertEqual("5.20.2", data["skill_version"])
+                self.assertEqual(managed_sources.SCOUT_VERSION, data["skill_version"])
                 self.assertEqual(host, data["host"])
                 self.assertEqual(purpose, data["purpose"])
                 self.assertEqual(proj_c, data["project_contract"])

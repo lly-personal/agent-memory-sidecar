@@ -7,7 +7,7 @@ description: Understand a project's goals, actors, scenarios and real workflows 
 
 ## Contract
 
-- Skill version: `5.20.2`
+- Skill version: `5.20.3`
 - Project result: `global_owner_scout_project_v7` (`native`: `global_owner_scout_project_v8`)
 - User review: `global_owner_scout_review_pack_v8` (`native`: `global_owner_scout_review_pack_v9`)
 - Delivery manifest: `global_owner_scout_delivery_v2`; Manifest-free terminal: `global_owner_scout_terminal_v1`; Preflight snapshot: `global_owner_scout_preflight_v1`

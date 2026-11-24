@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify exact Global Owner Scout 5.20.2 renderer or artifact Markdown bytes."""
+"""Verify exact Global Owner Scout 5.20.3 renderer or artifact Markdown bytes."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ if _SCRIPT_DIR not in sys.path:
 from utf8_stdio import configure_utf8_stdio
 
 from render_review import RECOVERY_BLOCK_END, RECOVERY_BLOCK_START, extract_conversation_brief
-from validate_output import ContractError, canonical_json, selection_token, valid_project, valid_review_pack
+from validate_output import ContractError, canonical_json, selection_token
 
 
 HASH = r"[0-9a-f]{64}"
@@ -186,6 +186,7 @@ def expect_invalid(value: str, label: str, *, surface: str = "interactive") -> N
 
 def run_self_test() -> None:
     from render_review import render_review_pack
+    from validate_output import valid_project, valid_review_pack
 
     tests = 0
     for surface in ("interactive", "scheduled"):

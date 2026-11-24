@@ -19,8 +19,8 @@ if _SCRIPT_DIR not in sys.path:
 from bootstrap_security import BootstrapError, physical_file_bytes
 
 
-BOOTSTRAP_VERSION = "2.6.2"
-SCOUT_VERSION = "5.20.2"
+BOOTSTRAP_VERSION = "2.6.3"
+SCOUT_VERSION = "5.20.3"
 PACK_VERSION = "agent_memory_workstation_deployment_pack_v4"
 DESKTOP_PROJECT_INVENTORY_VERSION = "agent_memory_desktop_project_inventory_v1"
 WORKSTATION_RECONCILE_PLAN_VERSION = "agent_memory_workstation_reconcile_plan_v2"

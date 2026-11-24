@@ -27,6 +27,7 @@ from prepare_delivery import (
     render_blocked_receipt,
     render_delivery_receipt,
     render_terminal_receipt,
+    sha256_bytes,
     validate_delivery_manifest,
     verify_final_receipt,
 )
@@ -51,6 +52,7 @@ from validate_output import (
     REVIEW_PACK_CONTRACT,
     SKILL_VERSION,
     canonical_hash,
+    canonical_json,
     describe_input,
     expected_action_policy,
     project_claim_hash,
@@ -77,14 +79,6 @@ def load_stdin_json(input_file: Path | None = None) -> Any:
         return json.loads(safe_artifact_bytes(input_file).decode('utf-8-sig')) if input_file else json.load(sys.stdin)
     except json.JSONDecodeError as exc:
         raise ContractError(f"stdin is not valid JSON: {exc}") from exc
-
-
-def canonical_json(value: dict[str, Any]) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-
-
-def sha256_bytes(value: bytes) -> str:
-    return hashlib.sha256(value).hexdigest()
 
 
 def build_preflight_summary(host: str, purpose: str) -> dict[str, Any]:

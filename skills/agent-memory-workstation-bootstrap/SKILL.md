@@ -7,12 +7,12 @@ description: Synchronize and materialize portable Agent Memory capability from a
 
 ## Contract
 
-- Skill version: `2.6.2`
+- Skill version: `2.6.3`
 - Modes: `inspect`, `verify_consumer`, `apply_enrollment`
 - Deployment pack: `agent_memory_workstation_deployment_pack_v4`
 - Enrollment pack: `global_owner_scout_enrollment_pack_v1`
 - Host profile: `global_owner_scout_host_profile_v1`
-- Read [references/contracts.md](references/contracts.md) completely before either mode.
+- For routine `inspect` / `verify_consumer`, read the cold-start source, Reconcile Plan, and Deployment Pack sections of [references/contracts.md](references/contracts.md); skip Scheduled-only Enrollment Pack and Host Profile sections unless entering `apply_enrollment`.
 
 This Skill separates six facts that must never be collapsed:
 
@@ -58,7 +58,7 @@ migration continue through `inspect` below.
      root/commit match exactly. One-sided, dirty, or mismatched Owner state fails closed.
 3. Run exact-hash `workstation-reconcile --apply`. Marketplace/Plugin mutation participates in the source-cutover rollback
    transaction. The transaction then runs Core setup, binds the explicit or preserved canonical Owner, verifies Doctor, installs
-   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.6.2`, Scout `5.20.2`,
+   both versioned Skills, and performs exact readback before releasing rollback state. Validate Bootstrap `2.6.3`, Scout `5.20.3`,
    and every desired identity. The result is `reload_required`; it proves host materialization, not model adoption or project-level
    same-name Skill parity.
 4. If the user also requested verification, continue through `verify_consumer` in this same task after exact readback; that request

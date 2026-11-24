@@ -28,7 +28,7 @@ from scout_security import (
     validate_output_root,
 )
 from utf8_stdio import configure_utf8_stdio
-from validate_output import ContractError, valid_project, valid_review_pack, validate_review_pack
+from validate_output import ContractError, validate_review_pack
 from verify_visible_output import verify_visible_output
 
 
@@ -503,6 +503,8 @@ def verify_final_receipt(value: str, *, artifact_root: Path, report_hash: str | 
 
 
 def run_self_test() -> None:
+    from validate_output import valid_project, valid_review_pack
+
     tests = 0
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)

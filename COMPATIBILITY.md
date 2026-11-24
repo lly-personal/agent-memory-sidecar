@@ -2,6 +2,7 @@
 
 | Release lane | Core | Plugin | Bootstrap | Scout | Review Pack | Python |
 |---|---:|---:|---:|---:|---:|---|
+| v0.7.6 | 0.7.6 | 1.12.6 | 2.6.3 | 5.20.3 | v8 | 3.11–3.13 |
 | v0.7.5 | 0.7.5 | 1.12.5 | 2.6.2 | 5.20.2 | v8 | 3.11–3.13 |
 | v0.7.4 | 0.7.4 | 1.12.4 | 2.6.2 | 5.20.2 | v8 | 3.11–3.13 |
 | v0.7.3 | 0.7.3 | 1.12.3 | 2.6.2 | 5.20.2 | v8 | 3.11–3.13 |
@@ -92,6 +93,7 @@ version is not claimed supported until it enters this matrix, even if its instal
 `v0.3.4` is an unpublished Git tag. Its release build stopped before artifact creation, so it is not an installable release lane.
 `v0.3.6` is a protected unpublished Git tag. Its stale draft was withdrawn after a post-tag release-process repair; the tag was
 not moved, and the corrected public lane advances to `v0.3.7`.
+`v0.7.3` is a protected unpublished Git tag (`76abaa7`, ancestor of `v0.7.4`). Its stale unpromoted draft (`455832643`) was archived and withdrawn without modifying the protected tag; the published public lane advanced to `v0.7.4`.
 
 Core 0.5.0 adds whole-document global instruction synchronization for Codex and Pi. Bootstrap 2.3.0 preserves its verified Owner
 snapshot during workstation reconciliation, and Plugin 1.7.0 exposes the shared release-bound Anchor. Scout remains 5.10.0;

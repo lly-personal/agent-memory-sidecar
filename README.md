@@ -24,6 +24,13 @@ the decisions are [ADR 0057](docs/decisions/0057-agent-memory-core-v1.zh.md),
 [ADR 0059](docs/decisions/0059-bounded-behavior-set-evolution.zh.md), and
 [ADR 0074](docs/decisions/0074-public-operations-closure.zh.md).
 
+## Quick navigation by role
+
+- **Daily users (remember, list, edit, revoke)**: start with [docs/user-guide.zh.md](docs/user-guide.zh.md). Normal work stays quiet; explicit authorization deploys directly to `AGENTS.md`.
+- **Workstation setup & upgrades**: follow [docs/sops/workstation-reconcile.zh.md](docs/sops/workstation-reconcile.zh.md) (Codex Desktop) or use `scripts/deploy_multihost.py` to reconcile all four hosts from one verified immutable Release.
+- **Maintainers (release & CI)**: sync component versions and dual Anchor copies (`scripts/sync_release_versions.py`), qualify the merged `main` commit with on-demand `.github/workflows/release-candidate.yml` (full 3×3 matrix), local tagged `scripts/build_release_artifacts.py`, and native Windows Codex `--sandbox read-only` smoke (`scripts/verify_release_sandbox.py`) before pushing the write-once `v*` tag, then promote the CI draft via `scripts/publish_release.py` (`download-draft` / `inspect` / `apply`; contract: [release-promotion-v1](specs/release-promotion-v1.md)) and reconcile all four hosts via `scripts/deploy_multihost.py`.
+- **Four-host capability boundaries (L1 / L2 / L3)**: check [COMPATIBILITY.md](COMPATIBILITY.md) and [ADR 0083](docs/decisions/0083-multihost-capability-ladder.zh.md). L1 global instruction sync and L2 read-only Scout span Codex, Pi, Claude Code, and Antigravity; L3 rule approval and writes remain Codex-only until a host-native unforgeable confirmation ADR passes.
+
 ## Product boundary
 
 - Stable Core: explicit authorization, deterministic scope validation, deploy,
@@ -97,7 +104,7 @@ For normal Codex Desktop use, register the immutable repository Marketplace,
 install the Agent Memory plugin, restart Desktop, and begin a new task:
 
 ```powershell
-codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.7.5
+codex plugin marketplace add lly-personal/agent-memory-sidecar --ref v0.7.6
 codex plugin add agent-memory-sidecar@agent-memory
 ```
 
@@ -117,8 +124,8 @@ Plugin, Pi package and Claude Code Plugin expose that same directory; their inst
 For Pi or local Claude Code, install the tagged source through the host's native manager:
 
 ```sh
-pi install git:github.com/lly-personal/agent-memory-sidecar@v0.7.5
-claude plugin marketplace add https://github.com/lly-personal/agent-memory-sidecar.git#v0.7.5
+pi install git:github.com/lly-personal/agent-memory-sidecar@v0.7.6
+claude plugin marketplace add https://github.com/lly-personal/agent-memory-sidecar.git#v0.7.6
 claude plugin install agent-memory-sidecar@agent-memory --scope user
 ```
 
@@ -201,7 +208,7 @@ For Core-only CLI use, install the wheel from the same Release, then preview and
 apply setup:
 
 ```powershell
-python -m pip install .\agent_memory_sidecar-0.7.5-py3-none-any.whl
+python -m pip install .\agent_memory_sidecar-0.7.6-py3-none-any.whl
 agent-memory --help
 agent-memory setup
 agent-memory setup --apply
@@ -214,7 +221,7 @@ and Doctor remain available; global publication and Scout Owner parity are
 explicitly unavailable. Owner-integrated installations provide a separate clean
 Git checkout and bind it explicitly.
 
-Workstation Bootstrap 2.6.2 accepts `agent_memory_source_manifest_v1`. Release
+Workstation Bootstrap 2.6.3 accepts `agent_memory_source_manifest_v1`. Release
 manifests bind each source to both a ref and a full commit SHA; an optional
 `canonical_owner` is `null` in the public profile. On an existing host that means “the release does not distribute an Owner”, not
 “detach the current Owner”: a clean managed Owner is preserved only when Core is bound to that exact root and commit. Floating branches are a
@@ -332,7 +339,4 @@ tasks can prove rule adoption and post-revoke continuity. Export verification,
 repository visibility, a version tag, a Release, registry publication, and
 engineering-authority cutover remain separately verified facts.
 
-Release CI intentionally stops at a complete draft. Maintainers promote it only through
-[`release-promotion-v1`](specs/release-promotion-v1.md), whose read-only inspect binds the exact commit and asset set to a
-`plan_hash`; apply consumes that hash and accepts success only after Release/per-asset attestation verification and immutable
-readback.
+Release CI intentionally stops at a complete draft. Routine PRs merge to `main` under `Unreleased` (tiered PR gate `core-gate` + `analyze`; full 3×3 matrix via on-demand `release-candidate.yml`). Before allocating a write-once `v*` tag, maintainers run `scripts/sync_release_versions.py --check` and `scripts/verify_release_sandbox.py` on the selected clean commit, then promote the CI draft through [`release-promotion-v1`](specs/release-promotion-v1.md) (`scripts/publish_release.py download-draft` / `inspect` / `apply`), whose read-only inspect binds the exact commit and asset set to a `plan_hash` and whose apply accepts success only after Release/per-asset attestation verification and immutable readback.
