@@ -3,6 +3,11 @@
 All notable user-visible changes are recorded here. This project uses semantic versions for Core; Plugin, Bootstrap, and Scout keep
 their own component versions in `COMPATIBILITY.md`.
 
+## 0.7.5 (2026-11-24)
+
+- Defer `tempfile.gettempdir()` resolution in `InstructionRepository.lock_root` to write-time (`lock_paths()`) instead of `__init__`, fixing `FileNotFoundError: No usable temporary directory found` when running `agent-memory rule list` inside a strictly read-only sandbox (such as Codex Windows `-s read-only`) where no temporary directory is writable (`instructions.py`, `tests/test_cli_and_package.py`).
+- Components: Core 0.7.5, Plugin 1.12.5, Bootstrap 2.6.2, and Scout 5.20.2.
+
 ## 0.7.4 (2026-11-24)
 
 - Add strict read-only Store connection mode (`CoreDatabase(..., read_only=True)`) using SQLite URI `?mode=ro`, `PRAGMA query_only = ON`, and read-only identity checks (`validate_store_identity` with no `chmod`/`SetFileSecurityW` mutation), rejecting write transactions (`store_read_only`) and translating OS `PermissionError` into structured `store_permission_denied` instead of `internal_error` (`database.py`, `file_security.py`).

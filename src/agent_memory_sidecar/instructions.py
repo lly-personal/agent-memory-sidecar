@@ -102,12 +102,20 @@ class InstructionRepository:
             if codex_home is not None
             else configured or Path.home() / ".codex"
         ).expanduser().absolute()
-        self.lock_root = Path(
-            lock_root
+        self._lock_root: Path | None = (
+            Path(lock_root).expanduser().resolve(strict=False)
             if lock_root is not None
-            else Path(tempfile.gettempdir())
-            / "agent-memory-sidecar-instruction-locks"
-        ).expanduser().resolve(strict=False)
+            else None
+        )
+
+    @property
+    def lock_root(self) -> Path:
+        if self._lock_root is None:
+            self._lock_root = (
+                Path(tempfile.gettempdir())
+                / "agent-memory-sidecar-instruction-locks"
+            ).expanduser().resolve(strict=False)
+        return self._lock_root
 
     def target_path(
         self,
