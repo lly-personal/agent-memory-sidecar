@@ -35,7 +35,7 @@ capability gate. The operator must label which channel supplied each claim.
 
 `scripts/publish_release.py inspect` is read-only and returns `agent_memory_release_promotion_plan_v1`. It requires:
 
-- a clean public checkout whose `HEAD`, annotated local tag, remote `main`, and peeled remote tag all equal one supplied full commit;
+- a clean public checkout whose `HEAD`, annotated local tag, and peeled remote tag all equal one supplied full commit, and whose remote `main` equals that commit (or, only when the maintainer explicitly opts into `--allow-ancestor-main`, contains that commit as a verified `git merge-base --is-ancestor` ancestor on protected `main`);
 - a versioned Changelog section with no stale `unreleased` copy;
 - a local release directory whose regular files, `SHA256SUMS`, release manifest, source repository/ref/commit, sizes, and digests agree;
 - an existing stable draft with the exact same uploaded asset set and GitHub SHA-256 digests; and

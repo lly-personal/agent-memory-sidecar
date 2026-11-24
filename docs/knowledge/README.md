@@ -2,7 +2,7 @@
 
 - Status: active
 - Owner layer: project_docs
-- Last verified: 2026-11-02
+- Last verified: 2026-11-24
 
 ## Current authority route
 
@@ -27,8 +27,9 @@ Root [`domain.md`](../../domain.md) owns shared vocabulary. Root `specs/` owns d
 ## Current operational route
 
 - [User guide](../user-guide.zh.md)
-- [Operator reference](../operator-reference.zh.md)
-- [Codex Desktop setup](../codex-desktop-setup.md)
+- [Workstation reconcile SOP](../sops/workstation-reconcile.zh.md)
+- [Repository README & maintainer release routes](../../README.md)
+- [Codex Desktop setup](../codex-desktop-setup.md) (early setup snapshot reference)
 
 Desktop installs exactly two Sidecar Hook entries: `UserPromptSubmit` and
 `SessionStart` with matcher `^compact$`. Both execute a content-addressed

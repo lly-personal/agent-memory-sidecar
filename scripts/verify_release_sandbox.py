@@ -50,12 +50,14 @@ def _default_run(
     *,
     cwd: Path | None = None,
     input_text: str | None = None,
+    env: dict[str, str] | None = None,
     timeout: int = 120,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
         cwd=str(cwd) if cwd else None,
         input=input_text,
+        env=env,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -64,25 +66,57 @@ def _default_run(
     )
 
 
-def _extract_json_object(text: str) -> dict[str, Any]:
-    raw = text.strip()
-    try:
-        parsed = json.loads(raw)
-        if isinstance(parsed, dict):
-            return parsed
-    except json.JSONDecodeError:
-        pass
-    decoder = json.JSONDecoder()
-    for index, ch in enumerate(raw):
-        if ch != "{":
+def _extract_verified_command_execution(ndjson_text: str, candidate_entry: Path) -> dict[str, Any]:
+    """Verify actual Codex --json command_execution output; never trust assistant prose."""
+    entry_norm = re.sub(r"[\\/]+", "/", str(candidate_entry)).casefold()
+    matched_events: list[dict[str, Any]] = []
+    for raw_line in ndjson_text.splitlines():
+        line = raw_line.strip()
+        if not line.startswith("{"):
             continue
         try:
-            obj, _ = decoder.raw_decode(raw, index)
+            event = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if isinstance(obj, dict) and ("rc" in obj or "candidate_rc" in obj):
-            return obj
-    raise SandboxGateError("sandbox_gate_unparseable_codex_output")
+        if not isinstance(event, dict) or event.get("type") != "item.completed":
+            continue
+        item = event.get("item")
+        if not isinstance(item, dict) or item.get("type") != "command_execution":
+            continue
+        command_str = str(item.get("command") or "")
+        command_norm = re.sub(r"[\\/]+", "/", command_str).casefold()
+        if entry_norm in command_norm and "rule list" in command_norm:
+            matched_events.append(item)
+
+    _require(bool(matched_events), "sandbox_gate_command_not_executed")
+    item = matched_events[-1]
+    _require(item.get("status") == "completed", "sandbox_gate_command_not_completed")
+    _require(item.get("exit_code") == 0, "sandbox_gate_candidate_nonzero_exit")
+
+    output = str(item.get("aggregated_output") or "").strip()
+    try:
+        envelope = json.loads(output)
+    except json.JSONDecodeError as exc:
+        raise SandboxGateError("sandbox_gate_unparseable_command_output") from exc
+
+    _require(isinstance(envelope, dict), "sandbox_gate_unparseable_command_output")
+    _require(envelope.get("contract_version") == "agent_memory_result_v1", "sandbox_gate_contract_mismatch")
+    _require(envelope.get("operation") == "rule.list", "sandbox_gate_operation_mismatch")
+    _require(envelope.get("status") == "ok", "sandbox_gate_candidate_status_not_ok")
+    data = envelope.get("data")
+    _require(isinstance(data, dict) and isinstance(data.get("rules"), list), "sandbox_gate_rules_count_invalid")
+    pending_count = data.get("pending_count")
+    pending_status = data.get("pending_status")
+    if pending_count is None:
+        _require(pending_status == "store_access_restricted", "sandbox_gate_unexpected_null_pending_status")
+    return {
+        "candidate_rc": 0,
+        "status": envelope["status"],
+        "rules_count": len(data["rules"]),
+        "pending_count": pending_count,
+        "pending_status": pending_status,
+        "verified_via": "codex_exec_json_command_execution",
+    }
 
 
 def verify_candidate_in_codex_sandbox(
@@ -169,25 +203,22 @@ def verify_candidate_in_codex_sandbox(
         skill_sha256 = _tree_sha256(skill_dir)
 
         prompt = (
-            "Execute this single read-only shell command and reply with ONLY one JSON object having keys "
-            "candidate_rc, status, rules_count, pending_count, pending_status, stderr_tail: "
+            "Execute this single read-only shell command verbatim and reply `done`: "
             f'python -B -S "{candidate_entry}" rule list'
         )
+        probe_env = None
+        if codex_home is not None:
+            probe_env = dict(os.environ)
+            probe_env["CODEX_HOME"] = str(active_codex_home)
+        probe_kwargs: dict[str, Any] = {"input_text": prompt, "timeout": 120}
+        if probe_env is not None:
+            probe_kwargs["env"] = probe_env
         probe = runner(
-            [str(codex_exe), "exec", "-s", "read-only", "--skip-git-repo-check", "-C", str(root), "-"],
-            input_text=prompt,
-            timeout=120,
+            [str(codex_exe), "exec", "--json", "-s", "read-only", "--skip-git-repo-check", "-C", str(root), "-"],
+            **probe_kwargs,
         )
         _require(probe.returncode == 0, "sandbox_gate_codex_exec_failed")
-        observed = _extract_json_object(probe.stdout)
-        _require(observed.get("candidate_rc") == 0, "sandbox_gate_candidate_nonzero_exit")
-        _require(observed.get("status") == "ok", "sandbox_gate_candidate_status_not_ok")
-        _require(isinstance(observed.get("rules_count"), int), "sandbox_gate_rules_count_invalid")
-        if observed.get("pending_count") is None:
-            _require(
-                observed.get("pending_status") == "store_access_restricted",
-                "sandbox_gate_unexpected_null_pending_status",
-            )
+        observed = _extract_verified_command_execution(probe.stdout, candidate_entry)
 
         after_global = _sha256_file(global_agents) if global_agents.is_file() else None
         after_project = _sha256_file(project_agents) if project_agents.is_file() else None
@@ -203,13 +234,7 @@ def verify_candidate_in_codex_sandbox(
             "wheel_name": wheel.name,
             "wheel_sha256": wheel_sha256,
             "skill_sha256": skill_sha256,
-            "observed": {
-                "candidate_rc": observed["candidate_rc"],
-                "status": observed["status"],
-                "rules_count": observed["rules_count"],
-                "pending_count": observed.get("pending_count"),
-                "pending_status": observed.get("pending_status"),
-            },
+            "observed": observed,
             "protected_targets_unchanged": True,
         }
     finally:

@@ -220,25 +220,45 @@ def download_draft_assets(
     repository = _normalize_repository(repository)
     require(TAG.fullmatch(tag) is not None, "promotion_tag_invalid")
     require(not output_dir.exists() and not output_dir.is_symlink(), "promotion_download_output_exists")
+    state = _release_state(repository=repository, tag=tag, root=root, runner=runner)
+    require(state.get("isDraft") is True, "promotion_release_not_draft")
     output_dir.mkdir(parents=True, exist_ok=False)
+    out_resolved = output_dir.resolve()
     try:
         runner(["gh", "release", "download", tag, "--repo", repository, "--dir", str(output_dir)], root)
         sums_path = output_dir / "SHA256SUMS"
         require(sums_path.is_file() and not _is_alias(sums_path), "promotion_release_metadata_missing")
+        planned_moves: list[tuple[Path, Path]] = []
         for raw in sums_path.read_text(encoding="utf-8").splitlines():
-            match = re.fullmatch(r"[0-9a-f]{64}  (.+)", raw)
+            match = re.fullmatch(r"([0-9a-f]{64})  (.+)", raw)
             require(match is not None, "promotion_checksums_invalid")
-            parsed = PurePosixPath(match.group(1))
+            expected_sha, rel_raw = match.group(1), match.group(2)
+            require("\\" not in rel_raw and ":" not in rel_raw, "promotion_checksums_invalid")
+            parsed = PurePosixPath(rel_raw)
             require(
                 not parsed.is_absolute() and all(part not in {"", ".", ".."} for part in parsed.parts),
                 "promotion_checksums_invalid",
             )
-            if len(parsed.parts) > 1:
-                flat_src = output_dir / parsed.name
-                nested_dst = output_dir / Path(*parsed.parts)
-                if flat_src.is_file() and not nested_dst.exists():
-                    nested_dst.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(flat_src), str(nested_dst))
+            flat_src = output_dir / parsed.name
+            nested_dst = output_dir / Path(*parsed.parts)
+            source_file = nested_dst if nested_dst.is_file() else flat_src
+            require(source_file.is_file() and not _is_alias(source_file), "promotion_asset_missing")
+            require(source_file.resolve().is_relative_to(out_resolved), "promotion_path_escape")
+            # Verify SHA-256 digest BEFORE any directory creation or file relocation.
+            require(digest(source_file) == expected_sha, "promotion_checksum_mismatch")
+            if len(parsed.parts) > 1 and source_file == flat_src and not nested_dst.exists():
+                planned_moves.append((flat_src, nested_dst))
+
+        for flat_src, nested_dst in planned_moves:
+            cursor = output_dir
+            for part in nested_dst.relative_to(output_dir).parts[:-1]:
+                cursor = cursor / part
+                if cursor.exists():
+                    require(cursor.is_dir() and not _is_alias(cursor), "promotion_path_escape")
+                else:
+                    cursor.mkdir(exist_ok=False)
+            require(nested_dst.parent.resolve().is_relative_to(out_resolved), "promotion_path_escape")
+            shutil.move(str(flat_src), str(nested_dst))
         assets, _ = _release_files(output_dir)
     except Exception:
         if output_dir.exists():
