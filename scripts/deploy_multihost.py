@@ -48,12 +48,27 @@ def _is_alias(path: Path) -> bool:
     )
 
 
+def _is_trusted_posix_root_alias(path: Path, st: os.stat_result, *, platform: str | None = None) -> bool:
+    """Mirror file_security._is_trusted_host_directory_alias (e.g. macOS /var -> /private/var)."""
+    effective_platform = os.name if platform is None else platform
+    return bool(
+        effective_platform == "posix"
+        and stat.S_ISLNK(st.st_mode)
+        and getattr(st, "st_uid", -1) == 0
+        and path.parent == Path(path.anchor)
+    )
+
+
 def _assert_physical_dir(path: Path, *, label: str) -> None:
     _require(path.exists() and path.is_dir() and not _is_alias(path), f"{label}_dir_unsafe")
     for parent in path.parents:
-        if parent == path.anchor or str(parent) == parent.anchor:
+        if parent == Path(parent.anchor) or str(parent) == parent.anchor:
             break
-        if _is_alias(parent):
+        try:
+            st = parent.lstat()
+        except OSError as exc:
+            raise MultiHostDeployError(f"{label}_ancestor_stat_failed") from exc
+        if _is_alias(parent) and not _is_trusted_posix_root_alias(parent, st):
             raise MultiHostDeployError(f"{label}_ancestor_alias_forbidden")
 
 

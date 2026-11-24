@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 
@@ -361,6 +362,14 @@ class DeployMultiHostTests(unittest.TestCase):
                 resolved_dir=resolved_dir,
             )
             self.assertEqual("noop", noop["hosts"]["antigravity"]["status"])
+
+    def test_trusted_posix_root_alias_accepts_only_root_owned_top_level_symlink(self) -> None:
+        root_link = types.SimpleNamespace(st_mode=0o120777, st_uid=0)
+        user_link = types.SimpleNamespace(st_mode=0o120777, st_uid=501)
+        self.assertTrue(self.deploy._is_trusted_posix_root_alias(Path("/var"), root_link, platform="posix"))
+        self.assertFalse(self.deploy._is_trusted_posix_root_alias(Path("/var/tmp"), root_link, platform="posix"))
+        self.assertFalse(self.deploy._is_trusted_posix_root_alias(Path("/var"), user_link, platform="posix"))
+        self.assertFalse(self.deploy._is_trusted_posix_root_alias(Path("/var"), root_link, platform="nt"))
 
     def test_codex_confirmation_guard_and_pi_dirty_checkout_preservation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
